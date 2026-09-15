@@ -7,6 +7,7 @@ import '../data/repositories/favorites_repository.dart';
 import '../data/repositories/settings_repository.dart';
 import '../data/services/audio_player_service.dart';
 import '../data/services/dab_usb_service.dart';
+import '../data/services/radio_audio_handler.dart';
 import '../data/services/radio_browser_api_service.dart';
 
 final databaseProvider = Provider<AppDatabase>((ref) {
@@ -39,6 +40,14 @@ final audioPlayerServiceProvider = Provider<AudioPlayerService>((ref) {
   final service = AudioPlayerService();
   ref.onDispose(service.dispose);
   return service;
+});
+
+/// Must be overridden with the instance `AudioService.init` returns in
+/// `main()` - it needs to exist before `runApp` so Android's MediaSession is
+/// registered from app startup, not created lazily on first read like a
+/// normal provider.
+final radioAudioHandlerProvider = Provider<RadioAudioHandler>((ref) {
+  throw UnimplementedError('radioAudioHandlerProvider must be overridden in main()');
 });
 
 final dabUsbServiceProvider = Provider<DabUsbService>((ref) {

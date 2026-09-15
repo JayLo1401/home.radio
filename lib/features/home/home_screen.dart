@@ -21,6 +21,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   PlayerState? _playerState;
   String? _icyTitle;
   String? _playbackError;
+  String? _dabStatusText;
+  bool _dabTuned = false;
   bool _dabDeviceOpen = false;
 
   @override
@@ -99,13 +101,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Future<void> _play(FavoriteChannel channel) async {
-    setState(() => _playbackError = null);
+    setState(() {
+      _playbackError = null;
+      _icyTitle = null;
+      _dabStatusText = null;
+      _dabTuned = false;
+    });
     ref.read(currentProgramNumberProvider.notifier).set(channel.programNumber);
     ref.read(settingsRepositoryProvider).setLastProgramNumber(channel.programNumber);
 
     final url = channel.internetStreamUrl;
     if (url != null) {
       await ref.read(audioPlayerServiceProvider).stop();
+      ref.read(radioAudioHandlerProvider).setChannel(channel, playing: true);
       await ref.read(audioPlayerServiceProvider).playStream(url);
       return;
     }
@@ -113,26 +121,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final freqKhz = channel.dabFreqKhz;
     if (freqKhz == null) return;
     if (!_dabDeviceOpen) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('DAB+-Adapter ist noch nicht bereit (Berechtigung/USB prüfen).')),
-      );
+      setState(() => _dabStatusText = 'DAB+-Adapter ist noch nicht bereit (Berechtigung/USB prüfen).');
       return;
     }
     // Only RF tuning + lock is implemented so far - actual DAB+ audio needs
     // MSC subchannel demuxing + AAC decoding, not done yet (see the DAB+
     // phase of the project plan). This still lets the tune itself be
-    // verified end-to-end even without audio output.
+    // verified end-to-end even without audio output, and it's already
+    // reported as "playing" to the MediaSession (Home Assistant/TV
+    // launcher) since RF lock is the closest equivalent state available.
     final ok = await ref.read(dabUsbServiceProvider).dabTuneFrequency(freqKhz);
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          ok
-              ? 'Auf "${channel.displayName}" getunt ($freqKhz kHz). DAB+-Audiowiedergabe ist noch nicht implementiert.'
-              : 'Tuning auf "${channel.displayName}" fehlgeschlagen.',
-        ),
-      ),
-    );
+    if (ok) {
+      ref.read(radioAudioHandlerProvider).setChannel(channel, playing: true);
+      setState(() {
+        _dabTuned = true;
+        _dabStatusText = 'Getunt – DAB+-Audiowiedergabe ist noch nicht implementiert.';
+      });
+    } else {
+      setState(() => _dabStatusText = 'Tuning auf "${channel.displayName}" fehlgeschlagen.');
+    }
   }
 
   @override
@@ -143,11 +151,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ? null
         : favorites.where((c) => c.programNumber == currentProgram).firstOrNull;
 
-    final isPlaying = _playerState?.playing ?? false;
-    final isBuffering = _playerState?.processingState == ProcessingState.buffering ||
-        _playerState?.processingState == ProcessingState.loading;
-    final subtitle = _icyTitle;
-    final errorMessage = _playbackError;
+    final isDab = currentChannel?.sourceType == FavoriteSourceType.dab;
+    final isPlaying = isDab ? _dabTuned : (_playerState?.playing ?? false);
+    final isBuffering = !isDab &&
+        (_playerState?.processingState == ProcessingState.buffering ||
+            _playerState?.processingState == ProcessingState.loading);
+    final subtitle = isDab ? _dabStatusText : _icyTitle;
+    final errorMessage = isDab ? null : _playbackError;
 
     return Scaffold(
       body: Stack(

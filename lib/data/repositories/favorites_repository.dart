@@ -72,6 +72,9 @@ class FavoritesRepository {
 
   Future<void> remove(int programNumber) => _db.removeFavorite(programNumber);
 
+  Future<void> updateLogoUrl(int programNumber, String logoUrl) =>
+      _db.updateFavoriteLogoUrl(programNumber, logoUrl);
+
   /// Removes the DAB favorite (if any) pointing at this exact station, by
   /// frequency + service id (there's no other stable key across scans).
   Future<void> removeDabFavoriteFor(int freqKhz, int serviceId) async {

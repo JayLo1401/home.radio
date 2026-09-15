@@ -87,6 +87,11 @@ class AppDatabase extends _$AppDatabase {
     return (delete(favorites)..where((f) => f.programNumber.equals(programNumber))).go();
   }
 
+  Future<void> updateFavoriteLogoUrl(int programNumber, String logoUrl) {
+    return (update(favorites)..where((f) => f.programNumber.equals(programNumber)))
+        .write(FavoritesCompanion(logoUrl: Value(logoUrl)));
+  }
+
   Future<String?> getSetting(String key) async {
     final row = await (select(settings)..where((s) => s.key.equals(key)))
         .getSingleOrNull();

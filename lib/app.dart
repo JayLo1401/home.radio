@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/providers.dart';
 import 'core/theme.dart';
-import 'features/home/home_screen.dart';
+import 'features/splash/splash_screen.dart';
 
 class HomeRadioApp extends ConsumerWidget {
   const HomeRadioApp({super.key});
@@ -16,7 +16,7 @@ class HomeRadioApp extends ConsumerWidget {
       debugShowCheckedModeBanner: false,
       theme: buildTvTheme(),
       builder: (context, child) => _UiScaleWrapper(scale: uiScale, child: child!),
-      home: const HomeScreen(),
+      home: const SplashScreen(),
     );
   }
 }

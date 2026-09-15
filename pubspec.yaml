@@ -47,6 +47,7 @@ dependencies:
   collection: ^1.19.1
   uuid: ^4.6.0
   audio_session: ^0.2.4
+  audio_service: ^0.18.19
 
 dev_dependencies:
   flutter_test:

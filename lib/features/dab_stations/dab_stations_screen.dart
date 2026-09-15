@@ -209,21 +209,59 @@ class _DeviceCard extends StatelessWidget {
   }
 }
 
+/// Best-effort logo lookup: DAB+ itself doesn't reliably deliver a fixed
+/// station logo (per the user - some players end up showing whatever
+/// slideshow image happened to be running instead of a real logo, since DAB+
+/// slideshow/MOT decoding isn't implemented here anyway - see the project
+/// plan), so instead this matches the station name against Radio-Browser's
+/// catalog (the same source used for internet-radio favicons) and takes the
+/// first hit's favicon, if any. Never throws - a missing/failed lookup just
+/// means no logo, not a broken favorite.
+Future<String?> _findLogoUrl(WidgetRef ref, String stationName) async {
+  try {
+    final results = await ref.read(radioBrowserApiServiceProvider).search(name: stationName, limit: 5);
+    return results.where((s) => s.favicon != null && s.favicon!.isNotEmpty).firstOrNull?.favicon;
+  } catch (_) {
+    return null;
+  }
+}
+
 class _FavoriteRow extends ConsumerWidget {
   final FavoriteChannel channel;
   const _FavoriteRow({required this.channel});
+
+  Future<void> _findLogo(WidgetRef ref) async {
+    final logoUrl = await _findLogoUrl(ref, channel.displayName);
+    if (logoUrl != null) {
+      await ref.read(favoritesRepositoryProvider).updateLogoUrl(channel.programNumber, logoUrl);
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return ListTile(
       contentPadding: EdgeInsets.zero,
-      leading: CircleAvatar(child: Text('${channel.programNumber}')),
+      leading: CircleAvatar(
+        backgroundImage: channel.logoUrl != null ? NetworkImage(channel.logoUrl!) : null,
+        child: channel.logoUrl == null ? Text('${channel.programNumber}') : null,
+      ),
       title: Text(channel.displayName),
       subtitle: Text('${channel.dabFreqKhz} kHz'),
-      trailing: IconButton(
-        icon: const Icon(Icons.star, color: Colors.amber),
-        tooltip: 'Favorit entfernen',
-        onPressed: () => ref.read(favoritesRepositoryProvider).remove(channel.programNumber),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (channel.logoUrl == null)
+            IconButton(
+              icon: const Icon(Icons.image_search),
+              tooltip: 'Logo suchen',
+              onPressed: () => _findLogo(ref),
+            ),
+          IconButton(
+            icon: const Icon(Icons.star, color: Colors.amber),
+            tooltip: 'Favorit entfernen',
+            onPressed: () => ref.read(favoritesRepositoryProvider).remove(channel.programNumber),
+          ),
+        ],
       ),
     );
   }
@@ -243,11 +281,13 @@ class _StationRow extends ConsumerWidget {
       builder: (context) => ProgramNumberDialog(initial: suggested),
     );
     if (programNumber == null) return;
+    final logoUrl = await _findLogoUrl(ref, station.stationLabel);
     await repo.addDabService(
       programNumber: programNumber,
       displayName: station.stationLabel,
       freqKhz: station.freqKhz,
       serviceId: station.serviceId,
+      logoUrl: logoUrl,
     );
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
