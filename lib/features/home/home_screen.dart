@@ -24,6 +24,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   String? _dabStatusText;
   bool _dabTuned = false;
   bool _dabDeviceOpen = false;
+  FavoriteChannel? _pendingDabChannel;
 
   @override
   void initState() {
@@ -74,11 +75,49 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     await ref.read(dabUsbServiceProvider).openDevice(device.deviceName);
     if (!mounted) return;
     _dabDeviceOpen = true;
-    // If the app already tried (and failed, since the adapter wasn't open
-    // yet) to autostart into a DAB+ favorite, retry now that it's ready.
+    // Whatever the user was actually trying to switch to (see
+    // _ensureDabAdapterReady) takes priority over autostart.
+    final pending = _pendingDabChannel;
+    _pendingDabChannel = null;
+    if (pending != null) {
+      await _play(pending);
+      return;
+    }
+    // Otherwise, if the app already tried (and failed, since the adapter
+    // wasn't open yet) to autostart into a DAB+ favorite, retry now.
     final current = ref.read(currentProgramNumberProvider);
     if (current != null) return; // something already playing/tuned
     await _autostart();
+  }
+
+  /// Called when the user picks a DAB+ favorite but the adapter isn't open
+  /// yet - (re-)requests USB permission if needed and opens the adapter, so
+  /// switching to a DAB+ station always tries to get ready rather than just
+  /// reporting "not ready" once and giving up. [channel] is retried
+  /// automatically via [_onDabPermissionGranted] once permission/opening
+  /// succeeds.
+  Future<void> _ensureDabAdapterReady(FavoriteChannel channel) async {
+    _pendingDabChannel = channel;
+    final dab = ref.read(dabUsbServiceProvider);
+    final devices = await dab.listDevices();
+    if (devices.isEmpty) {
+      if (mounted) setState(() => _dabStatusText = 'Kein DAB+-USB-Adapter angeschlossen.');
+      return;
+    }
+    final permitted = devices.where((d) => d.hasPermission).firstOrNull;
+    if (permitted != null) {
+      await dab.openDevice(permitted.deviceName);
+      if (!mounted) return;
+      _dabDeviceOpen = true;
+      final pending = _pendingDabChannel;
+      _pendingDabChannel = null;
+      if (pending != null) await _play(pending);
+      return;
+    }
+    // No permission yet - (re-)request it. The permissionEvents listener
+    // opens the device and retries _pendingDabChannel once answered.
+    if (mounted) setState(() => _dabStatusText = 'Warte auf USB-Berechtigung für den DAB+-Adapter…');
+    await dab.autoRequestPermissionForAdapter();
   }
 
   Future<void> _autostart() async {
@@ -100,6 +139,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (mounted) _play(channel);
   }
 
+  /// Mirrors the channel into the Android MediaSession (see
+  /// radioAudioHandlerProvider) - best-effort: the handler initializes
+  /// lazily (not blocking app startup on it, see that provider's doc
+  /// comment), so this silently does nothing if it isn't ready yet or fails,
+  /// rather than holding up actual playback for it.
+  void _setNowPlaying(FavoriteChannel channel, {required bool playing}) {
+    ref.read(radioAudioHandlerProvider.future).then(
+          (handler) => handler.setChannel(channel, playing: playing),
+          onError: (_) {},
+        );
+  }
+
   Future<void> _play(FavoriteChannel channel) async {
     setState(() {
       _playbackError = null;
@@ -113,7 +164,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final url = channel.internetStreamUrl;
     if (url != null) {
       await ref.read(audioPlayerServiceProvider).stop();
-      ref.read(radioAudioHandlerProvider).setChannel(channel, playing: true);
+      _setNowPlaying(channel, playing: true);
       await ref.read(audioPlayerServiceProvider).playStream(url);
       return;
     }
@@ -121,7 +172,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final freqKhz = channel.dabFreqKhz;
     if (freqKhz == null) return;
     if (!_dabDeviceOpen) {
-      setState(() => _dabStatusText = 'DAB+-Adapter ist noch nicht bereit (Berechtigung/USB prüfen).');
+      await _ensureDabAdapterReady(channel);
       return;
     }
     // Only RF tuning + lock is implemented so far - actual DAB+ audio needs
@@ -133,7 +184,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final ok = await ref.read(dabUsbServiceProvider).dabTuneFrequency(freqKhz);
     if (!mounted) return;
     if (ok) {
-      ref.read(radioAudioHandlerProvider).setChannel(channel, playing: true);
+      _setNowPlaying(channel, playing: true);
       setState(() {
         _dabTuned = true;
         _dabStatusText = 'Getunt – DAB+-Audiowiedergabe ist noch nicht implementiert.';

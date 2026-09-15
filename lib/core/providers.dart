@@ -1,3 +1,4 @@
+import 'package:audio_service/audio_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/db/database.dart';
@@ -42,12 +43,21 @@ final audioPlayerServiceProvider = Provider<AudioPlayerService>((ref) {
   return service;
 });
 
-/// Must be overridden with the instance `AudioService.init` returns in
-/// `main()` - it needs to exist before `runApp` so Android's MediaSession is
-/// registered from app startup, not created lazily on first read like a
-/// normal provider.
-final radioAudioHandlerProvider = Provider<RadioAudioHandler>((ref) {
-  throw UnimplementedError('radioAudioHandlerProvider must be overridden in main()');
+/// Lazily calls `AudioService.init` on first read rather than blocking
+/// `runApp` in `main()` on it - registering the Android MediaSession/
+/// notification involves starting a foreground service, which is slow
+/// enough on this TV to noticeably delay the very first Flutter frame (and
+/// therefore how long the native launch screen stays up) if awaited first.
+final radioAudioHandlerProvider = FutureProvider<RadioAudioHandler>((ref) async {
+  final player = ref.watch(audioPlayerServiceProvider);
+  return AudioService.init(
+    builder: () => RadioAudioHandler(player),
+    config: AudioServiceConfig(
+      androidNotificationChannelId: 'org.lotzapp.home_radio.audio',
+      androidNotificationChannelName: 'Home Radio Wiedergabe',
+      androidNotificationOngoing: true,
+    ),
+  );
 });
 
 final dabUsbServiceProvider = Provider<DabUsbService>((ref) {

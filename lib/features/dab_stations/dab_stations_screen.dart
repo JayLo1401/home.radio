@@ -217,10 +217,26 @@ class _DeviceCard extends StatelessWidget {
 /// catalog (the same source used for internet-radio favicons) and takes the
 /// first hit's favicon, if any. Never throws - a missing/failed lookup just
 /// means no logo, not a broken favorite.
+/// DAB+ station labels often carry decorative padding ("*GRUEN-WEISS*",
+/// stray pipes/dashes used as visual borders in the original 16-char FIG 1/1
+/// label) that a plain Radio-Browser name search won't match at all -
+/// strip everything but letters/digits/spaces first, and if that finds
+/// nothing, retry with just the first word (station names are frequently
+/// "Name slogan/suffix").
 Future<String?> _findLogoUrl(WidgetRef ref, String stationName) async {
+  final cleaned = stationName.replaceAll(RegExp(r'[^\w\säöüÄÖÜß]'), ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
+  if (cleaned.isEmpty) return null;
+  final api = ref.read(radioBrowserApiServiceProvider);
   try {
-    final results = await ref.read(radioBrowserApiServiceProvider).search(name: stationName, limit: 5);
-    return results.where((s) => s.favicon != null && s.favicon!.isNotEmpty).firstOrNull?.favicon;
+    final results = await api.search(name: cleaned, limit: 5);
+    final hit = results.where((s) => s.favicon != null && s.favicon!.isNotEmpty).firstOrNull;
+    if (hit != null) return hit.favicon;
+    final firstWord = cleaned.split(' ').first;
+    if (firstWord.length >= 3 && firstWord != cleaned) {
+      final broader = await api.search(name: firstWord, limit: 5);
+      return broader.where((s) => s.favicon != null && s.favicon!.isNotEmpty).firstOrNull?.favicon;
+    }
+    return null;
   } catch (_) {
     return null;
   }
@@ -230,10 +246,21 @@ class _FavoriteRow extends ConsumerWidget {
   final FavoriteChannel channel;
   const _FavoriteRow({required this.channel});
 
-  Future<void> _findLogo(WidgetRef ref) async {
+  Future<void> _findLogo(BuildContext context, WidgetRef ref) async {
     final logoUrl = await _findLogoUrl(ref, channel.displayName);
     if (logoUrl != null) {
       await ref.read(favoritesRepositoryProvider).updateLogoUrl(channel.programNumber, logoUrl);
+    }
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            logoUrl != null
+                ? 'Logo für "${channel.displayName}" gefunden.'
+                : 'Kein passendes Logo für "${channel.displayName}" gefunden.',
+          ),
+        ),
+      );
     }
   }
 
@@ -254,7 +281,7 @@ class _FavoriteRow extends ConsumerWidget {
             IconButton(
               icon: const Icon(Icons.image_search),
               tooltip: 'Logo suchen',
-              onPressed: () => _findLogo(ref),
+              onPressed: () => _findLogo(context, ref),
             ),
           IconButton(
             icon: const Icon(Icons.star, color: Colors.amber),
