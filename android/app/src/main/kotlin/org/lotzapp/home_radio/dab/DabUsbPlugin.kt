@@ -63,6 +63,15 @@ class DabUsbPlugin :
     // condition artifact, not real device responses.
     private val diagnosticsRunning = java.util.concurrent.atomic.AtomicBoolean(false)
 
+    // DAB+ playback: a long-lived thread (tune -> resolve subchannel via FIC
+    // -> open it -> continuously read/decode/play), independent of the
+    // one-shot diagnostics above (guarded by diagnosticsRunning too, so a
+    // scan/probe can't run concurrently with playback on the same USB
+    // connection).
+    private val playbackRunning = java.util.concurrent.atomic.AtomicBoolean(false)
+    private var playbackThread: Thread? = null
+    private var audioPlayer: DabAudioPlayer? = null
+
     private var pendingPermissionResult: MethodChannel.Result? = null
     private var pendingPermissionDeviceName: String? = null
 
@@ -233,6 +242,16 @@ class DabUsbPlugin :
                         false
                     }
                 }
+            }
+            "dabPlayService" -> {
+                val freqKhz = call.argument<Int>("freqKhz") ?: 0
+                val serviceId = call.argument<Int>("serviceId") ?: 0
+                startDabPlayback(freqKhz, serviceId)
+                result.success(null)
+            }
+            "dabStopPlayback" -> {
+                stopDabPlayback()
+                result.success(null)
             }
             "dabGetStatus" -> {
                 runOnDabThread(result) { driver ->
@@ -493,6 +512,171 @@ class DabUsbPlugin :
         Log.i(tag, "======== SINGLE CHANNEL TEST END ========")
     }
 
+    /**
+     * Starts DAB+ playback of one station: tunes to [freqKhz], waits for
+     * OFDM+FEC lock, resolves [serviceId]'s audio SubChId + per-CIF byte
+     * size from FIC (FIG 0/1 + 0/2 - see FigParser), opens that subchannel,
+     * then continuously reads/reframes/decodes/plays its MSC bytes until
+     * [stopDabPlayback] is called. Emits `playbackStatus` events
+     * (`tuning`/`resolvingSubchannel`/`playing`/`error`/`busy`) so the Dart
+     * side can show real status instead of just "tuned".
+     */
+    private fun startDabPlayback(freqKhz: Int, serviceId: Int) {
+        stopDabPlayback()
+        if (!diagnosticsRunning.compareAndSet(false, true)) {
+            Log.w("DabProbe", "startDabPlayback: another DAB operation is already running")
+            emit(mapOf("type" to "playbackStatus", "status" to "busy"))
+            return
+        }
+        playbackRunning.set(true)
+        playbackThread = Thread {
+            try {
+                runDabPlayback(freqKhz, serviceId)
+            } finally {
+                diagnosticsRunning.set(false)
+            }
+        }.apply { start() }
+    }
+
+    private fun stopDabPlayback() {
+        playbackRunning.set(false)
+        playbackThread?.interrupt()
+        playbackThread = null
+        audioPlayer?.stop()
+        audioPlayer = null
+    }
+
+    private fun runDabPlayback(freqKhz: Int, serviceId: Int) {
+        val tag = "DabProbe"
+        val connection = openConnection
+        val outEp = openEndpoints.values.find {
+            it.direction == UsbConstants.USB_DIR_OUT && it.type == UsbConstants.USB_ENDPOINT_XFER_BULK
+        }
+        val inEp = openEndpoints.values
+            .filter { it.direction == UsbConstants.USB_DIR_IN && it.type == UsbConstants.USB_ENDPOINT_XFER_BULK }
+            .maxByOrNull { it.maxPacketSize }
+        val channel = RaonTunerDriver.BAND3_CHANNELS.find { it.freqKhz == freqKhz }
+        if (connection == null || outEp == null || inEp == null || channel == null) {
+            Log.w(tag, "runDabPlayback: device not open or unknown frequency $freqKhz")
+            emit(mapOf("type" to "playbackStatus", "status" to "error", "message" to "device_not_open"))
+            return
+        }
+        val driver = RaonTunerDriver(connection, outEp, inEp)
+        Log.i(tag, "======== DAB+ PLAYBACK START: service=$serviceId ${channel.label} (${channel.freqKhz} kHz) ========")
+        emit(mapOf("type" to "playbackStatus", "status" to "tuning"))
+        if (!driver.initialize()) {
+            Log.w(tag, "runDabPlayback: initialize() failed")
+            emit(mapOf("type" to "playbackStatus", "status" to "error", "message" to "init_failed"))
+            return
+        }
+        driver.tuneToChannel(channel)
+
+        var locked = false
+        val lockDeadline = System.currentTimeMillis() + 2500
+        while (playbackRunning.get() && System.currentTimeMillis() < lockDeadline) {
+            if (driver.getLockStatus() == 0x03) {
+                locked = true
+                break
+            }
+            Thread.sleep(100)
+        }
+        if (!playbackRunning.get()) return
+        if (!locked) {
+            Log.w(tag, "runDabPlayback: no OFDM/FEC lock on ${channel.label}")
+            emit(mapOf("type" to "playbackStatus", "status" to "error", "message" to "no_lock"))
+            return
+        }
+
+        emit(mapOf("type" to "playbackStatus", "status" to "resolvingSubchannel"))
+        var subChId: Int? = null
+        var frameLen: Int? = null
+        val ficDeadline = System.currentTimeMillis() + 4000
+        while (playbackRunning.get() && System.currentTimeMillis() < ficDeadline && (subChId == null || frameLen == null)) {
+            val fic = driver.readFicRaw()
+            val parsed = FigParser.parse(fic)
+            val components = parsed.audioComponents[serviceId]
+            val comp = components?.firstOrNull { it.isDabPlus } ?: components?.firstOrNull()
+            if (comp != null) {
+                subChId = comp.subChId
+                parsed.subchannels[comp.subChId]?.let { frameLen = it.frameLenBytes }
+            }
+            Thread.sleep(120)
+        }
+        if (!playbackRunning.get()) return
+        val resolvedSubChId = subChId
+        val resolvedFrameLen = frameLen
+        if (resolvedSubChId == null || resolvedFrameLen == null || resolvedFrameLen <= 0) {
+            Log.w(tag, "runDabPlayback: could not resolve subchannel for service $serviceId in time")
+            emit(mapOf("type" to "playbackStatus", "status" to "error", "message" to "subchannel_not_found"))
+            return
+        }
+        Log.i(tag, "runDabPlayback: service $serviceId -> subChId=$resolvedSubChId frameLen=$resolvedFrameLen bytes/CIF")
+
+        driver.openSubChannel(resolvedSubChId)
+        driver.clearAndSetupMscMemory()
+        val player = DabAudioPlayer().also { it.start() }
+        audioPlayer = player
+        var framesFed = 0L
+        var ausDecoded = 0L
+        val decoder = DabPlusSuperframeDecoder { au, asc, sr, ch ->
+            ausDecoded++
+            player.submit(au, asc, sr, ch)
+        }
+        // NOTE (2026-09-15 test): adding EnergyDispersal.dedisperse() here made
+        // sync strictly *worse* (0% vs. a small but nonzero baseline without
+        // it) - the tuner chip evidently already undoes DAB energy dispersal
+        // in hardware as part of its normal decode pipeline (unlike an
+        // SDR-only receiver such as welle.io, which does everything after
+        // the raw demodulator in software and so needs this step itself).
+        // Left undone here on purpose.
+        val reframer = MscReframer(resolvedFrameLen) { frame ->
+            framesFed++
+            decoder.feed(frame)
+        }
+
+        emit(mapOf("type" to "playbackStatus", "status" to "playing"))
+        var totalBytesRead = 0L
+        var readCount = 0L
+        var emptyReadCount = 0L
+        var lastLog = System.currentTimeMillis()
+        try {
+            while (playbackRunning.get()) {
+                val bytes = driver.readMscRaw()
+                readCount++
+                if (bytes.isNotEmpty()) {
+                    totalBytesRead += bytes.size
+                    reframer.feed(bytes)
+                } else {
+                    emptyReadCount++
+                    if (driver.recoverMscOverrunIfNeeded()) {
+                        // The chip's MSC FIFO was just reset - any bytes we
+                        // still had buffered belong to the stream *before*
+                        // that reset and would otherwise get spliced onto
+                        // the fresh (hopefully CIF-aligned) data after it.
+                        reframer.reset()
+                        decoder.reset()
+                    }
+                    Thread.sleep(20)
+                }
+                val now = System.currentTimeMillis()
+                if (now - lastLog >= 2000) {
+                    lastLog = now
+                    Log.i(
+                        tag,
+                        "MSC stats: reads=$readCount (empty=$emptyReadCount) bytes=$totalBytesRead " +
+                            "cifFrames=$framesFed ausDecoded=$ausDecoded | sync=${decoder.syncSuccesses}/${decoder.syncAttempts} " +
+                            "rsUncorr=${decoder.rsUncorrectableCodewords} rsCorrected=${decoder.rsCorrectedSymbols} " +
+                            "auCrcOk=${decoder.auCrcOk} auCrcFail=${decoder.auCrcFail}",
+                    )
+                }
+            }
+        } finally {
+            driver.closeSubChannel(resolvedSubChId)
+            player.stop()
+            Log.i(tag, "======== DAB+ PLAYBACK END ========")
+        }
+    }
+
     private fun UsbDevice.toMap(): Map<String, Any?> {
         return mapOf(
             "deviceName" to deviceName,
@@ -584,6 +768,7 @@ class DabUsbPlugin :
     }
 
     private fun closeDevice() {
+        stopDabPlayback()
         openConnection?.close()
         openConnection = null
         openDevice = null

@@ -39,6 +39,7 @@ class RaonTunerDriver(
         private const val PAGE_HOST = 0x07
         private const val PAGE_DD = 0x09
         private const val PAGE_FIC = 0x0A
+        private const val PAGE_MSC1 = 0x0C
         private const val PAGE_RF = 0x0F
 
         // ADC clock types (index into the synth table below).
@@ -394,6 +395,87 @@ class RaonTunerDriver(
         val n = connection.bulkTransfer(inEp, buf, buf.size, 1000)
         switchPage(PAGE_DD)
         writeReg(0x35, 0x01) // FIC interrupt status clear (INT_E_UCLRL bit0)
+        return if (n > 4) buf.copyOfRange(4, n) else ByteArray(0)
+    }
+
+    /**
+     * Opens one MSC subchannel (0-63, from FIG 0/2's SubChId for the
+     * station's audio component) for reading via [readMscRaw] - mirrors
+     * openSubChannel() in the reference driver exactly. The chip is
+     * expected to already track the ensemble's subchannel layout from FIC
+     * reception on its own (there's no separate "configure start
+     * address/size" register write anywhere in the reference driver, only
+     * this bare subchannel-select), consistent with readMscRaw() returning
+     * only that one subchannel's already-demultiplexed bytes.
+     */
+    fun openSubChannel(subChId: Int) {
+        Log.i(TAG, "Opening subchannel $subChId")
+        switchPage(PAGE_DD)
+        writeReg(0x35, 0x70) // MSC1 interrupt status clear
+        switchPage(PAGE_HOST)
+        writeReg(0x62, 0x00)
+        switchPage(PAGE_DD)
+        writeReg(0x3A, 0x80 or subChId)
+    }
+
+    /**
+     * Resets and (re-)enables the chip's MSC memory/FIFO - mirrors
+     * clearAndSetupMscMemory() in the reference driver. There, it's only
+     * called reactively on an MSC overrun/underrun interrupt, which implies
+     * this memory region isn't enabled by default; called once after
+     * [openSubChannel] since nothing else in the init sequence enables it
+     * (unlike FIC, which setupMemoryFIC() explicitly enables at startup).
+     */
+    fun clearAndSetupMscMemory() {
+        switchPage(PAGE_DD)
+        writeReg(0x48, 0x00)
+        writeReg(0x48, 0x05)
+    }
+
+    /**
+     * Checks the interrupt status register for an MSC1 overrun/underrun
+     * condition and recovers from it (clearAndSetupMscMemory() + interrupt
+     * clear) if found - mirrors readMsc()'s reactive handling in the
+     * reference driver. Without this, once the FIFO overruns the read loop
+     * silently stops returning any data at all (observed after ~45s of
+     * continuous playback). Returns true if a recovery was performed.
+     */
+    fun recoverMscOverrunIfNeeded(): Boolean {
+        switchPage(PAGE_DD)
+        val status = readReg(0x33) // INT_E_STATL: bit6=MSC1 overrun, bit5=MSC1 underrun
+        if (status < 0 || (status and 0x60) == 0) return false // -1 = read failure, not a real status
+        Log.w(TAG, "MSC1 overrun/underrun detected (status=0x%02X) - resetting MSC memory".format(status))
+        clearAndSetupMscMemory()
+        writeReg(0x35, 0x04)
+        return true
+    }
+
+    fun closeSubChannel(subChId: Int) {
+        Log.i(TAG, "Closing subchannel $subChId")
+        switchPage(PAGE_DD)
+        writeReg(0x35, 0x70)
+        switchPage(PAGE_HOST)
+        writeReg(0x62, 0x00)
+        switchPage(PAGE_DD)
+        writeReg(0x3A, subChId)
+    }
+
+    /**
+     * Reads whatever raw MSC bytes have accumulated for the currently open
+     * subchannel (see [openSubChannel]) - NOT pre-chunked into fixed-size
+     * per-CIF frames (the amount returned depends on how much the chip's
+     * FIFO had buffered since the last read); the caller must re-frame this
+     * into fixed-size pieces itself (see DabPlusSuperframeDecoder/the
+     * subchannel's FIG 0/1 size) before feeding a superframe decoder.
+     */
+    fun readMscRaw(): ByteArray {
+        switchPage(PAGE_MSC1)
+        val req = byteArrayOf(0x22, 0x00, 0x00, 0x08, 0x10)
+        connection.bulkTransfer(outEp, req, req.size, 1000)
+        val buf = ByteArray(4096)
+        val n = connection.bulkTransfer(inEp, buf, buf.size, 1000)
+        switchPage(PAGE_DD)
+        writeReg(0x35, 0x04) // MSC1 interrupt status clear (INT_E_UCLRL bit2)
         return if (n > 4) buf.copyOfRange(4, n) else ByteArray(0)
     }
 }

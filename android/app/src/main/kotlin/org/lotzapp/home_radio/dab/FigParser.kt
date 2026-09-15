@@ -20,49 +20,44 @@ object FigParser {
         val ensembleLabel: String?,
         // ServiceId (SId) -> programme/station label.
         val services: Map<Int, String>,
+        // SubChId -> subchannel definition (FIG 0/1), needed to size the raw
+        // MSC byte stream per CIF once a subchannel is opened.
+        val subchannels: Map<Int, SubchannelInfo> = emptyMap(),
+        // ServiceId (SId) -> its audio service component(s) (FIG 0/2),
+        // needed to find which SubChId carries a given station's audio.
+        val audioComponents: Map<Int, List<AudioComponent>> = emptyMap(),
     )
 
-    // CRC-CCITT (poly 0x1021) lookup table, copied from FicParser::CRC_CCITT_TABLE.
-    private val CRC_TABLE = intArrayOf(
-        0x0000, 0x1021, 0x2042, 0x3063, 0x4084, 0x50A5, 0x60C6, 0x70E7,
-        0x8108, 0x9129, 0xA14A, 0xB16B, 0xC18C, 0xD1AD, 0xE1CE, 0xF1EF,
-        0x1231, 0x0210, 0x3273, 0x2252, 0x52B5, 0x4294, 0x72F7, 0x62D6,
-        0x9339, 0x8318, 0xB37B, 0xA35A, 0xD3BD, 0xC39C, 0xF3FF, 0xE3DE,
-        0x2462, 0x3443, 0x0420, 0x1401, 0x64E6, 0x74C7, 0x44A4, 0x5485,
-        0xA56A, 0xB54B, 0x8528, 0x9509, 0xE5EE, 0xF5CF, 0xC5AC, 0xD58D,
-        0x3653, 0x2672, 0x1611, 0x0630, 0x76D7, 0x66F6, 0x5695, 0x46B4,
-        0xB75B, 0xA77A, 0x9719, 0x8738, 0xF7DF, 0xE7FE, 0xD79D, 0xC7BC,
-        0x48C4, 0x58E5, 0x6886, 0x78A7, 0x0840, 0x1861, 0x2802, 0x3823,
-        0xC9CC, 0xD9ED, 0xE98E, 0xF9AF, 0x8948, 0x9969, 0xA90A, 0xB92B,
-        0x5AF5, 0x4AD4, 0x7AB7, 0x6A96, 0x1A71, 0x0A50, 0x3A33, 0x2A12,
-        0xDBFD, 0xCBDC, 0xFBBF, 0xEB9E, 0x9B79, 0x8B58, 0xBB3B, 0xAB1A,
-        0x6CA6, 0x7C87, 0x4CE4, 0x5CC5, 0x2C22, 0x3C03, 0x0C60, 0x1C41,
-        0xEDAE, 0xFD8F, 0xCDEC, 0xDDCD, 0xAD2A, 0xBD0B, 0x8D68, 0x9D49,
-        0x7E97, 0x6EB6, 0x5ED5, 0x4EF4, 0x3E13, 0x2E32, 0x1E51, 0x0E70,
-        0xFF9F, 0xEFBE, 0xDFDD, 0xCFFC, 0xBF1B, 0xAF3A, 0x9F59, 0x8F78,
-        0x9188, 0x81A9, 0xB1CA, 0xA1EB, 0xD10C, 0xC12D, 0xF14E, 0xE16F,
-        0x1080, 0x00A1, 0x30C2, 0x20E3, 0x5004, 0x4025, 0x7046, 0x6067,
-        0x83B9, 0x9398, 0xA3FB, 0xB3DA, 0xC33D, 0xD31C, 0xE37F, 0xF35E,
-        0x02B1, 0x1290, 0x22F3, 0x32D2, 0x4235, 0x5214, 0x6277, 0x7256,
-        0xB5EA, 0xA5CB, 0x95A8, 0x8589, 0xF56E, 0xE54F, 0xD52C, 0xC50D,
-        0x34E2, 0x24C3, 0x14A0, 0x0481, 0x7466, 0x6447, 0x5424, 0x4405,
-        0xA7DB, 0xB7FA, 0x8799, 0x97B8, 0xE75F, 0xF77E, 0xC71D, 0xD73C,
-        0x26D3, 0x36F2, 0x0691, 0x16B0, 0x6657, 0x7676, 0x4615, 0x5634,
-        0xD94C, 0xC96D, 0xF90E, 0xE92F, 0x99C8, 0x89E9, 0xB98A, 0xA9AB,
-        0x5844, 0x4865, 0x7806, 0x6827, 0x18C0, 0x08E1, 0x3882, 0x28A3,
-        0xCB7D, 0xDB5C, 0xEB3F, 0xFB1E, 0x8BF9, 0x9BD8, 0xABBB, 0xBB9A,
-        0x4A75, 0x5A54, 0x6A37, 0x7A16, 0x0AF1, 0x1AD0, 0x2AB3, 0x3A92,
-        0xFD2E, 0xED0F, 0xDD6C, 0xCD4D, 0xBDAA, 0xAD8B, 0x9DE8, 0x8DC9,
-        0x7C26, 0x6C07, 0x5C64, 0x4C45, 0x3CA2, 0x2C83, 0x1CE0, 0x0CC1,
-        0xEF1F, 0xFF3E, 0xCF5D, 0xDF7C, 0xAF9B, 0xBFBA, 0x8FD9, 0x9FF8,
-        0x6E17, 0x7E36, 0x4E55, 0x5E74, 0x2E93, 0x3EB2, 0x0ED1, 0x1EF0,
-    )
+    /** FIG 0/1: basic sub-channel organization (EN 300 401 clause 6.3.1). */
+    data class SubchannelInfo(
+        val subChId: Int,
+        val startAddr: Int,
+        // Subchannel size in Capacity Units (1 CU = 64 bits = 8 bytes); only
+        // populated for EEP (long form) subchannels - UEP (short form,
+        // uncommon for DAB+) isn't supported (would need the EN 300 401
+        // Table 9 UEP profile table to resolve a size).
+        val sizeCu: Int,
+    ) {
+        val frameLenBytes: Int get() = sizeCu * 8
+    }
+
+    /** FIG 0/2: a service's audio component (EN 300 401 clause 6.3.2). */
+    data class AudioComponent(
+        val subChId: Int,
+        // Audio Service Component Type: 0 = MPEG Layer II (DAB), 63 = DAB+.
+        val ascty: Int,
+        val isPrimary: Boolean,
+    ) {
+        val isDabPlus: Boolean get() = ascty == 63
+    }
 
     /** Parses a raw FIC burst (any multiple of 32 bytes = whole FIBs). */
     fun parse(fic: ByteArray): Result {
         var ensembleId: Int? = null
         var ensembleLabel: String? = null
         val services = mutableMapOf<Int, String>()
+        val subchannels = mutableMapOf<Int, SubchannelInfo>()
+        val audioComponents = mutableMapOf<Int, MutableList<AudioComponent>>()
 
         var offset = 0
         while (offset + 32 <= fic.size) {
@@ -79,8 +74,15 @@ object FigParser {
                 if (figType == 7 || figLength == 0) break // padding/empty - rest of FIB is filler
                 if (i + figLength > 30) break // malformed/truncated, bail on this FIB
                 val data = fib.copyOfRange(i, i + figLength)
-                if (figType == 1) {
-                    parseFig1(data, onEnsemble = { id, label ->
+                when (figType) {
+                    0 -> parseFig0(
+                        data,
+                        onSubchannel = { sub -> subchannels[sub.subChId] = sub },
+                        onAudioComponent = { sid, comp ->
+                            audioComponents.getOrPut(sid) { mutableListOf() }.add(comp)
+                        },
+                    )
+                    1 -> parseFig1(data, onEnsemble = { id, label ->
                         ensembleId = id
                         ensembleLabel = label
                     }, onService = { id, label -> services[id] = label })
@@ -88,18 +90,99 @@ object FigParser {
                 i += figLength
             }
         }
-        return Result(ensembleId, ensembleLabel, services)
+        return Result(ensembleId, ensembleLabel, services, subchannels, audioComponents)
+    }
+
+    /**
+     * FIG type 0 dispatch: extension 1 (basic sub-channel organization) and
+     * extension 2 (basic service/service-component definition) - the two
+     * pieces needed to resolve a station (ServiceId) to its audio SubChId
+     * and that subchannel's per-CIF byte size. Ported from welle.io's
+     * `FIBProcessor::HandleFIG0Extension1/2` (fib-processor.cpp, GPL-2.0),
+     * bit-for-bit - only the array indexing differs, since our `data` here
+     * already has the FIG header byte stripped (welle.io's bit offsets
+     * count from that header byte, ours from the byte right after it).
+     */
+    private fun parseFig0(
+        data: ByteArray,
+        onSubchannel: (SubchannelInfo) -> Unit,
+        onAudioComponent: (serviceId: Int, component: AudioComponent) -> Unit,
+    ) {
+        if (data.isEmpty()) return
+        val ext = data[0].toInt() and 0x1F
+        val pd = (data[0].toInt() and 0x20) != 0 // P/D: 0 = 16-bit SId (programme), 1 = 32-bit (data)
+        when (ext) {
+            1 -> parseFig0Ext1(data, onSubchannel)
+            2 -> parseFig0Ext2(data, pd, onAudioComponent)
+        }
+    }
+
+    private fun parseFig0Ext1(data: ByteArray, onSubchannel: (SubchannelInfo) -> Unit) {
+        var byteOffset = 1 // entries start right after the CN/OE/PD byte (data[0])
+        while (byteOffset + 3 <= data.size) {
+            val bitOffset = byteOffset * 8
+            val subChId = getBits(data, bitOffset, 6)
+            val shortLongFlag = getBits(data, bitOffset + 16, 1)
+            if (shortLongFlag == 0) {
+                // UEP (short form) - not supported (see SubchannelInfo doc).
+                byteOffset += 3
+                continue
+            }
+            if (byteOffset + 4 > data.size) break
+            val startAddr = getBits(data, bitOffset + 6, 10)
+            val option = getBits(data, bitOffset + 17, 3)
+            val sizeCu = getBits(data, bitOffset + 22, 10)
+            if (option == 0 || option == 1) { // EEP-A or EEP-B (the only supported/common profiles)
+                onSubchannel(SubchannelInfo(subChId, startAddr, sizeCu))
+            }
+            byteOffset += 4
+        }
+    }
+
+    private fun parseFig0Ext2(
+        data: ByteArray,
+        pd: Boolean,
+        onAudioComponent: (serviceId: Int, component: AudioComponent) -> Unit,
+    ) {
+        var byteOffset = 1
+        val sidBytes = if (pd) 4 else 2
+        while (byteOffset + sidBytes <= data.size) {
+            var bitOffset = byteOffset * 8
+            val serviceId = getBits(data, bitOffset, sidBytes * 8)
+            bitOffset += sidBytes * 8
+            if (bitOffset / 8 >= data.size) break
+            val numComponents = getBits(data, bitOffset + 4, 4)
+            bitOffset += 8
+            for (c in 0 until numComponents) {
+                if (bitOffset / 8 + 2 > data.size) break
+                val tmid = getBits(data, bitOffset, 2)
+                if (tmid == 0) { // MSC stream audio
+                    val ascty = getBits(data, bitOffset + 2, 6)
+                    val subChId = getBits(data, bitOffset + 8, 6)
+                    onAudioComponent(serviceId, AudioComponent(subChId, ascty, isPrimary = c == 0))
+                }
+                bitOffset += 16
+            }
+            byteOffset = bitOffset / 8
+        }
+    }
+
+    /** MSB-first bit reader (bit 0 = MSB of byte 0), matching DAB FIG bit numbering. */
+    private fun getBits(data: ByteArray, bitOffset: Int, bitLength: Int): Int {
+        var value = 0
+        for (n in 0 until bitLength) {
+            val pos = bitOffset + n
+            val byteIndex = pos / 8
+            val bit = if (byteIndex < data.size) (data[byteIndex].toInt() shr (7 - pos % 8)) and 0x01 else 0
+            value = (value shl 1) or bit
+        }
+        return value
     }
 
     private fun fibCrcOk(fib: ByteArray): Boolean {
-        var crc = 0xFFFF
-        for (idx in 0 until 30) {
-            val b = fib[idx].toInt() and 0xFF
-            crc = ((crc shl 8) xor CRC_TABLE[(crc shr 8) xor b]) and 0xFFFF
-        }
+        val crc = Crc16.CCITT.calc(fib, 0, 30)
         val crcVal = ((fib[30].toInt() and 0xFF) shl 8) or (fib[31].toInt() and 0xFF)
-        val crc2 = crcVal xor 0xFFFF
-        return crc == crc2
+        return crc == crcVal
     }
 
     private fun parseFig1(

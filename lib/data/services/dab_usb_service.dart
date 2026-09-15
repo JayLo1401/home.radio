@@ -17,6 +17,7 @@ class DabUsbService {
   final _deviceChangeController = StreamController<void>.broadcast();
   final _scanEventController = StreamController<Map<String, dynamic>>.broadcast();
   final _permissionController = StreamController<Map<String, dynamic>>.broadcast();
+  final _playbackStatusController = StreamController<Map<String, dynamic>>.broadcast();
   StreamSubscription<dynamic>? _eventSub;
 
   /// Fires whenever a USB device is attached/detached, so the UI can refresh
@@ -35,6 +36,11 @@ class DabUsbService {
   /// having to open the DAB+ screen themselves.
   Stream<Map<String, dynamic>> get permissionEvents => _permissionController.stream;
 
+  /// Fires with `{status, message?}` while DAB+ playback ([dabPlayService])
+  /// is running: `tuning`, `resolvingSubchannel`, `playing`, `busy`, or
+  /// `error` (with a `message` code). See DabUsbPlugin.runDabPlayback.
+  Stream<Map<String, dynamic>> get playbackStatusEvents => _playbackStatusController.stream;
+
   DabUsbService() {
     _eventSub = _eventChannel.receiveBroadcastStream().listen((event) {
       final map = event as Map<dynamic, dynamic>;
@@ -48,6 +54,8 @@ class DabUsbService {
           _scanEventController.add(map.cast<String, dynamic>());
         case 'permissionResult':
           _permissionController.add(map.cast<String, dynamic>());
+        case 'playbackStatus':
+          _playbackStatusController.add(map.cast<String, dynamic>());
       }
     });
   }
@@ -188,6 +196,18 @@ class DabUsbService {
     return result ?? false;
   }
 
+  /// Starts full DAB+ playback of one station (tune, resolve its subchannel
+  /// from FIC, decode the DAB+ superframe/AAC stream, play through the
+  /// device's speakers) - progress/result via [playbackStatusEvents].
+  Future<void> dabPlayService({required int freqKhz, required int serviceId}) {
+    return _methodChannel.invokeMethod('dabPlayService', {
+      'freqKhz': freqKhz,
+      'serviceId': serviceId,
+    });
+  }
+
+  Future<void> dabStopPlayback() => _methodChannel.invokeMethod('dabStopPlayback');
+
   /// Tunes to a single channel and logs detailed lock/antenna status every
   /// 200ms for ~8 seconds - faster to iterate on than a full scan when
   /// debugging one specific, externally-confirmed-active channel.
@@ -207,5 +227,6 @@ class DabUsbService {
     await _deviceChangeController.close();
     await _scanEventController.close();
     await _permissionController.close();
+    await _playbackStatusController.close();
   }
 }

@@ -50,6 +50,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     dab.permissionEvents.listen((event) {
       if (event['granted'] == true) _onDabPermissionGranted();
     });
+    dab.playbackStatusEvents.listen(_onDabPlaybackStatus);
     // If permission was already granted in an earlier session, no dialog
     // (and thus no permissionEvents callback) fires this time - open the
     // adapter directly if it's already attached+permitted.
@@ -163,35 +164,61 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     final url = channel.internetStreamUrl;
     if (url != null) {
+      await ref.read(dabUsbServiceProvider).dabStopPlayback();
       await ref.read(audioPlayerServiceProvider).stop();
       _setNowPlaying(channel, playing: true);
       await ref.read(audioPlayerServiceProvider).playStream(url);
       return;
     }
 
+    await ref.read(audioPlayerServiceProvider).stop();
     final freqKhz = channel.dabFreqKhz;
-    if (freqKhz == null) return;
+    final serviceId = channel.dabServiceId;
+    if (freqKhz == null || serviceId == null) return;
     if (!_dabDeviceOpen) {
       await _ensureDabAdapterReady(channel);
       return;
     }
-    // Only RF tuning + lock is implemented so far - actual DAB+ audio needs
-    // MSC subchannel demuxing + AAC decoding, not done yet (see the DAB+
-    // phase of the project plan). This still lets the tune itself be
-    // verified end-to-end even without audio output, and it's already
-    // reported as "playing" to the MediaSession (Home Assistant/TV
-    // launcher) since RF lock is the closest equivalent state available.
-    final ok = await ref.read(dabUsbServiceProvider).dabTuneFrequency(freqKhz);
+    await ref.read(dabUsbServiceProvider).dabPlayService(freqKhz: freqKhz, serviceId: serviceId);
+  }
+
+  /// Reflects native DAB+ playback progress (see DabUsbPlugin.runDabPlayback)
+  /// into the Now Playing banner and MediaSession - the actual audio
+  /// decode/output happens entirely natively (DabAudioPlayer), this is only
+  /// status/UI plumbing.
+  void _onDabPlaybackStatus(Map<String, dynamic> event) {
     if (!mounted) return;
-    if (ok) {
-      _setNowPlaying(channel, playing: true);
-      setState(() {
-        _dabTuned = true;
-        _dabStatusText = 'Getunt – DAB+-Audiowiedergabe ist noch nicht implementiert.';
-      });
-    } else {
-      setState(() => _dabStatusText = 'Tuning auf "${channel.displayName}" fehlgeschlagen.');
-    }
+    final status = event['status'] as String?;
+    setState(() {
+      switch (status) {
+        case 'tuning':
+          _dabTuned = false;
+          _dabStatusText = 'Wird getunt…';
+        case 'resolvingSubchannel':
+          _dabStatusText = 'Sender wird gesucht…';
+        case 'playing':
+          _dabTuned = true;
+          _dabStatusText = null;
+          final current = ref.read(currentProgramNumberProvider);
+          final channel = ref
+              .read(favoritesStreamProvider)
+              .value
+              ?.where((c) => c.programNumber == current)
+              .firstOrNull;
+          if (channel != null) _setNowPlaying(channel, playing: true);
+        case 'busy':
+          _dabTuned = false;
+          _dabStatusText = 'DAB+-Adapter ist gerade anderweitig beschäftigt.';
+        case 'error':
+          _dabTuned = false;
+          _dabStatusText = switch (event['message']) {
+            'no_lock' => 'Kein Empfang auf dieser Frequenz.',
+            'subchannel_not_found' => 'Sender im Ensemble nicht gefunden.',
+            'device_not_open' => 'DAB+-Adapter ist nicht bereit.',
+            _ => 'DAB+-Wiedergabe fehlgeschlagen.',
+          };
+      }
+    });
   }
 
   @override
