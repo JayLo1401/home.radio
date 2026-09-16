@@ -54,6 +54,13 @@ class DabPlusSuperframeDecoder(
     var rsCorrectedSymbols = 0L; private set
     var auCrcOk = 0L; private set
     var auCrcFail = 0L; private set
+    // TEMP (2026-09-16): per-AU-index breakdown - an offline analysis of a
+    // discontinuity-marked raw capture found AU#0/#1 succeeding ~90-98% of
+    // the time but the LAST AU (AU#2 for HE-AAC) failing ~100% of the time,
+    // consistently across 4 independent multi-second segments. Checking
+    // whether the live decoder shows the exact same per-position pattern.
+    val auCrcOkByIndex = LongArray(6)
+    val auCrcFailByIndex = LongArray(6)
 
     /** Discards in-progress frame accumulation - call together with [MscReframer.reset]. */
     fun reset() {
@@ -115,6 +122,7 @@ class DabPlusSuperframeDecoder(
             val crcCalc = Crc16.CCITT.calc(sf, start, auLen)
             if (crcStored != crcCalc) {
                 auCrcFail++
+                auCrcFailByIndex[i]++
                 if (auCrcFail <= 5 || auCrcFail % 500 == 0L) {
                     Log.d(
                         TAG,
@@ -125,6 +133,7 @@ class DabPlusSuperframeDecoder(
                 continue
             }
             auCrcOk++
+            auCrcOkByIndex[i]++
             onAudioUnit(sf.copyOfRange(start, start + auLen), asc, format.sampleRateHz, format.channels)
         }
 

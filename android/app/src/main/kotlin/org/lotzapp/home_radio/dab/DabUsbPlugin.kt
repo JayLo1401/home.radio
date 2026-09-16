@@ -530,6 +530,13 @@ class DabUsbPlugin :
         }
         playbackRunning.set(true)
         playbackThread = Thread {
+            // The MSC1 hardware FIFO needs servicing on a tight, real-time
+            // cadence (a 24ms CIF period) - on a loaded/low-power TV box,
+            // normal thread scheduling delays (GC pauses, other threads,
+            // logging I/O) may be enough to fall behind it, and once behind
+            // there's no way to catch back up (matches the permanent,
+            // never-recovering sync loss seen in testing this session).
+            android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_URGENT_AUDIO)
             try {
                 runDabPlayback(freqKhz, serviceId)
             } catch (e: InterruptedException) {
@@ -633,8 +640,11 @@ class DabUsbPlugin :
         }
         Log.i(tag, "runDabPlayback: service $serviceId -> subChId=$resolvedSubChId frameLen=$resolvedFrameLen bytes/CIF")
 
-        driver.openSubChannel(resolvedSubChId)
+        // Order matters and matches the reference's setService() exactly
+        // (clearAndSetupMscMemory() then openSubChannel(), found 2026-09-16
+        // - this project had it backwards until now).
         driver.clearAndSetupMscMemory()
+        driver.openSubChannel(resolvedSubChId)
         val player = DabAudioPlayer().also { it.start() }
         audioPlayer = player
         var framesFed = 0L
@@ -655,27 +665,48 @@ class DabUsbPlugin :
             decoder.feed(frame)
         }
 
-        // TEMPORARY (2026-09-15/16 debugging session): dump the raw,
-        // pre-reframing MSC byte stream to a file for offline analysis - the
-        // RS decode failing on ~99% of codewords is much faster to debug
-        // against a captured real byte stream (fast local iteration) than by
-        // repeating the live WLAN-debug/USB-host toggle cycle for every
-        // hypothesis. Capped at ~3MB (~30s at this bitrate). Remove once the
-        // root cause is found.
-        // Named per station (freq+serviceId) so testing multiple stations in
-        // a row keeps each one's capture instead of overwriting it.
+        // Raw MSC dump-to-file (added for offline RS-decode debugging,
+        // 2026-09-15/16) - disabled now that real audio decodes correctly;
+        // synchronous file I/O on this thread's critical, ~24ms-cadence path
+        // is itself a plausible contributor to the CPU/scheduling-driven
+        // permanent sync loss being chased now, so it's not just inert.
+        // dumpDone=true from the start means the write path below never
+        // executes; flip to false (and set dumpEnabled up here) to
+        // re-enable for a future debugging session.
+        // Raw MSC dump-to-file, with a 4-byte length prefix per USB read
+        // chunk and a 0xFFFFFFFF sentinel marking known stream
+        // discontinuities (see markDumpDiscontinuity below) - built
+        // 2026-09-15/16 for offline RS-decode debugging. Disabled again now
+        // that it's served its purpose (traced the persistent AU-CRC-
+        // failure pattern to AU#2 specifically - see DabPlusSuperframeDecoder's
+        // auCrcOkByIndex/auCrcFailByIndex doc comment); flip to true (and
+        // dumpDone below to false) to re-enable for a future session.
+        val dumpEnabled = false
         val dumpDir = context.getExternalFilesDir(null)
         val dumpTag = "${freqKhz}_$serviceId"
         val dumpFile = java.io.File(dumpDir, "dab_msc_dump_$dumpTag.bin")
-        val dumpMetaFile = java.io.File(dumpDir, "dab_msc_dump_$dumpTag.json")
-        dumpMetaFile.writeText(
-            "{\"freqKhz\":$freqKhz,\"serviceId\":$serviceId,\"subChId\":$resolvedSubChId," +
-                "\"frameLenBytes\":$resolvedFrameLen}",
-        )
-        val dumpOut = java.io.FileOutputStream(dumpFile)
+        var dumpOut: java.io.FileOutputStream? = null
         var dumpBytesWritten = 0
-        var dumpDone = false
+        var dumpDone = !dumpEnabled
         val dumpMaxBytes = 3_000_000
+        if (dumpEnabled) {
+            java.io.File(dumpDir, "dab_msc_dump_$dumpTag.json").writeText(
+                "{\"freqKhz\":$freqKhz,\"serviceId\":$serviceId,\"subChId\":$resolvedSubChId," +
+                    "\"frameLenBytes\":$resolvedFrameLen}",
+            )
+            dumpOut = java.io.FileOutputStream(dumpFile)
+        }
+        // 0xFFFFFFFF sentinel length (never a real chunk size) marking a
+        // known stream discontinuity (degenerate-fill discard, overrun
+        // recovery, or watchdog resync) - added so offline analysis can
+        // segment the dump into truly-contiguous runs instead of treating
+        // the whole file as one continuous byte stream, which otherwise
+        // makes the offline error rate look far worse than what the live
+        // decoder (which does reset its own state at exactly these points)
+        // actually sees.
+        fun markDumpDiscontinuity() {
+            if (!dumpDone) dumpOut?.write(byteArrayOf(0xFF.toByte(), 0xFF.toByte(), 0xFF.toByte(), 0xFF.toByte()))
+        }
 
         emit(mapOf("type" to "playbackStatus", "status" to "playing"))
         var totalBytesRead = 0L
@@ -684,6 +715,38 @@ class DabUsbPlugin :
         var lastLog = System.currentTimeMillis()
         var overrunDiscardCount = 0L
         var notReadyCount = 0L
+        // Watchdog for the permanent, never-recovering sync loss seen in
+        // testing (2026-09-16): confirmed NOT caused by FIC servicing, RS
+        // correctness, interleaving, byte alignment, reception quality,
+        // thread priority, or logging overhead (all ruled out this session,
+        // on real hardware, live-monitored).
+        //
+        // TIERED (2026-09-16, later): a discontinuity-marked raw capture
+        // showed the real pattern - long (10s+) stretches decode at
+        // 94-100% sync success, interrupted by brief (~0.6-0.7s) totally-
+        // dead windows that then recover on their own. Those brief dips are
+        // exactly what were triggering the (previously unconditional)
+        // subchannel reopen - and the reopen itself was shown (same
+        // capture) to cost an *additional* ~0.6-0.7s of guaranteed zero
+        // sync before the chip re-settles, on top of whatever the original
+        // dip cost. So: try cheap soft resets (decoder/reframer state only,
+        // no subchannel close/open) first, giving a brief real dip a chance
+        // to self-recover once fresh CIFs arrive; only escalate to a full
+        // subchannel reopen (the only thing that ever recovered the
+        // original *permanent* cliff bug) after repeated soft resets still
+        // haven't produced a new AAC frame.
+        var lastSyncSuccesses = 0L
+        var lastSyncProgressAt = System.currentTimeMillis()
+        var resyncCount = 0
+        var softResetAttempts = 0
+        val maxSoftResetsBeforeReopen = 2
+        // 1500ms: live-monitored testing (2026-09-16) shows a new AAC frame
+        // every ~200-250ms during healthy playback, so 1500ms of total
+        // silence is already many multiples of that and won't false-
+        // trigger, while still being short enough that even
+        // maxSoftResetsBeforeReopen soft-reset rounds (below) stay well
+        // under the ~0.6-0.7s a brief natural dip needs to clear on its own.
+        val syncWatchdogTimeoutMs = 1500L
         // FOUND (2026-09-16): this originally issued a bulk-read request on
         // every loop iteration regardless of whether the chip actually had
         // new data (the simpler "readMscData()"-style polling from the
@@ -707,8 +770,14 @@ class DabUsbPlugin :
                 // reverted - not the cause of the eventual permanent sync
                 // loss.
                 //
-                // Always serviced first, mirroring the reference's readData()
-                // - see RaonTunerDriver.serviceFicIfReady's doc comment.
+                // RULED OUT (2026-09-16): live-monitored on a second device
+                // (WLAN debug + USB host don't conflict there, unlike the Mi
+                // TV) with this call removed entirely - the exact same
+                // permanent sync loss still happened at a similar elapsed
+                // time (~31s vs. ~36s with it present). So continuously
+                // servicing FIC here is not the cause; restored since it
+                // matches the reference driver's behavior and is otherwise
+                // harmless.
                 driver.serviceFicIfReady()
                 if (!driver.isMscDataReady()) {
                     notReadyCount++
@@ -735,16 +804,28 @@ class DabUsbPlugin :
                         overrunDiscardCount++
                         reframer.reset()
                         decoder.reset()
+                        markDumpDiscontinuity()
                     } else {
                         totalBytesRead += bytes.size
                         reframer.feed(bytes)
                         if (!dumpDone) {
-                            dumpOut.write(bytes)
-                            dumpBytesWritten += bytes.size
+                            // 4-byte big-endian length prefix per USB read
+                            // chunk (see dumpEnabled note above) so an
+                            // offline script can recover exact read
+                            // boundaries within the concatenated stream.
+                            val lenPrefix = byteArrayOf(
+                                (bytes.size ushr 24).toByte(),
+                                (bytes.size ushr 16).toByte(),
+                                (bytes.size ushr 8).toByte(),
+                                bytes.size.toByte(),
+                            )
+                            dumpOut?.write(lenPrefix)
+                            dumpOut?.write(bytes)
+                            dumpBytesWritten += bytes.size + 4
                             if (dumpBytesWritten >= dumpMaxBytes) {
                                 dumpDone = true
-                                dumpOut.flush()
-                                dumpOut.close()
+                                dumpOut?.flush()
+                                dumpOut?.close()
                                 Log.i(tag, "MSC raw dump complete: ${dumpFile.absolutePath} ($dumpBytesWritten bytes)")
                             }
                         }
@@ -762,33 +843,69 @@ class DabUsbPlugin :
                     if (readCount % 20 == 0L && driver.recoverMscOverrunIfNeeded()) {
                         reframer.reset()
                         decoder.reset()
+                        markDumpDiscontinuity()
                     }
                 } else {
                     emptyReadCount++
                     if (driver.recoverMscOverrunIfNeeded()) {
                         reframer.reset()
                         decoder.reset()
+                        markDumpDiscontinuity()
                     }
                     Thread.sleep(20)
                 }
                 val now = System.currentTimeMillis()
+                val syncNow = decoder.syncSuccesses
+                if (syncNow > lastSyncSuccesses) {
+                    lastSyncSuccesses = syncNow
+                    lastSyncProgressAt = now
+                    softResetAttempts = 0
+                } else if (now - lastSyncProgressAt >= syncWatchdogTimeoutMs) {
+                    if (softResetAttempts < maxSoftResetsBeforeReopen) {
+                        softResetAttempts++
+                        Log.w(
+                            tag,
+                            "Sync watchdog: no new AAC frame for ${syncWatchdogTimeoutMs}ms (stuck at " +
+                                "$syncNow/${decoder.syncAttempts}) - soft reset #$softResetAttempts " +
+                                "(decoder/reframer only, subchannel stays open)",
+                        )
+                        reframer.reset()
+                        decoder.reset()
+                    } else {
+                        resyncCount++
+                        Log.w(
+                            tag,
+                            "Sync watchdog: still stuck after $maxSoftResetsBeforeReopen soft reset(s) - " +
+                                "re-opening subchannel (recovery #$resyncCount)",
+                        )
+                        driver.closeSubChannel(resolvedSubChId)
+                        driver.clearAndSetupMscMemory()
+                        driver.openSubChannel(resolvedSubChId)
+                        reframer.reset()
+                        decoder.reset()
+                        softResetAttempts = 0
+                    }
+                    markDumpDiscontinuity()
+                    lastSyncProgressAt = now
+                }
                 if (now - lastLog >= 2000) {
                     lastLog = now
                     Log.i(
                         tag,
                         "MSC stats: reads=$readCount (notReady=$notReadyCount empty=$emptyReadCount degenerate=$overrunDiscardCount) " +
-                            "bytes=$totalBytesRead cifFrames=$framesFed ausDecoded=$ausDecoded | " +
+                            "bytes=$totalBytesRead cifFrames=$framesFed ausDecoded=$ausDecoded resyncs=$resyncCount | " +
                             "sync=${decoder.syncSuccesses}/${decoder.syncAttempts} " +
                             "rsUncorr=${decoder.rsUncorrectableCodewords} rsCorrected=${decoder.rsCorrectedSymbols} " +
-                            "auCrcOk=${decoder.auCrcOk} auCrcFail=${decoder.auCrcFail}",
+                            "auCrcOk=${decoder.auCrcOk} auCrcFail=${decoder.auCrcFail} " +
+                            "perAu=${(0..2).joinToString(",") { "${decoder.auCrcOkByIndex[it]}/${decoder.auCrcOkByIndex[it] + decoder.auCrcFailByIndex[it]}" }}",
                     )
                 }
             }
         } finally {
             if (!dumpDone) {
                 try {
-                    dumpOut.flush()
-                    dumpOut.close()
+                    dumpOut?.flush()
+                    dumpOut?.close()
                 } catch (_: Exception) {
                 }
                 Log.i(tag, "MSC raw dump (partial): ${dumpFile.absolutePath} ($dumpBytesWritten bytes)")
