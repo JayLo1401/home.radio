@@ -465,6 +465,32 @@ class RaonTunerDriver(
         return status >= 0 && (status and 0x10) != 0
     }
 
+    /**
+     * Services the FIC-ready interrupt (bit0 of the same status register
+     * MSC1-ready/overrun are read from) if set, discarding the actual FIC
+     * content - added 2026-09-16 after audio played successfully for ~40s
+     * then lost sync permanently: the reference driver's real read loop
+     * (`RaonTunerInput::readData()`) always checks/services FIC on every
+     * call, interleaved with MSC, which this project's playback loop
+     * (focused on just MSC once tuning/subchannel-resolution is done)
+     * didn't. Left unacknowledged, a pending FIC interrupt may block the
+     * shared status register from correctly reporting new MSC1 events -
+     * untested as of this edit.
+     */
+    fun serviceFicIfReady(): Boolean {
+        switchPage(PAGE_DD)
+        val status = readReg(0x33)
+        if (status < 0 || (status and 0x01) == 0) return false
+        switchPage(PAGE_FIC)
+        val req = byteArrayOf(0x22, 0x00, 0x80.toByte(), 0x01, 0x10)
+        connection.bulkTransfer(outEp, req, req.size, 1000)
+        val buf = ByteArray(400)
+        connection.bulkTransfer(inEp, buf, buf.size, 1000)
+        switchPage(PAGE_DD)
+        writeReg(0x35, 0x01)
+        return true
+    }
+
     fun closeSubChannel(subChId: Int) {
         Log.i(TAG, "Closing subchannel $subChId")
         switchPage(PAGE_DD)
@@ -487,17 +513,25 @@ class RaonTunerDriver(
      * Reads whatever MSC bytes the chip has ready for the currently open
      * subchannel - call [isMscDataReady] first (only issues the actual bulk
      * transfer if it returns true) to avoid pulling stale/idle "fill" bytes
-     * instead of real payload (see that method's doc comment). Uses the
-     * interrupt-driven request/buffer size from the reference driver's
-     * `readMsc()` (`22 00 D8 00 10`, 1536-byte response) - NOT the simpler
-     * polling `readMscData()` variant (`22 00 00 08 10`, up to 4096 bytes)
-     * this project originally (and incorrectly) used here.
+     * instead of real payload (see that method's doc comment).
+     *
+     * Request/buffer size corrected 2026-09-16 after finding the *complete*
+     * reference driver (our earlier docs/dab-research/omri-usb-raon copy was
+     * missing the tail of this file): the interrupt-gated request this
+     * project briefly switched to (`22 00 D8 00 10`, 1536-byte response,
+     * from the reference's `readMsc()`) is only reachable from a code path
+     * that's NOT the one actually wired up as OMRI's real polling loop.
+     * `RaonTunerInput::readData()` - confirmed as the one really used
+     * (called from the thread `startReadDataThread()` starts) - guards on
+     * the exact same MSC1 "ready" bit but issues the *other* request
+     * (`22 00 00 08 10`, 4096-byte buffer, 2048-byte chip-side threshold)
+     * this project originally had before that detour.
      */
     fun readMscRaw(): ByteArray {
         switchPage(PAGE_MSC1)
-        val req = byteArrayOf(0x22, 0x00, 0xD8.toByte(), 0x00, 0x10)
+        val req = byteArrayOf(0x22, 0x00, 0x00, 0x08, 0x10)
         connection.bulkTransfer(outEp, req, req.size, 1000)
-        val buf = ByteArray(1536)
+        val buf = ByteArray(4096)
         val n = connection.bulkTransfer(inEp, buf, buf.size, 1000)
         switchPage(PAGE_DD)
         writeReg(0x35, 0x04) // MSC1 interrupt status clear (INT_E_UCLRL bit2)

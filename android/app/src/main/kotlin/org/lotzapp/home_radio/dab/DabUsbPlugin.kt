@@ -697,6 +697,9 @@ class DabUsbPlugin :
         // hardware as of this edit.
         try {
             while (playbackRunning.get()) {
+                // Always serviced first, mirroring the reference's readData()
+                // - see RaonTunerDriver.serviceFicIfReady's doc comment.
+                driver.serviceFicIfReady()
                 if (!driver.isMscDataReady()) {
                     notReadyCount++
                     if (driver.recoverMscOverrunIfNeeded()) {
