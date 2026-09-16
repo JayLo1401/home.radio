@@ -697,6 +697,16 @@ class DabUsbPlugin :
         // hardware as of this edit.
         try {
             while (playbackRunning.get()) {
+                // TRIED (2026-09-16): periodic antenna-level polling, based
+                // on readData()'s antenna-level bookkeeping - turned out
+                // that whole block is commented out (dead) in the reference,
+                // never actually called from its real, active read loop
+                // (commandProcessing(), which just re-pushes readData()
+                // whenever its command queue is empty). Made playback
+                // measurably worse (shorter bursts, longer gaps) and was
+                // reverted - not the cause of the eventual permanent sync
+                // loss.
+                //
                 // Always serviced first, mirroring the reference's readData()
                 // - see RaonTunerDriver.serviceFicIfReady's doc comment.
                 driver.serviceFicIfReady()
@@ -738,6 +748,20 @@ class DabUsbPlugin :
                                 Log.i(tag, "MSC raw dump complete: ${dumpFile.absolutePath} ($dumpBytesWritten bytes)")
                             }
                         }
+                    }
+                    // Overrun previously was only ever checked on an *empty*
+                    // read, which never happens once real data is flowing
+                    // steadily (observed: sync holds perfectly for the first
+                    // ~15-40s of playback, then fails permanently, with
+                    // reads never once coming back empty around that point)
+                    // - so a genuine FIFO overrun there would go completely
+                    // undetected. Checked periodically here too now, without
+                    // touching chip state on every single read (which caused
+                    // a self-inflicted stall in earlier testing this
+                    // session) - untested as of this edit.
+                    if (readCount % 20 == 0L && driver.recoverMscOverrunIfNeeded()) {
+                        reframer.reset()
+                        decoder.reset()
                     }
                 } else {
                     emptyReadCount++
