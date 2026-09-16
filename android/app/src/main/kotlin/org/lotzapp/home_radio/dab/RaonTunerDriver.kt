@@ -450,6 +450,21 @@ class RaonTunerDriver(
         return true
     }
 
+    /**
+     * True once the chip's MSC1 "data ready" interrupt bit is set - i.e.
+     * [readMscRaw] actually has something to return. Without gating on this,
+     * blindly issuing bulk-read requests (the simpler `readMscData()`-style
+     * polling this project's readMscRaw() originally used) can return the
+     * chip's stale/idle "fill" bytes instead of real payload when called
+     * before new data has actually arrived - observed as long runs of one
+     * repeated byte value in a raw capture (2026-09-16 debugging session).
+     */
+    fun isMscDataReady(): Boolean {
+        switchPage(PAGE_DD)
+        val status = readReg(0x33)
+        return status >= 0 && (status and 0x10) != 0
+    }
+
     fun closeSubChannel(subChId: Int) {
         Log.i(TAG, "Closing subchannel $subChId")
         switchPage(PAGE_DD)
@@ -468,11 +483,21 @@ class RaonTunerDriver(
      * into fixed-size pieces itself (see DabPlusSuperframeDecoder/the
      * subchannel's FIG 0/1 size) before feeding a superframe decoder.
      */
+    /**
+     * Reads whatever MSC bytes the chip has ready for the currently open
+     * subchannel - call [isMscDataReady] first (only issues the actual bulk
+     * transfer if it returns true) to avoid pulling stale/idle "fill" bytes
+     * instead of real payload (see that method's doc comment). Uses the
+     * interrupt-driven request/buffer size from the reference driver's
+     * `readMsc()` (`22 00 D8 00 10`, 1536-byte response) - NOT the simpler
+     * polling `readMscData()` variant (`22 00 00 08 10`, up to 4096 bytes)
+     * this project originally (and incorrectly) used here.
+     */
     fun readMscRaw(): ByteArray {
         switchPage(PAGE_MSC1)
-        val req = byteArrayOf(0x22, 0x00, 0x00, 0x08, 0x10)
+        val req = byteArrayOf(0x22, 0x00, 0xD8.toByte(), 0x00, 0x10)
         connection.bulkTransfer(outEp, req, req.size, 1000)
-        val buf = ByteArray(4096)
+        val buf = ByteArray(1536)
         val n = connection.bulkTransfer(inEp, buf, buf.size, 1000)
         switchPage(PAGE_DD)
         writeReg(0x35, 0x04) // MSC1 interrupt status clear (INT_E_UCLRL bit2)

@@ -26,3 +26,6 @@
 -   Startanimation immer noch nicht zu sehen.
     Hier auch mit grünem Schriftzug "Powered by Jay" hinzufügen. 
 -   Applogo noch immer flutter logo.
+
+-   Bedienung:
+    Taste nächster Titel vorherioger Titel soll sender rauf und runterschalten

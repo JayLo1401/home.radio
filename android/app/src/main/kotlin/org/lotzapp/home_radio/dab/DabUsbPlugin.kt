@@ -634,25 +634,87 @@ class DabUsbPlugin :
             decoder.feed(frame)
         }
 
+        // TEMPORARY (2026-09-15/16 debugging session): dump the raw,
+        // pre-reframing MSC byte stream to a file for offline analysis - the
+        // RS decode failing on ~99% of codewords is much faster to debug
+        // against a captured real byte stream (fast local iteration) than by
+        // repeating the live WLAN-debug/USB-host toggle cycle for every
+        // hypothesis. Capped at ~3MB (~30s at this bitrate). Remove once the
+        // root cause is found.
+        val dumpDir = context.getExternalFilesDir(null)
+        val dumpFile = java.io.File(dumpDir, "dab_msc_dump.bin")
+        val dumpMetaFile = java.io.File(dumpDir, "dab_msc_dump.json")
+        dumpMetaFile.writeText(
+            "{\"freqKhz\":$freqKhz,\"serviceId\":$serviceId,\"subChId\":$resolvedSubChId," +
+                "\"frameLenBytes\":$resolvedFrameLen}",
+        )
+        val dumpOut = java.io.FileOutputStream(dumpFile)
+        var dumpBytesWritten = 0
+        var dumpDone = false
+        val dumpMaxBytes = 3_000_000
+
         emit(mapOf("type" to "playbackStatus", "status" to "playing"))
         var totalBytesRead = 0L
         var readCount = 0L
         var emptyReadCount = 0L
         var lastLog = System.currentTimeMillis()
+        var overrunDiscardCount = 0L
+        var notReadyCount = 0L
+        // FOUND (2026-09-16): this originally issued a bulk-read request on
+        // every loop iteration regardless of whether the chip actually had
+        // new data (the simpler "readMscData()"-style polling from the
+        // reference driver, meant to be called from a timer, not gated on
+        // anything). The reference's *interrupt-driven* readMsc() instead
+        // checks the MSC1 "data ready" bit first and only reads when it's
+        // set - not gating on it is what let stale/idle "fill" bytes get
+        // read as if they were real payload. Gating on isMscDataReady() here
+        // now (plus using that variant's own request/buffer size - see
+        // RaonTunerDriver.readMscRaw's doc comment) is untested against real
+        // hardware as of this edit.
         try {
             while (playbackRunning.get()) {
+                if (!driver.isMscDataReady()) {
+                    notReadyCount++
+                    if (driver.recoverMscOverrunIfNeeded()) {
+                        reframer.reset()
+                        decoder.reset()
+                    }
+                    Thread.sleep(5)
+                    continue
+                }
                 val bytes = driver.readMscRaw()
                 readCount++
                 if (bytes.isNotEmpty()) {
-                    totalBytesRead += bytes.size
-                    reframer.feed(bytes)
+                    if (isDegenerateFill(bytes)) {
+                        // Discard-only, no hardware reset here: checking (and
+                        // resetting on) overrun status *before* every single
+                        // read - tried in this same debugging session - made
+                        // things categorically worse (status stayed asserted
+                        // constantly, so the reset ran every iteration and
+                        // the FIFO never got a chance to fill at all).
+                        // Dropping just the bad-looking chunk, without
+                        // touching chip state, avoids that self-inflicted
+                        // loop while still not feeding garbage downstream.
+                        overrunDiscardCount++
+                        reframer.reset()
+                        decoder.reset()
+                    } else {
+                        totalBytesRead += bytes.size
+                        reframer.feed(bytes)
+                        if (!dumpDone) {
+                            dumpOut.write(bytes)
+                            dumpBytesWritten += bytes.size
+                            if (dumpBytesWritten >= dumpMaxBytes) {
+                                dumpDone = true
+                                dumpOut.flush()
+                                dumpOut.close()
+                                Log.i(tag, "MSC raw dump complete: ${dumpFile.absolutePath} ($dumpBytesWritten bytes)")
+                            }
+                        }
+                    }
                 } else {
                     emptyReadCount++
                     if (driver.recoverMscOverrunIfNeeded()) {
-                        // The chip's MSC FIFO was just reset - any bytes we
-                        // still had buffered belong to the stream *before*
-                        // that reset and would otherwise get spliced onto
-                        // the fresh (hopefully CIF-aligned) data after it.
                         reframer.reset()
                         decoder.reset()
                     }
@@ -663,18 +725,51 @@ class DabUsbPlugin :
                     lastLog = now
                     Log.i(
                         tag,
-                        "MSC stats: reads=$readCount (empty=$emptyReadCount) bytes=$totalBytesRead " +
-                            "cifFrames=$framesFed ausDecoded=$ausDecoded | sync=${decoder.syncSuccesses}/${decoder.syncAttempts} " +
+                        "MSC stats: reads=$readCount (notReady=$notReadyCount empty=$emptyReadCount degenerate=$overrunDiscardCount) " +
+                            "bytes=$totalBytesRead cifFrames=$framesFed ausDecoded=$ausDecoded | " +
+                            "sync=${decoder.syncSuccesses}/${decoder.syncAttempts} " +
                             "rsUncorr=${decoder.rsUncorrectableCodewords} rsCorrected=${decoder.rsCorrectedSymbols} " +
                             "auCrcOk=${decoder.auCrcOk} auCrcFail=${decoder.auCrcFail}",
                     )
                 }
             }
         } finally {
+            if (!dumpDone) {
+                try {
+                    dumpOut.flush()
+                    dumpOut.close()
+                } catch (_: Exception) {
+                }
+                Log.i(tag, "MSC raw dump (partial): ${dumpFile.absolutePath} ($dumpBytesWritten bytes)")
+            }
             driver.closeSubChannel(resolvedSubChId)
             player.stop()
             Log.i(tag, "======== DAB+ PLAYBACK END ========")
         }
+    }
+
+    /**
+     * Detects the chip's MSC "idle/underrun fill" pattern: a long run of one
+     * repeated byte value, seen in a raw capture (2026-09-16 debugging
+     * session) instead of real payload whenever the FIFO underran - the read
+     * itself still returns non-empty data, so [RaonTunerDriver.recoverMscOverrunIfNeeded]
+     * checked only on empty reads doesn't catch it; this heuristic does.
+     * Real (RS-protected, effectively-random-looking) MSC bytes essentially
+     * never have runs this long, so a conservative threshold is safe.
+     */
+    private fun isDegenerateFill(bytes: ByteArray): Boolean {
+        if (bytes.size < 32) return false
+        var runLen = 1
+        var maxRun = 1
+        for (i in 1 until bytes.size) {
+            if (bytes[i] == bytes[i - 1]) {
+                runLen++
+                if (runLen > maxRun) maxRun = runLen
+            } else {
+                runLen = 1
+            }
+        }
+        return maxRun >= 24
     }
 
     private fun UsbDevice.toMap(): Map<String, Any?> {
