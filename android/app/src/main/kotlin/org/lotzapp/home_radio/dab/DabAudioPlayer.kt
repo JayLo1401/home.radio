@@ -11,13 +11,17 @@ import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 
 /**
- * Decodes DAB+ AAC access units (from [DabPlusSuperframeDecoder]) to PCM via
+ * Decodes DAB+ AAC access units (from [NativeDabDecoder]) to PCM via
  * Android's built-in MediaCodec raw-AAC decoder, and plays them through an
  * AudioTrack. Runs its own decode thread with an input queue so feeding new
  * access units (from the USB MSC-reading thread) never blocks on decoding.
  */
 class DabAudioPlayer {
-    private data class AuTask(val au: ByteArray, val asc: ByteArray, val sampleRateHz: Int, val channels: Int)
+    // au == null means "insert durationMs of silence" (a CRC-failed AU) -
+    // keeps output timing continuous instead of jump-cutting ahead to the
+    // next surviving AU, which sounded far choppier for the same amount of
+    // missing audio (found 2026-09-16).
+    private data class AuTask(val au: ByteArray?, val asc: ByteArray, val sampleRateHz: Int, val channels: Int, val durationMs: Int)
 
     private val queue = LinkedBlockingQueue<AuTask>(64)
 
@@ -42,13 +46,17 @@ class DabAudioPlayer {
         releaseCodec()
     }
 
-    /** Called from the MSC-reading thread whenever a valid access unit was decoded and CRC-checked. */
-    fun submit(au: ByteArray, asc: ByteArray, sampleRateHz: Int, channels: Int) {
+    /**
+     * Called from the MSC-reading thread for every AU slot in a synced
+     * superframe - [au] is null for a CRC-failed AU, meaning [durationMs]
+     * of silence should play in its place instead of just dropping it.
+     */
+    fun submit(au: ByteArray?, asc: ByteArray, sampleRateHz: Int, channels: Int, durationMs: Int) {
         if (!running) return
         // Drop rather than block if the decoder can't keep up - a queue
         // backlog would just mean increasing audio latency, not lost errors.
         if (queue.remainingCapacity() == 0) queue.poll()
-        queue.offer(AuTask(au, asc, sampleRateHz, channels))
+        queue.offer(AuTask(au, asc, sampleRateHz, channels, durationMs))
     }
 
     private fun runLoop() {
@@ -60,7 +68,12 @@ class DabAudioPlayer {
             }
             try {
                 ensureConfigured(task.asc, task.sampleRateHz, task.channels)
-                decodeAndPlay(task.au)
+                val au = task.au
+                if (au == null) {
+                    writeSilence(task.durationMs)
+                } else {
+                    decodeAndPlay(au)
+                }
             } catch (e: Exception) {
                 Log.w(TAG, "DabAudioPlayer: decode error: ${e.message}")
             }
@@ -78,7 +91,7 @@ class DabAudioPlayer {
         val format = MediaFormat.createAudioFormat(MediaFormat.MIMETYPE_AUDIO_AAC, sampleRateHz, channels)
         format.setByteBuffer("csd-0", ByteBuffer.wrap(asc))
         // Raw AAC access units (no ADTS/LOAS framing) - matches exactly what
-        // DabPlusSuperframeDecoder hands us (the CRC-stripped AU payload).
+        // NativeDabDecoder hands us (the CRC-stripped AU payload).
         format.setInteger(MediaFormat.KEY_IS_ADTS, 0)
 
         val newCodec = MediaCodec.createDecoderByType(MediaFormat.MIMETYPE_AUDIO_AAC)
@@ -127,6 +140,21 @@ class DabAudioPlayer {
                 else -> break // INFO_TRY_AGAIN_LATER or no more output right now
             }
         }
+    }
+
+    /**
+     * Writes [durationMs] of silence to the currently configured AudioTrack,
+     * if any. TRIED (2026-09-16): repeating the last successfully decoded
+     * PCM chunk to fill this gap instead of true silence - user-tested on
+     * real hardware and reported as sounding *worse* (a looped/buzzing
+     * artifact) than a clean silence gap, despite the same underlying
+     * missing-audio duration. Reverted.
+     */
+    private fun writeSilence(durationMs: Int) {
+        val track = audioTrack ?: return
+        val numSamples = track.sampleRate.toLong() * durationMs / 1000
+        val silence = ByteArray((numSamples * track.channelCount * 2).toInt()) // 16-bit PCM
+        track.write(silence, 0, silence.size)
     }
 
     private fun setupAudioTrack(sampleRateHz: Int, channels: Int) {

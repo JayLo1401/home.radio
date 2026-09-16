@@ -506,7 +506,7 @@ class RaonTunerDriver(
      * subchannel (see [openSubChannel]) - NOT pre-chunked into fixed-size
      * per-CIF frames (the amount returned depends on how much the chip's
      * FIFO had buffered since the last read); the caller must re-frame this
-     * into fixed-size pieces itself (see DabPlusSuperframeDecoder/the
+     * into fixed-size pieces itself (see NativeDabDecoder/the
      * subchannel's FIG 0/1 size) before feeding a superframe decoder.
      */
     /**

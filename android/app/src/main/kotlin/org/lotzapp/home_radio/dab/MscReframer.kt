@@ -6,7 +6,7 @@ package org.lotzapp.home_radio.dab
  * whatever happened to have accumulated in the chip's FIFO since the last
  * read. This buffers that stream and emits it back out in exact,
  * fixed-size [frameLen]-byte pieces (one per 24ms CIF), which is what
- * [DabPlusSuperframeDecoder.feed] requires.
+ * [NativeDabDecoder.feed] requires.
  */
 class MscReframer(private val frameLen: Int, private val onFrame: (ByteArray) -> Unit) {
     private var pending = ByteArray(0)

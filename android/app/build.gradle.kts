@@ -23,6 +23,21 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+
+        externalNativeBuild {
+            cmake {
+                cppFlags += "-std=c++17"
+            }
+        }
+    }
+
+    // Native DAB+ decoder (see src/main/cpp) - a JNI port of DABlin's
+    // SuperframeFilter + Phil Karn's real libfec RS(120,110) codec, used
+    // instead of a hand-ported Kotlin translation (see NativeDabDecoder.kt).
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+        }
     }
 
     buildTypes {

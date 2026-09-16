@@ -280,18 +280,34 @@ class DabUsbPlugin :
     }
 
     /**
-     * Known hardware signature of this project's DAB+ USB dongle ("DAB USB
-     * Dongle", see docs/dab-research/omri-usb-raon/README.md) - used to tell
-     * it apart from other USB devices (in particular this TV's own internal
-     * AMLOGIC Wi-Fi adapter, vendor id 0x1B8E, which otherwise also shows up
-     * as a generic vendor-class USB device in the host device list).
+     * Known hardware signatures of Raontech-chipset DAB+ USB dongles, taken
+     * from the reference driver's own device match list (see
+     * jusbdevice.cpp:74 in docs/dab-research/omri-usb-raon/) - this project's
+     * own dongle is the third pair; the other two are additional
+     * Raontech-compatible dongles the reference app also supports and are
+     * kept here so a different physical dongle isn't silently filtered out.
      */
-    private fun isDabAdapter(device: UsbDevice) =
-        device.vendorId == 0x16C0 && device.productId == 0x05DC
+    private val knownDabAdapterIds = setOf(
+        0x1D19 to 0x110D,
+        0x0FD9 to 0x004C,
+        0x16C0 to 0x05DC,
+    )
 
+    private fun isDabAdapter(device: UsbDevice) =
+        (device.vendorId to device.productId) in knownDabAdapterIds
+
+    /**
+     * Only ever list actual DAB+ dongles: a host box (e.g. a Sunmi
+     * set-top/POS device) can expose a whole internal USB hub's worth of
+     * other peripherals (fingerprint reader, printer, NFC, internal Wi-Fi,
+     * ...) as generic host-visible USB devices, which used to all show up
+     * here too - this app has no use for any of them, so filter to the
+     * known DAB adapter signatures instead of trying to blacklist every
+     * possible non-DAB device individually.
+     */
     private fun listDevices(): List<Map<String, Any?>> {
         return usbManager.deviceList.values
-            .filter { it.vendorId != 0x1B8E } // exclude the TV's own internal Wi-Fi adapter
+            .filter { isDabAdapter(it) }
             .map { device -> device.toMap() }
     }
 
@@ -640,6 +656,15 @@ class DabUsbPlugin :
         }
         Log.i(tag, "runDabPlayback: service $serviceId -> subChId=$resolvedSubChId frameLen=$resolvedFrameLen bytes/CIF")
 
+        // RULED OUT (2026-09-16): tried waiting several extra seconds here,
+        // continuing to service FIC well past what's needed for our own
+        // subChId/frameLen resolution, in case the chip's internal
+        // (register-invisible) per-subchannel protection-level setup needs
+        // more FIC observation time before openSubChannel() - verified via
+        // a standalone PC-side (Windows/libusb) capture that this makes no
+        // difference at all (same ~100% AU2-position corruption either
+        // way). Not the cause.
+        //
         // Order matters and matches the reference's setService() exactly
         // (clearAndSetupMscMemory() then openSubChannel(), found 2026-09-16
         // - this project had it backwards until now).
@@ -649,9 +674,9 @@ class DabUsbPlugin :
         audioPlayer = player
         var framesFed = 0L
         var ausDecoded = 0L
-        val decoder = DabPlusSuperframeDecoder { au, asc, sr, ch ->
-            ausDecoded++
-            player.submit(au, asc, sr, ch)
+        val decoder = NativeDabDecoder { au, asc, sr, ch, durationMs ->
+            if (au != null) ausDecoded++
+            player.submit(au, asc, sr, ch, durationMs)
         }
         // NOTE (2026-09-15 test): adding EnergyDispersal.dedisperse() here made
         // sync strictly *worse* (0% vs. a small but nonzero baseline without
@@ -663,6 +688,48 @@ class DabUsbPlugin :
         val reframer = MscReframer(resolvedFrameLen) { frame ->
             framesFed++
             decoder.feed(frame)
+        }
+
+        // Decoupled decode thread (2026-09-16): the actual production
+        // decoder the working reference app uses (OMRI's
+        // DabPlusServiceComponentDecoder, found by tracing componentDataInput
+        // -> DabEnsemble::dataInput from the real readData() call chain -
+        // this project had been comparing against DABlin, a different,
+        // independent DAB+ player, not what this hardware's own reference
+        // app is built on) runs RS-decode/superframe-assembly on its own
+        // background thread, fed via a queue from the USB-reading thread,
+        // rather than inline in the read loop like this project's code did.
+        // RS-decoding a ~2-3KB superframe (up to 28 interleaved columns,
+        // Berlekamp-Massey per column) is real CPU work, done on EVERY
+        // sync attempt (not just successes - failed/sliding attempts also
+        // trigger a full decode) - doing it inline risked occasionally
+        // delaying the next isMscDataReady()/readMscRaw() call long enough
+        // to fall behind the chip's real-time FIFO, which a fixed AU-
+        // position-correlated corruption pattern (a native/reference-
+        // decoder-verified bug-free decoder still showed it) is consistent
+        // with. Decoupling can only help - matching the proven architecture
+        // is a reasonable, low-risk change regardless.
+        val rawCifQueue = java.util.concurrent.LinkedBlockingQueue<ByteArray>(256)
+        val resetSentinel = ByteArray(0)
+        val decodeThread = Thread {
+            android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_URGENT_AUDIO)
+            while (!Thread.currentThread().isInterrupted) {
+                val chunk = try {
+                    rawCifQueue.poll(200, java.util.concurrent.TimeUnit.MILLISECONDS)
+                } catch (e: InterruptedException) {
+                    break
+                } ?: continue
+                if (chunk === resetSentinel) {
+                    reframer.reset()
+                    decoder.reset()
+                } else {
+                    reframer.feed(chunk)
+                }
+            }
+        }.apply { name = "DabDecode"; start() }
+        fun queueReset() {
+            rawCifQueue.clear()
+            rawCifQueue.offer(resetSentinel)
         }
 
         // Raw MSC dump-to-file (added for offline RS-decode debugging,
@@ -782,8 +849,7 @@ class DabUsbPlugin :
                 if (!driver.isMscDataReady()) {
                     notReadyCount++
                     if (driver.recoverMscOverrunIfNeeded()) {
-                        reframer.reset()
-                        decoder.reset()
+                        queueReset()
                     }
                     Thread.sleep(5)
                     continue
@@ -802,12 +868,12 @@ class DabUsbPlugin :
                         // touching chip state, avoids that self-inflicted
                         // loop while still not feeding garbage downstream.
                         overrunDiscardCount++
-                        reframer.reset()
-                        decoder.reset()
+                        queueReset()
                         markDumpDiscontinuity()
                     } else {
                         totalBytesRead += bytes.size
-                        reframer.feed(bytes)
+                        if (rawCifQueue.remainingCapacity() == 0) rawCifQueue.poll()
+                        rawCifQueue.offer(bytes)
                         if (!dumpDone) {
                             // 4-byte big-endian length prefix per USB read
                             // chunk (see dumpEnabled note above) so an
@@ -841,15 +907,13 @@ class DabUsbPlugin :
                     // a self-inflicted stall in earlier testing this
                     // session) - untested as of this edit.
                     if (readCount % 20 == 0L && driver.recoverMscOverrunIfNeeded()) {
-                        reframer.reset()
-                        decoder.reset()
+                        queueReset()
                         markDumpDiscontinuity()
                     }
                 } else {
                     emptyReadCount++
                     if (driver.recoverMscOverrunIfNeeded()) {
-                        reframer.reset()
-                        decoder.reset()
+                        queueReset()
                         markDumpDiscontinuity()
                     }
                     Thread.sleep(20)
@@ -869,8 +933,7 @@ class DabUsbPlugin :
                                 "$syncNow/${decoder.syncAttempts}) - soft reset #$softResetAttempts " +
                                 "(decoder/reframer only, subchannel stays open)",
                         )
-                        reframer.reset()
-                        decoder.reset()
+                        queueReset()
                     } else {
                         resyncCount++
                         Log.w(
@@ -881,8 +944,7 @@ class DabUsbPlugin :
                         driver.closeSubChannel(resolvedSubChId)
                         driver.clearAndSetupMscMemory()
                         driver.openSubChannel(resolvedSubChId)
-                        reframer.reset()
-                        decoder.reset()
+                        queueReset()
                         softResetAttempts = 0
                     }
                     markDumpDiscontinuity()
@@ -897,11 +959,15 @@ class DabUsbPlugin :
                             "sync=${decoder.syncSuccesses}/${decoder.syncAttempts} " +
                             "rsUncorr=${decoder.rsUncorrectableCodewords} rsCorrected=${decoder.rsCorrectedSymbols} " +
                             "auCrcOk=${decoder.auCrcOk} auCrcFail=${decoder.auCrcFail} " +
-                            "perAu=${(0..2).joinToString(",") { "${decoder.auCrcOkByIndex[it]}/${decoder.auCrcOkByIndex[it] + decoder.auCrcFailByIndex[it]}" }}",
+                            "perAu=${(0..2).joinToString(",") {
+                                "${decoder.auCrcOkForIndex(it)}/${decoder.auCrcOkForIndex(it) + decoder.auCrcFailForIndex(it)}"
+                            }}",
                     )
                 }
             }
         } finally {
+            decodeThread.interrupt()
+            decodeThread.join(300)
             if (!dumpDone) {
                 try {
                     dumpOut?.flush()
@@ -912,6 +978,7 @@ class DabUsbPlugin :
             }
             driver.closeSubChannel(resolvedSubChId)
             player.stop()
+            decoder.destroy()
             Log.i(tag, "======== DAB+ PLAYBACK END ========")
         }
     }
