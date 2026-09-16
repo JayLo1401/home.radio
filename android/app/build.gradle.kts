@@ -45,6 +45,12 @@ android {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
+            // Explicit (was implicit/default-on before, which is what let
+            // proguard-rules.pro's NativeDabDecoder keep rule go unnoticed
+            // until a release-ish build crashed every DAB+ playback attempt
+            // with NoSuchMethodError - found 2026-09-16).
+            isMinifyEnabled = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
 }
