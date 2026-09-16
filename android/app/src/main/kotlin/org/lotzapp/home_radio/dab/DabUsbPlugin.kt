@@ -532,6 +532,13 @@ class DabUsbPlugin :
         playbackThread = Thread {
             try {
                 runDabPlayback(freqKhz, serviceId)
+            } catch (e: InterruptedException) {
+                // Expected: stopDabPlayback() (e.g. switching to another
+                // station) interrupts this thread to wake it from whichever
+                // Thread.sleep() it's in - without this catch, the exception
+                // propagated uncaught and crashed the whole app (found
+                // 2026-09-16 while testing station switches).
+                Log.i("DabProbe", "runDabPlayback: interrupted (stopped)")
             } finally {
                 diagnosticsRunning.set(false)
             }
@@ -541,6 +548,20 @@ class DabUsbPlugin :
     private fun stopDabPlayback() {
         playbackRunning.set(false)
         playbackThread?.interrupt()
+        // Wait for the old thread to actually exit (and release
+        // diagnosticsRunning in its finally block) before returning -
+        // without this, quickly switching stations could hit
+        // startDabPlayback's diagnosticsRunning guard and report "busy"
+        // even though the old playback was already being stopped (found
+        // 2026-09-16 while testing station switches).
+        // Short timeout only - this runs on the Flutter platform/UI thread
+        // (MethodChannel calls dispatch there by default), so it must not
+        // block noticeably; the interrupt should wake the old thread's
+        // sleep almost immediately in the common case.
+        try {
+            playbackThread?.join(300)
+        } catch (_: InterruptedException) {
+        }
         playbackThread = null
         audioPlayer?.stop()
         audioPlayer = null
@@ -641,9 +662,12 @@ class DabUsbPlugin :
         // repeating the live WLAN-debug/USB-host toggle cycle for every
         // hypothesis. Capped at ~3MB (~30s at this bitrate). Remove once the
         // root cause is found.
+        // Named per station (freq+serviceId) so testing multiple stations in
+        // a row keeps each one's capture instead of overwriting it.
         val dumpDir = context.getExternalFilesDir(null)
-        val dumpFile = java.io.File(dumpDir, "dab_msc_dump.bin")
-        val dumpMetaFile = java.io.File(dumpDir, "dab_msc_dump.json")
+        val dumpTag = "${freqKhz}_$serviceId"
+        val dumpFile = java.io.File(dumpDir, "dab_msc_dump_$dumpTag.bin")
+        val dumpMetaFile = java.io.File(dumpDir, "dab_msc_dump_$dumpTag.json")
         dumpMetaFile.writeText(
             "{\"freqKhz\":$freqKhz,\"serviceId\":$serviceId,\"subChId\":$resolvedSubChId," +
                 "\"frameLenBytes\":$resolvedFrameLen}",
