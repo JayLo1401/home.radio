@@ -5,6 +5,7 @@ import '../../core/providers.dart';
 import '../../core/theme.dart';
 import '../../data/models/favorite_channel.dart';
 import '../../data/repositories/settings_repository.dart';
+import '../rtlsdr/rtl_sdr_test_screen.dart';
 import '../shared/rename_dialog.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -241,6 +242,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                 ),
               ),
+            const Divider(height: 32),
+            Text('Technik', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 8),
+            FocusTraversalOrder(
+              order: NumericFocusOrder(nextOrder()),
+              child: _TvChoiceTile(
+                label: 'RTL-SDR Test',
+                selected: false,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const RtlSdrTestScreen()),
+                ),
+              ),
+            ),
           ],
         ),
       ),

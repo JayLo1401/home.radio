@@ -10,6 +10,7 @@ import '../data/services/audio_player_service.dart';
 import '../data/services/dab_usb_service.dart';
 import '../data/services/radio_audio_handler.dart';
 import '../data/services/radio_browser_api_service.dart';
+import '../data/services/rtl_sdr_service.dart';
 
 final databaseProvider = Provider<AppDatabase>((ref) {
   final db = AppDatabase();
@@ -62,6 +63,12 @@ final radioAudioHandlerProvider = FutureProvider<RadioAudioHandler>((ref) async 
 
 final dabUsbServiceProvider = Provider<DabUsbService>((ref) {
   final service = DabUsbService();
+  ref.onDispose(service.dispose);
+  return service;
+});
+
+final rtlSdrServiceProvider = Provider<RtlSdrService>((ref) {
+  final service = RtlSdrService();
   ref.onDispose(service.dispose);
   return service;
 });
