@@ -12,7 +12,6 @@ import '../dab_stations/dab_stations_screen.dart';
 import '../search_internet/internet_radio_search_screen.dart';
 import '../settings/settings_screen.dart';
 import 'background_layer.dart';
-import 'dab_tuning_panel.dart';
 import 'favorites_sidebar.dart';
 import 'now_playing_banner.dart';
 
@@ -339,7 +338,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     MaterialPageRoute(builder: (_) => const SettingsScreen()),
                   ),
                 ),
-                if (isDab) const DabTuningPanel(),
                 Expanded(
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
