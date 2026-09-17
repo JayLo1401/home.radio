@@ -1,11 +1,18 @@
 // JNI port of DABlin's DAB+ superframe decoder (SuperframeFilter, from
 // dabplus_decoder.cpp/h - github.com/opendigitalradio/dablin, GPLv3,
-// Copyright (C) 2015-2024 Stefan Poeschel). Only the transport-layer logic
+// Copyright (C) 2015-2024 Stefan Poeschel). The transport-layer logic
 // (5-CIF accumulation, RS(120,110) outer FEC via the real libfec, Fire-code
-// superframe sync, AU boundary parsing + CRC16 check) is ported - AAC
-// decoding itself is left to Android's own MediaCodec on the Kotlin side
-// (NativeDabDecoder.kt), matching what DABlin's own AACDecoder classes are
-// a thin wrapper around anyway (FDK-AAC / FAAD2).
+// superframe sync, AU boundary parsing + CRC16 check) is ported, and AAC
+// decoding is done here too via the real Fraunhofer FDK AAC library
+// (fdk-aac/, vendored from github.com/mstorsjo/fdk-aac v2.0.3) instead of
+// Android's MediaCodec - matching what DABlin/OMRI-based DAB+ players
+// actually use, and critically giving access to FDK-AAC's built-in error
+// concealment (AACDEC_CONCEAL) for CRC-failed AUs, which real production
+// DAB+ players rely on and which is not exposed via MediaCodec at all.
+// Plain silence and a naive "repeat last PCM" were both tried for this in
+// the Kotlin layer earlier (2026-09-16) and both sounded worse than doing
+// nothing about it - proper concealment needs the decoder's own internal
+// state, which only the decoder itself has.
 //
 // The RS decode step uses Phil Karn's actual, unmodified LGPL-2.1 `libfec`
 // char/RS codec (fec/init_rs_char.c, fec/decode_rs_char.c -
@@ -21,6 +28,8 @@
 extern "C" {
 #include "fec.h"
 }
+
+#include "aacdecoder_lib.h"
 
 #define TAG "DabNative"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
@@ -107,8 +116,16 @@ struct DabDecoderState {
     jobject callback_obj = nullptr; // global ref to the Kotlin NativeDabDecoder instance
     jmethodID callback_method = nullptr;
 
+    HANDLE_AACDECODER aac_handle = nullptr;
+    uint8_t configured_format_raw = 0xFF; // sentinel "unset" (0x00 is a real, if degenerate, format byte)
+    bool aac_configured = false;
+    int pcm_sample_rate_hz = 0;
+    int pcm_channels = 0;
+    std::vector<int16_t> pcm_buf;
+
     ~DabDecoderState() {
         if (rs_handle) free_rs_char(rs_handle);
+        if (aac_handle) aacDecoder_Close(aac_handle);
     }
 };
 
@@ -187,6 +204,69 @@ bool checkSync(DabDecoderState *st, const uint8_t *sf) {
     return true;
 }
 
+// Mirrors AACDecoderFDKAAC's constructor exactly (dabplus_decoder.cpp).
+bool configureAac(DabDecoderState *st) {
+    if (st->aac_handle) {
+        aacDecoder_Close(st->aac_handle);
+        st->aac_handle = nullptr;
+    }
+    st->aac_handle = aacDecoder_Open(TT_MP4_RAW, 1);
+    if (!st->aac_handle) {
+        LOGW("aacDecoder_Open failed");
+        return false;
+    }
+
+    int channels = st->format.channels();
+    if (aacDecoder_SetParam(st->aac_handle, AAC_PCM_MIN_OUTPUT_CHANNELS, channels) != AAC_DEC_OK ||
+        aacDecoder_SetParam(st->aac_handle, AAC_PCM_MAX_OUTPUT_CHANNELS, channels) != AAC_DEC_OK) {
+        LOGW("aacDecoder_SetParam (channels) failed");
+        return false;
+    }
+
+    auto asc = buildAsc(st->format);
+    uint8_t *asc_array[1] = {asc.data()};
+    const unsigned int asc_size_array[1] = {(unsigned int) asc.size()};
+    if (aacDecoder_ConfigRaw(st->aac_handle, asc_array, asc_size_array) != AAC_DEC_OK) {
+        LOGW("aacDecoder_ConfigRaw failed");
+        return false;
+    }
+
+    st->pcm_sample_rate_hz = st->format.sampleRateHz();
+    st->pcm_channels = channels;
+    // 960 core samples/AU, x2 for SBR upsampling, x2 bytes doesn't apply
+    // here (pcm_buf is int16_t already) - matches output_frame_len/2 in
+    // the reference (which counts bytes, not samples).
+    size_t pcm_samples = 960 * channels * (st->format.sbr_flag ? 2 : 1);
+    st->pcm_buf.assign(pcm_samples, 0);
+    st->aac_configured = true;
+    return true;
+}
+
+// Returns the number of valid int16 samples written to st->pcm_buf, or -1
+// on a hard decode error (concealment itself should never hard-fail).
+int decodeAacToPcm(DabDecoderState *st, const uint8_t *au, int au_len, bool conceal) {
+    if (!conceal) {
+        uint8_t *input_buffer[1] = {(uint8_t *) au};
+        const unsigned int input_buffer_size[1] = {(unsigned int) au_len};
+        unsigned int bytes_valid = au_len;
+        AAC_DECODER_ERROR fill_result = aacDecoder_Fill(st->aac_handle, input_buffer, input_buffer_size, &bytes_valid);
+        if (fill_result != AAC_DEC_OK || bytes_valid != 0) {
+            LOGW("aacDecoder_Fill error=%d bytesValid=%u", fill_result, bytes_valid);
+            return -1;
+        }
+    }
+
+    AAC_DECODER_ERROR result = aacDecoder_DecodeFrame(
+        st->aac_handle, (INT_PCM *) st->pcm_buf.data(), (INT) st->pcm_buf.size(),
+        conceal ? AACDEC_CONCEAL : 0);
+    if (result != AAC_DEC_OK) {
+        // Not fatal - matches DABlin's AudioWarning-and-continue behavior.
+        LOGW("aacDecoder_DecodeFrame error=%d conceal=%d", result, conceal);
+        return -1;
+    }
+    return (int) st->pcm_buf.size();
+}
+
 void feedOneFrame(JNIEnv *env, DabDecoderState *st, const uint8_t *data, size_t len) {
     if (st->frame_len) {
         if (st->frame_len != len) return; // subchannel reconfigured mid-stream - ignore
@@ -217,13 +297,13 @@ void feedOneFrame(JNIEnv *env, DabDecoderState *st, const uint8_t *data, size_t 
     if (!checkSync(st, sf.data())) return; // frame_count stays 5 -> next feed() slides the window by one CIF
     st->stats[STAT_SYNC_SUCCESSES]++;
 
-    auto asc = buildAsc(st->format);
-    jbyteArray ascArray = env->NewByteArray((jsize) asc.size());
-    env->SetByteArrayRegion(ascArray, 0, (jsize) asc.size(), (const jbyte *) asc.data());
-
-    int auDurationMs = 120 / st->num_aus;
-    int sampleRateHz = st->format.sampleRateHz();
-    int channels = st->format.channels();
+    if (!st->aac_configured || st->format_raw != st->configured_format_raw) {
+        st->configured_format_raw = st->format_raw;
+        if (!configureAac(st)) {
+            st->aac_configured = false;
+            return; // try again on the next successfully-synced superframe
+        }
+    }
 
     for (int i = 0; i < st->num_aus; i++) {
         int start = st->au_start[i];
@@ -232,22 +312,38 @@ void feedOneFrame(JNIEnv *env, DabDecoderState *st, const uint8_t *data, size_t 
         int auLen = end - start - 2;
         uint16_t crcStored = (uint16_t) ((sf[end - 2] << 8) | sf[end - 1]);
         uint16_t crcCalced = CRC_CCITT.calc(sf.data(), (size_t) start, (size_t) auLen);
+        bool crcActuallyOk = crcStored == crcCalced;
+        // REVERTED (2026-09-16): combining CRC-bypass with the larger
+        // AudioTrack buffer made things much worse ("long nothing, then
+        // something garbled") - feeding genuinely corrupted AU bytes
+        // straight to the AAC decoder as if valid produces real decode
+        // garbage/noise, not just missing audio, and a bigger buffer means
+        // more of that garbage (or decode failures with no output at all)
+        // accumulates before anything audible changes. Back to real CRC
+        // checking, so FDK-AAC's own concealment (AACDEC_CONCEAL) handles
+        // failed AUs properly instead of being fed garbage.
+        bool crcOk = crcActuallyOk;
 
-        jbyteArray auArray = nullptr;
-        if (crcStored != crcCalced) {
-            st->stats[STAT_AU_FAIL]++;
-            if (i < 6) st->stats[STAT_AU_FAIL_BY_INDEX + i]++;
-        } else {
+        if (crcActuallyOk) {
             st->stats[STAT_AU_OK]++;
             if (i < 6) st->stats[STAT_AU_OK_BY_INDEX + i]++;
-            auArray = env->NewByteArray(auLen);
-            env->SetByteArrayRegion(auArray, 0, auLen, (const jbyte *) &sf[start]);
+        } else {
+            st->stats[STAT_AU_FAIL]++;
+            if (i < 6) st->stats[STAT_AU_FAIL_BY_INDEX + i]++;
         }
 
-        env->CallVoidMethod(st->callback_obj, st->callback_method, auArray, ascArray, sampleRateHz, channels, auDurationMs);
-        if (auArray) env->DeleteLocalRef(auArray);
+        // Always call the AAC decoder, even on a CRC failure - passing
+        // AACDEC_CONCEAL instead of the (untrustworthy) AU bytes triggers
+        // FDK-AAC's own error concealment, which needs its internal state
+        // (spectral history etc.) to keep advancing every AU regardless.
+        int pcm_samples = decodeAacToPcm(st, crcOk ? &sf[start] : nullptr, crcOk ? auLen : 0, !crcOk);
+        if (pcm_samples <= 0) continue;
+
+        jbyteArray pcmArray = env->NewByteArray(pcm_samples * (jsize) sizeof(int16_t));
+        env->SetByteArrayRegion(pcmArray, 0, pcm_samples * (jsize) sizeof(int16_t), (const jbyte *) st->pcm_buf.data());
+        env->CallVoidMethod(st->callback_obj, st->callback_method, pcmArray, st->pcm_sample_rate_hz, st->pcm_channels);
+        env->DeleteLocalRef(pcmArray);
     }
-    env->DeleteLocalRef(ascArray);
 
     st->frame_count = 0;
 }
@@ -266,7 +362,7 @@ Java_org_lotzapp_home_1radio_dab_NativeDabDecoder_nativeCreate(JNIEnv *env, jobj
     env->GetJavaVM(&st->jvm);
     st->callback_obj = env->NewGlobalRef(thiz);
     jclass cls = env->GetObjectClass(thiz);
-    st->callback_method = env->GetMethodID(cls, "onAuFromNative", "([B[BIII)V");
+    st->callback_method = env->GetMethodID(cls, "onPcmFromNative", "([BII)V");
     return (jlong) st;
 }
 
@@ -285,6 +381,12 @@ Java_org_lotzapp_home_1radio_dab_NativeDabDecoder_nativeReset(JNIEnv *, jobject,
     auto *st = (DabDecoderState *) handle;
     if (!st) return;
     st->frame_count = 0;
+    // Force the AAC decoder to be (re)configured fresh on the next synced
+    // superframe - a reset here means a real stream discontinuity (watchdog
+    // resync, overrun recovery), so any concealment history FDK-AAC is
+    // holding onto is for audio that's now gone; starting clean avoids it
+    // concealing "into" unrelated new content.
+    st->aac_configured = false;
 }
 
 extern "C" JNIEXPORT void JNICALL

@@ -2,10 +2,33 @@ import '../db/database.dart';
 
 enum AutostartMode { lastStation, fixedStation }
 
+/// Either a favorite's program number or a DAB+ station played directly from
+/// "Alle DAB+ Sender" without being favorited (see FavoritesSidebar) - the
+/// latter has no program number of its own, so [AutostartMode.lastStation]
+/// needs to remember which kind it was. See [SettingsRepository.getLastPlayed].
+class LastPlayed {
+  final int? favoriteProgramNumber;
+  final int? dabFreqKhz;
+  final int? dabServiceId;
+
+  const LastPlayed.favorite(int programNumber)
+      : favoriteProgramNumber = programNumber,
+        dabFreqKhz = null,
+        dabServiceId = null;
+
+  const LastPlayed.dabStation({required int freqKhz, required int serviceId})
+      : favoriteProgramNumber = null,
+        dabFreqKhz = freqKhz,
+        dabServiceId = serviceId;
+}
+
 class SettingsRepository {
   static const _keyAutostartMode = 'autostart_mode';
   static const _keyFixedProgramNumber = 'autostart_fixed_program_number';
   static const _keyLastProgramNumber = 'last_played_program_number';
+  static const _keyLastPlayedKind = 'last_played_kind'; // 'favorite' | 'dab'
+  static const _keyLastDabFreqKhz = 'last_played_dab_freq_khz';
+  static const _keyLastDabServiceId = 'last_played_dab_service_id';
   static const _keyWeatherEnabled = 'weather_enabled';
   static const _keyRadarEnabled = 'radar_enabled';
   static const _keyWeatherLat = 'weather_lat';
@@ -42,6 +65,32 @@ class SettingsRepository {
 
   Future<void> setLastProgramNumber(int programNumber) =>
       _db.setSetting(_keyLastProgramNumber, '$programNumber');
+
+  Future<void> setLastPlayedFavorite(int programNumber) async {
+    await setLastProgramNumber(programNumber);
+    await _db.setSetting(_keyLastPlayedKind, 'favorite');
+  }
+
+  Future<void> setLastPlayedDabStation(int freqKhz, int serviceId) async {
+    await _db.setSetting(_keyLastDabFreqKhz, '$freqKhz');
+    await _db.setSetting(_keyLastDabServiceId, '$serviceId');
+    await _db.setSetting(_keyLastPlayedKind, 'dab');
+  }
+
+  /// Whatever was last played, regardless of whether it's still a saved
+  /// favorite - see [LastPlayed].
+  Future<LastPlayed?> getLastPlayed() async {
+    final kind = await _db.getSetting(_keyLastPlayedKind);
+    if (kind == 'dab') {
+      final freqKhz = int.tryParse(await _db.getSetting(_keyLastDabFreqKhz) ?? '');
+      final serviceId = int.tryParse(await _db.getSetting(_keyLastDabServiceId) ?? '');
+      if (freqKhz != null && serviceId != null) {
+        return LastPlayed.dabStation(freqKhz: freqKhz, serviceId: serviceId);
+      }
+    }
+    final programNumber = await getLastProgramNumber();
+    return programNumber == null ? null : LastPlayed.favorite(programNumber);
+  }
 
   Future<bool> getWeatherEnabled() async =>
       (await _db.getSetting(_keyWeatherEnabled)) != 'false';

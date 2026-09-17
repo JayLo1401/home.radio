@@ -5,7 +5,7 @@ import '../../core/providers.dart';
 import '../../core/theme.dart';
 import '../../data/models/favorite_channel.dart';
 import '../../data/repositories/settings_repository.dart';
-import '../dab_stations/dab_stations_screen.dart';
+import '../shared/rename_dialog.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -50,6 +50,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final next = (_uiScale + delta).clamp(0.4, 1.4);
     setState(() => _uiScale = next);
     await ref.read(uiScaleProvider.notifier).set(next);
+  }
+
+  Future<void> _renameFavorite(FavoriteChannel channel) async {
+    final newName = await showDialog<String>(
+      context: context,
+      builder: (context) => RenameDialog(
+        title: 'Favorit umbenennen',
+        initialValue: channel.displayName,
+      ),
+    );
+    if (newName == null || newName.isEmpty) return;
+    await ref.read(favoritesRepositoryProvider).rename(channel.programNumber, newName);
   }
 
   @override
@@ -182,37 +194,53 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ],
             ),
             const Divider(height: 32),
-            Text('DAB+', style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 8),
-            FocusTraversalOrder(
-              order: NumericFocusOrder(nextOrder()),
-              child: ListTile(
-                leading: const Icon(Icons.radio),
-                title: const Text('DAB+ Sender verwalten'),
-                subtitle: const Text('Adapter, Sendersuchlauf, Favoriten'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const DabStationsScreen()),
-                ),
+            Text('Favoriten verwalten', style: Theme.of(context).textTheme.titleLarge),
+            const Padding(
+              padding: EdgeInsets.only(top: 4, bottom: 4),
+              child: Text(
+                'Mit den Pfeilen die Reihenfolge (Sendernummer) ändern.',
+                style: TextStyle(color: Colors.white54, fontSize: 13),
               ),
             ),
-            const Divider(height: 32),
-            Text('Favoriten verwalten', style: Theme.of(context).textTheme.titleLarge),
-            ...favorites.map(
-              (c) => FocusTraversalOrder(
+            for (final (index, c) in favorites.indexed)
+              FocusTraversalOrder(
                 order: NumericFocusOrder(nextOrder()),
                 child: ListTile(
                   leading: CircleAvatar(child: Text('${c.programNumber}')),
                   title: Text(c.displayName),
                   subtitle:
                       Text(c.sourceType == FavoriteSourceType.dab ? 'DAB+' : 'Internetradio'),
-                  trailing: _TvIconButton(
-                    icon: Icons.delete_outline,
-                    onTap: () => ref.read(favoritesRepositoryProvider).remove(c.programNumber),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _TvIconButton(
+                        icon: Icons.keyboard_arrow_up,
+                        onTap: index == 0
+                            ? null
+                            : () => ref
+                                .read(favoritesRepositoryProvider)
+                                .swapProgramNumbers(c.programNumber, favorites[index - 1].programNumber),
+                      ),
+                      _TvIconButton(
+                        icon: Icons.keyboard_arrow_down,
+                        onTap: index == favorites.length - 1
+                            ? null
+                            : () => ref
+                                .read(favoritesRepositoryProvider)
+                                .swapProgramNumbers(c.programNumber, favorites[index + 1].programNumber),
+                      ),
+                      _TvIconButton(
+                        icon: Icons.edit_outlined,
+                        onTap: () => _renameFavorite(c),
+                      ),
+                      _TvIconButton(
+                        icon: Icons.delete_outline,
+                        onTap: () => ref.read(favoritesRepositoryProvider).remove(c.programNumber),
+                      ),
+                    ],
                   ),
                 ),
               ),
-            ),
           ],
         ),
       ),
@@ -287,7 +315,7 @@ class _TvChoiceTileState extends State<_TvChoiceTile> {
 
 class _TvIconButton extends StatefulWidget {
   final IconData icon;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   const _TvIconButton({required this.icon, required this.onTap});
 
@@ -311,7 +339,7 @@ class _TvIconButtonState extends State<_TvIconButton> {
         onTap: widget.onTap,
         child: Padding(
           padding: const EdgeInsets.all(10),
-          child: Icon(widget.icon),
+          child: Icon(widget.icon, color: widget.onTap == null ? Colors.white24 : null),
         ),
       ),
     );

@@ -1,7 +1,9 @@
 import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart' as just_audio;
 
+import '../db/database.dart' show DabStation;
 import '../models/favorite_channel.dart';
+import '../repositories/dab_stations_repository.dart' show DabStationDisplay;
 import 'audio_player_service.dart';
 
 /// Mirrors the app's current channel/playback state into an Android
@@ -30,6 +32,28 @@ class RadioAudioHandler extends BaseAudioHandler {
         title: channel.displayName,
         album: channel.sourceType == FavoriteSourceType.dab ? 'DAB+' : 'Internetradio',
         artUri: channel.logoUrl != null ? Uri.tryParse(channel.logoUrl!) : null,
+      ),
+    );
+    playbackState.add(
+      playbackState.value.copyWith(
+        controls: [MediaControl.stop],
+        systemActions: const {MediaAction.stop},
+        playing: playing,
+        processingState: AudioProcessingState.ready,
+      ),
+    );
+  }
+
+  /// Same as [setChannel] but for a DAB+ station played directly from "Alle
+  /// DAB+ Sender" (see FavoritesSidebar) without being a favorite - it has no
+  /// program number, so the MediaItem id is built from its frequency/service
+  /// id instead.
+  void setDabStation(DabStation station, {required bool playing}) {
+    mediaItem.add(
+      MediaItem(
+        id: 'dab_${station.freqKhz}_${station.serviceId}',
+        title: station.displayLabel,
+        album: 'DAB+',
       ),
     );
     playbackState.add(

@@ -33,4 +33,26 @@ class DabStationsRepository {
   }
 
   Future<void> clearAll() => _db.clearDabStations();
+
+  /// Overrides the decoded FIG label for one station - DAB+ labels sometimes
+  /// carry genuinely-real but garbled-looking special characters, so this
+  /// lets the user replace it (see [DabStationDisplay.displayLabel]). An
+  /// empty [customLabel] reverts back to the decoded [DabStation.stationLabel].
+  Future<void> setCustomLabel({
+    required int freqKhz,
+    required int serviceId,
+    required String? customLabel,
+  }) {
+    final trimmed = customLabel?.trim();
+    return _db.setDabStationCustomLabel(freqKhz, serviceId, trimmed?.isEmpty ?? true ? null : trimmed);
+  }
+}
+
+/// [DabStation.stationLabel] with any user-provided [DabStation.customLabel]
+/// override applied - use this everywhere a station's name is displayed.
+extension DabStationDisplay on DabStation {
+  String get displayLabel {
+    final custom = customLabel;
+    return custom == null || custom.isEmpty ? stationLabel : custom;
+  }
 }

@@ -4,13 +4,16 @@ import 'dart:math' as math;
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
-import '../../data/models/favorite_channel.dart';
-
 /// Bottom banner showing the currently playing station, logo and metadata.
-/// Source-agnostic (internet radio vs. DAB+) - the caller resolves the
-/// underlying player/bridge state into these plain flags/text fields.
+/// Source-agnostic (internet radio vs. DAB+, favorite or a DAB+ station
+/// played directly from "Alle DAB+ Sender" without being one - see
+/// FavoritesSidebar) - the caller resolves whatever's actually playing into
+/// these plain fields; [programNumber] is null for the latter case.
 class NowPlayingBanner extends StatelessWidget {
-  final FavoriteChannel? channel;
+  final int? programNumber;
+  final String? displayName;
+  final String? logoUrl;
+  final String? logoLocalPath;
   final bool isPlaying;
   final bool isBuffering;
   final String? subtitle;
@@ -18,7 +21,10 @@ class NowPlayingBanner extends StatelessWidget {
 
   const NowPlayingBanner({
     super.key,
-    required this.channel,
+    required this.programNumber,
+    required this.displayName,
+    required this.logoUrl,
+    required this.logoLocalPath,
     required this.isPlaying,
     this.isBuffering = false,
     this.subtitle,
@@ -27,19 +33,19 @@ class NowPlayingBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final channel = this.channel;
+    final displayName = this.displayName;
     return Container(
       height: 110,
       color: Colors.black.withValues(alpha: 0.7),
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-      child: channel == null
+      child: displayName == null
           ? const Center(
               child: Text('Kein Sender ausgewählt',
                   style: TextStyle(color: Colors.white54, fontSize: 20)),
             )
           : Row(
               children: [
-                _BannerLogo(channel: channel),
+                _BannerLogo(logoUrl: logoUrl, logoLocalPath: logoLocalPath),
                 const SizedBox(width: 18),
                 Expanded(
                   child: Column(
@@ -47,7 +53,7 @@ class NowPlayingBanner extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '${channel.programNumber} · ${channel.displayName}',
+                        programNumber != null ? '$programNumber · $displayName' : displayName,
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 24,
@@ -142,8 +148,9 @@ class _PlayingPulseState extends State<_PlayingPulse> with SingleTickerProviderS
 }
 
 class _BannerLogo extends StatelessWidget {
-  final FavoriteChannel channel;
-  const _BannerLogo({required this.channel});
+  final String? logoUrl;
+  final String? logoLocalPath;
+  const _BannerLogo({required this.logoUrl, required this.logoLocalPath});
 
   @override
   Widget build(BuildContext context) {
@@ -157,19 +164,19 @@ class _BannerLogo extends StatelessWidget {
       ),
       child: const Icon(Icons.radio, color: Colors.white38, size: 36),
     );
-    if (channel.logoLocalPath != null) {
+    if (logoLocalPath != null) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(10),
-        child: Image.file(File(channel.logoLocalPath!),
+        child: Image.file(File(logoLocalPath!),
             width: size, height: size, fit: BoxFit.cover,
             errorBuilder: (_, _, _) => placeholder),
       );
     }
-    if (channel.logoUrl != null) {
+    if (logoUrl != null) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(10),
         child: CachedNetworkImage(
-          imageUrl: channel.logoUrl!,
+          imageUrl: logoUrl!,
           width: size,
           height: size,
           fit: BoxFit.cover,

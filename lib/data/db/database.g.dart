@@ -755,6 +755,17 @@ class $DabStationsTable extends DabStations
     requiredDuringInsert: false,
     defaultValue: currentDateAndTime,
   );
+  static const VerificationMeta _customLabelMeta = const VerificationMeta(
+    'customLabel',
+  );
+  @override
+  late final GeneratedColumn<String> customLabel = GeneratedColumn<String>(
+    'custom_label',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     freqKhz,
@@ -763,6 +774,7 @@ class $DabStationsTable extends DabStations
     stationLabel,
     ensembleLabel,
     lastSeenAt,
+    customLabel,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -832,6 +844,15 @@ class $DabStationsTable extends DabStations
         ),
       );
     }
+    if (data.containsKey('custom_label')) {
+      context.handle(
+        _customLabelMeta,
+        customLabel.isAcceptableOrUnknown(
+          data['custom_label']!,
+          _customLabelMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -865,6 +886,10 @@ class $DabStationsTable extends DabStations
         DriftSqlType.dateTime,
         data['${effectivePrefix}last_seen_at'],
       )!,
+      customLabel: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}custom_label'],
+      ),
     );
   }
 
@@ -881,6 +906,7 @@ class DabStation extends DataClass implements Insertable<DabStation> {
   final String stationLabel;
   final String? ensembleLabel;
   final DateTime lastSeenAt;
+  final String? customLabel;
   const DabStation({
     required this.freqKhz,
     required this.serviceId,
@@ -888,6 +914,7 @@ class DabStation extends DataClass implements Insertable<DabStation> {
     required this.stationLabel,
     this.ensembleLabel,
     required this.lastSeenAt,
+    this.customLabel,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -900,6 +927,9 @@ class DabStation extends DataClass implements Insertable<DabStation> {
       map['ensemble_label'] = Variable<String>(ensembleLabel);
     }
     map['last_seen_at'] = Variable<DateTime>(lastSeenAt);
+    if (!nullToAbsent || customLabel != null) {
+      map['custom_label'] = Variable<String>(customLabel);
+    }
     return map;
   }
 
@@ -913,6 +943,9 @@ class DabStation extends DataClass implements Insertable<DabStation> {
           ? const Value.absent()
           : Value(ensembleLabel),
       lastSeenAt: Value(lastSeenAt),
+      customLabel: customLabel == null && nullToAbsent
+          ? const Value.absent()
+          : Value(customLabel),
     );
   }
 
@@ -928,6 +961,7 @@ class DabStation extends DataClass implements Insertable<DabStation> {
       stationLabel: serializer.fromJson<String>(json['stationLabel']),
       ensembleLabel: serializer.fromJson<String?>(json['ensembleLabel']),
       lastSeenAt: serializer.fromJson<DateTime>(json['lastSeenAt']),
+      customLabel: serializer.fromJson<String?>(json['customLabel']),
     );
   }
   @override
@@ -940,6 +974,7 @@ class DabStation extends DataClass implements Insertable<DabStation> {
       'stationLabel': serializer.toJson<String>(stationLabel),
       'ensembleLabel': serializer.toJson<String?>(ensembleLabel),
       'lastSeenAt': serializer.toJson<DateTime>(lastSeenAt),
+      'customLabel': serializer.toJson<String?>(customLabel),
     };
   }
 
@@ -950,6 +985,7 @@ class DabStation extends DataClass implements Insertable<DabStation> {
     String? stationLabel,
     Value<String?> ensembleLabel = const Value.absent(),
     DateTime? lastSeenAt,
+    Value<String?> customLabel = const Value.absent(),
   }) => DabStation(
     freqKhz: freqKhz ?? this.freqKhz,
     serviceId: serviceId ?? this.serviceId,
@@ -959,6 +995,7 @@ class DabStation extends DataClass implements Insertable<DabStation> {
         ? ensembleLabel.value
         : this.ensembleLabel,
     lastSeenAt: lastSeenAt ?? this.lastSeenAt,
+    customLabel: customLabel.present ? customLabel.value : this.customLabel,
   );
   DabStation copyWithCompanion(DabStationsCompanion data) {
     return DabStation(
@@ -976,6 +1013,9 @@ class DabStation extends DataClass implements Insertable<DabStation> {
       lastSeenAt: data.lastSeenAt.present
           ? data.lastSeenAt.value
           : this.lastSeenAt,
+      customLabel: data.customLabel.present
+          ? data.customLabel.value
+          : this.customLabel,
     );
   }
 
@@ -987,7 +1027,8 @@ class DabStation extends DataClass implements Insertable<DabStation> {
           ..write('channelLabel: $channelLabel, ')
           ..write('stationLabel: $stationLabel, ')
           ..write('ensembleLabel: $ensembleLabel, ')
-          ..write('lastSeenAt: $lastSeenAt')
+          ..write('lastSeenAt: $lastSeenAt, ')
+          ..write('customLabel: $customLabel')
           ..write(')'))
         .toString();
   }
@@ -1000,6 +1041,7 @@ class DabStation extends DataClass implements Insertable<DabStation> {
     stationLabel,
     ensembleLabel,
     lastSeenAt,
+    customLabel,
   );
   @override
   bool operator ==(Object other) =>
@@ -1010,7 +1052,8 @@ class DabStation extends DataClass implements Insertable<DabStation> {
           other.channelLabel == this.channelLabel &&
           other.stationLabel == this.stationLabel &&
           other.ensembleLabel == this.ensembleLabel &&
-          other.lastSeenAt == this.lastSeenAt);
+          other.lastSeenAt == this.lastSeenAt &&
+          other.customLabel == this.customLabel);
 }
 
 class DabStationsCompanion extends UpdateCompanion<DabStation> {
@@ -1020,6 +1063,7 @@ class DabStationsCompanion extends UpdateCompanion<DabStation> {
   final Value<String> stationLabel;
   final Value<String?> ensembleLabel;
   final Value<DateTime> lastSeenAt;
+  final Value<String?> customLabel;
   final Value<int> rowid;
   const DabStationsCompanion({
     this.freqKhz = const Value.absent(),
@@ -1028,6 +1072,7 @@ class DabStationsCompanion extends UpdateCompanion<DabStation> {
     this.stationLabel = const Value.absent(),
     this.ensembleLabel = const Value.absent(),
     this.lastSeenAt = const Value.absent(),
+    this.customLabel = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   DabStationsCompanion.insert({
@@ -1037,6 +1082,7 @@ class DabStationsCompanion extends UpdateCompanion<DabStation> {
     required String stationLabel,
     this.ensembleLabel = const Value.absent(),
     this.lastSeenAt = const Value.absent(),
+    this.customLabel = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : freqKhz = Value(freqKhz),
        serviceId = Value(serviceId),
@@ -1049,6 +1095,7 @@ class DabStationsCompanion extends UpdateCompanion<DabStation> {
     Expression<String>? stationLabel,
     Expression<String>? ensembleLabel,
     Expression<DateTime>? lastSeenAt,
+    Expression<String>? customLabel,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1058,6 +1105,7 @@ class DabStationsCompanion extends UpdateCompanion<DabStation> {
       if (stationLabel != null) 'station_label': stationLabel,
       if (ensembleLabel != null) 'ensemble_label': ensembleLabel,
       if (lastSeenAt != null) 'last_seen_at': lastSeenAt,
+      if (customLabel != null) 'custom_label': customLabel,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1069,6 +1117,7 @@ class DabStationsCompanion extends UpdateCompanion<DabStation> {
     Value<String>? stationLabel,
     Value<String?>? ensembleLabel,
     Value<DateTime>? lastSeenAt,
+    Value<String?>? customLabel,
     Value<int>? rowid,
   }) {
     return DabStationsCompanion(
@@ -1078,6 +1127,7 @@ class DabStationsCompanion extends UpdateCompanion<DabStation> {
       stationLabel: stationLabel ?? this.stationLabel,
       ensembleLabel: ensembleLabel ?? this.ensembleLabel,
       lastSeenAt: lastSeenAt ?? this.lastSeenAt,
+      customLabel: customLabel ?? this.customLabel,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1103,6 +1153,9 @@ class DabStationsCompanion extends UpdateCompanion<DabStation> {
     if (lastSeenAt.present) {
       map['last_seen_at'] = Variable<DateTime>(lastSeenAt.value);
     }
+    if (customLabel.present) {
+      map['custom_label'] = Variable<String>(customLabel.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1118,6 +1171,7 @@ class DabStationsCompanion extends UpdateCompanion<DabStation> {
           ..write('stationLabel: $stationLabel, ')
           ..write('ensembleLabel: $ensembleLabel, ')
           ..write('lastSeenAt: $lastSeenAt, ')
+          ..write('customLabel: $customLabel, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -1534,6 +1588,7 @@ typedef $$DabStationsTableCreateCompanionBuilder =
       required String stationLabel,
       Value<String?> ensembleLabel,
       Value<DateTime> lastSeenAt,
+      Value<String?> customLabel,
       Value<int> rowid,
     });
 typedef $$DabStationsTableUpdateCompanionBuilder =
@@ -1544,6 +1599,7 @@ typedef $$DabStationsTableUpdateCompanionBuilder =
       Value<String> stationLabel,
       Value<String?> ensembleLabel,
       Value<DateTime> lastSeenAt,
+      Value<String?> customLabel,
       Value<int> rowid,
     });
 
@@ -1583,6 +1639,11 @@ class $$DabStationsTableFilterComposer
 
   ColumnFilters<DateTime> get lastSeenAt => $composableBuilder(
     column: $table.lastSeenAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get customLabel => $composableBuilder(
+    column: $table.customLabel,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -1625,6 +1686,11 @@ class $$DabStationsTableOrderingComposer
     column: $table.lastSeenAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get customLabel => $composableBuilder(
+    column: $table.customLabel,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$DabStationsTableAnnotationComposer
@@ -1659,6 +1725,11 @@ class $$DabStationsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get lastSeenAt => $composableBuilder(
     column: $table.lastSeenAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get customLabel => $composableBuilder(
+    column: $table.customLabel,
     builder: (column) => column,
   );
 }
@@ -1700,6 +1771,7 @@ class $$DabStationsTableTableManager
                 Value<String> stationLabel = const Value.absent(),
                 Value<String?> ensembleLabel = const Value.absent(),
                 Value<DateTime> lastSeenAt = const Value.absent(),
+                Value<String?> customLabel = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => DabStationsCompanion(
                 freqKhz: freqKhz,
@@ -1708,6 +1780,7 @@ class $$DabStationsTableTableManager
                 stationLabel: stationLabel,
                 ensembleLabel: ensembleLabel,
                 lastSeenAt: lastSeenAt,
+                customLabel: customLabel,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -1718,6 +1791,7 @@ class $$DabStationsTableTableManager
                 required String stationLabel,
                 Value<String?> ensembleLabel = const Value.absent(),
                 Value<DateTime> lastSeenAt = const Value.absent(),
+                Value<String?> customLabel = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => DabStationsCompanion.insert(
                 freqKhz: freqKhz,
@@ -1726,6 +1800,7 @@ class $$DabStationsTableTableManager
                 stationLabel: stationLabel,
                 ensembleLabel: ensembleLabel,
                 lastSeenAt: lastSeenAt,
+                customLabel: customLabel,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

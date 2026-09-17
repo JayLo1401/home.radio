@@ -53,3 +53,10 @@ app.*.map.json
 /applogo2.png
 /applogo3.png
 /pdf_text.txt
+
+# Third-party reference APKs (decompiled locally for protocol comparison,
+# 2026-09-16/17) and their extracted/decompiled contents - copyrighted
+# binaries, not our source, not meant to be checked in.
+/DAB-Z*.apk
+/DABPlus-*/
+/dabz_extracted/

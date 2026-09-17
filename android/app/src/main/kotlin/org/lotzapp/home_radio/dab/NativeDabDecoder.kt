@@ -2,9 +2,13 @@ package org.lotzapp.home_radio.dab
 
 /**
  * JNI wrapper around a native (C/C++) port of DABlin's DAB+ superframe
- * decoder (github.com/opendigitalradio/dablin, GPLv3, Copyright (C)
- * 2015-2024 Stefan Poeschel) and Phil Karn's LGPL-2.1 `libfec` RS(120,110)
- * codec (github.com/quiet/libfec) - see android/app/src/main/cpp/dab_native.cpp.
+ * transport-layer decoder (github.com/opendigitalradio/dablin, GPLv3,
+ * Copyright (C) 2015-2024 Stefan Poeschel), Phil Karn's LGPL-2.1 `libfec`
+ * RS(120,110) codec (github.com/quiet/libfec), and the Fraunhofer FDK AAC
+ * decoder (github.com/mstorsjo/fdk-aac) - see
+ * android/app/src/main/cpp/dab_native.cpp. Hands back ready-to-play PCM
+ * directly (AAC decoding, including FDK-AAC's own error concealment for
+ * CRC-failed AUs, happens natively) rather than raw AAC access units.
  *
  * Replaces the hand-ported Kotlin [DabPlusSuperframeDecoder]/[ReedSolomon]
  * (2026-09-16, after an extensive, still-unexplained ~35-45% AU-CRC failure
@@ -12,14 +16,15 @@ package org.lotzapp.home_radio.dab
  * the same upstream sources multiple times): using the actual reference C
  * sources directly - rather than a from-scratch Kotlin translation - removes
  * any possibility of a subtle porting bug as the explanation, whatever the
- * real cause turns out to be.
+ * real cause turns out to be. MediaCodec (Android's own AAC decoder) was
+ * replaced the same way shortly after, to get access to FDK-AAC's built-in
+ * concealment - a hand-rolled "silence" and "repeat last PCM" substitute for
+ * CRC-failed AUs were both tried in the Kotlin layer and sounded worse than
+ * doing nothing, which real concealment needs the decoder's own internal
+ * state to do properly.
  */
 class NativeDabDecoder(
-    // au == null means "this AU's CRC failed, but the superframe as a whole
-    // is synced" - the caller should insert durationMs of silence to keep
-    // playback timing continuous instead of jump-cutting to the next
-    // surviving AU.
-    private val onAudioUnit: (au: ByteArray?, asc: ByteArray, sampleRateHz: Int, channels: Int, durationMs: Int) -> Unit,
+    private val onPcm: (pcm: ByteArray, sampleRateHz: Int, channels: Int) -> Unit,
 ) {
     private val handle: Long = nativeCreate()
 
@@ -36,9 +41,9 @@ class NativeDabDecoder(
     fun auCrcOkForIndex(i: Int): Long = nativeGetStat(handle, 6 + i)
     fun auCrcFailForIndex(i: Int): Long = nativeGetStat(handle, 12 + i)
 
-    /** Called from native code (dab_native.cpp) for every AU slot in a synced superframe. */
-    fun onAuFromNative(au: ByteArray?, asc: ByteArray, sampleRateHz: Int, channels: Int, durationMs: Int) {
-        onAudioUnit(au, asc, sampleRateHz, channels, durationMs)
+    /** Called from native code (dab_native.cpp) with decoded PCM for every AU slot in a synced superframe. */
+    fun onPcmFromNative(pcm: ByteArray, sampleRateHz: Int, channels: Int) {
+        onPcm(pcm, sampleRateHz, channels)
     }
 
     private external fun nativeCreate(): Long

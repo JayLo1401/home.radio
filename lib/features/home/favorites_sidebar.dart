@@ -6,56 +6,292 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers.dart';
 import '../../core/theme.dart';
+import '../../data/db/database.dart' show DabStation;
 import '../../data/models/favorite_channel.dart';
+import '../../data/repositories/dab_stations_repository.dart' show DabStationDisplay;
 
-/// Scrollable list of favorite stations, shown on the right edge of the
-/// home screen. Navigable with D-Pad up/down; OK/Enter tunes the station.
-class FavoritesSidebar extends ConsumerWidget {
+enum _SidebarCategory { favorites, dabStations }
+
+/// Categorized, scrollable list of stations shown on the right edge of the
+/// home screen: "Favoriten" (favorites sorted by program number) and
+/// "DAB-Sender" (every DAB+ station ever found by a scan - see
+/// DabStationsRepository - playable directly without being a favorite).
+/// Navigable with D-Pad up/down; OK/Enter tunes the station.
+class FavoritesSidebar extends ConsumerStatefulWidget {
   final void Function(FavoriteChannel channel) onSelect;
+  final void Function(DabStation station) onSelectDabStation;
 
-  const FavoritesSidebar({super.key, required this.onSelect});
+  const FavoritesSidebar({
+    super.key,
+    required this.onSelect,
+    required this.onSelectDabStation,
+  });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final favoritesAsync = ref.watch(favoritesStreamProvider);
-    final current = ref.watch(currentProgramNumberProvider);
+  ConsumerState<FavoritesSidebar> createState() => _FavoritesSidebarState();
+}
+
+class _FavoritesSidebarState extends ConsumerState<FavoritesSidebar> {
+  _SidebarCategory _category = _SidebarCategory.favorites;
+
+  @override
+  Widget build(BuildContext context) {
+    final currentProgramNumber = ref.watch(currentProgramNumberProvider);
+    final currentDabStation = ref.watch(currentDabStationProvider);
 
     return Container(
       width: 320,
       color: Colors.black.withValues(alpha: 0.55),
-      child: favoritesAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(
-          child: Text('Fehler beim Laden der Favoriten:\n$e',
-              style: const TextStyle(color: Colors.white70)),
-        ),
-        data: (favorites) {
-          if (favorites.isEmpty) {
-            return const Center(
-              child: Padding(
-                padding: EdgeInsets.all(24),
-                child: Text(
-                  'Noch keine Favoriten.\nSuche Sender über das Menü.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white70, fontSize: 18),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _CategoryTab(
+                    label: 'Favoriten',
+                    selected: _category == _SidebarCategory.favorites,
+                    onTap: () => setState(() => _category = _SidebarCategory.favorites),
+                  ),
                 ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _CategoryTab(
+                    label: 'DAB-Sender',
+                    selected: _category == _SidebarCategory.dabStations,
+                    onTap: () => setState(() => _category = _SidebarCategory.dabStations),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: _category == _SidebarCategory.favorites
+                ? _FavoritesList(currentProgramNumber: currentProgramNumber, onSelect: widget.onSelect)
+                : _DabStationsList(
+                    currentDabStation: currentDabStation,
+                    onSelect: widget.onSelectDabStation,
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CategoryTab extends StatefulWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _CategoryTab({required this.label, required this.selected, required this.onTap});
+
+  @override
+  State<_CategoryTab> createState() => _CategoryTabState();
+}
+
+class _CategoryTabState extends State<_CategoryTab> {
+  bool _focused = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return TvFocusHighlight(
+      focused: _focused,
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        focusColor: Colors.transparent,
+        onFocusChange: (v) => setState(() => _focused = v),
+        onTap: widget.onTap,
+        child: Container(
+          decoration: BoxDecoration(
+            color: widget.selected
+                ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.25)
+                : Colors.white.withValues(alpha: 0.04),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          alignment: Alignment.center,
+          child: Text(
+            widget.label,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: widget.selected ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FavoritesList extends ConsumerWidget {
+  final int? currentProgramNumber;
+  final void Function(FavoriteChannel channel) onSelect;
+
+  const _FavoritesList({required this.currentProgramNumber, required this.onSelect});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final favoritesAsync = ref.watch(favoritesStreamProvider);
+    return favoritesAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(
+        child: Text('Fehler beim Laden der Favoriten:\n$e',
+            style: const TextStyle(color: Colors.white70)),
+      ),
+      data: (favorites) {
+        if (favorites.isEmpty) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: Text(
+                'Noch keine Favoriten.\nSuche Sender über das Menü.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white70, fontSize: 18),
               ),
-            );
-          }
-          return ListView.builder(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            itemCount: favorites.length,
-            itemBuilder: (context, index) {
-              final channel = favorites[index];
-              final isCurrent = channel.programNumber == current;
-              return _FavoriteRow(
-                channel: channel,
-                isCurrent: isCurrent,
-                onSelect: () => onSelect(channel),
-              );
-            },
+            ),
           );
-        },
+        }
+        return ListView.builder(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          itemCount: favorites.length,
+          itemBuilder: (context, index) {
+            final channel = favorites[index];
+            final isCurrent = channel.programNumber == currentProgramNumber;
+            return _FavoriteRow(
+              channel: channel,
+              isCurrent: isCurrent,
+              onSelect: () => onSelect(channel),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _DabStationsList extends ConsumerWidget {
+  final ({int freqKhz, int serviceId})? currentDabStation;
+  final void Function(DabStation station) onSelect;
+
+  const _DabStationsList({required this.currentDabStation, required this.onSelect});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final stationsAsync = ref.watch(dabStationsStreamProvider);
+    return stationsAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(
+        child: Text('Fehler beim Laden der DAB+ Sender:\n$e',
+            style: const TextStyle(color: Colors.white70)),
+      ),
+      data: (stations) {
+        if (stations.isEmpty) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: Text(
+                'Noch keine DAB+ Sender gefunden.\nSendersuchlauf über das DAB-Menü starten.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white70, fontSize: 18),
+              ),
+            ),
+          );
+        }
+        final current = currentDabStation;
+        return ListView.builder(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          itemCount: stations.length,
+          itemBuilder: (context, index) {
+            final station = stations[index];
+            final isCurrent =
+                current != null && current.freqKhz == station.freqKhz && current.serviceId == station.serviceId;
+            return _DabStationRow(
+              station: station,
+              isCurrent: isCurrent,
+              onSelect: () => onSelect(station),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _DabStationRow extends StatefulWidget {
+  final DabStation station;
+  final bool isCurrent;
+  final VoidCallback onSelect;
+
+  const _DabStationRow({
+    required this.station,
+    required this.isCurrent,
+    required this.onSelect,
+  });
+
+  @override
+  State<_DabStationRow> createState() => _DabStationRowState();
+}
+
+class _DabStationRowState extends State<_DabStationRow> {
+  bool _focused = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final station = widget.station;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      child: TvFocusHighlight(
+        focused: _focused,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          focusColor: Colors.transparent,
+          onFocusChange: (v) => setState(() => _focused = v),
+          onTap: widget.onSelect,
+          child: Container(
+            decoration: BoxDecoration(
+              color: widget.isCurrent
+                  ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.25)
+                  : Colors.white.withValues(alpha: 0.04),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(
+              children: [
+                const Padding(
+                  padding: EdgeInsets.only(right: 10),
+                  child: Icon(Icons.radio, size: 20, color: Colors.white38),
+                ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        station.displayLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: widget.isCurrent ? FontWeight.bold : FontWeight.normal,
+                        ),
+                      ),
+                      Text(
+                        '${station.ensembleLabel ?? "Ensemble unbekannt"} · ${station.channelLabel}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Colors.white54, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

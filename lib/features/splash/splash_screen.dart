@@ -7,6 +7,15 @@ import '../home/home_screen.dart';
 /// launch_background.xml) hands off to Flutter, before the actual UI
 /// (device/favorites lookups, DAB+ auto-permission, autostart, ...) takes
 /// over. Purely cosmetic - no app logic lives here.
+///
+/// Renders fully visible on its very first frame (no fade-in from
+/// transparent) so there's no perceptible flash of plain black between the
+/// native launch background disappearing and this content appearing -
+/// only a brief scale-in "pop" animates in on top of the already-visible
+/// logo/text. [HomeScreen] is pushed as soon as that pop finishes rather
+/// than after a longer, purely decorative wait, so its own startup work
+/// (DAB+ auto-permission, autostart, favorites lookups, ...) begins as
+/// early as possible instead of being gated behind this screen.
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -15,21 +24,19 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
+  static const _popDuration = Duration(milliseconds: 500);
+
   late final AnimationController _controller = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 700),
+    duration: _popDuration,
   );
   late final Animation<double> _scale = CurvedAnimation(parent: _controller, curve: Curves.easeOutBack);
-  late final Animation<double> _fade = CurvedAnimation(
-    parent: _controller,
-    curve: const Interval(0, 0.6, curve: Curves.easeIn),
-  );
 
   @override
   void initState() {
     super.initState();
     _controller.forward();
-    Future.delayed(const Duration(milliseconds: 1400), () {
+    Future.delayed(_popDuration, () {
       if (mounted) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => const HomeScreen()),
@@ -51,10 +58,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       body: Center(
         child: AnimatedBuilder(
           animation: _controller,
-          builder: (context, child) => Opacity(
-            opacity: _fade.value,
-            child: Transform.scale(scale: 0.7 + 0.3 * _scale.value, child: child),
-          ),
+          builder: (context, child) => Transform.scale(scale: 0.85 + 0.15 * _scale.value, child: child),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -66,6 +70,11 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
               const Text(
                 'Home Radio',
                 style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Powered by Jay',
+                style: TextStyle(color: Colors.green, fontSize: 15, fontWeight: FontWeight.w600),
               ),
             ],
           ),

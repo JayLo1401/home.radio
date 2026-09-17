@@ -30,6 +30,19 @@ class RaonTunerDriver(
     private val outEp: UsbEndpoint,
     private val inEp: UsbEndpoint,
 ) {
+    // Raw fd for ioctl(USBDEVFS_BULK) transfers (see NativeUsbIo's doc
+    // comment) - bypasses connection.bulkTransfer()'s Java/JNI overhead on
+    // every single register/data transfer, which the real reference app's
+    // native code was found to do too (2026-09-16, direct `ioctl` import
+    // found in its decompiled libirtdab.so).
+    private val fd: Int = connection.fileDescriptor
+
+    private fun bulkOut(data: ByteArray, timeoutMs: Int = 1000): Int =
+        NativeUsbIo.bulkTransfer(fd, outEp.address, data, 0, data.size, timeoutMs)
+
+    private fun bulkIn(buf: ByteArray, timeoutMs: Int = 1000): Int =
+        NativeUsbIo.bulkTransfer(fd, inEp.address, buf, 0, buf.size, timeoutMs)
+
     companion object {
         private const val TAG = "DabProbe"
 
@@ -111,14 +124,14 @@ class RaonTunerDriver(
 
     private fun writeReg(reg: Int, value: Int) {
         val data = byteArrayOf(0x21, 0x00, 0x00, 0x02, reg.toByte(), value.toByte())
-        connection.bulkTransfer(outEp, data, data.size, 1000)
+        bulkOut(data)
     }
 
     private fun readReg(reg: Int): Int {
         val req = byteArrayOf(0x22, 0x00, 0x01, 0x00, reg.toByte())
-        connection.bulkTransfer(outEp, req, req.size, 1000)
+        bulkOut(req)
         val buf = ByteArray(8)
-        val n = connection.bulkTransfer(inEp, buf, buf.size, 1000)
+        val n = bulkIn(buf)
         return if (n >= 5) buf[4].toInt() and 0xFF else -1
     }
 
@@ -292,12 +305,26 @@ class RaonTunerDriver(
     /** Raw bulk exchange with a different (non-register) framing - purpose unconfirmed. */
     private fun rtvRfSpecial() {
         for (req in listOf(byteArrayOf(0x10, 0x00, 0x00, 0x01), byteArrayOf(0, 0, 0, 0), byteArrayOf(1, 0, 0, 0))) {
-            connection.bulkTransfer(outEp, req, req.size, 1000)
+            bulkOut(req)
             val buf = ByteArray(4)
-            connection.bulkTransfer(inEp, buf, buf.size, 1000)
+            bulkIn(buf)
         }
     }
 
+    // TRIED (2026-09-16): both directions away from the reference's exact
+    // value (2048) break things, in different ways:
+    // - Lower (0x0400/1024): 100% degenerate fill, no real data at all.
+    // - Higher (0x0C00/3072): real data flowed at the *same* ~9000 B/s as
+    //   2048, but sync success collapsed to ~1.5% (from ~90%+) - our read
+    //   command only *pulls* 2048 bytes per call regardless of this
+    //   register, so the ready-threshold being higher leaves a residual
+    //   1024 bytes stuck in the chip's buffer each cycle, shifting the
+    //   CIF/frame boundary inconsistently read-to-read.
+    // - Max (0x0FFF/4095): permanent, immediate overrun loop (status=0x50)
+    //   - no data gets through at all. This means MSC1's physical FIFO is
+    //   only around 2048-3072 bytes, not bigger - 2048 isn't an arbitrary
+    //   choice by the reference driver, it's close to the hardware's real
+    //   ceiling. There is no larger-threshold path to more throughput here.
     private fun setupMscThreshold() = writeRegs(PAGE_DD, 0x56 to 0x08, 0x57 to 0x00)
 
     private fun setupMemoryFIC() = writeRegs(PAGE_DD, 0x46 to 0x14, 0x46 to 0x16)
@@ -348,6 +375,12 @@ class RaonTunerDriver(
         writeReg(0x20, 0x00)
         val v15 = readReg(0x15)
         Log.i(TAG, "Post-tune verify reg 0x15=0x%02X (bit1 set = locked hint)".format(v15))
+        // TRIED (2026-09-16): calling this twice in a row (matching what
+        // looked like a literal double-call in the reference - once inline
+        // at the end of setFrequency(), once again via the explicit
+        // softReset() its caller tuneFrequencySync() makes) made sync
+        // measurably *worse* (sync ratio collapsed from the usual ~90%+ to
+        // ~15-20%, AU CRC success dropped to 0) - reverted to once.
         softReset()
     }
 
@@ -390,9 +423,9 @@ class RaonTunerDriver(
     fun readFicRaw(): ByteArray {
         switchPage(PAGE_FIC)
         val req = byteArrayOf(0x22, 0x00, 0x80.toByte(), 0x01, 0x10)
-        connection.bulkTransfer(outEp, req, req.size, 1000)
+        bulkOut(req)
         val buf = ByteArray(400)
-        val n = connection.bulkTransfer(inEp, buf, buf.size, 1000)
+        val n = bulkIn(buf)
         switchPage(PAGE_DD)
         writeReg(0x35, 0x01) // FIC interrupt status clear (INT_E_UCLRL bit0)
         return if (n > 4) buf.copyOfRange(4, n) else ByteArray(0)
@@ -443,11 +476,7 @@ class RaonTunerDriver(
     fun recoverMscOverrunIfNeeded(): Boolean {
         switchPage(PAGE_DD)
         val status = readReg(0x33) // INT_E_STATL: bit6=MSC1 overrun, bit5=MSC1 underrun
-        if (status < 0 || (status and 0x60) == 0) return false // -1 = read failure, not a real status
-        Log.w(TAG, "MSC1 overrun/underrun detected (status=0x%02X) - resetting MSC memory".format(status))
-        clearAndSetupMscMemory()
-        writeReg(0x35, 0x04)
-        return true
+        return recoverMscOverrunIfSet(status)
     }
 
     /**
@@ -462,7 +491,38 @@ class RaonTunerDriver(
     fun isMscDataReady(): Boolean {
         switchPage(PAGE_DD)
         val status = readReg(0x33)
-        return status >= 0 && (status and 0x10) != 0
+        return isMscReadySet(status)
+    }
+
+    /**
+     * Reads INT_E_STATL (0x33) once - shared FIC-ready/MSC1-ready/overrun
+     * bits all live in this one byte. FOUND (2026-09-16): the playback loop
+     * used to call [serviceFicIfReady], [isMscDataReady] and
+     * [recoverMscOverrunIfNeeded] every single non-ready iteration, each
+     * independently re-reading this *same* register (3x switchPage + 3x
+     * readReg = 9 USB bulk transfers per idle iteration). The reference
+     * driver's readData() reads it exactly once per call and checks all
+     * three conditions from that one value. Measured effect: with the
+     * redundant reads, MSC1's 2048-byte threshold (~114ms of real data at
+     * 144kbps) was only observed refilling every ~220ms - almost exactly
+     * double - strongly suggesting our own per-iteration USB round-trip
+     * overhead, not the chip/reception, was the throughput ceiling. Use
+     * [pollStatus] + [serviceFicIfSet]/[isMscReadySet]/[recoverMscOverrunIfSet]
+     * in the hot loop instead of this and [serviceFicIfReady] separately.
+     */
+    fun pollStatus(): Int {
+        switchPage(PAGE_DD)
+        return readReg(0x33)
+    }
+
+    fun isMscReadySet(status: Int): Boolean = status >= 0 && (status and 0x10) != 0
+
+    fun recoverMscOverrunIfSet(status: Int): Boolean {
+        if (status < 0 || (status and 0x60) == 0) return false // -1 = read failure, not a real status
+        Log.w(TAG, "MSC1 overrun/underrun detected (status=0x%02X) - resetting MSC memory".format(status))
+        clearAndSetupMscMemory()
+        writeReg(0x35, 0x04)
+        return true
     }
 
     /**
@@ -474,18 +534,21 @@ class RaonTunerDriver(
      * call, interleaved with MSC, which this project's playback loop
      * (focused on just MSC once tuning/subchannel-resolution is done)
      * didn't. Left unacknowledged, a pending FIC interrupt may block the
-     * shared status register from correctly reporting new MSC1 events -
-     * untested as of this edit.
+     * shared status register from correctly reporting new MSC1 events.
      */
     fun serviceFicIfReady(): Boolean {
         switchPage(PAGE_DD)
         val status = readReg(0x33)
+        return serviceFicIfSet(status)
+    }
+
+    fun serviceFicIfSet(status: Int): Boolean {
         if (status < 0 || (status and 0x01) == 0) return false
         switchPage(PAGE_FIC)
         val req = byteArrayOf(0x22, 0x00, 0x80.toByte(), 0x01, 0x10)
-        connection.bulkTransfer(outEp, req, req.size, 1000)
+        bulkOut(req)
         val buf = ByteArray(400)
-        connection.bulkTransfer(inEp, buf, buf.size, 1000)
+        bulkIn(buf)
         switchPage(PAGE_DD)
         writeReg(0x35, 0x01)
         return true
@@ -530,11 +593,26 @@ class RaonTunerDriver(
     fun readMscRaw(): ByteArray {
         switchPage(PAGE_MSC1)
         val req = byteArrayOf(0x22, 0x00, 0x00, 0x08, 0x10)
-        connection.bulkTransfer(outEp, req, req.size, 1000)
+        bulkOut(req)
         val buf = ByteArray(4096)
-        val n = connection.bulkTransfer(inEp, buf, buf.size, 1000)
+        val n = bulkIn(buf)
         switchPage(PAGE_DD)
         writeReg(0x35, 0x04) // MSC1 interrupt status clear (INT_E_UCLRL bit2)
         return if (n > 4) buf.copyOfRange(4, n) else ByteArray(0)
+    }
+
+    /**
+     * DIAGNOSTIC (2026-09-16): tries a raw read on the data-in endpoint with
+     * NO preceding "give me data" OUT request at all, and with a very short
+     * timeout - to test whether the bridge ever has data sitting ready to
+     * push unsolicited (independent of whatever we ask for), which would
+     * mean our own request/status-poll cycle is itself gating/delaying
+     * bytes that are otherwise already available. Does not touch the
+     * "MSC1 ready" status bit or the interrupt-clear register at all.
+     */
+    fun probeUnsolicitedRead(timeoutMs: Int = 5): Pair<Int, ByteArray> {
+        val buf = ByteArray(4096)
+        val n = NativeUsbIo.bulkTransfer(fd, inEp.address, buf, 0, buf.size, timeoutMs)
+        return n to (if (n > 0) buf.copyOf(n) else ByteArray(0))
     }
 }

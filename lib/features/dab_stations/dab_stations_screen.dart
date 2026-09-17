@@ -7,7 +7,9 @@ import '../../core/providers.dart';
 import '../../data/db/database.dart' show DabStation;
 import '../../data/models/favorite_channel.dart';
 import '../../data/models/usb_device_info.dart';
+import '../../data/repositories/dab_stations_repository.dart' show DabStationDisplay;
 import '../shared/program_number_dialog.dart';
+import '../shared/rename_dialog.dart';
 
 /// DAB+ adapter management: grant USB permission/open the adapter, run a
 /// Band III scan (native, independent USB Host API access via
@@ -308,35 +310,66 @@ class _StationRow extends ConsumerWidget {
       builder: (context) => ProgramNumberDialog(initial: suggested),
     );
     if (programNumber == null) return;
-    final logoUrl = await _findLogoUrl(ref, station.stationLabel);
+    final logoUrl = await _findLogoUrl(ref, station.displayLabel);
     await repo.addDabService(
       programNumber: programNumber,
-      displayName: station.stationLabel,
+      displayName: station.displayLabel,
       freqKhz: station.freqKhz,
       serviceId: station.serviceId,
       logoUrl: logoUrl,
     );
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('"${station.stationLabel}" als Nr. $programNumber gespeichert.')),
+        SnackBar(content: Text('"${station.displayLabel}" als Nr. $programNumber gespeichert.')),
       );
     }
+  }
+
+  /// DAB+ FIG labels sometimes carry genuinely-real but garbled-looking
+  /// special characters (confirmed real-world AT ensembles, not a decode
+  /// bug) - lets the user override this station's name with something
+  /// readable. An empty result reverts back to the decoded label.
+  Future<void> _rename(BuildContext context, WidgetRef ref) async {
+    final newName = await showDialog<String>(
+      context: context,
+      builder: (context) => RenameDialog(
+        title: 'Sender umbenennen',
+        initialValue: station.displayLabel,
+      ),
+    );
+    if (newName == null) return;
+    await ref.read(dabStationsRepositoryProvider).setCustomLabel(
+          freqKhz: station.freqKhz,
+          serviceId: station.serviceId,
+          customLabel: newName,
+        );
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return ListTile(
       contentPadding: EdgeInsets.zero,
-      title: Text(station.stationLabel),
+      title: Text(station.displayLabel),
       subtitle: Text(
         '${station.ensembleLabel ?? "Ensemble unbekannt"} · ${station.channelLabel} · ${station.freqKhz} kHz',
       ),
-      trailing: favorite != null
-          ? Chip(label: Text('Nr. ${favorite!.programNumber}'))
-          : FilledButton.tonal(
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.edit_outlined),
+            tooltip: 'Umbenennen',
+            onPressed: () => _rename(context, ref),
+          ),
+          if (favorite != null)
+            Chip(label: Text('Nr. ${favorite!.programNumber}'))
+          else
+            FilledButton.tonal(
               onPressed: () => _addFavorite(context, ref),
               child: const Text('Favorit hinzufügen'),
             ),
+        ],
+      ),
     );
   }
 }

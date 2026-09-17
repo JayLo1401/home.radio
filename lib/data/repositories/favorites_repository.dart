@@ -72,6 +72,27 @@ class FavoritesRepository {
 
   Future<void> remove(int programNumber) => _db.removeFavorite(programNumber);
 
+  /// Swaps two favorites' program numbers - the building block for moving a
+  /// favorite up/down in the settings editor (see SettingsScreen). Routes
+  /// through a temporary negative number first: program number is the
+  /// primary key, so writing B's number directly onto A while B still holds
+  /// it would violate uniqueness mid-transaction.
+  Future<void> swapProgramNumbers(int a, int b) async {
+    if (a == b) return;
+    await _db.transaction(() async {
+      const temp = -1;
+      await _db.setFavoriteProgramNumber(a, temp);
+      await _db.setFavoriteProgramNumber(b, a);
+      await _db.setFavoriteProgramNumber(temp, b);
+    });
+  }
+
+  /// Overrides a favorite's display name - lets the user clean up a DAB+
+  /// station's raw decoded FIG label (see DabStationsRepository.setCustomLabel)
+  /// without affecting which favorite it stays being.
+  Future<void> rename(int programNumber, String displayName) =>
+      _db.updateFavoriteDisplayName(programNumber, displayName);
+
   Future<void> updateLogoUrl(int programNumber, String logoUrl) =>
       _db.updateFavoriteLogoUrl(programNumber, logoUrl);
 

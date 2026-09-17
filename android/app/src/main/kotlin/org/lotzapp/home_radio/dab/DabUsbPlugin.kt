@@ -253,6 +253,23 @@ class DabUsbPlugin :
                 stopDabPlayback()
                 result.success(null)
             }
+            "dabSetTuning" -> {
+                call.argument<Int>("audioBufferMs")?.let { DabTuning.audioBufferMs = it }
+                call.argument<Int>("degenerateFillThreshold")?.let { DabTuning.degenerateFillThreshold = it }
+                call.argument<Int>("overrunCheckInterval")?.let { DabTuning.overrunCheckInterval = it }
+                call.argument<Int>("watchdogTimeoutMs")?.let { DabTuning.watchdogTimeoutMs = it.toLong() }
+                result.success(null)
+            }
+            "dabGetTuning" -> {
+                result.success(
+                    mapOf(
+                        "audioBufferMs" to DabTuning.audioBufferMs,
+                        "degenerateFillThreshold" to DabTuning.degenerateFillThreshold,
+                        "overrunCheckInterval" to DabTuning.overrunCheckInterval,
+                        "watchdogTimeoutMs" to DabTuning.watchdogTimeoutMs.toInt(),
+                    ),
+                )
+            }
             "dabGetStatus" -> {
                 runOnDabThread(result) { driver ->
                     val lockStatus = driver.getLockStatus()
@@ -668,294 +685,77 @@ class DabUsbPlugin :
         // Order matters and matches the reference's setService() exactly
         // (clearAndSetupMscMemory() then openSubChannel(), found 2026-09-16
         // - this project had it backwards until now).
+        // FAITHFUL PORT (2026-09-16): after exhausting every register/timing/
+        // architecture comparison against the real reference (byte-for-byte
+        // identical at every level checked, including the low-level USB
+        // transfer syscall itself), this loop was rebuilt to mirror the
+        // reference's actual readData()/commandProcessing() exactly - no
+        // watchdog, no degenerate-fill heuristic, no periodic extra overrun
+        // check beyond the one the reference itself does. All of those were
+        // this project's own additions from earlier debugging sessions, none
+        // of which exist in the working reference app.
         driver.clearAndSetupMscMemory()
         driver.openSubChannel(resolvedSubChId)
-        val player = DabAudioPlayer().also { it.start() }
+        // WAV dump (pass context here to re-enable) was left on from an
+        // earlier debugging session - synchronous file I/O on the playback
+        // thread for every PCM chunk is exactly the kind of extra work that
+        // has no business being in the real playback path.
+        val player = DabAudioPlayer(null).also { it.start() }
         audioPlayer = player
         var framesFed = 0L
         var ausDecoded = 0L
-        val decoder = NativeDabDecoder { au, asc, sr, ch, durationMs ->
-            if (au != null) ausDecoded++
-            player.submit(au, asc, sr, ch, durationMs)
+        val decoder = NativeDabDecoder { pcm, sr, ch ->
+            ausDecoded++
+            player.submit(pcm, sr, ch)
         }
-        // NOTE (2026-09-15 test): adding EnergyDispersal.dedisperse() here made
-        // sync strictly *worse* (0% vs. a small but nonzero baseline without
-        // it) - the tuner chip evidently already undoes DAB energy dispersal
-        // in hardware as part of its normal decode pipeline (unlike an
-        // SDR-only receiver such as welle.io, which does everything after
-        // the raw demodulator in software and so needs this step itself).
-        // Left undone here on purpose.
         val reframer = MscReframer(resolvedFrameLen) { frame ->
             framesFed++
             decoder.feed(frame)
         }
 
-        // Decoupled decode thread (2026-09-16): the actual production
-        // decoder the working reference app uses (OMRI's
-        // DabPlusServiceComponentDecoder, found by tracing componentDataInput
-        // -> DabEnsemble::dataInput from the real readData() call chain -
-        // this project had been comparing against DABlin, a different,
-        // independent DAB+ player, not what this hardware's own reference
-        // app is built on) runs RS-decode/superframe-assembly on its own
-        // background thread, fed via a queue from the USB-reading thread,
-        // rather than inline in the read loop like this project's code did.
-        // RS-decoding a ~2-3KB superframe (up to 28 interleaved columns,
-        // Berlekamp-Massey per column) is real CPU work, done on EVERY
-        // sync attempt (not just successes - failed/sliding attempts also
-        // trigger a full decode) - doing it inline risked occasionally
-        // delaying the next isMscDataReady()/readMscRaw() call long enough
-        // to fall behind the chip's real-time FIFO, which a fixed AU-
-        // position-correlated corruption pattern (a native/reference-
-        // decoder-verified bug-free decoder still showed it) is consistent
-        // with. Decoupling can only help - matching the proven architecture
-        // is a reasonable, low-risk change regardless.
-        val rawCifQueue = java.util.concurrent.LinkedBlockingQueue<ByteArray>(256)
-        val resetSentinel = ByteArray(0)
-        val decodeThread = Thread {
-            android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_URGENT_AUDIO)
-            while (!Thread.currentThread().isInterrupted) {
-                val chunk = try {
-                    rawCifQueue.poll(200, java.util.concurrent.TimeUnit.MILLISECONDS)
-                } catch (e: InterruptedException) {
-                    break
-                } ?: continue
-                if (chunk === resetSentinel) {
-                    reframer.reset()
-                    decoder.reset()
-                } else {
-                    reframer.feed(chunk)
-                }
-            }
-        }.apply { name = "DabDecode"; start() }
-        fun queueReset() {
-            rawCifQueue.clear()
-            rawCifQueue.offer(resetSentinel)
-        }
-
-        // Raw MSC dump-to-file (added for offline RS-decode debugging,
-        // 2026-09-15/16) - disabled now that real audio decodes correctly;
-        // synchronous file I/O on this thread's critical, ~24ms-cadence path
-        // is itself a plausible contributor to the CPU/scheduling-driven
-        // permanent sync loss being chased now, so it's not just inert.
-        // dumpDone=true from the start means the write path below never
-        // executes; flip to false (and set dumpEnabled up here) to
-        // re-enable for a future debugging session.
-        // Raw MSC dump-to-file, with a 4-byte length prefix per USB read
-        // chunk and a 0xFFFFFFFF sentinel marking known stream
-        // discontinuities (see markDumpDiscontinuity below) - built
-        // 2026-09-15/16 for offline RS-decode debugging. Disabled again now
-        // that it's served its purpose (traced the persistent AU-CRC-
-        // failure pattern to AU#2 specifically - see DabPlusSuperframeDecoder's
-        // auCrcOkByIndex/auCrcFailByIndex doc comment); flip to true (and
-        // dumpDone below to false) to re-enable for a future session.
-        val dumpEnabled = false
-        val dumpDir = context.getExternalFilesDir(null)
-        val dumpTag = "${freqKhz}_$serviceId"
-        val dumpFile = java.io.File(dumpDir, "dab_msc_dump_$dumpTag.bin")
-        var dumpOut: java.io.FileOutputStream? = null
-        var dumpBytesWritten = 0
-        var dumpDone = !dumpEnabled
-        val dumpMaxBytes = 3_000_000
-        if (dumpEnabled) {
-            java.io.File(dumpDir, "dab_msc_dump_$dumpTag.json").writeText(
-                "{\"freqKhz\":$freqKhz,\"serviceId\":$serviceId,\"subChId\":$resolvedSubChId," +
-                    "\"frameLenBytes\":$resolvedFrameLen}",
-            )
-            dumpOut = java.io.FileOutputStream(dumpFile)
-        }
-        // 0xFFFFFFFF sentinel length (never a real chunk size) marking a
-        // known stream discontinuity (degenerate-fill discard, overrun
-        // recovery, or watchdog resync) - added so offline analysis can
-        // segment the dump into truly-contiguous runs instead of treating
-        // the whole file as one continuous byte stream, which otherwise
-        // makes the offline error rate look far worse than what the live
-        // decoder (which does reset its own state at exactly these points)
-        // actually sees.
-        fun markDumpDiscontinuity() {
-            if (!dumpDone) dumpOut?.write(byteArrayOf(0xFF.toByte(), 0xFF.toByte(), 0xFF.toByte(), 0xFF.toByte()))
-        }
-
         emit(mapOf("type" to "playbackStatus", "status" to "playing"))
         var totalBytesRead = 0L
         var readCount = 0L
-        var emptyReadCount = 0L
-        var lastLog = System.currentTimeMillis()
-        var overrunDiscardCount = 0L
         var notReadyCount = 0L
-        // Watchdog for the permanent, never-recovering sync loss seen in
-        // testing (2026-09-16): confirmed NOT caused by FIC servicing, RS
-        // correctness, interleaving, byte alignment, reception quality,
-        // thread priority, or logging overhead (all ruled out this session,
-        // on real hardware, live-monitored).
-        //
-        // TIERED (2026-09-16, later): a discontinuity-marked raw capture
-        // showed the real pattern - long (10s+) stretches decode at
-        // 94-100% sync success, interrupted by brief (~0.6-0.7s) totally-
-        // dead windows that then recover on their own. Those brief dips are
-        // exactly what were triggering the (previously unconditional)
-        // subchannel reopen - and the reopen itself was shown (same
-        // capture) to cost an *additional* ~0.6-0.7s of guaranteed zero
-        // sync before the chip re-settles, on top of whatever the original
-        // dip cost. So: try cheap soft resets (decoder/reframer state only,
-        // no subchannel close/open) first, giving a brief real dip a chance
-        // to self-recover once fresh CIFs arrive; only escalate to a full
-        // subchannel reopen (the only thing that ever recovered the
-        // original *permanent* cliff bug) after repeated soft resets still
-        // haven't produced a new AAC frame.
-        var lastSyncSuccesses = 0L
-        var lastSyncProgressAt = System.currentTimeMillis()
-        var resyncCount = 0
-        var softResetAttempts = 0
-        val maxSoftResetsBeforeReopen = 2
-        // 1500ms: live-monitored testing (2026-09-16) shows a new AAC frame
-        // every ~200-250ms during healthy playback, so 1500ms of total
-        // silence is already many multiples of that and won't false-
-        // trigger, while still being short enough that even
-        // maxSoftResetsBeforeReopen soft-reset rounds (below) stay well
-        // under the ~0.6-0.7s a brief natural dip needs to clear on its own.
-        val syncWatchdogTimeoutMs = 1500L
-        // FOUND (2026-09-16): this originally issued a bulk-read request on
-        // every loop iteration regardless of whether the chip actually had
-        // new data (the simpler "readMscData()"-style polling from the
-        // reference driver, meant to be called from a timer, not gated on
-        // anything). The reference's *interrupt-driven* readMsc() instead
-        // checks the MSC1 "data ready" bit first and only reads when it's
-        // set - not gating on it is what let stale/idle "fill" bytes get
-        // read as if they were real payload. Gating on isMscDataReady() here
-        // now (plus using that variant's own request/buffer size - see
-        // RaonTunerDriver.readMscRaw's doc comment) is untested against real
-        // hardware as of this edit.
+        var lastLog = System.currentTimeMillis()
         try {
             while (playbackRunning.get()) {
-                // TRIED (2026-09-16): periodic antenna-level polling, based
-                // on readData()'s antenna-level bookkeeping - turned out
-                // that whole block is commented out (dead) in the reference,
-                // never actually called from its real, active read loop
-                // (commandProcessing(), which just re-pushes readData()
-                // whenever its command queue is empty). Made playback
-                // measurably worse (shorter bursts, longer gaps) and was
-                // reverted - not the cause of the eventual permanent sync
-                // loss.
-                //
-                // RULED OUT (2026-09-16): live-monitored on a second device
-                // (WLAN debug + USB host don't conflict there, unlike the Mi
-                // TV) with this call removed entirely - the exact same
-                // permanent sync loss still happened at a similar elapsed
-                // time (~31s vs. ~36s with it present). So continuously
-                // servicing FIC here is not the cause; restored since it
-                // matches the reference driver's behavior and is otherwise
-                // harmless.
-                driver.serviceFicIfReady()
-                if (!driver.isMscDataReady()) {
+                // Exactly readData(): one combined status read, service FIC
+                // if its bit is set, reset MSC memory and skip this
+                // iteration on overrun/underrun, else read+feed if ready,
+                // else sleep(20) (the reference's own not-ready delay).
+                val status = driver.pollStatus()
+                driver.serviceFicIfSet(status)
+                if (driver.recoverMscOverrunIfSet(status)) {
+                    continue
+                }
+                if (!driver.isMscReadySet(status)) {
                     notReadyCount++
-                    if (driver.recoverMscOverrunIfNeeded()) {
-                        queueReset()
+                    // DIAGNOSTIC (2026-09-16): check whether the bridge has
+                    // unsolicited data sitting ready on the data endpoint
+                    // even though the status register's "ready" bit says no
+                    // - would mean our own request/poll cycle, not the
+                    // chip/bridge itself, is what's gating byte arrival.
+                    val (n, unsolicited) = driver.probeUnsolicitedRead()
+                    if (n > 0) {
+                        Log.w(tag, "UNSOLICITED: got $n bytes without asking! first bytes=${unsolicited.take(8).joinToString(" ") { "%02X".format(it) }}")
                     }
-                    Thread.sleep(5)
+                    Thread.sleep(20)
                     continue
                 }
                 val bytes = driver.readMscRaw()
                 readCount++
                 if (bytes.isNotEmpty()) {
-                    if (isDegenerateFill(bytes)) {
-                        // Discard-only, no hardware reset here: checking (and
-                        // resetting on) overrun status *before* every single
-                        // read - tried in this same debugging session - made
-                        // things categorically worse (status stayed asserted
-                        // constantly, so the reset ran every iteration and
-                        // the FIFO never got a chance to fill at all).
-                        // Dropping just the bad-looking chunk, without
-                        // touching chip state, avoids that self-inflicted
-                        // loop while still not feeding garbage downstream.
-                        overrunDiscardCount++
-                        queueReset()
-                        markDumpDiscontinuity()
-                    } else {
-                        totalBytesRead += bytes.size
-                        if (rawCifQueue.remainingCapacity() == 0) rawCifQueue.poll()
-                        rawCifQueue.offer(bytes)
-                        if (!dumpDone) {
-                            // 4-byte big-endian length prefix per USB read
-                            // chunk (see dumpEnabled note above) so an
-                            // offline script can recover exact read
-                            // boundaries within the concatenated stream.
-                            val lenPrefix = byteArrayOf(
-                                (bytes.size ushr 24).toByte(),
-                                (bytes.size ushr 16).toByte(),
-                                (bytes.size ushr 8).toByte(),
-                                bytes.size.toByte(),
-                            )
-                            dumpOut?.write(lenPrefix)
-                            dumpOut?.write(bytes)
-                            dumpBytesWritten += bytes.size + 4
-                            if (dumpBytesWritten >= dumpMaxBytes) {
-                                dumpDone = true
-                                dumpOut?.flush()
-                                dumpOut?.close()
-                                Log.i(tag, "MSC raw dump complete: ${dumpFile.absolutePath} ($dumpBytesWritten bytes)")
-                            }
-                        }
-                    }
-                    // Overrun previously was only ever checked on an *empty*
-                    // read, which never happens once real data is flowing
-                    // steadily (observed: sync holds perfectly for the first
-                    // ~15-40s of playback, then fails permanently, with
-                    // reads never once coming back empty around that point)
-                    // - so a genuine FIFO overrun there would go completely
-                    // undetected. Checked periodically here too now, without
-                    // touching chip state on every single read (which caused
-                    // a self-inflicted stall in earlier testing this
-                    // session) - untested as of this edit.
-                    if (readCount % 20 == 0L && driver.recoverMscOverrunIfNeeded()) {
-                        queueReset()
-                        markDumpDiscontinuity()
-                    }
-                } else {
-                    emptyReadCount++
-                    if (driver.recoverMscOverrunIfNeeded()) {
-                        queueReset()
-                        markDumpDiscontinuity()
-                    }
-                    Thread.sleep(20)
+                    totalBytesRead += bytes.size
+                    reframer.feed(bytes)
                 }
                 val now = System.currentTimeMillis()
-                val syncNow = decoder.syncSuccesses
-                if (syncNow > lastSyncSuccesses) {
-                    lastSyncSuccesses = syncNow
-                    lastSyncProgressAt = now
-                    softResetAttempts = 0
-                } else if (now - lastSyncProgressAt >= syncWatchdogTimeoutMs) {
-                    if (softResetAttempts < maxSoftResetsBeforeReopen) {
-                        softResetAttempts++
-                        Log.w(
-                            tag,
-                            "Sync watchdog: no new AAC frame for ${syncWatchdogTimeoutMs}ms (stuck at " +
-                                "$syncNow/${decoder.syncAttempts}) - soft reset #$softResetAttempts " +
-                                "(decoder/reframer only, subchannel stays open)",
-                        )
-                        queueReset()
-                    } else {
-                        resyncCount++
-                        Log.w(
-                            tag,
-                            "Sync watchdog: still stuck after $maxSoftResetsBeforeReopen soft reset(s) - " +
-                                "re-opening subchannel (recovery #$resyncCount)",
-                        )
-                        driver.closeSubChannel(resolvedSubChId)
-                        driver.clearAndSetupMscMemory()
-                        driver.openSubChannel(resolvedSubChId)
-                        queueReset()
-                        softResetAttempts = 0
-                    }
-                    markDumpDiscontinuity()
-                    lastSyncProgressAt = now
-                }
                 if (now - lastLog >= 2000) {
                     lastLog = now
                     Log.i(
                         tag,
-                        "MSC stats: reads=$readCount (notReady=$notReadyCount empty=$emptyReadCount degenerate=$overrunDiscardCount) " +
-                            "bytes=$totalBytesRead cifFrames=$framesFed ausDecoded=$ausDecoded resyncs=$resyncCount | " +
+                        "MSC stats: reads=$readCount (notReady=$notReadyCount) " +
+                            "bytes=$totalBytesRead cifFrames=$framesFed ausDecoded=$ausDecoded | " +
                             "sync=${decoder.syncSuccesses}/${decoder.syncAttempts} " +
                             "rsUncorr=${decoder.rsUncorrectableCodewords} rsCorrected=${decoder.rsCorrectedSymbols} " +
                             "auCrcOk=${decoder.auCrcOk} auCrcFail=${decoder.auCrcFail} " +
@@ -966,16 +766,6 @@ class DabUsbPlugin :
                 }
             }
         } finally {
-            decodeThread.interrupt()
-            decodeThread.join(300)
-            if (!dumpDone) {
-                try {
-                    dumpOut?.flush()
-                    dumpOut?.close()
-                } catch (_: Exception) {
-                }
-                Log.i(tag, "MSC raw dump (partial): ${dumpFile.absolutePath} ($dumpBytesWritten bytes)")
-            }
             driver.closeSubChannel(resolvedSubChId)
             player.stop()
             decoder.destroy()
@@ -991,6 +781,13 @@ class DabUsbPlugin :
      * checked only on empty reads doesn't catch it; this heuristic does.
      * Real (RS-protected, effectively-random-looking) MSC bytes essentially
      * never have runs this long, so a conservative threshold is safe.
+     *
+     * RELAXED (2026-09-16): raised from 24 to 64 - every discard here throws
+     * away a whole 2048-byte chunk and forces a full reframer/decoder reset
+     * (losing in-flight buffered CIFs too), so a lower threshold risks
+     * discarding real, decodable data on a coincidental short run rather
+     * than only genuine chip-idle fill. 64 is still far longer than any run
+     * plausible in real RS-protected data by chance.
      */
     private fun isDegenerateFill(bytes: ByteArray): Boolean {
         if (bytes.size < 32) return false
@@ -1004,7 +801,7 @@ class DabUsbPlugin :
                 runLen = 1
             }
         }
-        return maxRun >= 24
+        return maxRun >= DabTuning.degenerateFillThreshold
     }
 
     private fun UsbDevice.toMap(): Map<String, Any?> {

@@ -208,6 +208,28 @@ class DabUsbService {
 
   Future<void> dabStopPlayback() => _methodChannel.invokeMethod('dabStopPlayback');
 
+  /// Live DAB+ playback tuning knobs (2026-09-16) - takes effect on the
+  /// currently-running playback within a fraction of a second, no restart
+  /// needed. Any omitted key leaves that knob unchanged. See DabTuning.kt.
+  Future<void> dabSetTuning({
+    int? audioBufferMs,
+    int? degenerateFillThreshold,
+    int? overrunCheckInterval,
+    int? watchdogTimeoutMs,
+  }) {
+    return _methodChannel.invokeMethod('dabSetTuning', {
+      if (audioBufferMs != null) 'audioBufferMs': audioBufferMs,
+      if (degenerateFillThreshold != null) 'degenerateFillThreshold': degenerateFillThreshold,
+      if (overrunCheckInterval != null) 'overrunCheckInterval': overrunCheckInterval,
+      if (watchdogTimeoutMs != null) 'watchdogTimeoutMs': watchdogTimeoutMs,
+    });
+  }
+
+  Future<Map<String, int>> dabGetTuning() async {
+    final result = await _methodChannel.invokeMapMethod<String, dynamic>('dabGetTuning');
+    return (result ?? const {}).map((key, value) => MapEntry(key, value as int));
+  }
+
   /// Tunes to a single channel and logs detailed lock/antenna status every
   /// 200ms for ~8 seconds - faster to iterate on than a full scan when
   /// debugging one specific, externally-confirmed-active channel.

@@ -44,6 +44,12 @@ class DabStations extends Table {
   TextColumn get stationLabel => text()();
   TextColumn get ensembleLabel => text().nullable()();
   DateTimeColumn get lastSeenAt => dateTime().withDefault(currentDateAndTime)();
+  // User-provided override for [stationLabel] - DAB+ FIG labels sometimes
+  // carry decorative/garbled-looking special characters that are genuinely
+  // how the station spelled its name over the air (confirmed real-world AT
+  // ensembles, not a decode bug), so this lets the user replace it with
+  // something readable. Null means "use stationLabel as-is".
+  TextColumn get customLabel => text().nullable()();
 
   @override
   Set<Column> get primaryKey => {freqKhz, serviceId};
@@ -55,13 +61,14 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onCreate: (m) => m.createAll(),
         onUpgrade: (m, from, to) async {
           if (from < 2) await m.createTable(dabStations);
+          if (from < 3) await m.addColumn(dabStations, dabStations.customLabel);
         },
       );
 
@@ -92,6 +99,16 @@ class AppDatabase extends _$AppDatabase {
         .write(FavoritesCompanion(logoUrl: Value(logoUrl)));
   }
 
+  /// Renumbers a favorite in place (its program number is its primary key).
+  /// Callers must route through a temporary, out-of-range number when
+  /// swapping two favorites directly - see [FavoritesRepository.swapProgramNumbers] -
+  /// since going straight from A's number to B's (while B still holds it)
+  /// would hit the primary key's uniqueness constraint mid-transaction.
+  Future<void> setFavoriteProgramNumber(int oldNumber, int newNumber) {
+    return (update(favorites)..where((f) => f.programNumber.equals(oldNumber)))
+        .write(FavoritesCompanion(programNumber: Value(newNumber)));
+  }
+
   Future<String?> getSetting(String key) async {
     final row = await (select(settings)..where((s) => s.key.equals(key)))
         .getSingleOrNull();
@@ -117,7 +134,18 @@ class AppDatabase extends _$AppDatabase {
     return into(dabStations).insertOnConflictUpdate(entry);
   }
 
+  Future<void> setDabStationCustomLabel(int freqKhz, int serviceId, String? customLabel) {
+    return (update(dabStations)
+          ..where((s) => s.freqKhz.equals(freqKhz) & s.serviceId.equals(serviceId)))
+        .write(DabStationsCompanion(customLabel: Value(customLabel)));
+  }
+
   Future<void> clearDabStations() => delete(dabStations).go();
+
+  Future<void> updateFavoriteDisplayName(int programNumber, String displayName) {
+    return (update(favorites)..where((f) => f.programNumber.equals(programNumber)))
+        .write(FavoritesCompanion(displayName: Value(displayName)));
+  }
 }
 
 LazyDatabase _openConnection() {

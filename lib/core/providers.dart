@@ -81,6 +81,20 @@ class CurrentProgramNumber extends Notifier<int?> {
 final currentProgramNumberProvider =
     NotifierProvider<CurrentProgramNumber, int?>(CurrentProgramNumber.new);
 
+/// The DAB+ station currently tuned via the sidebar's "DAB-Sender" category
+/// (see FavoritesSidebar) - i.e. played directly, without being a favorite
+/// and therefore without a program number of its own. Mutually exclusive
+/// with [currentProgramNumberProvider]: playing one clears the other.
+class CurrentDabStation extends Notifier<({int freqKhz, int serviceId})?> {
+  @override
+  ({int freqKhz, int serviceId})? build() => null;
+
+  void set(({int freqKhz, int serviceId})? value) => state = value;
+}
+
+final currentDabStationProvider =
+    NotifierProvider<CurrentDabStation, ({int freqKhz, int serviceId})?>(CurrentDabStation.new);
+
 /// Global UI scale factor (1.0 = 100%), persisted and applied app-wide via a
 /// MediaQuery/Transform wrapper in [HomeRadioApp] so every screen respects
 /// the user's chosen size without each widget needing its own scaling logic.
