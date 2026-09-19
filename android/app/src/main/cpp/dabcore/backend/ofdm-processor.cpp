@@ -34,6 +34,10 @@
 #include "ofdm-processor.h"
 #include "various/profiling.h"
 #include <iostream>
+#ifdef __ANDROID__
+#include <cerrno>
+#include <sys/resource.h>
+#endif
 //
 #define SEARCH_RANGE        (2 * 36)
 #define CORRELATION_LENGTH  24
@@ -234,6 +238,20 @@ void OFDMProcessor::getSamples(DSPCOMPLEX *v, int16_t n, int32_t phase)
  */
 void OFDMProcessor::run()
 {
+#ifdef __ANDROID__
+    /*
+     * Added for home_radio (2026-09-19): this is the actual OFDM time/
+     * frequency synchronization loop - if it loses scheduler time to the
+     * Flutter UI thread or other native work in the same process, it falls
+     * behind consuming from the input's sample buffer, which showed up as
+     * DAB+ playback repeatedly losing and re-acquiring sync (audio cutting
+     * in and out) even on an otherwise stable, already-tuned station. -19
+     * matches Android's ANDROID_PRIORITY_AUDIO / THREAD_PRIORITY_URGENT_AUDIO.
+     */
+    if (setpriority(PRIO_PROCESS, 0, -19) != 0) {
+        std::clog << "ofdm-processor: setpriority(-19) failed, errno=" << errno << std::endl;
+    }
+#endif
     int32_t startIndex;
     int32_t i;
     int32_t counter;

@@ -6,6 +6,7 @@
 /// condition the same way rather than decoding `sy`).
 enum WeatherCondition {
   clear,
+  mostlyClear,
   partlyCloudy,
   cloudy,
   rainy,

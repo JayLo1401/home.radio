@@ -20,8 +20,10 @@
 #include <atomic>
 #include <cstdio>
 #include <cstring>
+#include <mutex>
 #include <string>
 #include <thread>
+#include <unistd.h>
 #include <vector>
 
 #include "rtl_tcp_bridge.h"
@@ -35,6 +37,38 @@ namespace {
 std::thread g_serverThread;
 std::atomic<bool> g_running{false};
 std::atomic<int> g_lastResult{0};
+
+/*
+ * rtl_tcp.c (vendored, see librtlsdr/rtl_tcp.c) reports everything - bind
+ * errors, device-open failures, "listening..." - via plain printf/
+ * fprintf(stderr, ...). On Android that output goes nowhere visible by
+ * default (no console, and logcat doesn't capture raw stdio), which made a
+ * real startup failure (e.g. a failed bind()) look identical to "started
+ * fine" from Kotlin's point of view. This redirects the process's stdout/
+ * stderr into logcat instead - the standard Android technique (pipe + a
+ * reader thread), started once before the server thread runs.
+ */
+void redirectStdioToLogcat() {
+	static std::once_flag once;
+	std::call_once(once, [] {
+		int pipeFds[2];
+		if (pipe(pipeFds) != 0) return;
+		dup2(pipeFds[1], STDOUT_FILENO);
+		dup2(pipeFds[1], STDERR_FILENO);
+		close(pipeFds[1]);
+		setvbuf(stdout, nullptr, _IOLBF, 0);
+		setvbuf(stderr, nullptr, _IONBF, 0);
+		std::thread([readFd = pipeFds[0]] {
+			char buf[512];
+			ssize_t n;
+			while ((n = read(readFd, buf, sizeof(buf) - 1)) > 0) {
+				if (buf[n - 1] == '\n') n--;
+				buf[n] = '\0';
+				__android_log_print(ANDROID_LOG_INFO, "rtl_tcp", "%s", buf);
+			}
+		}).detach();
+	});
+}
 
 void serverThreadMain(std::vector<std::string> argvStrings) {
 	std::vector<char *> argv;
@@ -62,6 +96,8 @@ Java_org_lotzapp_home_1radio_rtlsdr_RtlSdrUsbServer_nativeStart(
 	}
 	if (g_serverThread.joinable())
 		g_serverThread.join();
+
+	redirectStdioToLogcat();
 
 	const char *bindAddrChars = env->GetStringUTFChars(jBindAddr, nullptr);
 	std::string bindAddr = bindAddrChars ? bindAddrChars : "127.0.0.1";

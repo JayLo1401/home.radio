@@ -146,8 +146,15 @@ target_compile_definitions(dabcore PUBLIC KISSFFT DABLIN_AAC_FDKAAC)
 target_compile_features(dabcore PUBLIC cxx_std_17)
 target_link_libraries(dabcore PUBLIC fdk-aac)
 
+# direct_rtlsdr_input.cpp/.h (home_radio addition, 2026-09-19, not part of any
+# vendored library - see that header's own doc comment) is the "own USB
+# service" mode's alternative InputInterface: it drives librtlsdr directly,
+# skipping the in-process rtl_tcp server/client round trip CRTL_TCP_Client
+# otherwise goes through for that mode. Hence dabrtlsdrnative now also needs
+# librtlsdr's own "rtlsdr"/"usb1.0" static libs, not just dabcore.
 add_library(dabrtlsdrnative SHARED
     dabcore_jni.cpp
+    direct_rtlsdr_input.cpp
 )
 target_compile_features(dabrtlsdrnative PRIVATE cxx_std_17)
-target_link_libraries(dabrtlsdrnative dabcore ${log-lib})
+target_link_libraries(dabrtlsdrnative dabcore rtlsdr usb1.0 ${log-lib})

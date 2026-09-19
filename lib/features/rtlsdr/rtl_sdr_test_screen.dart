@@ -5,20 +5,21 @@ import '../../core/providers.dart';
 import '../../data/services/rtl_sdr_service.dart';
 import '../../data/services/rtl_sdr_usb_service.dart';
 
-/// How the app reaches the RTL-SDR dongle - the three options from the
-/// project's DAB+/RTL-SDR settings: our own direct-USB service (this app
-/// drives the dongle itself and serves rtl_tcp on localhost), an external
-/// rtl_tcp driver app running on this same device, or an external rtl_tcp
-/// service somewhere on the network (e.g. a Raspberry Pi with the dongle
-/// attached).
-enum RtlSdrConnectionMode { ownUsb, externalApp, network }
+/// How the DAB+ decoder (and this screen's own test connection) reaches the
+/// RTL-SDR dongle:
+/// - [usb]: this app drives the dongle directly over USB (see
+///   direct_rtlsdr_input.h) - no rtl_tcp server/client involved at all.
+/// - [tcp]: a plain rtl_tcp client connection to host:port - either an
+///   external driver app on this same device (localhost), an external
+///   rtl_tcp service elsewhere on the network (e.g. a Raspberry Pi with the
+///   dongle attached), or a future rtl_tcp server of our own - all reached
+///   the exact same way, so they don't need separate options here.
+enum RtlSdrConnectionMode { usb, tcp }
 
-/// Standalone test screen for the RTL-SDR / rtl_tcp connection layer
-/// (2026-09-17) - lets the whole chain (dongle -> Android driver app or
-/// remote rtl_tcp server -> this app) be verified the moment the dongle
-/// arrives, independent of the DAB+/FM/AM demodulation work that comes
-/// after. Meant to stay useful as a low-level diagnostic tool even once
-/// that's built, not just a throwaway.
+/// DAB+'s RTL-SDR setup/diagnostic screen (2026-09-17, renamed/reworked
+/// 2026-09-19 once DAB+ moved off the rtl_tcp server for USB mode - see
+/// direct_rtlsdr_input.h) - picks how the dongle is reached and lets that
+/// chain be verified independently of the DAB+ demodulation work itself.
 class RtlSdrTestScreen extends ConsumerStatefulWidget {
   const RtlSdrTestScreen({super.key});
 
@@ -36,30 +37,27 @@ class _RtlSdrTestScreenState extends ConsumerState<RtlSdrTestScreen> {
   RtlSdrStats? _lastStats;
   bool _autoGain = true;
 
-  RtlSdrConnectionMode _mode = RtlSdrConnectionMode.ownUsb;
+  RtlSdrConnectionMode _mode = RtlSdrConnectionMode.tcp;
   List<RtlSdrUsbDevice> _usbDevices = [];
   bool _usbBusy = false;
-  bool _usbServerRunning = false;
-  String? _usbError;
 
   @override
   void initState() {
     super.initState();
+    _loadPersisted();
     _refreshUsbDevices();
-    _loadPersistedServer();
   }
 
-  /// The DAB+ decoder (DabRtlSdrPlugin) reads the same host/port from
-  /// SettingsRepository to know where to connect, so this screen persists
-  /// whatever the user configures here rather than keeping it purely local.
-  Future<void> _loadPersistedServer() async {
+  Future<void> _loadPersisted() async {
     final settings = ref.read(settingsRepositoryProvider);
     final host = await settings.getRtlSdrHost();
     final port = await settings.getRtlSdrPort();
+    final ownUsb = await settings.getRtlSdrAutoStartOwnService();
     if (!mounted) return;
     setState(() {
       _hostController.text = host;
       _portController.text = '$port';
+      _mode = ownUsb ? RtlSdrConnectionMode.usb : RtlSdrConnectionMode.tcp;
     });
   }
 
@@ -84,12 +82,8 @@ class _RtlSdrTestScreenState extends ConsumerState<RtlSdrTestScreen> {
 
   Future<void> _refreshUsbDevices() async {
     final devices = await _usbService.listDevices();
-    final running = await _usbService.isServerRunning();
     if (!mounted) return;
-    setState(() {
-      _usbDevices = devices;
-      _usbServerRunning = running;
-    });
+    setState(() => _usbDevices = devices);
   }
 
   Future<void> _requestUsbPermission(RtlSdrUsbDevice device) async {
@@ -99,38 +93,17 @@ class _RtlSdrTestScreenState extends ConsumerState<RtlSdrTestScreen> {
     if (mounted) setState(() => _usbBusy = false);
   }
 
-  Future<void> _toggleUsbServer() async {
-    setState(() {
-      _usbBusy = true;
-      _usbError = null;
-    });
-    try {
-      if (_usbServerRunning) {
-        await _usbService.stopServer();
-      } else {
-        final port = int.tryParse(_portController.text) ?? 1234;
-        final freq = int.tryParse(_freqController.text) ?? 100000000;
-        await _usbService.startServer(port: port, frequencyHz: freq);
-        _hostController.text = '127.0.0.1';
-        _portController.text = '$port';
-        await ref.read(settingsRepositoryProvider).setRtlSdrServer('127.0.0.1', port);
-        await ref.read(settingsRepositoryProvider).setRtlSdrMode(ownUsbService: true);
-      }
-    } catch (e) {
-      _usbError = '$e';
-    }
-    await _refreshUsbDevices();
-    if (mounted) setState(() => _usbBusy = false);
+  Future<void> _selectMode(RtlSdrConnectionMode mode) async {
+    setState(() => _mode = mode);
+    await ref.read(settingsRepositoryProvider).setRtlSdrMode(ownUsbService: mode == RtlSdrConnectionMode.usb);
+    if (mode == RtlSdrConnectionMode.usb) _refreshUsbDevices();
   }
 
   Future<void> _connect() async {
     setState(() => _connecting = true);
     final host = _hostController.text.trim();
     final port = int.tryParse(_portController.text) ?? 1234;
-    if (_mode != RtlSdrConnectionMode.ownUsb) {
-      await ref.read(settingsRepositoryProvider).setRtlSdrServer(host, port);
-      await ref.read(settingsRepositoryProvider).setRtlSdrMode(ownUsbService: false);
-    }
+    await ref.read(settingsRepositoryProvider).setRtlSdrServer(host, port);
     final result = await _service.connect(host: host, port: port);
     if (!mounted) return;
     setState(() {
@@ -166,42 +139,34 @@ class _RtlSdrTestScreenState extends ConsumerState<RtlSdrTestScreen> {
   Widget build(BuildContext context) {
     final connected = _lastResult?.connected ?? false;
     return Scaffold(
-      appBar: AppBar(title: const Text('RTL-SDR Test')),
+      appBar: AppBar(title: const Text('DAB+ RTL-SDR Einrichtung')),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Wie soll der RTL-SDR-Stick angesprochen werden? Entweder direkt über '
-              'unseren eigenen USB-Dienst, über eine externe rtl_tcp-App auf diesem '
-              'Gerät (z.B. "SDR driver" / marto.rtl_tcp_andro), oder über einen '
-              'externen Netzwerk-Dienst (z.B. Raspberry Pi mit angeschlossenem Stick).',
+              'Wie soll DAB+ den RTL-SDR-Stick ansprechen?',
               style: TextStyle(color: Colors.white70),
             ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              children: [
-                ChoiceChip(
-                  label: const Text('Eigener USB-Dienst'),
-                  selected: _mode == RtlSdrConnectionMode.ownUsb,
-                  onSelected: connected ? null : (_) => setState(() => _mode = RtlSdrConnectionMode.ownUsb),
-                ),
-                ChoiceChip(
-                  label: const Text('Externe App'),
-                  selected: _mode == RtlSdrConnectionMode.externalApp,
-                  onSelected: connected ? null : (_) => setState(() => _mode = RtlSdrConnectionMode.externalApp),
-                ),
-                ChoiceChip(
-                  label: const Text('Netzwerk-Dienst'),
-                  selected: _mode == RtlSdrConnectionMode.network,
-                  onSelected: connected ? null : (_) => setState(() => _mode = RtlSdrConnectionMode.network),
-                ),
+            const SizedBox(height: 8),
+            DropdownButton<RtlSdrConnectionMode>(
+              value: _mode,
+              items: const [
+                DropdownMenuItem(value: RtlSdrConnectionMode.usb, child: Text('RTL-SDR-USB')),
+                DropdownMenuItem(value: RtlSdrConnectionMode.tcp, child: Text('RTL-SDR TCP')),
               ],
+              onChanged: connected ? null : (m) => m == null ? null : _selectMode(m),
             ),
             const SizedBox(height: 16),
-            if (_mode == RtlSdrConnectionMode.ownUsb) ...[
+            if (_mode == RtlSdrConnectionMode.usb) ...[
+              const Text(
+                'DAB+ öffnet den Stick direkt über USB, ohne rtl_tcp-Umweg. '
+                'Kein separater "Dienst starten"-Schritt nötig - sobald ein Sender '
+                'gestartet wird, öffnet der Decoder den Stick selbst.',
+                style: TextStyle(color: Colors.white70),
+              ),
+              const SizedBox(height: 12),
               if (_usbDevices.isEmpty)
                 const Text('Kein RTL-SDR-Stick erkannt.', style: TextStyle(color: Colors.orangeAccent))
               else
@@ -221,106 +186,96 @@ class _RtlSdrTestScreenState extends ConsumerState<RtlSdrTestScreen> {
                       ],
                     ),
                   ),
+              IconButton(onPressed: _refreshUsbDevices, icon: const Icon(Icons.refresh)),
+            ] else ...[
+              const Text(
+                'Verbindet sich als rtl_tcp-Client - egal ob eine externe Treiber-App '
+                'auf diesem Gerät (Host 127.0.0.1), ein Netzwerkdienst (z.B. Raspberry '
+                'Pi) oder später einmal ein eigener lokaler Dienst dahintersteckt.',
+                style: TextStyle(color: Colors.white70),
+              ),
+              const SizedBox(height: 12),
               Row(
                 children: [
-                  ElevatedButton(
-                    onPressed: (_usbBusy || _usbDevices.every((d) => !d.hasPermission)) ? null : _toggleUsbServer,
-                    child: Text(
-                      _usbBusy
-                          ? 'Bitte warten…'
-                          : (_usbServerRunning ? 'USB-Dienst stoppen' : 'USB-Dienst starten'),
+                  Expanded(
+                    flex: 2,
+                    child: TextField(
+                      controller: _hostController,
+                      enabled: !connected,
+                      decoration: const InputDecoration(labelText: 'Host (IP)'),
                     ),
                   ),
                   const SizedBox(width: 12),
-                  IconButton(onPressed: _refreshUsbDevices, icon: const Icon(Icons.refresh)),
+                  Expanded(
+                    child: TextField(
+                      controller: _portController,
+                      enabled: !connected,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'Port'),
+                    ),
+                  ),
                 ],
               ),
-              if (_usbError != null)
-                Text('Fehler: $_usbError', style: const TextStyle(color: Colors.redAccent)),
               const SizedBox(height: 12),
-            ],
-            Row(
-              children: [
-                Expanded(
-                  flex: 2,
-                  child: TextField(
-                    controller: _hostController,
-                    enabled: !connected && _mode != RtlSdrConnectionMode.ownUsb,
-                    decoration: const InputDecoration(labelText: 'Host (IP)'),
+              Row(
+                children: [
+                  ElevatedButton(
+                    onPressed: _connecting ? null : (connected ? _disconnect : _connect),
+                    child: Text(_connecting ? 'Verbinde…' : (connected ? 'Trennen' : 'Verbinden')),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextField(
-                    controller: _portController,
-                    enabled: !connected,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Port'),
+                  const SizedBox(width: 16),
+                  Switch(
+                    value: _autoGain,
+                    onChanged: connected
+                        ? (v) {
+                            setState(() => _autoGain = v);
+                            _service.setGainMode(auto: v);
+                          }
+                        : null,
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                ElevatedButton(
-                  onPressed: _connecting || (!connected && _mode == RtlSdrConnectionMode.ownUsb && !_usbServerRunning)
-                      ? null
-                      : (connected ? _disconnect : _connect),
-                  child: Text(_connecting ? 'Verbinde…' : (connected ? 'Trennen' : 'Verbinden')),
-                ),
-                const SizedBox(width: 16),
-                Switch(
-                  value: _autoGain,
-                  onChanged: connected
-                      ? (v) {
-                          setState(() => _autoGain = v);
-                          _service.setGainMode(auto: v);
-                        }
-                      : null,
-                ),
-                const Text('Auto-Gain'),
-              ],
-            ),
-            const Divider(height: 32),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _freqController,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Frequenz (Hz)'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                ElevatedButton(onPressed: connected ? _tune : null, child: const Text('Antunen')),
-              ],
-            ),
-            const SizedBox(height: 24),
-            Text(
-              connected ? 'Status: Verbunden' : 'Status: Nicht verbunden',
-              style: TextStyle(color: connected ? Colors.greenAccent : Colors.redAccent, fontSize: 16),
-            ),
-            if (_lastResult?.error != null)
-              Text('Fehler: ${_lastResult!.error}', style: const TextStyle(color: Colors.redAccent)),
-            if (connected) ...[
-              Text('Tuner-Typ: ${_lastResult?.tunerType}'),
-              Text('Gain-Stufen: ${_lastResult?.tunerGainCount}'),
-              const SizedBox(height: 12),
-              Text(
-                _lastStats == null
-                    ? 'Warte auf Daten…'
-                    : 'Empfangen: ${_lastStats!.bytesPerSec} Byte/s '
-                        '(gesamt: ${(_lastStats!.totalBytes / 1024).toStringAsFixed(0)} KB)',
-                style: const TextStyle(fontSize: 18),
+                  const Text('Auto-Gain'),
+                ],
               ),
-              const SizedBox(height: 8),
-              Text(
-                (_lastStats?.bytesPerSec ?? 0) > 0
-                    ? '✓ Es kommen Daten an - die Kette Stick → Treiber-App → Netzwerk → diese App funktioniert.'
-                    : 'Noch keine Daten - prüfe ob die Treiber-App läuft und den Stick erkannt hat.',
-                style: const TextStyle(color: Colors.white70),
+              const Divider(height: 32),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _freqController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'Frequenz (Hz)'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  ElevatedButton(onPressed: connected ? _tune : null, child: const Text('Antunen')),
+                ],
               ),
+              const SizedBox(height: 24),
+              Text(
+                connected ? 'Status: Verbunden' : 'Status: Nicht verbunden',
+                style: TextStyle(color: connected ? Colors.greenAccent : Colors.redAccent, fontSize: 16),
+              ),
+              if (_lastResult?.error != null)
+                Text('Fehler: ${_lastResult!.error}', style: const TextStyle(color: Colors.redAccent)),
+              if (connected) ...[
+                Text('Tuner-Typ: ${_lastResult?.tunerType}'),
+                Text('Gain-Stufen: ${_lastResult?.tunerGainCount}'),
+                const SizedBox(height: 12),
+                Text(
+                  _lastStats == null
+                      ? 'Warte auf Daten…'
+                      : 'Empfangen: ${_lastStats!.bytesPerSec} Byte/s '
+                          '(gesamt: ${(_lastStats!.totalBytes / 1024).toStringAsFixed(0)} KB)',
+                  style: const TextStyle(fontSize: 18),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  (_lastStats?.bytesPerSec ?? 0) > 0
+                      ? '✓ Es kommen Daten an - die Kette Stick → Treiber-App → Netzwerk → diese App funktioniert.'
+                      : 'Noch keine Daten - prüfe ob die Treiber-App läuft und den Stick erkannt hat.',
+                  style: const TextStyle(color: Colors.white70),
+                ),
+              ],
             ],
           ],
         ),

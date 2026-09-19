@@ -410,7 +410,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             FocusTraversalOrder(
               order: NumericFocusOrder(nextOrder()),
               child: _TvChoiceTile(
-                label: 'RTL-SDR Test',
+                label: 'DAB+ RTL-SDR Einrichtung',
                 selected: false,
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const RtlSdrTestScreen()),

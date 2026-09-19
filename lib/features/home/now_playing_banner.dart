@@ -18,6 +18,7 @@ class NowPlayingBanner extends StatelessWidget {
   final bool isBuffering;
   final String? subtitle;
   final String? errorMessage;
+  final double? snrDb;
 
   const NowPlayingBanner({
     super.key,
@@ -29,6 +30,7 @@ class NowPlayingBanner extends StatelessWidget {
     this.isBuffering = false,
     this.subtitle,
     this.errorMessage,
+    this.snrDb,
   });
 
   @override
@@ -52,14 +54,33 @@ class NowPlayingBanner extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        programNumber != null ? '$programNumber · $displayName' : displayName,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        overflow: TextOverflow.ellipsis,
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              programNumber != null ? '$programNumber · $displayName' : displayName,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (snrDb != null) ...[
+                            const SizedBox(width: 10),
+                            Icon(
+                              snrDb! >= 12
+                                  ? Icons.signal_cellular_alt
+                                  : (snrDb! >= 6 ? Icons.signal_cellular_alt_2_bar : Icons.signal_cellular_alt_1_bar),
+                              color: snrDb! >= 12
+                                  ? Colors.greenAccent
+                                  : (snrDb! >= 6 ? Colors.orangeAccent : Colors.redAccent),
+                              size: 28,
+                            ),
+                          ],
+                        ],
                       ),
                       const SizedBox(height: 4),
                       Text(

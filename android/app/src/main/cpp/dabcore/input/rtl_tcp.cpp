@@ -32,6 +32,10 @@
 
 #include <iostream>
 #include <sys/time.h>
+#ifdef __ANDROID__
+#include <cerrno>
+#include <sys/resource.h>
+#endif
 
 #include "rtl_tcp.h"
 
@@ -432,6 +436,15 @@ void CRTL_TCP_Client::setPort(uint16_t Port)
 
 void CRTL_TCP_Client::receiveAndReconnect()
 {
+#ifdef __ANDROID__
+    // See the matching priority boost in the rtl_tcp *server*
+    // (librtlsdr/rtl_tcp.c) - this is the same idea for the client side of
+    // the same loopback connection: this thread's recv() loop must not be
+    // starved by the Flutter UI thread or other native work.
+    if (setpriority(PRIO_PROCESS, 0, -19) != 0) {
+        std::clog << "RTL_TCP_CLIENT: setpriority(-19) on receiveAndReconnect failed, errno=" << errno << std::endl;
+    }
+#endif
     while (rtlsdrRunning) {
         std::unique_lock<std::mutex> lock(mutex);
 
@@ -484,6 +497,11 @@ void CRTL_TCP_Client::receiveAndReconnect()
 #define NETWORK_BUFFER_READ_SAMPLES 32768
 void CRTL_TCP_Client::networkBufferCopy()
 {
+#ifdef __ANDROID__
+    if (setpriority(PRIO_PROCESS, 0, -19) != 0) {
+        std::clog << "RTL_TCP_CLIENT: setpriority(-19) on networkBufferCopy failed, errno=" << errno << std::endl;
+    }
+#endif
     std::vector<uint8_t> tempBuffer(NETWORK_BUFFER_READ_SAMPLES * 2);
 
     while (rtlsdrRunning) {
@@ -542,6 +560,7 @@ void CRTL_TCP_Client::agcTimer(void)
                 // We have to decrease the gain
                 if(currentGainCount > 0) {
                     setGain(currentGainCount - 1);
+                    lastGainDecreaseTime_us = getMyTime();
                     //std::clog << "RTL_TCP_CLIENT: Decrease gain to " << (float)currentGain << std::endl;
                 }
             }
@@ -555,8 +574,37 @@ void CRTL_TCP_Client::agcTimer(void)
                     const int newMaxValue = (float)maxAmplitude * linGain;
                     const int newMinValue = (float)minAmplitude / linGain;
 
-                    // We have to increase the gain
-                    if (newMinValue >=0 && newMaxValue <= 255) {
+                    /*
+                     * Added for home_radio (2026-09-19): the original check
+                     * only rejected an increase that would exactly touch the
+                     * 0/255 clipping edges. On a real (not simulated) signal,
+                     * amplitude varies enough between one 8192-byte buffer
+                     * and the next that an amplitude margin alone (see
+                     * newMinValue/newMaxValue below) only slows the hunting
+                     * down, it doesn't stop it: an occasional buffer will
+                     * still look like it has headroom right after a
+                     * clipping-triggered decrease, so it increases again,
+                     * clips again a moment later, and so on - a continuous
+                     * back-and-forth between two adjacent gain steps that
+                     * never gives the OFDM synchronizer a stable signal
+                     * level long enough to lock.
+                     *
+                     * The debounce is keyed off the last *decrease*, not off
+                     * the last increase: an increase right after a clipping-
+                     * triggered decrease is exactly the hunting case and
+                     * gets held off for 2s, but climbing several steps in a
+                     * row when nothing has clipped recently (e.g. right
+                     * after retuning to a new, weaker channel, starting from
+                     * whatever gain the previous channel converged to) is
+                     * legitimate and must stay fast - gating that on "time
+                     * since last increase" too (an earlier version of this
+                     * fix did that) made the AGC take many seconds to climb
+                     * back up on a fresh channel, well past a scan's
+                     * per-channel budget, and found fewer stations than
+                     * before this file had any debounce at all.
+                     */
+                    const bool cooledDown = (getMyTime() - lastGainDecreaseTime_us) > 2000000;
+                    if (cooledDown && newMinValue >= 10 && newMaxValue <= 235) {
                         setGain(currentGainCount + 1);
                         //std::clog << "RTL_TCP_CLIENT: Increase gain to " << currentGain << std::endl;
                     }

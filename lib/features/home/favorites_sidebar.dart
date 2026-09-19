@@ -262,9 +262,9 @@ class _DabStationRowState extends State<_DabStationRow> {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             child: Row(
               children: [
-                const Padding(
-                  padding: EdgeInsets.only(right: 10),
-                  child: Icon(Icons.radio, size: 20, color: Colors.white38),
+                Padding(
+                  padding: const EdgeInsets.only(right: 10),
+                  child: _Logo(logoLocalPath: station.logoLocalPath, logoUrl: station.logoUrl),
                 ),
                 Expanded(
                   child: Column(
@@ -346,7 +346,7 @@ class _FavoriteRowState extends State<_FavoriteRow> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                _Logo(channel: channel),
+                _Logo(logoLocalPath: channel.logoLocalPath, logoUrl: channel.logoUrl),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
@@ -375,14 +375,15 @@ class _FavoriteRowState extends State<_FavoriteRow> {
 }
 
 class _Logo extends StatelessWidget {
-  final FavoriteChannel channel;
-  const _Logo({required this.channel});
+  final String? logoLocalPath;
+  final String? logoUrl;
+  const _Logo({required this.logoLocalPath, required this.logoUrl});
 
   @override
   Widget build(BuildContext context) {
     const size = 40.0;
-    final localPath = channel.logoLocalPath;
-    final url = channel.logoUrl;
+    final localPath = logoLocalPath;
+    final url = logoUrl;
     Widget placeholder = Container(
       width: size,
       height: size,

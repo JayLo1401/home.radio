@@ -1270,6 +1270,22 @@ void FIBProcessor::clearEnsemble()
     serviceRepeatCount.clear();
     timeLastServiceDecrement = std::chrono::steady_clock::now();
     timeLastFCT0Frame = std::chrono::system_clock::now();
+    /*
+     * Added for home_radio (2026-09-19): the ensemble id/ecc/label were
+     * never reset here, only the per-service state above. RadioReceiver::
+     * restart() calls clearEnsemble() on every retune (see ofdm-processor.cpp),
+     * so a scan that steps through many frequencies would keep reporting
+     * whichever ensemble label was last successfully decoded on an earlier,
+     * real channel for every subsequent channel afterwards - including ones
+     * with no signal/sync at all - since nothing here ever cleared it.
+     * getServiceList() correctly stayed empty for those (services.clear()
+     * above), which is what made this look like "ensemble found, 0
+     * services" everywhere instead of an obviously-wrong repeated ensemble
+     * name.
+     */
+    ensembleId = 0;
+    ensembleEcc = 0;
+    ensembleLabel = DabLabel();
 }
 
 std::vector<Service> FIBProcessor::getServiceList() const

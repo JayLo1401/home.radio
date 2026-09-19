@@ -50,6 +50,23 @@ class DabStations extends Table {
   // ensembles, not a decode bug), so this lets the user replace it with
   // something readable. Null means "use stationLabel as-is".
   TextColumn get customLabel => text().nullable()();
+  // Real DAB+ MOT slideshow image captured while listening/probing this
+  // station (see DabRtlSdrPlugin.nativeOnMot) - a local file path, not a
+  // URL, since it's decoded straight out of the broadcast rather than
+  // fetched from the network like [logoUrl]. No longer written to
+  // automatically (see home_screen.dart's _onDabEvent 'motLogo' case) -
+  // broadcast slideshow images are usually just "now playing" cover art,
+  // not a stable station logo, so they're only ever shown live during
+  // current playback now, not persisted as *the* station logo. Kept for
+  // backward compatibility with anything captured before that change.
+  TextColumn get logoLocalPath => text().nullable()();
+  // The station's actual persistent logo - looked up by name from an
+  // internet catalog (Radio-Browser, the same source Favorites.logoUrl
+  // uses for internet radio) or set manually, since DAB+ itself has no
+  // reliable concept of "the" station logo separate from whatever
+  // slideshow image happens to be playing (see [logoLocalPath]). This is
+  // what station lists, favorites and the background image use.
+  TextColumn get logoUrl => text().nullable()();
 
   @override
   Set<Column> get primaryKey => {freqKhz, serviceId};
@@ -61,7 +78,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -69,6 +86,8 @@ class AppDatabase extends _$AppDatabase {
         onUpgrade: (m, from, to) async {
           if (from < 2) await m.createTable(dabStations);
           if (from < 3) await m.addColumn(dabStations, dabStations.customLabel);
+          if (from < 4) await m.addColumn(dabStations, dabStations.logoLocalPath);
+          if (from < 5) await m.addColumn(dabStations, dabStations.logoUrl);
         },
       );
 
@@ -141,6 +160,23 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Future<void> clearDabStations() => delete(dabStations).go();
+
+  Future<void> setDabStationLogoPath(int freqKhz, int serviceId, String logoLocalPath) {
+    return (update(dabStations)
+          ..where((s) => s.freqKhz.equals(freqKhz) & s.serviceId.equals(serviceId)))
+        .write(DabStationsCompanion(logoLocalPath: Value(logoLocalPath)));
+  }
+
+  Future<void> setDabStationLogoUrl(int freqKhz, int serviceId, String logoUrl) {
+    return (update(dabStations)
+          ..where((s) => s.freqKhz.equals(freqKhz) & s.serviceId.equals(serviceId)))
+        .write(DabStationsCompanion(logoUrl: Value(logoUrl)));
+  }
+
+  Future<void> updateFavoriteLogoLocalPath(int programNumber, String logoLocalPath) {
+    return (update(favorites)..where((f) => f.programNumber.equals(programNumber)))
+        .write(FavoritesCompanion(logoLocalPath: Value(logoLocalPath)));
+  }
 
   Future<void> updateFavoriteDisplayName(int programNumber, String displayName) {
     return (update(favorites)..where((f) => f.programNumber.equals(programNumber)))

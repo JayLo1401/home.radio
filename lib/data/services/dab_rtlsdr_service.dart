@@ -37,6 +37,17 @@ class DabRtlSdrService {
     return result ?? false;
   }
 
+  /// "Own USB service" mode's alternative to [setServer]: opens the RTL-SDR
+  /// dongle directly (no rtl_tcp TCP loopback) and feeds it straight to the
+  /// decoder - see DabRtlSdrPlugin.useDirectUsb()/direct_rtlsdr_input.h for
+  /// why. Mutually exclusive with RtlSdrUsbService's own TCP server on the
+  /// same dongle; callers should use this instead of that server + [setServer]
+  /// when "own USB service" is the configured RTL-SDR source.
+  Future<bool> useDirectUsb() async {
+    final result = await _methodChannel.invokeMethod<bool>('useDirectUsb');
+    return result ?? false;
+  }
+
   Future<void> scanBand3() => _methodChannel.invokeMethod('scanBand3');
 
   Future<void> stopScan() => _methodChannel.invokeMethod('stopScan');
@@ -55,10 +66,31 @@ class DabRtlSdrService {
 
   Future<void> stopPlayback() => _methodChannel.invokeMethod('stopPlayback');
 
+  /// Tears down the native DAB+ session (direct-USB mode's rtlsdr_dev_t /
+  /// UsbDeviceConnection, or the rtl_tcp client) so a later play/scan
+  /// attempt starts fresh - call this once RtlSdrUsbService reports the
+  /// known RTL-SDR dongle was unplugged. Without it, a direct-USB session
+  /// left pointing at now-gone hardware never recovers on its own; every
+  /// later attempt just silently fails until the app is force-stopped.
+  Future<void> resetSession() => _methodChannel.invokeMethod('resetSession');
+
   Future<String> getEnsembleLabel() async {
     final result = await _methodChannel.invokeMethod<String>('getEnsembleLabel');
     return result ?? '';
   }
+
+  /// Tunes to each station in turn and waits for a real DAB+ MOT slideshow
+  /// image (the actual broadcast logo/cover art) - a dedicated, separate,
+  /// slower action from [scanBand3] (some stations take 10-30s to send a
+  /// slide, some never do). Progress/results arrive via [events]
+  /// (`logoScanProgress`, `logoFound`, `logoNotFound`, `logoScanFinished`).
+  Future<void> fetchLogos(List<({int freqKhz, int serviceId})> stations) {
+    return _methodChannel.invokeMethod('fetchLogos', {
+      'stations': stations.map((s) => {'freqKhz': s.freqKhz, 'serviceId': s.serviceId}).toList(),
+    });
+  }
+
+  Future<void> stopLogoFetch() => _methodChannel.invokeMethod('stopLogoFetch');
 
   Future<void> dispose() async {
     await _eventSub?.cancel();

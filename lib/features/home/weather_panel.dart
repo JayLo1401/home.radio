@@ -60,6 +60,7 @@ class _WeatherPanelState extends State<WeatherPanel> {
   // ...), so no colour tint is applied on top.
   static const _conditionIcons = {
     WeatherCondition.clear: WeatherSvgIcons.clearDay,
+    WeatherCondition.mostlyClear: WeatherSvgIcons.mostlyClearDay,
     WeatherCondition.partlyCloudy: WeatherSvgIcons.partlyCloudyDay,
     WeatherCondition.cloudy: WeatherSvgIcons.overcast,
     WeatherCondition.rainy: WeatherSvgIcons.rain,
@@ -187,9 +188,15 @@ class _HourRow extends StatelessWidget {
           Expanded(
             child: Row(
               children: [
-                const Icon(Icons.air_rounded, color: Colors.white38, size: 16),
+                Icon(Icons.air_rounded, color: _windColor(windKmh), size: 16),
                 const SizedBox(width: 3),
-                Text('$windKmh km/h', style: const TextStyle(color: Colors.white54)),
+                Text(
+                  '$windKmh km/h',
+                  style: TextStyle(
+                    color: _windColor(windKmh),
+                    fontWeight: windKmh >= 20 ? FontWeight.w600 : FontWeight.normal,
+                  ),
+                ),
               ],
             ),
           ),
@@ -206,6 +213,15 @@ class _HourRow extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Same highlight idea as [_RainBadge], just as a plain colour tier instead
+/// of a badge background: calm under 10 km/h, noticeable up to 20 km/h,
+/// strong above that.
+Color _windColor(int kmh) {
+  if (kmh >= 20) return Colors.redAccent;
+  if (kmh >= 10) return Colors.orangeAccent;
+  return Colors.white54;
 }
 
 /// Precipitation badge: background blueness scales with the hourly amount

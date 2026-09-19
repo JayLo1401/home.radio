@@ -1696,6 +1696,13 @@ int rtlsdr_open_from_fd(rtlsdr_dev_t **out_dev, int fd)
 		free(dev);
 		return -1;
 	}
+	/* The LIBUSB_LOG_LEVEL_DEBUG used while diagnosing the endpoint-stall/
+	 * control-transfer-timeout issues (2026-09-19, see rtlsdr_open_from_fd's
+	 * libusb_clear_halt() calls below) floods logcat with several thousand
+	 * lines per second once streaming starts, pushing this app's own
+	 * higher-level "rtl_tcp"/"DabRtlSdr" log lines out of the buffer before
+	 * they can be read - WARNING is enough to still catch real problems. */
+	libusb_set_option(dev->ctx, LIBUSB_OPTION_LOG_LEVEL, LIBUSB_LOG_LEVEL_WARNING);
 
 	dev->dev_lost = 1;
 
@@ -1711,12 +1718,32 @@ int rtlsdr_open_from_fd(rtlsdr_dev_t **out_dev, int fd)
 		goto err;
 	}
 
+	/*
+	 * Android-specific addition (2026-09-19): on this fd-wrapped session,
+	 * the bulk IN endpoint (0x81, the actual IQ sample stream) has been
+	 * observed to come back permanently STALLED (libusb "detected endpoint
+	 * stall", every read URB failing immediately with 0 bytes) the moment
+	 * rtlsdr_read_async() submits its transfers, even though register I/O
+	 * (control transfers) on the very same device handle works fine right
+	 * up to that point. This is consistent with the endpoint being left
+	 * halted by an earlier libusb_reset_device() call further down this
+	 * same function (over a flaky USB link that already needed a reset
+	 * once before reaching this point) - Android's UsbDeviceConnection has
+	 * no visibility into that libusb-level reset, so nothing else clears
+	 * it. A proactive clear-halt here is the standard, harmless fix (a
+	 * clear-halt on an endpoint that was never stalled is a no-op).
+	 */
+	libusb_clear_halt(dev->devh, 0x81);
+
 	dev->rtl_xtal = DEF_RTL_XTAL_FREQ;
 
 	/* perform a dummy write, if it fails, reset the device */
 	if (rtlsdr_write_reg(dev, USBB, USB_SYSCTL, 0x09, 1) < 0) {
 		fprintf(stderr, "Resetting device...\n");
 		libusb_reset_device(dev->devh);
+		/* The reset above can leave 0x81 stalled again - clear it once
+		 * more now that the reset has actually completed. */
+		libusb_clear_halt(dev->devh, 0x81);
 	}
 
 	rtlsdr_init_baseband(dev);

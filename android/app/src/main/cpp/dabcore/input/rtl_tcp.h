@@ -98,6 +98,10 @@ private:
     uint8_t maxAmplitude = 0;
     bool isAGC = true;
     bool isHwAGC = false;
+    // home_radio addition (2026-09-19): debounce for agcTimer()'s gain
+    // increase step, keyed off the last *decrease* - see the comment at
+    // its call site in rtl_tcp.cpp.
+    int64_t lastGainDecreaseTime_us = 0;
     int frequency = kHz(220000);
     RingBuffer<uint8_t> sampleBuffer;
     RingBuffer<uint8_t> sampleNetworkBuffer;

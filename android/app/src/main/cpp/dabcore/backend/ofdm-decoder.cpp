@@ -31,6 +31,10 @@
 #include "ofdm-decoder.h"
 #include "various/profiling.h"
 #include <iostream>
+#ifdef __ANDROID__
+#include <cerrno>
+#include <sys/resource.h>
+#endif
 
 /**
  * \brief OfdmDecoder
@@ -92,6 +96,26 @@ void OfdmDecoder::reset()
  */
 void OfdmDecoder::workerthread()
 {
+#ifdef __ANDROID__
+    /*
+     * Added for home_radio (2026-09-19): this thread does the actual
+     * per-symbol FFT + phase-reference correlation + bit extraction work
+     * handed off from OFDMProcessor::run() (see that function's own
+     * comment on why -19/THREAD_PRIORITY_URGENT_AUDIO is used here) - it
+     * was found completely unboosted (default nice 0) while genuinely
+     * needing close to a full CPU core continuously (confirmed via `adb
+     * shell top -H`: this thread and OFDMProcessor::run()'s thread
+     * together account for the large majority of one physical core's
+     * capacity on a 4+2 big.LITTLE Android TV box - not something a
+     * default-priority thread reliably gets scheduled promptly for
+     * against Flutter UI/GC work in the same process), so it was as
+     * likely a cause of the same audio-cutting-in-and-out symptom as the
+     * already-boosted OFDM sync loop.
+     */
+    if (setpriority(PRIO_PROCESS, 0, -19) != 0) {
+        std::clog << "ofdm-decoder: setpriority(-19) failed, errno=" << errno << std::endl;
+    }
+#endif
     int currentSym = 0;
 
     running = true;

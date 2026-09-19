@@ -766,6 +766,28 @@ class $DabStationsTable extends DabStations
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _logoLocalPathMeta = const VerificationMeta(
+    'logoLocalPath',
+  );
+  @override
+  late final GeneratedColumn<String> logoLocalPath = GeneratedColumn<String>(
+    'logo_local_path',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _logoUrlMeta = const VerificationMeta(
+    'logoUrl',
+  );
+  @override
+  late final GeneratedColumn<String> logoUrl = GeneratedColumn<String>(
+    'logo_url',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     freqKhz,
@@ -775,6 +797,8 @@ class $DabStationsTable extends DabStations
     ensembleLabel,
     lastSeenAt,
     customLabel,
+    logoLocalPath,
+    logoUrl,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -853,6 +877,21 @@ class $DabStationsTable extends DabStations
         ),
       );
     }
+    if (data.containsKey('logo_local_path')) {
+      context.handle(
+        _logoLocalPathMeta,
+        logoLocalPath.isAcceptableOrUnknown(
+          data['logo_local_path']!,
+          _logoLocalPathMeta,
+        ),
+      );
+    }
+    if (data.containsKey('logo_url')) {
+      context.handle(
+        _logoUrlMeta,
+        logoUrl.isAcceptableOrUnknown(data['logo_url']!, _logoUrlMeta),
+      );
+    }
     return context;
   }
 
@@ -890,6 +929,14 @@ class $DabStationsTable extends DabStations
         DriftSqlType.string,
         data['${effectivePrefix}custom_label'],
       ),
+      logoLocalPath: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}logo_local_path'],
+      ),
+      logoUrl: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}logo_url'],
+      ),
     );
   }
 
@@ -907,6 +954,8 @@ class DabStation extends DataClass implements Insertable<DabStation> {
   final String? ensembleLabel;
   final DateTime lastSeenAt;
   final String? customLabel;
+  final String? logoLocalPath;
+  final String? logoUrl;
   const DabStation({
     required this.freqKhz,
     required this.serviceId,
@@ -915,6 +964,8 @@ class DabStation extends DataClass implements Insertable<DabStation> {
     this.ensembleLabel,
     required this.lastSeenAt,
     this.customLabel,
+    this.logoLocalPath,
+    this.logoUrl,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -929,6 +980,12 @@ class DabStation extends DataClass implements Insertable<DabStation> {
     map['last_seen_at'] = Variable<DateTime>(lastSeenAt);
     if (!nullToAbsent || customLabel != null) {
       map['custom_label'] = Variable<String>(customLabel);
+    }
+    if (!nullToAbsent || logoLocalPath != null) {
+      map['logo_local_path'] = Variable<String>(logoLocalPath);
+    }
+    if (!nullToAbsent || logoUrl != null) {
+      map['logo_url'] = Variable<String>(logoUrl);
     }
     return map;
   }
@@ -946,6 +1003,12 @@ class DabStation extends DataClass implements Insertable<DabStation> {
       customLabel: customLabel == null && nullToAbsent
           ? const Value.absent()
           : Value(customLabel),
+      logoLocalPath: logoLocalPath == null && nullToAbsent
+          ? const Value.absent()
+          : Value(logoLocalPath),
+      logoUrl: logoUrl == null && nullToAbsent
+          ? const Value.absent()
+          : Value(logoUrl),
     );
   }
 
@@ -962,6 +1025,8 @@ class DabStation extends DataClass implements Insertable<DabStation> {
       ensembleLabel: serializer.fromJson<String?>(json['ensembleLabel']),
       lastSeenAt: serializer.fromJson<DateTime>(json['lastSeenAt']),
       customLabel: serializer.fromJson<String?>(json['customLabel']),
+      logoLocalPath: serializer.fromJson<String?>(json['logoLocalPath']),
+      logoUrl: serializer.fromJson<String?>(json['logoUrl']),
     );
   }
   @override
@@ -975,6 +1040,8 @@ class DabStation extends DataClass implements Insertable<DabStation> {
       'ensembleLabel': serializer.toJson<String?>(ensembleLabel),
       'lastSeenAt': serializer.toJson<DateTime>(lastSeenAt),
       'customLabel': serializer.toJson<String?>(customLabel),
+      'logoLocalPath': serializer.toJson<String?>(logoLocalPath),
+      'logoUrl': serializer.toJson<String?>(logoUrl),
     };
   }
 
@@ -986,6 +1053,8 @@ class DabStation extends DataClass implements Insertable<DabStation> {
     Value<String?> ensembleLabel = const Value.absent(),
     DateTime? lastSeenAt,
     Value<String?> customLabel = const Value.absent(),
+    Value<String?> logoLocalPath = const Value.absent(),
+    Value<String?> logoUrl = const Value.absent(),
   }) => DabStation(
     freqKhz: freqKhz ?? this.freqKhz,
     serviceId: serviceId ?? this.serviceId,
@@ -996,6 +1065,10 @@ class DabStation extends DataClass implements Insertable<DabStation> {
         : this.ensembleLabel,
     lastSeenAt: lastSeenAt ?? this.lastSeenAt,
     customLabel: customLabel.present ? customLabel.value : this.customLabel,
+    logoLocalPath: logoLocalPath.present
+        ? logoLocalPath.value
+        : this.logoLocalPath,
+    logoUrl: logoUrl.present ? logoUrl.value : this.logoUrl,
   );
   DabStation copyWithCompanion(DabStationsCompanion data) {
     return DabStation(
@@ -1016,6 +1089,10 @@ class DabStation extends DataClass implements Insertable<DabStation> {
       customLabel: data.customLabel.present
           ? data.customLabel.value
           : this.customLabel,
+      logoLocalPath: data.logoLocalPath.present
+          ? data.logoLocalPath.value
+          : this.logoLocalPath,
+      logoUrl: data.logoUrl.present ? data.logoUrl.value : this.logoUrl,
     );
   }
 
@@ -1028,7 +1105,9 @@ class DabStation extends DataClass implements Insertable<DabStation> {
           ..write('stationLabel: $stationLabel, ')
           ..write('ensembleLabel: $ensembleLabel, ')
           ..write('lastSeenAt: $lastSeenAt, ')
-          ..write('customLabel: $customLabel')
+          ..write('customLabel: $customLabel, ')
+          ..write('logoLocalPath: $logoLocalPath, ')
+          ..write('logoUrl: $logoUrl')
           ..write(')'))
         .toString();
   }
@@ -1042,6 +1121,8 @@ class DabStation extends DataClass implements Insertable<DabStation> {
     ensembleLabel,
     lastSeenAt,
     customLabel,
+    logoLocalPath,
+    logoUrl,
   );
   @override
   bool operator ==(Object other) =>
@@ -1053,7 +1134,9 @@ class DabStation extends DataClass implements Insertable<DabStation> {
           other.stationLabel == this.stationLabel &&
           other.ensembleLabel == this.ensembleLabel &&
           other.lastSeenAt == this.lastSeenAt &&
-          other.customLabel == this.customLabel);
+          other.customLabel == this.customLabel &&
+          other.logoLocalPath == this.logoLocalPath &&
+          other.logoUrl == this.logoUrl);
 }
 
 class DabStationsCompanion extends UpdateCompanion<DabStation> {
@@ -1064,6 +1147,8 @@ class DabStationsCompanion extends UpdateCompanion<DabStation> {
   final Value<String?> ensembleLabel;
   final Value<DateTime> lastSeenAt;
   final Value<String?> customLabel;
+  final Value<String?> logoLocalPath;
+  final Value<String?> logoUrl;
   final Value<int> rowid;
   const DabStationsCompanion({
     this.freqKhz = const Value.absent(),
@@ -1073,6 +1158,8 @@ class DabStationsCompanion extends UpdateCompanion<DabStation> {
     this.ensembleLabel = const Value.absent(),
     this.lastSeenAt = const Value.absent(),
     this.customLabel = const Value.absent(),
+    this.logoLocalPath = const Value.absent(),
+    this.logoUrl = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   DabStationsCompanion.insert({
@@ -1083,6 +1170,8 @@ class DabStationsCompanion extends UpdateCompanion<DabStation> {
     this.ensembleLabel = const Value.absent(),
     this.lastSeenAt = const Value.absent(),
     this.customLabel = const Value.absent(),
+    this.logoLocalPath = const Value.absent(),
+    this.logoUrl = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : freqKhz = Value(freqKhz),
        serviceId = Value(serviceId),
@@ -1096,6 +1185,8 @@ class DabStationsCompanion extends UpdateCompanion<DabStation> {
     Expression<String>? ensembleLabel,
     Expression<DateTime>? lastSeenAt,
     Expression<String>? customLabel,
+    Expression<String>? logoLocalPath,
+    Expression<String>? logoUrl,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1106,6 +1197,8 @@ class DabStationsCompanion extends UpdateCompanion<DabStation> {
       if (ensembleLabel != null) 'ensemble_label': ensembleLabel,
       if (lastSeenAt != null) 'last_seen_at': lastSeenAt,
       if (customLabel != null) 'custom_label': customLabel,
+      if (logoLocalPath != null) 'logo_local_path': logoLocalPath,
+      if (logoUrl != null) 'logo_url': logoUrl,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1118,6 +1211,8 @@ class DabStationsCompanion extends UpdateCompanion<DabStation> {
     Value<String?>? ensembleLabel,
     Value<DateTime>? lastSeenAt,
     Value<String?>? customLabel,
+    Value<String?>? logoLocalPath,
+    Value<String?>? logoUrl,
     Value<int>? rowid,
   }) {
     return DabStationsCompanion(
@@ -1128,6 +1223,8 @@ class DabStationsCompanion extends UpdateCompanion<DabStation> {
       ensembleLabel: ensembleLabel ?? this.ensembleLabel,
       lastSeenAt: lastSeenAt ?? this.lastSeenAt,
       customLabel: customLabel ?? this.customLabel,
+      logoLocalPath: logoLocalPath ?? this.logoLocalPath,
+      logoUrl: logoUrl ?? this.logoUrl,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1156,6 +1253,12 @@ class DabStationsCompanion extends UpdateCompanion<DabStation> {
     if (customLabel.present) {
       map['custom_label'] = Variable<String>(customLabel.value);
     }
+    if (logoLocalPath.present) {
+      map['logo_local_path'] = Variable<String>(logoLocalPath.value);
+    }
+    if (logoUrl.present) {
+      map['logo_url'] = Variable<String>(logoUrl.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1172,6 +1275,8 @@ class DabStationsCompanion extends UpdateCompanion<DabStation> {
           ..write('ensembleLabel: $ensembleLabel, ')
           ..write('lastSeenAt: $lastSeenAt, ')
           ..write('customLabel: $customLabel, ')
+          ..write('logoLocalPath: $logoLocalPath, ')
+          ..write('logoUrl: $logoUrl, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -1589,6 +1694,8 @@ typedef $$DabStationsTableCreateCompanionBuilder =
       Value<String?> ensembleLabel,
       Value<DateTime> lastSeenAt,
       Value<String?> customLabel,
+      Value<String?> logoLocalPath,
+      Value<String?> logoUrl,
       Value<int> rowid,
     });
 typedef $$DabStationsTableUpdateCompanionBuilder =
@@ -1600,6 +1707,8 @@ typedef $$DabStationsTableUpdateCompanionBuilder =
       Value<String?> ensembleLabel,
       Value<DateTime> lastSeenAt,
       Value<String?> customLabel,
+      Value<String?> logoLocalPath,
+      Value<String?> logoUrl,
       Value<int> rowid,
     });
 
@@ -1644,6 +1753,16 @@ class $$DabStationsTableFilterComposer
 
   ColumnFilters<String> get customLabel => $composableBuilder(
     column: $table.customLabel,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get logoLocalPath => $composableBuilder(
+    column: $table.logoLocalPath,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get logoUrl => $composableBuilder(
+    column: $table.logoUrl,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -1691,6 +1810,16 @@ class $$DabStationsTableOrderingComposer
     column: $table.customLabel,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get logoLocalPath => $composableBuilder(
+    column: $table.logoLocalPath,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get logoUrl => $composableBuilder(
+    column: $table.logoUrl,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$DabStationsTableAnnotationComposer
@@ -1732,6 +1861,14 @@ class $$DabStationsTableAnnotationComposer
     column: $table.customLabel,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get logoLocalPath => $composableBuilder(
+    column: $table.logoLocalPath,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get logoUrl =>
+      $composableBuilder(column: $table.logoUrl, builder: (column) => column);
 }
 
 class $$DabStationsTableTableManager
@@ -1772,6 +1909,8 @@ class $$DabStationsTableTableManager
                 Value<String?> ensembleLabel = const Value.absent(),
                 Value<DateTime> lastSeenAt = const Value.absent(),
                 Value<String?> customLabel = const Value.absent(),
+                Value<String?> logoLocalPath = const Value.absent(),
+                Value<String?> logoUrl = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => DabStationsCompanion(
                 freqKhz: freqKhz,
@@ -1781,6 +1920,8 @@ class $$DabStationsTableTableManager
                 ensembleLabel: ensembleLabel,
                 lastSeenAt: lastSeenAt,
                 customLabel: customLabel,
+                logoLocalPath: logoLocalPath,
+                logoUrl: logoUrl,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -1792,6 +1933,8 @@ class $$DabStationsTableTableManager
                 Value<String?> ensembleLabel = const Value.absent(),
                 Value<DateTime> lastSeenAt = const Value.absent(),
                 Value<String?> customLabel = const Value.absent(),
+                Value<String?> logoLocalPath = const Value.absent(),
+                Value<String?> logoUrl = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => DabStationsCompanion.insert(
                 freqKhz: freqKhz,
@@ -1801,6 +1944,8 @@ class $$DabStationsTableTableManager
                 ensembleLabel: ensembleLabel,
                 lastSeenAt: lastSeenAt,
                 customLabel: customLabel,
+                logoLocalPath: logoLocalPath,
+                logoUrl: logoUrl,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

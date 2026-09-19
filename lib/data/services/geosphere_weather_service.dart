@@ -87,7 +87,12 @@ class GeoSphereWeatherService {
       if (tempC <= 0.5) return WeatherCondition.snowy;
       return rainMmPerHour >= pouringThreshold ? WeatherCondition.pouring : WeatherCondition.rainy;
     }
-    if (cloudCoverPct <= 20) return WeatherCondition.clear;
+    // Four gradations instead of the previous three ("clear"/"partly
+    // cloudy"/"cloudy") - "leicht bewölkt" (mostly sunny, just a little
+    // cloud) used to fall into the same bucket as genuinely balanced
+    // cloud/sun conditions and showed the same icon as either extreme.
+    if (cloudCoverPct <= 15) return WeatherCondition.clear;
+    if (cloudCoverPct <= 40) return WeatherCondition.mostlyClear;
     if (cloudCoverPct <= 70) return WeatherCondition.partlyCloudy;
     return WeatherCondition.cloudy;
   }

@@ -3,31 +3,34 @@ import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
-import '../../data/models/favorite_channel.dart';
-
 /// Full-screen background. Phase 1: dark background, optionally with a
 /// dimmed station logo. Phase 3 replaces this with FTP-synced photos.
+///
+/// Takes the plain logo fields rather than a whole FavoriteChannel so a DAB+
+/// station played directly from "Alle DAB+ Sender" (not a saved favorite)
+/// can use its own persistent logo here too, not just favorites.
 class BackgroundLayer extends StatelessWidget {
-  final FavoriteChannel? currentChannel;
+  final String? logoLocalPath;
+  final String? logoUrl;
 
-  const BackgroundLayer({super.key, this.currentChannel});
+  const BackgroundLayer({super.key, this.logoLocalPath, this.logoUrl});
 
   @override
   Widget build(BuildContext context) {
-    final channel = currentChannel;
-    final logo = channel?.logoLocalPath ?? channel?.logoUrl;
+    final localPath = logoLocalPath;
+    final url = logoUrl;
 
     return Container(
       color: const Color(0xFF05070A),
-      child: logo == null
+      child: localPath == null && url == null
           ? null
           : Opacity(
               opacity: 0.18,
-              child: channel!.logoLocalPath != null
-                  ? Image.file(File(channel.logoLocalPath!),
+              child: localPath != null
+                  ? Image.file(File(localPath),
                       fit: BoxFit.cover, width: double.infinity, height: double.infinity)
                   : CachedNetworkImage(
-                      imageUrl: channel.logoUrl!,
+                      imageUrl: url!,
                       fit: BoxFit.cover,
                       width: double.infinity,
                       height: double.infinity,

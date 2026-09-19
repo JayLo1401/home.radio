@@ -31,6 +31,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   String? _dabStatusText;
   bool _dabTuned = false;
   bool _dabServerReady = false;
+  double? _dabSnrDb;
+
+  // A real DAB+ MOT slideshow image for whatever's currently playing (see
+  // _onDabEvent's 'motLogo' case) - shown live in the Now Playing banner
+  // only, never persisted as *the* station logo (see DabStation.logoUrl's
+  // own doc comment for why: it's usually just "now playing" cover art,
+  // not a stable logo). Reset whenever playback target changes so a stale
+  // image from a previous station never lingers.
+  String? _liveMotLogoPath;
 
   @override
   void initState() {
@@ -45,20 +54,112 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     audio.errorStream.listen((e) {
       if (mounted) setState(() => _playbackError = e);
     });
-    _initDabServer();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _autostart());
+    ref.read(dabRtlSdrServiceProvider).events.listen(_onDabEvent);
+    ref.read(rtlSdrUsbServiceProvider).events.listen(_onUsbDeviceEvent);
+    // _autostart() must wait for _initDabServer() to actually finish (USB
+    // permission request + native rtl_tcp service startup can take a
+    // couple of seconds, or longer the very first time) rather than racing
+    // it - a DAB+ autostart attempted before any samples are flowing yet
+    // has no real chance of succeeding, and there was no retry afterwards.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _initDabServer();
+      await _autostart();
+    });
   }
 
-  /// Points the DAB+ decoder (see DabRtlSdrService) at whichever rtl_tcp
-  /// source was configured in Settings/RtlSdrTestScreen - our own USB-TCP
-  /// service, an external driver app, or a network service. Unlike the old
-  /// Raontech pipeline, there is no USB permission dialog to wait for here:
-  /// the decoder is just a TCP client, so this either connects or doesn't.
+  /// Live DAB+ radiotext (DLS/dynamic label - the "now playing" style text
+  /// some stations send, e.g. artist/title) shown in place of the static
+  /// "wird gesucht"/error text once actual playback is underway. Empty/
+  /// blank labels are common (many stations send nothing, or clear it
+  /// between songs) and fall back to no subtitle rather than an empty one.
+  void _onDabEvent(Map<String, dynamic> event) {
+    if (!mounted) return;
+    switch (event['type']) {
+      case 'dynamicLabel' when _dabTuned:
+        final label = event['label'] as String? ?? '';
+        setState(() => _dabStatusText = label.isEmpty ? null : label);
+      case 'snr' when _dabTuned:
+        setState(() => _dabSnrDb = (event['snrDb'] as num).toDouble());
+      case 'motLogo' when _dabTuned:
+        // A real DAB+ MOT slideshow image just arrived for whatever's
+        // currently playing (see DabRtlSdrPlugin.nativeOnMot) - shown live
+        // in the Now Playing banner only (see [_liveMotLogoPath]'s own doc
+        // comment for why this deliberately does NOT touch the station's
+        // persistent logo/DB row).
+        setState(() => _liveMotLogoPath = event['path'] as String);
+    }
+  }
+
+  /// Recovers from the known RTL-SDR dongle being unplugged/replugged while
+  /// this app has it open in direct-USB mode (see RtlSdrUsbService.events
+  /// and DabRtlSdrService.resetSession()'s own doc comment for why the
+  /// native session can't just fix itself). Previously nothing listened for
+  /// this at all - a mid-playback unplug left the app stuck needing a force-
+  /// stop to ever play DAB+ again, exactly the failure this closes.
+  void _onUsbDeviceEvent(Map<String, dynamic> event) {
+    final type = event['type'];
+    if (type != 'deviceDetached' && type != 'deviceAttached') return;
+    () async {
+      if (!mounted) return;
+      if (!await ref.read(settingsRepositoryProvider).getRtlSdrAutoStartOwnService()) {
+        return; // only direct-USB mode actually owns the dongle itself
+      }
+      if (type == 'deviceDetached') {
+        final wasDabPlaying = _dabTuned;
+        await ref.read(dabRtlSdrServiceProvider).resetSession();
+        if (!mounted) return;
+        setState(() {
+          _dabServerReady = false;
+          _dabTuned = false;
+          if (wasDabPlaying) _dabStatusText = 'USB-Stick getrennt - warte auf Wiederanschluss…';
+        });
+      } else {
+        if (_dabServerReady) return; // was never actually interrupted
+        await _initDabServer();
+        await _resumeDabAfterReconnect();
+      }
+    }();
+  }
+
+  /// Re-plays whatever DAB+ source was current when the dongle got pulled
+  /// (see [_onUsbDeviceEvent]) - [currentDabStationProvider]/
+  /// [currentProgramNumberProvider] still hold that identity even while
+  /// disconnected, since nothing resets them on a mere playback failure.
+  Future<void> _resumeDabAfterReconnect() async {
+    if (!mounted || !_dabServerReady) return;
+    final currentDabStation = ref.read(currentDabStationProvider);
+    if (currentDabStation != null) {
+      final stations = await ref.read(dabStationsRepositoryProvider).watchAll().first;
+      final station = stations
+          .where((s) => s.freqKhz == currentDabStation.freqKhz && s.serviceId == currentDabStation.serviceId)
+          .firstOrNull;
+      if (station != null && mounted) await _playDabStation(station);
+      return;
+    }
+    final currentProgram = ref.read(currentProgramNumberProvider);
+    if (currentProgram == null) return;
+    final favorites = await ref.read(favoritesRepositoryProvider).watchFavorites().first;
+    final channel = favorites.where((c) => c.programNumber == currentProgram).firstOrNull;
+    if (channel != null && channel.dabFreqKhz != null && channel.dabServiceId != null && mounted) {
+      await _play(channel);
+    }
+  }
+
+  /// Points the DAB+ decoder (see DabRtlSdrService) at whichever RTL-SDR
+  /// source was configured in Settings/RtlSdrTestScreen. "Own USB service"
+  /// mode goes straight over USB (see [DabRtlSdrService.useDirectUsb] /
+  /// direct_rtlsdr_input.h) instead of through RtlSdrUsbService's rtl_tcp
+  /// TCP server - that server is now only started from RtlSdrTestScreen
+  /// itself for standalone testing, not auto-started here, since direct
+  /// mode and that server are mutually exclusive consumers of the same
+  /// dongle. An external app or network service still just gets a plain
+  /// rtl_tcp client connection, same as before.
   Future<void> _initDabServer() async {
     final settings = ref.read(settingsRepositoryProvider);
-    final host = await settings.getRtlSdrHost();
-    final port = await settings.getRtlSdrPort();
-    final ok = await ref.read(dabRtlSdrServiceProvider).setServer(host: host, port: port);
+    final dab = ref.read(dabRtlSdrServiceProvider);
+    final ok = await settings.getRtlSdrAutoStartOwnService()
+        ? await dab.useDirectUsb()
+        : await dab.setServer(host: await settings.getRtlSdrHost(), port: await settings.getRtlSdrPort());
     if (mounted) setState(() => _dabServerReady = ok);
   }
 
@@ -129,6 +230,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       _icyTitle = null;
       _dabStatusText = null;
       _dabTuned = false;
+      _dabSnrDb = null;
+      _liveMotLogoPath = null;
     });
     ref.read(currentDabStationProvider.notifier).set(null);
     ref.read(currentProgramNumberProvider.notifier).set(channel.programNumber);
@@ -161,6 +264,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       _icyTitle = null;
       _dabStatusText = null;
       _dabTuned = false;
+      _dabSnrDb = null;
+      _liveMotLogoPath = null;
     });
     ref.read(currentProgramNumberProvider.notifier).set(null);
     ref.read(currentDabStationProvider.notifier).set((freqKhz: station.freqKhz, serviceId: station.serviceId));
@@ -224,7 +329,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          BackgroundLayer(currentChannel: currentChannel),
+          BackgroundLayer(
+            logoLocalPath: currentChannel?.logoLocalPath ?? currentRawDabStation?.logoLocalPath,
+            logoUrl: currentChannel?.logoUrl ?? currentRawDabStation?.logoUrl,
+          ),
           SafeArea(
             child: Column(
               children: [
@@ -251,12 +359,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 NowPlayingBanner(
                   programNumber: currentChannel?.programNumber,
                   displayName: currentChannel?.displayName ?? currentRawDabStation?.displayLabel,
-                  logoUrl: currentChannel?.logoUrl,
-                  logoLocalPath: currentChannel?.logoLocalPath,
+                  logoUrl: currentChannel?.logoUrl ?? currentRawDabStation?.logoUrl,
+                  logoLocalPath: _liveMotLogoPath ?? currentChannel?.logoLocalPath ?? currentRawDabStation?.logoLocalPath,
                   isPlaying: isPlaying,
                   isBuffering: isBuffering,
                   subtitle: (subtitle?.isEmpty ?? true) ? null : subtitle,
                   errorMessage: errorMessage,
+                  snrDb: (isDab && isPlaying) ? _dabSnrDb : null,
                 ),
               ],
             ),

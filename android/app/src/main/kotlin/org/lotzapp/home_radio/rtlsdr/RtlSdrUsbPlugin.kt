@@ -283,12 +283,24 @@ class RtlSdrUsbPlugin :
         result.success(mapOf("bindAddr" to bindAddr, "port" to port))
     }
 
-    private fun stopServer() {
-        if (RtlSdrUsbServer.nativeIsRunning()) {
-            RtlSdrUsbServer.nativeStop()
-        }
-        openConnection?.close()
-        openConnection = null
+    /**
+     * nativeStop() blocks until the native server thread actually exits
+     * (it joins that thread) - normally fast, but rtl_tcp_main()'s thread
+     * can be stuck inside a libusb call (a timed-out control transfer, a
+     * device reset, ...) on a flaky USB connection, which used to freeze
+     * the whole app since this ran synchronously on the platform/UI thread
+     * that every MethodChannel call arrives on. Always run it on a
+     * background thread instead.
+     */
+    private fun stopServer(onDone: (() -> Unit)? = null) {
+        Thread {
+            if (RtlSdrUsbServer.nativeIsRunning()) {
+                RtlSdrUsbServer.nativeStop()
+            }
+            openConnection?.close()
+            openConnection = null
+            onDone?.let { mainHandler.post(it) }
+        }.start()
     }
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
@@ -300,10 +312,7 @@ class RtlSdrUsbPlugin :
                 result.success(null)
             }
             "startServer" -> startServer(call, result)
-            "stopServer" -> {
-                stopServer()
-                result.success(null)
-            }
+            "stopServer" -> stopServer { result.success(null) }
             "isServerRunning" -> result.success(RtlSdrUsbServer.nativeIsRunning())
             else -> result.notImplemented()
         }

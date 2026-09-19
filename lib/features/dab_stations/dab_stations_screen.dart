@@ -1,11 +1,14 @@
 import 'dart:async';
+import 'dart:io';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers.dart';
 import '../../data/db/database.dart' show DabStation;
 import '../../data/models/favorite_channel.dart';
+import '../../data/models/internet_radio_station.dart';
 import '../../data/repositories/dab_stations_repository.dart' show DabStationDisplay;
 import '../shared/program_number_dialog.dart';
 import '../shared/rename_dialog.dart';
@@ -91,7 +94,14 @@ class _DabStationsScreenState extends ConsumerState<DabStationsScreen> {
             else
               ...dabFavorites.map((c) => _FavoriteRow(channel: c)),
             const SizedBox(height: 24),
-            Text('Alle DAB+ Sender', style: Theme.of(context).textTheme.titleLarge),
+            Row(
+              children: [
+                Expanded(
+                  child: Text('Alle DAB+ Sender', style: Theme.of(context).textTheme.titleLarge),
+                ),
+                if (stations.isNotEmpty) _LogoFetchButton(stations: stations),
+              ],
+            ),
             const SizedBox(height: 8),
             if (stations.isEmpty)
               const Text(
@@ -112,14 +122,251 @@ class _DabStationsScreenState extends ConsumerState<DabStationsScreen> {
   }
 }
 
-/// Best-effort logo lookup: DAB+ itself doesn't reliably deliver a fixed
-/// station logo (per the user - some players end up showing whatever
-/// slideshow image happened to be running instead of a real logo, since DAB+
-/// slideshow/MOT decoding isn't implemented here anyway - see the project
-/// plan), so instead this matches the station name against Radio-Browser's
-/// catalog (the same source used for internet-radio favicons) and takes the
-/// first hit's favicon, if any. Never throws - a missing/failed lookup just
-/// means no logo, not a broken favorite.
+/// Looks up a logo for every known station that doesn't have one yet, via
+/// [_findLogoUrl] (Radio-Browser, matched by cleaned-up station name) -
+/// pure Dart/HTTP, no tuning/USB involved at all, so this is fast even for
+/// dozens of stations. Replaces an earlier version of this button that tuned
+/// to each station in turn and waited (10-30s each) for a real DAB+ MOT
+/// slideshow image - that gave *some* stations a logo, but it was usually
+/// just whatever was "now playing" (album/cover art), not a stable station
+/// logo, and left most stations empty since not every station even sends
+/// one. A broadcast slideshow image is still shown, just only live during
+/// current playback now (see home_screen.dart's _onDabEvent), not as this
+/// persistent logo.
+class _LogoFetchButton extends ConsumerStatefulWidget {
+  final List<DabStation> stations;
+  const _LogoFetchButton({required this.stations});
+
+  @override
+  ConsumerState<_LogoFetchButton> createState() => _LogoFetchButtonState();
+}
+
+class _LogoFetchButtonState extends ConsumerState<_LogoFetchButton> {
+  bool _running = false;
+  bool _cancelled = false;
+  String? _progressText;
+
+  @override
+  void dispose() {
+    _cancelled = true;
+    super.dispose();
+  }
+
+  Future<void> _start() async {
+    // Skip stations that already have a logo - re-running this over and
+    // over shouldn't re-query everything every time.
+    final pending = widget.stations.where((s) => s.logoUrl == null).toList();
+    if (pending.isEmpty) return;
+    setState(() {
+      _running = true;
+      _cancelled = false;
+      _progressText = null;
+    });
+    final stationsRepo = ref.read(dabStationsRepositoryProvider);
+    final favoritesRepo = ref.read(favoritesRepositoryProvider);
+    var found = 0;
+    for (var i = 0; i < pending.length; i++) {
+      if (_cancelled) break;
+      final station = pending[i];
+      if (mounted) setState(() => _progressText = 'Sender ${i + 1}/${pending.length}…');
+      final logoUrl = await _findLogoUrl(ref, station.displayLabel);
+      if (logoUrl != null) {
+        found++;
+        await stationsRepo.setLogoUrl(freqKhz: station.freqKhz, serviceId: station.serviceId, logoUrl: logoUrl);
+        final matchingFavorite = (ref.read(favoritesStreamProvider).value ?? const <FavoriteChannel>[])
+            .where((c) => c.dabFreqKhz == station.freqKhz && c.dabServiceId == station.serviceId)
+            .firstOrNull;
+        if (matchingFavorite != null) {
+          await favoritesRepo.updateLogoUrl(matchingFavorite.programNumber, logoUrl);
+        }
+      }
+      // A courtesy delay between requests to the public Radio-Browser API,
+      // not something this app's own responsiveness needs.
+      if (!_cancelled && i < pending.length - 1) {
+        await Future.delayed(const Duration(milliseconds: 300));
+      }
+    }
+    if (mounted) {
+      setState(() {
+        _running = false;
+        _progressText = null;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Senderlogos aktualisiert: $found von ${pending.length} gefunden.')),
+      );
+    }
+  }
+
+  void _stop() {
+    _cancelled = true;
+    setState(() => _running = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (_running && _progressText != null) ...[
+          Text(_progressText!, style: const TextStyle(color: Colors.white54, fontSize: 12)),
+          const SizedBox(width: 8),
+        ],
+        TextButton.icon(
+          onPressed: _running ? _stop : _start,
+          icon: Icon(_running ? Icons.stop : Icons.image_search),
+          label: Text(_running ? 'Stoppen' : 'Senderlogos aus dem Internet holen'),
+        ),
+      ],
+    );
+  }
+}
+
+/// Manual "nachbessern" for when [_findLogoUrl]'s automatic pick was wrong
+/// or empty - [_findLogoUrl] only ever takes the *first* Radio-Browser hit,
+/// which for a common station name/short name can easily be the wrong
+/// station's logo entirely. Lets the user search themselves and pick from
+/// the actual candidates (with a thumbnail preview, so no guessing from
+/// names alone), or as a last resort paste a direct image URL - without
+/// having to go googling for one outside the app. Returns the chosen URL,
+/// or null if cancelled.
+class _LogoPickerDialog extends ConsumerStatefulWidget {
+  final String initialQuery;
+  const _LogoPickerDialog({required this.initialQuery});
+
+  @override
+  ConsumerState<_LogoPickerDialog> createState() => _LogoPickerDialogState();
+}
+
+class _LogoPickerDialogState extends ConsumerState<_LogoPickerDialog> {
+  late final _queryController = TextEditingController(text: widget.initialQuery);
+  final _urlController = TextEditingController();
+  List<InternetRadioStation> _results = [];
+  bool _loading = false;
+  bool _searched = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _search();
+  }
+
+  @override
+  void dispose() {
+    _queryController.dispose();
+    _urlController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _search() async {
+    final query = _queryController.text.trim();
+    if (query.isEmpty) return;
+    setState(() => _loading = true);
+    try {
+      final results = await ref.read(radioBrowserApiServiceProvider).search(name: query, limit: 25);
+      if (mounted) setState(() => _results = results.where((s) => s.favicon != null).toList());
+    } catch (_) {
+      if (mounted) setState(() => _results = []);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _searched = true;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Logo suchen'),
+      content: SizedBox(
+        width: 420,
+        height: 420,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _queryController,
+                    decoration: const InputDecoration(labelText: 'Sendername'),
+                    onSubmitted: (_) => _search(),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton(icon: const Icon(Icons.search), onPressed: _search),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _results.isEmpty
+                      ? Center(
+                          child: Text(
+                            _searched ? 'Keine Treffer mit Vorschaubild.' : '',
+                            style: const TextStyle(color: Colors.white54),
+                          ),
+                        )
+                      : ListView.builder(
+                          itemCount: _results.length,
+                          itemBuilder: (context, index) {
+                            final station = _results[index];
+                            return ListTile(
+                              leading: CircleAvatar(backgroundImage: CachedNetworkImageProvider(station.favicon!)),
+                              title: Text(station.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+                              subtitle: Text(station.countryCode),
+                              onTap: () => Navigator.of(context).pop(station.favicon),
+                            );
+                          },
+                        ),
+            ),
+            const Divider(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _urlController,
+                    decoration: const InputDecoration(labelText: 'oder direkte Bild-URL', hintText: 'https://…'),
+                    keyboardType: TextInputType.url,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                FilledButton(
+                  onPressed: () {
+                    final url = _urlController.text.trim();
+                    if (url.isNotEmpty) Navigator.of(context).pop(url);
+                  },
+                  child: const Text('Übernehmen'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Abbrechen')),
+      ],
+    );
+  }
+}
+
+Future<String?> _showLogoUrlDialog(BuildContext context, {required String stationName}) {
+  return showDialog<String>(
+    context: context,
+    builder: (context) => _LogoPickerDialog(initialQuery: stationName),
+  );
+}
+
+/// A dedicated, separate action (see [_LogoFetchButton]'s own doc comment)
+/// captures real DAB+ MOT slideshow images. This is the fallback/quick
+/// alternative for stations that don't send one (or before that scan has
+/// been run): matches the station name against Radio-Browser's catalog (the
+/// same source used for internet-radio favicons) and takes the first hit's
+/// favicon, if any. Never throws - a missing/failed lookup just means no
+/// logo, not a broken favorite.
 /// DAB+ station labels often carry decorative padding ("*GRUEN-WEISS*",
 /// stray pipes/dashes used as visual borders in the original 16-char FIG 1/1
 /// label) that a plain Radio-Browser name search won't match at all -
@@ -167,12 +414,18 @@ class _FavoriteRow extends ConsumerWidget {
     }
   }
 
+  Future<void> _setLogoManually(BuildContext context, WidgetRef ref) async {
+    final url = await _showLogoUrlDialog(context, stationName: channel.displayName);
+    if (url == null) return;
+    await ref.read(favoritesRepositoryProvider).updateLogoUrl(channel.programNumber, url);
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return ListTile(
       contentPadding: EdgeInsets.zero,
       leading: CircleAvatar(
-        backgroundImage: channel.logoUrl != null ? NetworkImage(channel.logoUrl!) : null,
+        backgroundImage: channel.logoUrl != null ? CachedNetworkImageProvider(channel.logoUrl!) : null,
         child: channel.logoUrl == null ? Text('${channel.programNumber}') : null,
       ),
       title: Text(channel.displayName),
@@ -186,6 +439,11 @@ class _FavoriteRow extends ConsumerWidget {
               tooltip: 'Logo suchen',
               onPressed: () => _findLogo(context, ref),
             ),
+          IconButton(
+            icon: const Icon(Icons.edit_outlined),
+            tooltip: 'Logo nachbessern',
+            onPressed: () => _setLogoManually(context, ref),
+          ),
           IconButton(
             icon: const Icon(Icons.star, color: Colors.amber),
             tooltip: 'Favorit entfernen',
@@ -211,7 +469,9 @@ class _StationRow extends ConsumerWidget {
       builder: (context) => ProgramNumberDialog(initial: suggested),
     );
     if (programNumber == null) return;
-    final logoUrl = await _findLogoUrl(ref, station.displayLabel);
+    // Already have one (auto or manual, from "Alle DAB+ Sender" itself) -
+    // keep it rather than looking it up again.
+    final logoUrl = station.logoUrl ?? await _findLogoUrl(ref, station.displayLabel);
     await repo.addDabService(
       programNumber: programNumber,
       displayName: station.displayLabel,
@@ -219,10 +479,49 @@ class _StationRow extends ConsumerWidget {
       serviceId: station.serviceId,
       logoUrl: logoUrl,
     );
+    if (logoUrl != null && station.logoUrl == null) {
+      await ref
+          .read(dabStationsRepositoryProvider)
+          .setLogoUrl(freqKhz: station.freqKhz, serviceId: station.serviceId, logoUrl: logoUrl);
+    }
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('"${station.displayLabel}" als Nr. $programNumber gespeichert.')),
       );
+    }
+  }
+
+  Future<void> _findLogo(BuildContext context, WidgetRef ref) async {
+    final logoUrl = await _findLogoUrl(ref, station.displayLabel);
+    if (logoUrl != null) {
+      await ref
+          .read(dabStationsRepositoryProvider)
+          .setLogoUrl(freqKhz: station.freqKhz, serviceId: station.serviceId, logoUrl: logoUrl);
+      if (favorite != null) {
+        await ref.read(favoritesRepositoryProvider).updateLogoUrl(favorite!.programNumber, logoUrl);
+      }
+    }
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            logoUrl != null
+                ? 'Logo für "${station.displayLabel}" gefunden.'
+                : 'Kein passendes Logo für "${station.displayLabel}" gefunden.',
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _setLogoManually(BuildContext context, WidgetRef ref) async {
+    final url = await _showLogoUrlDialog(context, stationName: station.displayLabel);
+    if (url == null) return;
+    await ref
+        .read(dabStationsRepositoryProvider)
+        .setLogoUrl(freqKhz: station.freqKhz, serviceId: station.serviceId, logoUrl: url);
+    if (favorite != null) {
+      await ref.read(favoritesRepositoryProvider).updateLogoUrl(favorite!.programNumber, url);
     }
   }
 
@@ -248,8 +547,13 @@ class _StationRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final logoUrl = station.logoUrl;
+    final logoPath = station.logoLocalPath;
     return ListTile(
       contentPadding: EdgeInsets.zero,
+      leading: logoUrl != null
+          ? CircleAvatar(backgroundImage: CachedNetworkImageProvider(logoUrl))
+          : (logoPath == null ? null : CircleAvatar(backgroundImage: FileImage(File(logoPath)))),
       title: Text(station.displayLabel),
       subtitle: Text(
         '${station.ensembleLabel ?? "Ensemble unbekannt"} · ${station.channelLabel} · ${station.freqKhz} kHz',
@@ -257,6 +561,17 @@ class _StationRow extends ConsumerWidget {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (logoUrl == null)
+            IconButton(
+              icon: const Icon(Icons.image_search),
+              tooltip: 'Logo suchen',
+              onPressed: () => _findLogo(context, ref),
+            ),
+          IconButton(
+            icon: const Icon(Icons.add_photo_alternate_outlined),
+            tooltip: 'Logo nachbessern',
+            onPressed: () => _setLogoManually(context, ref),
+          ),
           IconButton(
             icon: const Icon(Icons.edit_outlined),
             tooltip: 'Umbenennen',
@@ -279,14 +594,14 @@ class _FoundChannel {
   final int index;
   final String label;
   final int freqKhz;
-  final int antennaLevel;
+  final double snrDb;
   final String? ensembleLabel;
   final List<({int serviceId, String label})> services;
   const _FoundChannel({
     required this.index,
     required this.label,
     required this.freqKhz,
-    required this.antennaLevel,
+    required this.snrDb,
     this.ensembleLabel,
     this.services = const [],
   });
@@ -308,8 +623,7 @@ class _ScanPanel extends ConsumerStatefulWidget {
 }
 
 class _ScanPanelState extends ConsumerState<_ScanPanel> {
-  final _hostController = TextEditingController();
-  final _portController = TextEditingController();
+  bool _ownUsbMode = false;
   bool _scanning = false;
   String? _currentLabel;
   final List<_FoundChannel> _found = [];
@@ -319,7 +633,7 @@ class _ScanPanelState extends ConsumerState<_ScanPanel> {
   @override
   void initState() {
     super.initState();
-    _loadServer();
+    _loadMode();
     _sub = ref.read(dabRtlSdrServiceProvider).events.listen((event) {
       if (!mounted) return;
       switch (event['type']) {
@@ -339,7 +653,7 @@ class _ScanPanelState extends ConsumerState<_ScanPanel> {
                 index: event['index'] as int,
                 label: channelLabel,
                 freqKhz: freqKhz,
-                antennaLevel: event['antennaLevel'] as int,
+                snrDb: (event['snrDb'] as num?)?.toDouble() ?? 0.0,
                 ensembleLabel: ensembleLabel,
                 services: services,
               ),
@@ -367,30 +681,35 @@ class _ScanPanelState extends ConsumerState<_ScanPanel> {
     });
   }
 
-  Future<void> _loadServer() async {
-    final settings = ref.read(settingsRepositoryProvider);
-    final host = await settings.getRtlSdrHost();
-    final port = await settings.getRtlSdrPort();
-    if (!mounted) return;
-    setState(() {
-      _hostController.text = host;
-      _portController.text = '$port';
-    });
+  /// Which RTL-SDR source to use is now configured once, in "DAB+ RTL-SDR
+  /// Einrichtung" (see RtlSdrTestScreen) - this panel used to have its own
+  /// separate, editable host/port fields that duplicated that setting and
+  /// could disagree with it. Just reads whatever's configured there.
+  Future<void> _loadMode() async {
+    final ownUsb = await ref.read(settingsRepositoryProvider).getRtlSdrAutoStartOwnService();
+    if (mounted) setState(() => _ownUsbMode = ownUsb);
   }
 
   @override
   void dispose() {
     _sub?.cancel();
-    _hostController.dispose();
-    _portController.dispose();
     super.dispose();
   }
 
   Future<void> _startScan() async {
-    final host = _hostController.text.trim();
-    final port = int.tryParse(_portController.text) ?? 1234;
-    await ref.read(settingsRepositoryProvider).setRtlSdrServer(host, port);
-    final connected = await ref.read(dabRtlSdrServiceProvider).setServer(host: host, port: port);
+    // In "RTL-SDR-USB" (direct) mode there is no rtl_tcp server to connect
+    // to at all (see direct_rtlsdr_input.h) - this used to always call
+    // setServer() regardless of the configured mode, which in direct mode
+    // just failed its own "is anything listening" probe immediately
+    // (nothing ever was), making a scan impossible to even start.
+    final connected = _ownUsbMode
+        ? await ref.read(dabRtlSdrServiceProvider).useDirectUsb()
+        : await () async {
+            final settings = ref.read(settingsRepositoryProvider);
+            final host = await settings.getRtlSdrHost();
+            final port = await settings.getRtlSdrPort();
+            return ref.read(dabRtlSdrServiceProvider).setServer(host: host, port: port);
+          }();
     if (!connected) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -434,28 +753,15 @@ class _ScanPanelState extends ConsumerState<_ScanPanel> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Expanded(
-              flex: 2,
-              child: TextField(
-                controller: _hostController,
-                enabled: !_scanning,
-                decoration: const InputDecoration(labelText: 'RTL-SDR Host (IP)'),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: TextField(
-                controller: _portController,
-                enabled: !_scanning,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Port'),
-              ),
-            ),
-          ],
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Text(
+            _ownUsbMode
+                ? 'Quelle: RTL-SDR-USB (direkt) - siehe "DAB+ RTL-SDR Einrichtung" in den Einstellungen.'
+                : 'Quelle: RTL-SDR TCP - siehe "DAB+ RTL-SDR Einrichtung" in den Einstellungen.',
+            style: const TextStyle(color: Colors.white54, fontSize: 12),
+          ),
         ),
-        const SizedBox(height: 12),
         Row(
           children: [
             FilledButton.icon(
@@ -495,7 +801,8 @@ class _ScanPanelState extends ConsumerState<_ScanPanel> {
                 children: [
                   Text(
                     '${channel.label} · ${channel.freqKhz} kHz · '
-                    '${channel.ensembleLabel ?? "Ensemble-Name unbekannt"}',
+                    '${channel.ensembleLabel ?? "Ensemble-Name unbekannt"} · '
+                    'SNR ${channel.snrDb.toStringAsFixed(1)} dB',
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                   if (channel.services.isEmpty)

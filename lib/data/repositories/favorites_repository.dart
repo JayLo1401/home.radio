@@ -96,6 +96,11 @@ class FavoritesRepository {
   Future<void> updateLogoUrl(int programNumber, String logoUrl) =>
       _db.updateFavoriteLogoUrl(programNumber, logoUrl);
 
+  /// Real DAB+ MOT slideshow image (local file path) - see
+  /// DabStationsRepository.setLogoPath's doc comment.
+  Future<void> updateLogoLocalPath(int programNumber, String logoLocalPath) =>
+      _db.updateFavoriteLogoLocalPath(programNumber, logoLocalPath);
+
   /// Removes the DAB favorite (if any) pointing at this exact station, by
   /// frequency + service id (there's no other stable key across scans).
   Future<void> removeDabFavoriteFor(int freqKhz, int serviceId) async {

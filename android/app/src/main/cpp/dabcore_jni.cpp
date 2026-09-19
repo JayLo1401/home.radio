@@ -30,6 +30,7 @@
 #include "radio-controller.h"
 #include "radio-receiver.h"
 #include "rtl_tcp.h"
+#include "direct_rtlsdr_input.h"
 
 #define LOG_TAG "DabRtlSdr"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
@@ -48,6 +49,8 @@ jmethodID m_onDynamicLabel = nullptr;
 jmethodID m_onAudioPcm = nullptr;
 jmethodID m_onRsErrors = nullptr;
 jmethodID m_onAacErrors = nullptr;
+jmethodID m_onMot = nullptr;
+jmethodID m_onSnr = nullptr;
 
 /* Attaches the calling thread to the JVM if needed. welle.io's OFDM/decoder
  * threads are created internally by the vendored library (std::thread), not
@@ -72,7 +75,13 @@ JNIEnv* attachedEnv()
 
 class AndroidRadioController : public RadioControllerInterface {
 public:
-    void onSNR(float) override {}
+    void onSNR(float snr) override
+    {
+        JNIEnv* env = attachedEnv();
+        if (env && g_listener && m_onSnr) {
+            env->CallVoidMethod(g_listener, m_onSnr, snr);
+        }
+    }
 
     void onFrequencyCorrectorChange(int, int) override {}
 
@@ -178,7 +187,16 @@ public:
         }
     }
 
-    void onMOT(const mot_file_t&) override {}
+    void onMOT(const mot_file_t& mot) override
+    {
+        JNIEnv* env = attachedEnv();
+        if (!env || !g_listener || !m_onMot || mot.data.empty()) return;
+        jbyteArray data = env->NewByteArray(static_cast<jsize>(mot.data.size()));
+        if (!data) return;
+        env->SetByteArrayRegion(data, 0, static_cast<jsize>(mot.data.size()), reinterpret_cast<const jbyte*>(mot.data.data()));
+        env->CallVoidMethod(g_listener, m_onMot, data, static_cast<jint>(mot.content_sub_type));
+        env->DeleteLocalRef(data);
+    }
 
     void onPADLengthError(size_t, size_t) override {}
 };
@@ -186,14 +204,35 @@ public:
 struct DabSession {
     AndroidRadioController controller;
     AndroidProgrammeHandler programmeHandler;
-    std::unique_ptr<CRTL_TCP_Client> input;
+    std::unique_ptr<InputInterface> input;
     std::unique_ptr<RadioReceiver> receiver;
     Service currentService{0};
     bool playing = false;
+    bool directMode = false; // true when input is a DirectRtlSdrInput, not a CRTL_TCP_Client
 };
 
 std::mutex g_sessionMutex;
 std::unique_ptr<DabSession> g_session;
+
+/* Shared by nativeCreate() and nativeCreateDirect(): resolves and caches the
+ * Kotlin callback method IDs against whichever DabRtlSdrPlugin instance is
+ * live right now. Both entry points need this, since either one may be the
+ * first (and only) one called for a given session. */
+void registerListenerAndMethods(JNIEnv* env, jobject thiz)
+{
+    g_listener = env->NewGlobalRef(thiz);
+    jclass cls = env->GetObjectClass(thiz);
+    m_onSyncChange = env->GetMethodID(cls, "nativeOnSyncChange", "(Z)V");
+    m_onEnsembleLabel = env->GetMethodID(cls, "nativeOnEnsembleLabel", "(Ljava/lang/String;)V");
+    m_onServiceDetected = env->GetMethodID(cls, "nativeOnServiceDetected", "(I)V");
+    m_onDynamicLabel = env->GetMethodID(cls, "nativeOnDynamicLabel", "(Ljava/lang/String;)V");
+    m_onAudioPcm = env->GetMethodID(cls, "nativeOnAudioPcm", "([BII)V");
+    m_onRsErrors = env->GetMethodID(cls, "nativeOnRsErrors", "(ZI)V");
+    m_onAacErrors = env->GetMethodID(cls, "nativeOnAacErrors", "(I)V");
+    m_onMot = env->GetMethodID(cls, "nativeOnMot", "([BI)V");
+    m_onSnr = env->GetMethodID(cls, "nativeOnSnr", "(F)V");
+    env->ExceptionClear();
+}
 
 /* JSON is built by hand rather than pulling in a JSON library: the only
  * strings involved are DAB service/ensemble labels, and '"'/'\\'/control
@@ -238,23 +277,68 @@ Java_org_lotzapp_home_1radio_dab_DabRtlSdrPlugin_nativeCreate(JNIEnv* env, jobje
         return JNI_TRUE;
     }
 
-    g_listener = env->NewGlobalRef(thiz);
-    jclass cls = env->GetObjectClass(thiz);
-    m_onSyncChange = env->GetMethodID(cls, "nativeOnSyncChange", "(Z)V");
-    m_onEnsembleLabel = env->GetMethodID(cls, "nativeOnEnsembleLabel", "(Ljava/lang/String;)V");
-    m_onServiceDetected = env->GetMethodID(cls, "nativeOnServiceDetected", "(I)V");
-    m_onDynamicLabel = env->GetMethodID(cls, "nativeOnDynamicLabel", "(Ljava/lang/String;)V");
-    m_onAudioPcm = env->GetMethodID(cls, "nativeOnAudioPcm", "([BII)V");
-    m_onRsErrors = env->GetMethodID(cls, "nativeOnRsErrors", "(ZI)V");
-    m_onAacErrors = env->GetMethodID(cls, "nativeOnAacErrors", "(I)V");
-    env->ExceptionClear();
+    registerListenerAndMethods(env, thiz);
 
     auto session = std::make_unique<DabSession>();
-    session->input = std::make_unique<CRTL_TCP_Client>(session->controller);
+    auto tcpInput = std::make_unique<CRTL_TCP_Client>(session->controller);
+    /*
+     * CRTL_TCP_Client always forces *manual* tuner gain (see its own
+     * receiveData() comment: "the AGC is implemented in software" - which
+     * welle.io's GUI provides but this bridge does not) and otherwise
+     * defaults to gain index 0, the lowest step (~0 dB for the R820T) -
+     * far too little to pull DAB+ out of the noise floor. Request the
+     * highest gain step instead; getGainCount() is safe to call before any
+     * connection exists (it falls back to the R820T table, the common
+     * case, until the real tuner type is known) and the setting is
+     * re-applied automatically on every (re)connect.
+     */
+    tcpInput->setGain(tcpInput->getGainCount() - 1);
+    session->input = std::move(tcpInput);
     RadioReceiverOptions options;
     session->receiver = std::make_unique<RadioReceiver>(session->controller, *session->input, options, 1);
+    session->directMode = false;
     g_session = std::move(session);
-    LOGI("nativeCreate: session ready");
+    LOGI("nativeCreate: session ready (rtl_tcp client mode)");
+    return JNI_TRUE;
+}
+
+/*
+ * Direct-USB counterpart to nativeCreate(): used for "own USB service" mode
+ * instead of tuning in over rtl_tcp's TCP loopback (see
+ * direct_rtlsdr_input.h for why - eliminating the redundant in-process
+ * TCP server/client pair that both ends of "own USB service" mode otherwise
+ * run, suspected to contribute CPU/scheduling overhead behind the
+ * OFDM-sync/audio-underrun instability seen during long playback).
+ * `fd` is an already-permission-granted Android USB file descriptor for the
+ * RTL-SDR dongle (Kotlin side owns requesting that permission).
+ */
+extern "C" JNIEXPORT jboolean JNICALL
+Java_org_lotzapp_home_1radio_dab_DabRtlSdrPlugin_nativeCreateDirect(JNIEnv* env, jobject thiz, jint fd)
+{
+    std::lock_guard<std::mutex> lock(g_sessionMutex);
+    if (g_session) {
+        LOGW("nativeCreateDirect: session already exists");
+        return JNI_TRUE;
+    }
+
+    registerListenerAndMethods(env, thiz);
+
+    auto session = std::make_unique<DabSession>();
+    auto directInput = std::make_unique<DirectRtlSdrInput>(session->controller);
+    if (!directInput->openFromFd(static_cast<int>(fd))) {
+        LOGE("nativeCreateDirect: openFromFd failed for fd %d", fd);
+        if (g_listener) {
+            env->DeleteGlobalRef(g_listener);
+            g_listener = nullptr;
+        }
+        return JNI_FALSE;
+    }
+    session->input = std::move(directInput);
+    RadioReceiverOptions options;
+    session->receiver = std::make_unique<RadioReceiver>(session->controller, *session->input, options, 1);
+    session->directMode = true;
+    g_session = std::move(session);
+    LOGI("nativeCreateDirect: session ready (direct USB mode, fd=%d)", fd);
     return JNI_TRUE;
 }
 
@@ -280,9 +364,14 @@ Java_org_lotzapp_home_1radio_dab_DabRtlSdrPlugin_nativeSetServer(JNIEnv* env, jo
 {
     std::lock_guard<std::mutex> lock(g_sessionMutex);
     if (!g_session) return;
+    if (g_session->directMode) {
+        LOGW("nativeSetServer: ignored, session is in direct USB mode (no rtl_tcp server involved)");
+        return;
+    }
+    auto* tcpInput = static_cast<CRTL_TCP_Client*>(g_session->input.get());
     const char* host = env->GetStringUTFChars(jHost, nullptr);
-    g_session->input->setServerAddress(host ? host : "127.0.0.1");
-    g_session->input->setPort(static_cast<uint16_t>(port));
+    tcpInput->setServerAddress(host ? host : "127.0.0.1");
+    tcpInput->setPort(static_cast<uint16_t>(port));
     if (host) env->ReleaseStringUTFChars(jHost, host);
 }
 
@@ -292,6 +381,22 @@ Java_org_lotzapp_home_1radio_dab_DabRtlSdrPlugin_nativeSetFrequency(JNIEnv*, job
     std::lock_guard<std::mutex> lock(g_sessionMutex);
     if (!g_session) return;
     g_session->input->setFrequency(hz);
+    /*
+     * Added for home_radio (2026-09-19): neither RadioReceiver::restart()
+     * nor OFDMProcessor::restart() ever calls InputInterface::reset() (see
+     * CRTL_TCP_Client::reset(), which flushes its ring buffers) - so
+     * whatever raw samples were already buffered for the *previous*
+     * frequency (network + client-side ring buffers can hold a fair chunk
+     * given the RTL-SDR's ~2 MB/s raw rate) are still sitting there when
+     * the OFDM synchronizer's fresh run() thread starts consuming right
+     * after this call. During a channel scan that retunes every few
+     * seconds, that let a real ensemble's tail end of buffered samples get
+     * processed again right after retuning to the *next* channel, making a
+     * scan report the exact same ensemble/service as "found" on several
+     * consecutive channels in a row. Flushing here, right where the
+     * frequency actually changes, discards that stale carry-over.
+     */
+    g_session->input->reset();
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -327,11 +432,35 @@ Java_org_lotzapp_home_1radio_dab_DabRtlSdrPlugin_nativeGetServiceListJson(JNIEnv
     if (g_session) {
         bool first = true;
         for (const Service& s : g_session->receiver->getServiceList()) {
-            if (!g_session->receiver->serviceHasAudioComponent(s)) continue;
+            // Deliberately not filtered on serviceHasAudioComponent(): that
+            // also requires the subchannel (FIG 0/1) to be resolved, which
+            // in practice arrives noticeably later than the service label
+            // itself (FIG 1/1) - a service worth showing in a scan result
+            // only needs a real label; nativePlayService()/
+            // playSingleProgramme() already handles a not-yet-resolved
+            // subchannel safely (returns false) if the user picks one too
+            // early.
+            //
+            // Non-audio services (e.g. an ensemble's "EPG"/journaline data
+            // service - confirmed showing up as e.g. "EPG ORS" on a real AT
+            // ensemble) do need to be excluded though - checking each
+            // component's transportMode() only needs FIG 0/2 (service
+            // component org), not the subchannel too, so this doesn't bring
+            // back the same lag serviceHasAudioComponent() had.
+            const std::string label = s.serviceLabel.utf8_label();
+            if (label.empty()) continue;
+            bool hasAudioComponent = false;
+            for (const ServiceComponent& sc : g_session->receiver->getComponents(s)) {
+                if (sc.transportMode() == TransportMode::Audio) {
+                    hasAudioComponent = true;
+                    break;
+                }
+            }
+            if (!hasAudioComponent) continue;
             if (!first) out << ",";
             first = false;
             out << "{\"serviceId\":" << s.serviceId
-                << ",\"label\":\"" << jsonEscape(s.serviceLabel.utf8_label()) << "\"}";
+                << ",\"label\":\"" << jsonEscape(label) << "\"}";
         }
     }
     out << "]";

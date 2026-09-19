@@ -10,6 +10,7 @@ import java.io.File
 import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.locks.ReentrantLock
 
 /**
@@ -116,9 +117,10 @@ class DabAudioPlayer(private val dumpContext: Context? = null) {
     private var audioTrack: AudioTrack? = null
     private var ringBuffer: RingBuffer? = null
     private var chunkSize = 0
-    private var configuredSampleRate = -1
-    private var configuredChannels = -1
+    @Volatile private var configuredSampleRate = -1
+    @Volatile private var configuredChannels = -1
     private val configLock = ReentrantLock()
+    private val configuring = AtomicBoolean(false)
 
     // TEMP (2026-09-16): dumps exactly what's sent to the AudioTrack to a
     // WAV file, so the actual playback timeline can be inspected/measured
@@ -154,10 +156,37 @@ class DabAudioPlayer(private val dumpContext: Context? = null) {
      * block here: the decode thread is already decoupled from raw USB
      * reads via its own queue (see DabUsbPlugin's rawCifQueue), so a short
      * stall doesn't risk losing incoming USB data.
+     *
+     * On the very first call for a station (or after a format change),
+     * [ensureConfigured] used to run right here, inline. That's exactly
+     * the wrong place for it: this is called straight out of the native
+     * AAC decode step, itself inside OFDMProcessor::run()'s own thread
+     * (see dabcore_jni.cpp's onNewAudio()/nativeOnAudioPcm) - the same
+     * time-critical OFDM sync loop the whole priority-boosting effort
+     * elsewhere in this app exists to protect. AudioTrack.Builder().build()
+     * + .play() are slow Binder/AudioFlinger calls (tens of ms, sometimes
+     * more), and running them there stalled OFDM sync at exactly the worst
+     * possible moment - right after a fresh tune, when sync is still
+     * fragile - matching the "hakelt vor allem beim Starten eines Senders"
+     * symptom. Now handed off to a plain background thread instead; this
+     * call just drops PCM chunks that arrive before setup finishes (a few
+     * ms of silence on a station nobody has heard yet is inaudible).
      */
     fun submit(pcm: ByteArray, sampleRateHz: Int, channels: Int) {
         if (!running) return
-        val ring = ensureConfigured(sampleRateHz, channels) ?: return
+        if (configuredSampleRate != sampleRateHz || configuredChannels != channels) {
+            if (configuring.compareAndSet(false, true)) {
+                Thread {
+                    try {
+                        ensureConfigured(sampleRateHz, channels)
+                    } finally {
+                        configuring.set(false)
+                    }
+                }.start()
+            }
+            return
+        }
+        val ring = ringBuffer ?: return
         var offset = 0
         var waitedMs = 0L
         while (offset < pcm.size && running) {
@@ -175,6 +204,16 @@ class DabAudioPlayer(private val dumpContext: Context? = null) {
                 }
                 waitedMs += 10
             }
+        }
+        // This runs on the same native decode thread that also drives OFDM
+        // sync (see AndroidProgrammeHandler::onNewAudio in dabcore_jni.cpp -
+        // it's called straight out of the AAC decode step, itself inside
+        // OFDMProcessor::run()'s loop) - a submit() that blocks a
+        // significant amount of time here isn't just a playback-side stall,
+        // it directly starves the synchronizer too. Logged whenever it's
+        // long enough to plausibly matter, not just at the 3s drop timeout.
+        if (waitedMs >= 100) {
+            Log.w(TAG, "DabAudioPlayer: submit() blocked ${waitedMs}ms (ring buffer was full)")
         }
     }
 
@@ -202,7 +241,8 @@ class DabAudioPlayer(private val dumpContext: Context? = null) {
                     try {
                         val count = track.underrunCount
                         if (count != lastUnderrunCount) {
-                            Log.w(TAG, "DabAudioPlayer: AudioTrack underrunCount=$count")
+                            val fillPct = ringBuffer?.let { it.availableToRead() * 100 / it.capacity } ?: -1
+                            Log.w(TAG, "DabAudioPlayer: AudioTrack underrunCount=$count ringFill=$fillPct%")
                             lastUnderrunCount = count
                         }
                     } catch (_: Exception) {
@@ -284,7 +324,16 @@ class DabAudioPlayer(private val dumpContext: Context? = null) {
                 .setBufferSizeInBytes(minBufSize)
                 .setTransferMode(AudioTrack.MODE_STREAM)
                 .build()
+            // Fade in over ~300ms instead of jumping straight to full volume:
+            // the ring buffer takes a moment to fill and the OFDM/AAC pipeline
+            // is still settling right after a fresh tune, so the first chunks
+            // written here are the ones most likely to contain a genuine
+            // small gap/glitch - masking that at low volume is standard
+            // practice (other DAB/radio players do the same) rather than
+            // something a buffering fix alone can get rid of.
+            newTrack.setVolume(0f)
             newTrack.play()
+            fadeIn(newTrack)
 
             val bytesPerSecond = sampleRateHz * channels * 2 // 16-bit PCM
             val ringBytes = bytesPerSecond * DabTuning.audioBufferMs / 1000
@@ -304,6 +353,26 @@ class DabAudioPlayer(private val dumpContext: Context? = null) {
         } finally {
             configLock.unlock()
         }
+    }
+
+    private fun fadeIn(track: AudioTrack) {
+        Thread {
+            val steps = 30
+            val stepMs = 10L
+            for (i in 1..steps) {
+                if (audioTrack !== track) return@Thread // superseded by a newer station/track
+                try {
+                    track.setVolume(i.toFloat() / steps)
+                } catch (_: Exception) {
+                    return@Thread
+                }
+                try {
+                    Thread.sleep(stepMs)
+                } catch (_: InterruptedException) {
+                    return@Thread
+                }
+            }
+        }.start()
     }
 
     private fun releaseTrack() {

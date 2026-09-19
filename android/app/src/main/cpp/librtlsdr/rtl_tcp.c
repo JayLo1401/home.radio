@@ -30,6 +30,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/time.h>
+#include <sys/resource.h>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <fcntl.h>
@@ -229,6 +230,11 @@ static void *tcp_worker(void *arg)
 	struct timeval tp;
 	fd_set writefds;
 	int r = 0;
+
+	/* See the same priority boost where rtlsdr_read_async() is called. */
+	if (setpriority(PRIO_PROCESS, 0, -19) != 0) {
+		fprintf(stderr, "rtl_tcp: setpriority(-19) on tcp_worker failed, errno=%d\n", errno);
+	}
 
 	while(1) {
 		if(do_exit)
@@ -667,6 +673,23 @@ int rtl_tcp_main(int argc, char **argv)
 		r = pthread_create(&tcp_worker_thread, &attr, tcp_worker, NULL);
 		r = pthread_create(&command_thread, &attr, command_worker, NULL);
 		pthread_attr_destroy(&attr);
+
+		/*
+		 * Added for home_radio (2026-09-19): on a modest Android SoC, this
+		 * thread (it calls rtlsdr_read_async() below, which drives the
+		 * actual USB bulk reads) was observed losing scheduler time to the
+		 * Flutter UI thread and other native work (OFDM demod, AAC decode)
+		 * running in the same process, causing gaps in the sample stream
+		 * that showed up as the DAB+ OFDM synchronizer repeatedly losing
+		 * and re-acquiring sync during otherwise-stable playback (visible
+		 * as audio cutting in and out). -19 matches Android's own
+		 * ANDROID_PRIORITY_AUDIO / THREAD_PRIORITY_URGENT_AUDIO, the same
+		 * priority this app's own DAB audio-output thread already uses
+		 * (see DabAudioPlayer/RaonTunerDriver's playback thread).
+		 */
+		if (setpriority(PRIO_PROCESS, 0, -19) != 0) {
+			fprintf(stderr, "rtl_tcp: setpriority(-19) on read_async thread failed, errno=%d\n", errno);
+		}
 
 		r = rtlsdr_read_async(dev, rtlsdr_callback, NULL, buf_num, 0);
 
