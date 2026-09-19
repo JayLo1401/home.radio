@@ -304,11 +304,13 @@ class DabUsbPlugin :
      * Raontech-compatible dongles the reference app also supports and are
      * kept here so a different physical dongle isn't silently filtered out.
      */
-    private val knownDabAdapterIds = setOf(
-        0x1D19 to 0x110D,
-        0x0FD9 to 0x004C,
-        0x16C0 to 0x05DC,
-    )
+    // EMPTIED (2026-09-18): the Raontech dongle path is retired in favor of
+    // RTL-SDR (see TODO.md/rtlsdr/) - this being empty means isDabAdapter()
+    // never matches anything, so the old dongle's USB permission popup
+    // (which kept firing on every attach even though nothing used it
+    // anymore) no longer appears. The Raontech driver code itself is left
+    // in place, not deleted, in case this is revisited.
+    private val knownDabAdapterIds = emptySet<Pair<Int, Int>>()
 
     private fun isDabAdapter(device: UsbDevice) =
         (device.vendorId to device.productId) in knownDabAdapterIds

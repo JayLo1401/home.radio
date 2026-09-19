@@ -3,6 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers.dart';
 import '../../data/services/rtl_sdr_service.dart';
+import '../../data/services/rtl_sdr_usb_service.dart';
+
+/// How the app reaches the RTL-SDR dongle - the three options from the
+/// project's DAB+/RTL-SDR settings: our own direct-USB service (this app
+/// drives the dongle itself and serves rtl_tcp on localhost), an external
+/// rtl_tcp driver app running on this same device, or an external rtl_tcp
+/// service somewhere on the network (e.g. a Raspberry Pi with the dongle
+/// attached).
+enum RtlSdrConnectionMode { ownUsb, externalApp, network }
 
 /// Standalone test screen for the RTL-SDR / rtl_tcp connection layer
 /// (2026-09-17) - lets the whole chain (dongle -> Android driver app or
@@ -27,8 +36,43 @@ class _RtlSdrTestScreenState extends ConsumerState<RtlSdrTestScreen> {
   RtlSdrStats? _lastStats;
   bool _autoGain = true;
 
+  RtlSdrConnectionMode _mode = RtlSdrConnectionMode.ownUsb;
+  List<RtlSdrUsbDevice> _usbDevices = [];
+  bool _usbBusy = false;
+  bool _usbServerRunning = false;
+  String? _usbError;
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshUsbDevices();
+    _loadPersistedServer();
+  }
+
+  /// The DAB+ decoder (DabRtlSdrPlugin) reads the same host/port from
+  /// SettingsRepository to know where to connect, so this screen persists
+  /// whatever the user configures here rather than keeping it purely local.
+  Future<void> _loadPersistedServer() async {
+    final settings = ref.read(settingsRepositoryProvider);
+    final host = await settings.getRtlSdrHost();
+    final port = await settings.getRtlSdrPort();
+    if (!mounted) return;
+    setState(() {
+      _hostController.text = host;
+      _portController.text = '$port';
+    });
+  }
+
   @override
   void dispose() {
+    // rtl_tcp (both our own server and most external ones) only serves one
+    // client at a time - leaving this screen connected would permanently
+    // block the DAB+ decoder (or anything else) from ever getting a real
+    // connection, with no obvious error (the TCP handshake still succeeds,
+    // it just never receives any data).
+    if (_lastResult?.connected == true) {
+      _service.disconnect();
+    }
     _hostController.dispose();
     _portController.dispose();
     _freqController.dispose();
@@ -36,11 +80,58 @@ class _RtlSdrTestScreenState extends ConsumerState<RtlSdrTestScreen> {
   }
 
   RtlSdrService get _service => ref.read(rtlSdrServiceProvider);
+  RtlSdrUsbService get _usbService => ref.read(rtlSdrUsbServiceProvider);
+
+  Future<void> _refreshUsbDevices() async {
+    final devices = await _usbService.listDevices();
+    final running = await _usbService.isServerRunning();
+    if (!mounted) return;
+    setState(() {
+      _usbDevices = devices;
+      _usbServerRunning = running;
+    });
+  }
+
+  Future<void> _requestUsbPermission(RtlSdrUsbDevice device) async {
+    setState(() => _usbBusy = true);
+    await _usbService.requestPermission(device.deviceName);
+    await _refreshUsbDevices();
+    if (mounted) setState(() => _usbBusy = false);
+  }
+
+  Future<void> _toggleUsbServer() async {
+    setState(() {
+      _usbBusy = true;
+      _usbError = null;
+    });
+    try {
+      if (_usbServerRunning) {
+        await _usbService.stopServer();
+      } else {
+        final port = int.tryParse(_portController.text) ?? 1234;
+        final freq = int.tryParse(_freqController.text) ?? 100000000;
+        await _usbService.startServer(port: port, frequencyHz: freq);
+        _hostController.text = '127.0.0.1';
+        _portController.text = '$port';
+        await ref.read(settingsRepositoryProvider).setRtlSdrServer('127.0.0.1', port);
+        await ref.read(settingsRepositoryProvider).setRtlSdrMode(ownUsbService: true);
+      }
+    } catch (e) {
+      _usbError = '$e';
+    }
+    await _refreshUsbDevices();
+    if (mounted) setState(() => _usbBusy = false);
+  }
 
   Future<void> _connect() async {
     setState(() => _connecting = true);
+    final host = _hostController.text.trim();
     final port = int.tryParse(_portController.text) ?? 1234;
-    final result = await _service.connect(host: _hostController.text.trim(), port: port);
+    if (_mode != RtlSdrConnectionMode.ownUsb) {
+      await ref.read(settingsRepositoryProvider).setRtlSdrServer(host, port);
+      await ref.read(settingsRepositoryProvider).setRtlSdrMode(ownUsbService: false);
+    }
+    final result = await _service.connect(host: host, port: port);
     if (!mounted) return;
     setState(() {
       _connecting = false;
@@ -82,19 +173,79 @@ class _RtlSdrTestScreenState extends ConsumerState<RtlSdrTestScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Verbindet sich mit einem rtl_tcp-Server - z.B. der App "SDR driver" '
-              '(marto.rtl_tcp_andro) lokal auf diesem Gerät, oder einem entfernten '
-              'Server (z.B. Raspberry Pi mit angeschlossenem Stick).',
+              'Wie soll der RTL-SDR-Stick angesprochen werden? Entweder direkt über '
+              'unseren eigenen USB-Dienst, über eine externe rtl_tcp-App auf diesem '
+              'Gerät (z.B. "SDR driver" / marto.rtl_tcp_andro), oder über einen '
+              'externen Netzwerk-Dienst (z.B. Raspberry Pi mit angeschlossenem Stick).',
               style: TextStyle(color: Colors.white70),
             ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              children: [
+                ChoiceChip(
+                  label: const Text('Eigener USB-Dienst'),
+                  selected: _mode == RtlSdrConnectionMode.ownUsb,
+                  onSelected: connected ? null : (_) => setState(() => _mode = RtlSdrConnectionMode.ownUsb),
+                ),
+                ChoiceChip(
+                  label: const Text('Externe App'),
+                  selected: _mode == RtlSdrConnectionMode.externalApp,
+                  onSelected: connected ? null : (_) => setState(() => _mode = RtlSdrConnectionMode.externalApp),
+                ),
+                ChoiceChip(
+                  label: const Text('Netzwerk-Dienst'),
+                  selected: _mode == RtlSdrConnectionMode.network,
+                  onSelected: connected ? null : (_) => setState(() => _mode = RtlSdrConnectionMode.network),
+                ),
+              ],
+            ),
             const SizedBox(height: 16),
+            if (_mode == RtlSdrConnectionMode.ownUsb) ...[
+              if (_usbDevices.isEmpty)
+                const Text('Kein RTL-SDR-Stick erkannt.', style: TextStyle(color: Colors.orangeAccent))
+              else
+                for (final device in _usbDevices)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      children: [
+                        Expanded(child: Text(device.label)),
+                        if (!device.hasPermission)
+                          ElevatedButton(
+                            onPressed: _usbBusy ? null : () => _requestUsbPermission(device),
+                            child: const Text('Zugriff erlauben'),
+                          )
+                        else
+                          const Text('Zugriff erteilt', style: TextStyle(color: Colors.greenAccent)),
+                      ],
+                    ),
+                  ),
+              Row(
+                children: [
+                  ElevatedButton(
+                    onPressed: (_usbBusy || _usbDevices.every((d) => !d.hasPermission)) ? null : _toggleUsbServer,
+                    child: Text(
+                      _usbBusy
+                          ? 'Bitte warten…'
+                          : (_usbServerRunning ? 'USB-Dienst stoppen' : 'USB-Dienst starten'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  IconButton(onPressed: _refreshUsbDevices, icon: const Icon(Icons.refresh)),
+                ],
+              ),
+              if (_usbError != null)
+                Text('Fehler: $_usbError', style: const TextStyle(color: Colors.redAccent)),
+              const SizedBox(height: 12),
+            ],
             Row(
               children: [
                 Expanded(
                   flex: 2,
                   child: TextField(
                     controller: _hostController,
-                    enabled: !connected,
+                    enabled: !connected && _mode != RtlSdrConnectionMode.ownUsb,
                     decoration: const InputDecoration(labelText: 'Host (IP)'),
                   ),
                 ),
@@ -113,7 +264,9 @@ class _RtlSdrTestScreenState extends ConsumerState<RtlSdrTestScreen> {
             Row(
               children: [
                 ElevatedButton(
-                  onPressed: _connecting ? null : (connected ? _disconnect : _connect),
+                  onPressed: _connecting || (!connected && _mode == RtlSdrConnectionMode.ownUsb && !_usbServerRunning)
+                      ? null
+                      : (connected ? _disconnect : _connect),
                   child: Text(_connecting ? 'Verbinde…' : (connected ? 'Trennen' : 'Verbinden')),
                 ),
                 const SizedBox(width: 16),

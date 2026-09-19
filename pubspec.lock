@@ -237,10 +237,10 @@ packages:
     dependency: transitive
     description:
       name: cupertino_ui
-      sha256: e9dfe7fac704028f8928cbe4028a0be5e8a709498e8daf8247de99e99a32aef3
+      sha256: "427360789a03b76eaf659c37131570d2fc98e381f80d55f252bd9e30f37e7126"
       url: "https://pub.dev"
     source: hosted
-    version: "1.0.2"
+    version: "0.0.2"
   dart_style:
     dependency: transitive
     description:
@@ -265,6 +265,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.35.0"
+  es_compression:
+    dependency: transitive
+    description:
+      name: es_compression
+      sha256: c1ff7af54802631cf5c3942cb67bb99daadcc087f573ca99a9de91002d1a7ece
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.0.15"
   fake_async:
     dependency: transitive
     description:
@@ -306,10 +314,10 @@ packages:
     dependency: transitive
     description:
       name: flutter_cache_manager
-      sha256: "1de7849213b4c73c85aca7e0ac687a9a5d82ccdb594366b9dcc26cb6a2189cd2"
+      sha256: f94fc6f5480977e3eb7b622ed488f671ba96c971bd0e274e6bd0f0ba9b044816
       url: "https://pub.dev"
     source: hosted
-    version: "3.4.2"
+    version: "3.4.5"
   flutter_launcher_icons:
     dependency: "direct dev"
     description:
@@ -339,6 +347,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.4.3"
+  flutter_svg:
+    dependency: transitive
+    description:
+      name: flutter_svg
+      sha256: "35882981abcbfb8c15b286f0cd690ff25bac12d95eff3e25ee207f37d4c42e7f"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.3.0"
   flutter_test:
     dependency: "direct dev"
     description: flutter
@@ -349,6 +365,14 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
+  full_svg_flutter:
+    dependency: transitive
+    description:
+      name: full_svg_flutter
+      sha256: "6603e0cc1a6e6db5132dc8ad0ee6277da4022cc4ed76922596581fba199e3c84"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.5.1"
   glob:
     dependency: transitive
     description:
@@ -553,10 +577,10 @@ packages:
     dependency: transitive
     description:
       name: material_ui
-      sha256: fbfb53cab6c4629438feeade5f3d305f72944bc9d9f25786b19106d32b80ec45
+      sha256: d9b4f6c69b80bc83d0a14357c86e4c14c8076e807ae73cf2960c8560f623995f
       url: "https://pub.dev"
     source: hosted
-    version: "1.2.0"
+    version: "1.0.0"
   meta:
     dependency: transitive
     description:
@@ -613,6 +637,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.9.1"
+  path_parsing:
+    dependency: transitive
+    description:
+      name: path_parsing
+      sha256: "883402936929eac138ee0a45da5b0f2c80f89913e6dc3bf77eb65b84b409c6ca"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.1.0"
   path_provider:
     dependency: "direct main"
     description:
@@ -717,6 +749,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.6.0"
+  quickjs_engine:
+    dependency: transitive
+    description:
+      name: quickjs_engine
+      sha256: f0738189a6fc0c669b57e5bf8541b12fdfa9d02853611313d7198fe189f4cfa7
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.1.5"
   recase:
     dependency: transitive
     description:
@@ -862,10 +902,10 @@ packages:
     dependency: transitive
     description:
       name: sqflite_common
-      sha256: b3ebf7b30c8ae279615f146dfc29ea6ba097299294193107c85a7531ec2346d9
+      sha256: "077e38e82c099534146a2fb31b608c2a3a4489a0f21d9af6b2f5c87b566a1ea0"
       url: "https://pub.dev"
     source: hosted
-    version: "2.5.12"
+    version: "2.5.13"
   sqflite_darwin:
     dependency: transitive
     description:
@@ -938,6 +978,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.4.1"
+  sync_http:
+    dependency: transitive
+    description:
+      name: sync_http
+      sha256: "7f0cd72eca000d2e026bcd6f990b81d0ca06022ef4e32fb257b30d3d1014a961"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.3.1"
   synchronized:
     dependency: transitive
     description:
@@ -978,6 +1026,30 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "4.6.0"
+  vector_graphics:
+    dependency: transitive
+    description:
+      name: vector_graphics
+      sha256: "9d0e3b9cb16542ad660daee871e726a10d13a93b7b5391677c3160e8f5e83935"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.2.3"
+  vector_graphics_codec:
+    dependency: transitive
+    description:
+      name: vector_graphics_codec
+      sha256: "99fd9fbd34d9f9a32efd7b6a6aae14125d8237b10403b422a6a6dfeac2806146"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.1.13"
+  vector_graphics_compiler:
+    dependency: transitive
+    description:
+      name: vector_graphics_compiler
+      sha256: "4dca4feb77dc3ec7f6e27e49c53241eb8217f55e4f9b12599a27f8903bca5682"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.3.0"
   vector_math:
     dependency: transitive
     description:
@@ -1002,6 +1074,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.2.1"
+  weather_svg_icons:
+    dependency: "direct main"
+    description:
+      name: weather_svg_icons
+      sha256: "64548c304c041e7912ee84abef74e4e4dbe80efe64a911fb74c5f7d5271bfca4"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.3.0"
   web:
     dependency: transitive
     description:
@@ -1058,6 +1138,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.26.1"
+  woff2:
+    dependency: transitive
+    description:
+      name: woff2
+      sha256: a2dd1505feb0f28b12df27e59ae7fa0a13eb2fe6cd6a715d9073e446eab03bfe
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.1.0"
   xdg_directories:
     dependency: transitive
     description:

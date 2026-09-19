@@ -33,11 +33,18 @@ class SettingsRepository {
   static const _keyRadarEnabled = 'radar_enabled';
   static const _keyWeatherLat = 'weather_lat';
   static const _keyWeatherLon = 'weather_lon';
+  static const _keyWeatherLocationName = 'weather_location_name';
+  static const _keyWeatherTileScale = 'weather_tile_scale';
+  static const _keyRadarTileScale = 'radar_tile_scale';
+  static const _keyRadarDimming = 'radar_dimming';
   static const _keyUiScale = 'ui_scale';
   static const _keyFtpHost = 'ftp_host';
   static const _keyFtpUser = 'ftp_user';
   static const _keyFtpPass = 'ftp_pass';
   static const _keyFtpDir = 'ftp_dir';
+  static const _keyRtlSdrHost = 'rtl_sdr_host';
+  static const _keyRtlSdrPort = 'rtl_sdr_port';
+  static const _keyRtlSdrMode = 'rtl_sdr_mode'; // 'own' | 'external'
 
   final AppDatabase _db;
   SettingsRepository(this._db);
@@ -106,6 +113,7 @@ class SettingsRepository {
 
   static const defaultLat = 47.0707;
   static const defaultLon = 15.4395; // Graz
+  static const defaultLocationName = 'Graz';
 
   Future<double> getWeatherLat() async =>
       double.tryParse(await _db.getSetting(_keyWeatherLat) ?? '') ?? defaultLat;
@@ -113,10 +121,36 @@ class SettingsRepository {
   Future<double> getWeatherLon() async =>
       double.tryParse(await _db.getSetting(_keyWeatherLon) ?? '') ?? defaultLon;
 
-  Future<void> setWeatherLocation(double lat, double lon) async {
+  Future<String> getWeatherLocationName() async =>
+      (await _db.getSetting(_keyWeatherLocationName)) ?? defaultLocationName;
+
+  Future<void> setWeatherLocation(double lat, double lon, String name) async {
     await _db.setSetting(_keyWeatherLat, '$lat');
     await _db.setSetting(_keyWeatherLon, '$lon');
+    await _db.setSetting(_keyWeatherLocationName, name);
   }
+
+  static const defaultTileScale = 1.0;
+
+  Future<double> getWeatherTileScale() async =>
+      double.tryParse(await _db.getSetting(_keyWeatherTileScale) ?? '') ?? defaultTileScale;
+
+  Future<void> setWeatherTileScale(double scale) => _db.setSetting(_keyWeatherTileScale, '$scale');
+
+  Future<double> getRadarTileScale() async =>
+      double.tryParse(await _db.getSetting(_keyRadarTileScale) ?? '') ?? defaultTileScale;
+
+  Future<void> setRadarTileScale(double scale) => _db.setSetting(_keyRadarTileScale, '$scale');
+
+  static const defaultRadarDimming = 0.0;
+
+  /// 0.0 = no dimming, 1.0 = fully black - a plain dark overlay over the
+  /// radar webview rather than a CSS/colour-invert dark mode, which would
+  /// risk distorting the map's own precipitation-intensity colour coding.
+  Future<double> getRadarDimming() async =>
+      double.tryParse(await _db.getSetting(_keyRadarDimming) ?? '') ?? defaultRadarDimming;
+
+  Future<void> setRadarDimming(double dimming) => _db.setSetting(_keyRadarDimming, '$dimming');
 
   // Default is intentionally below 100%: unscaled Material widget sizes look
   // oversized on a 65" TV viewed from a couch/terrace distance.
@@ -145,4 +179,32 @@ class SettingsRepository {
     await _db.setSetting(_keyFtpPass, pass);
     await _db.setSetting(_keyFtpDir, dir);
   }
+
+  static const defaultRtlSdrHost = '127.0.0.1';
+  static const defaultRtlSdrPort = 1234;
+
+  /// The rtl_tcp-protocol source used by both the raw RTL-SDR test screen
+  /// and the DAB+ decoder - our own USB-TCP service, an external driver
+  /// app, or a network service (e.g. a Raspberry Pi), all reached the same
+  /// way (see RtlSdrTestScreen's mode selector).
+  Future<String> getRtlSdrHost() async => (await _db.getSetting(_keyRtlSdrHost)) ?? defaultRtlSdrHost;
+
+  Future<int> getRtlSdrPort() async =>
+      int.tryParse(await _db.getSetting(_keyRtlSdrPort) ?? '') ?? defaultRtlSdrPort;
+
+  Future<void> setRtlSdrServer(String host, int port) async {
+    await _db.setSetting(_keyRtlSdrHost, host);
+    await _db.setSetting(_keyRtlSdrPort, '$port');
+  }
+
+  /// Whether the app should automatically (re-)start its own USB-TCP RTL-SDR
+  /// service (RtlSdrUsbService) at startup - set whenever the user actually
+  /// starts that service from RtlSdrTestScreen, so the dongle is ready
+  /// without any manual step the next time the app launches. 'external'
+  /// means the user picked an external driver app or a network service
+  /// instead, which this app has no business auto-starting.
+  Future<bool> getRtlSdrAutoStartOwnService() async => (await _db.getSetting(_keyRtlSdrMode)) == 'own';
+
+  Future<void> setRtlSdrMode({required bool ownUsbService}) =>
+      _db.setSetting(_keyRtlSdrMode, ownUsbService ? 'own' : 'external');
 }

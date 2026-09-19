@@ -14,6 +14,8 @@ import '../settings/settings_screen.dart';
 import 'background_layer.dart';
 import 'favorites_sidebar.dart';
 import 'now_playing_banner.dart';
+import 'radar_panel.dart';
+import 'weather_panel.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -28,8 +30,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   String? _playbackError;
   String? _dabStatusText;
   bool _dabTuned = false;
-  bool _dabDeviceOpen = false;
-  Future<void> Function()? _pendingDabResume;
+  bool _dabServerReady = false;
 
   @override
   void initState() {
@@ -44,87 +45,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     audio.errorStream.listen((e) {
       if (mounted) setState(() => _playbackError = e);
     });
-    final dab = ref.read(dabUsbServiceProvider);
-    // Ask for USB permission for the DAB+ adapter right away if it's
-    // attached, instead of waiting for the user to open the DAB+ screen -
-    // never targets any other USB device (e.g. the TV's own Wi-Fi adapter).
-    // The system permission dialog itself can't be skipped (confirmed not
-    // possible, same as with the previous DAB app) - Home Assistant already
-    // auto-dismisses it, everything after that must happen on its own.
-    dab.autoRequestPermissionForAdapter();
-    dab.permissionEvents.listen((event) {
-      if (event['granted'] == true) _onDabPermissionGranted();
-    });
-    dab.playbackStatusEvents.listen(_onDabPlaybackStatus);
-    // If permission was already granted in an earlier session, no dialog
-    // (and thus no permissionEvents callback) fires this time - open the
-    // adapter directly if it's already attached+permitted.
-    _tryOpenAlreadyPermittedAdapter();
+    _initDabServer();
     WidgetsBinding.instance.addPostFrameCallback((_) => _autostart());
   }
 
-  Future<void> _tryOpenAlreadyPermittedAdapter() async {
-    final devices = await ref.read(dabUsbServiceProvider).listDevices();
-    if (devices.any((d) => d.hasPermission)) {
-      await _onDabPermissionGranted();
-    }
-  }
-
-  /// Fires once the OS USB permission dialog for the DAB+ adapter has been
-  /// answered "yes" (see [dabUsbServiceProvider].permissionEvents) - opens
-  /// the adapter immediately so a DAB+ autostart favorite can actually tune
-  /// without any further user interaction.
-  Future<void> _onDabPermissionGranted() async {
-    final devices = await ref.read(dabUsbServiceProvider).listDevices();
-    final device = devices.where((d) => d.hasPermission).firstOrNull;
-    if (device == null) return;
-    await ref.read(dabUsbServiceProvider).openDevice(device.deviceName);
-    if (!mounted) return;
-    _dabDeviceOpen = true;
-    // Whatever the user was actually trying to switch to (see
-    // _ensureDabAdapterReady) takes priority over autostart.
-    final pending = _pendingDabResume;
-    _pendingDabResume = null;
-    if (pending != null) {
-      await pending();
-      return;
-    }
-    // Otherwise, if the app already tried (and failed, since the adapter
-    // wasn't open yet) to autostart into a DAB+ favorite/station, retry now.
-    if (ref.read(currentProgramNumberProvider) != null) return;
-    if (ref.read(currentDabStationProvider) != null) return;
-    await _autostart();
-  }
-
-  /// Called when the user picks a DAB+ favorite/station but the adapter
-  /// isn't open yet - (re-)requests USB permission if needed and opens the
-  /// adapter, so switching to a DAB+ station always tries to get ready
-  /// rather than just reporting "not ready" once and giving up. [resume] is
-  /// called automatically via [_onDabPermissionGranted] once
-  /// permission/opening succeeds - it's whichever of [_play]/[_playDabStation]
-  /// the caller was in the middle of, retried from the top.
-  Future<void> _ensureDabAdapterReady(Future<void> Function() resume) async {
-    _pendingDabResume = resume;
-    final dab = ref.read(dabUsbServiceProvider);
-    final devices = await dab.listDevices();
-    if (devices.isEmpty) {
-      if (mounted) setState(() => _dabStatusText = 'Kein DAB+-USB-Adapter angeschlossen.');
-      return;
-    }
-    final permitted = devices.where((d) => d.hasPermission).firstOrNull;
-    if (permitted != null) {
-      await dab.openDevice(permitted.deviceName);
-      if (!mounted) return;
-      _dabDeviceOpen = true;
-      final pending = _pendingDabResume;
-      _pendingDabResume = null;
-      if (pending != null) await pending();
-      return;
-    }
-    // No permission yet - (re-)request it. The permissionEvents listener
-    // opens the device and retries _pendingDabResume once answered.
-    if (mounted) setState(() => _dabStatusText = 'Warte auf USB-Berechtigung für den DAB+-Adapter…');
-    await dab.autoRequestPermissionForAdapter();
+  /// Points the DAB+ decoder (see DabRtlSdrService) at whichever rtl_tcp
+  /// source was configured in Settings/RtlSdrTestScreen - our own USB-TCP
+  /// service, an external driver app, or a network service. Unlike the old
+  /// Raontech pipeline, there is no USB permission dialog to wait for here:
+  /// the decoder is just a TCP client, so this either connects or doesn't.
+  Future<void> _initDabServer() async {
+    final settings = ref.read(settingsRepositoryProvider);
+    final host = await settings.getRtlSdrHost();
+    final port = await settings.getRtlSdrPort();
+    final ok = await ref.read(dabRtlSdrServiceProvider).setServer(host: host, port: port);
+    if (mounted) setState(() => _dabServerReady = ok);
   }
 
   Future<void> _autostart() async {
@@ -201,7 +136,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     final url = channel.internetStreamUrl;
     if (url != null) {
-      await ref.read(dabUsbServiceProvider).dabStopPlayback();
+      await ref.read(dabRtlSdrServiceProvider).stopPlayback();
       await ref.read(audioPlayerServiceProvider).stop();
       _setNowPlayingFavorite(channel, playing: true);
       await ref.read(audioPlayerServiceProvider).playStream(url);
@@ -212,11 +147,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final freqKhz = channel.dabFreqKhz;
     final serviceId = channel.dabServiceId;
     if (freqKhz == null || serviceId == null) return;
-    if (!_dabDeviceOpen) {
-      await _ensureDabAdapterReady(() => _play(channel));
-      return;
-    }
-    await ref.read(dabUsbServiceProvider).dabPlayService(freqKhz: freqKhz, serviceId: serviceId);
+    await _playDab(freqKhz: freqKhz, serviceId: serviceId, onPlaying: () => _setNowPlayingFavorite(channel, playing: true));
   }
 
   /// Plays a DAB+ station directly from the sidebar's "DAB-Sender" category
@@ -236,64 +167,34 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     ref.read(settingsRepositoryProvider).setLastPlayedDabStation(station.freqKhz, station.serviceId);
 
     await ref.read(audioPlayerServiceProvider).stop();
-    if (!_dabDeviceOpen) {
-      await _ensureDabAdapterReady(() => _playDabStation(station));
-      return;
-    }
-    await ref
-        .read(dabUsbServiceProvider)
-        .dabPlayService(freqKhz: station.freqKhz, serviceId: station.serviceId);
+    await _playDab(
+      freqKhz: station.freqKhz,
+      serviceId: station.serviceId,
+      onPlaying: () => _setNowPlayingDabStation(station, playing: true),
+    );
   }
 
-  /// Reflects native DAB+ playback progress (see DabUsbPlugin.runDabPlayback)
-  /// into the Now Playing banner and MediaSession - the actual audio
-  /// decode/output happens entirely natively (DabAudioPlayer), this is only
-  /// status/UI plumbing.
-  void _onDabPlaybackStatus(Map<String, dynamic> event) {
+  /// Shared DAB+ playback path for both [_play] (favorites) and
+  /// [_playDabStation]: tunes+decodes via the RTL-SDR/welle.io pipeline
+  /// (DabRtlSdrService) and waits for the result - unlike the old
+  /// Raontech-chip pipeline, this is a single await rather than a
+  /// multi-stage event stream (tuning/resolvingSubchannel/playing/...), so
+  /// there's no USB permission/adapter-open dance to manage here either.
+  Future<void> _playDab({
+    required int freqKhz,
+    required int serviceId,
+    required VoidCallback onPlaying,
+  }) async {
+    if (mounted) setState(() => _dabStatusText = 'Sender wird gesucht…');
+    final ok = await ref.read(dabRtlSdrServiceProvider).playService(freqKhz: freqKhz, serviceId: serviceId);
     if (!mounted) return;
-    final status = event['status'] as String?;
     setState(() {
-      switch (status) {
-        case 'tuning':
-          _dabTuned = false;
-          _dabStatusText = 'Wird getunt…';
-        case 'resolvingSubchannel':
-          _dabStatusText = 'Sender wird gesucht…';
-        case 'playing':
-          _dabTuned = true;
-          _dabStatusText = null;
-          final current = ref.read(currentProgramNumberProvider);
-          if (current != null) {
-            final channel = ref
-                .read(favoritesStreamProvider)
-                .value
-                ?.where((c) => c.programNumber == current)
-                .firstOrNull;
-            if (channel != null) _setNowPlayingFavorite(channel, playing: true);
-          } else {
-            final currentDab = ref.read(currentDabStationProvider);
-            final station = currentDab == null
-                ? null
-                : ref
-                    .read(dabStationsStreamProvider)
-                    .value
-                    ?.where((s) => s.freqKhz == currentDab.freqKhz && s.serviceId == currentDab.serviceId)
-                    .firstOrNull;
-            if (station != null) _setNowPlayingDabStation(station, playing: true);
-          }
-        case 'busy':
-          _dabTuned = false;
-          _dabStatusText = 'DAB+-Adapter ist gerade anderweitig beschäftigt.';
-        case 'error':
-          _dabTuned = false;
-          _dabStatusText = switch (event['message']) {
-            'no_lock' => 'Kein Empfang auf dieser Frequenz.',
-            'subchannel_not_found' => 'Sender im Ensemble nicht gefunden.',
-            'device_not_open' => 'DAB+-Adapter ist nicht bereit.',
-            _ => 'DAB+-Wiedergabe fehlgeschlagen.',
-          };
-      }
+      _dabTuned = ok;
+      _dabStatusText = ok
+          ? null
+          : (_dabServerReady ? 'Kein Empfang auf dieser Frequenz.' : 'RTL-SDR-Quelle nicht erreichbar.');
     });
+    if (ok) onPlaying();
   }
 
   @override
@@ -366,13 +267,90 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 }
 
-/// Placeholder column for weather/radar panels (Phase 2).
-class _WeatherRadarColumn extends StatelessWidget {
+/// Hourly forecast and rain radar as compact tiles, centered in the
+/// available area (both axes) - deliberately *not* filling the whole space
+/// (there's no need for either to be that big). Sized from a base size
+/// scaled by the user's per-tile size setting (see WeatherDisplaySettings'
+/// doc comment). Uses [Wrap] rather than a fixed [Row] specifically so more
+/// tiles can be added later (e.g. a second radar layer, a webcam) without
+/// redoing the layout - it wraps to a new centered row by itself once tiles
+/// no longer fit side by side, instead of overflowing or needing a scrollbar.
+class _WeatherRadarColumn extends ConsumerWidget {
   const _WeatherRadarColumn();
+
+  // Both tiles share the same base size (widescreen, not square) so that at
+  // 100% they line up as one visually consistent group.
+  static const _tileBaseWidth = 420.0;
+  static const _tileBaseHeight = 260.0;
+  static const _tileRadius = 16.0;
+  static const _tileGap = 16.0;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(weatherDisplaySettingsProvider);
+    if (!settings.weatherEnabled && !settings.radarEnabled) {
+      return const SizedBox.shrink();
+    }
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Wrap(
+          alignment: WrapAlignment.center,
+          runAlignment: WrapAlignment.center,
+          spacing: _tileGap,
+          runSpacing: _tileGap,
+          children: [
+            if (settings.weatherEnabled)
+              _Tile(
+                width: _tileBaseWidth * settings.weatherScale,
+                height: _tileBaseHeight * settings.weatherScale,
+                radius: _tileRadius,
+                child: WeatherPanel(
+                  locationName: settings.locationName,
+                  lat: settings.lat,
+                  lon: settings.lon,
+                ),
+              ),
+            if (settings.radarEnabled)
+              _Tile(
+                width: _tileBaseWidth * settings.radarScale,
+                height: _tileBaseHeight * settings.radarScale,
+                radius: _tileRadius,
+                child: RadarPanel(lat: settings.lat, lon: settings.lon, dimming: settings.radarDimming),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Tile extends StatelessWidget {
+  const _Tile({required this.width, required this.height, required this.radius, required this.child});
+
+  final double width;
+  final double height;
+  final double radius;
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    return const SizedBox.shrink();
+    return SizedBox(
+      width: width,
+      height: height,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(radius),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 12, offset: const Offset(0, 4)),
+            ],
+          ),
+          child: child,
+        ),
+      ),
+    );
   }
 }
 

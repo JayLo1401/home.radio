@@ -5,6 +5,7 @@ import '../../core/providers.dart';
 import '../../core/theme.dart';
 import '../../data/models/favorite_channel.dart';
 import '../../data/repositories/settings_repository.dart';
+import '../dab_stations/dab_stations_screen.dart';
 import '../rtlsdr/rtl_sdr_test_screen.dart';
 import '../shared/rename_dialog.dart';
 
@@ -21,12 +22,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _weatherEnabled = true;
   bool _radarEnabled = true;
   double _uiScale = 1.0;
+  double _weatherScale = 1.0;
+  double _radarScale = 1.0;
+  double _radarDimming = 0.0;
   bool _loaded = false;
+  final _latController = TextEditingController();
+  final _lonController = TextEditingController();
+  final _locationNameController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _latController.dispose();
+    _lonController.dispose();
+    _locationNameController.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -35,6 +50,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final fixed = await repo.getFixedProgramNumber();
     final weather = await repo.getWeatherEnabled();
     final radar = await repo.getRadarEnabled();
+    final lat = await repo.getWeatherLat();
+    final lon = await repo.getWeatherLon();
+    final locationName = await repo.getWeatherLocationName();
+    final weatherScale = await repo.getWeatherTileScale();
+    final radarScale = await repo.getRadarTileScale();
+    final radarDimming = await repo.getRadarDimming();
     final scale = ref.read(uiScaleProvider);
     if (!mounted) return;
     setState(() {
@@ -43,14 +64,48 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       _weatherEnabled = weather;
       _radarEnabled = radar;
       _uiScale = scale;
+      _weatherScale = weatherScale;
+      _radarScale = radarScale;
+      _radarDimming = radarDimming;
+      _latController.text = lat.toString();
+      _lonController.text = lon.toString();
+      _locationNameController.text = locationName;
       _loaded = true;
     });
+  }
+
+  Future<void> _saveLocation() async {
+    final lat = double.tryParse(_latController.text.replaceAll(',', '.'));
+    final lon = double.tryParse(_lonController.text.replaceAll(',', '.'));
+    if (lat == null || lon == null) return;
+    final name = _locationNameController.text.trim();
+    await ref
+        .read(weatherDisplaySettingsProvider.notifier)
+        .setLocation(lat, lon, name.isEmpty ? 'Standort' : name);
   }
 
   Future<void> _changeUiScale(double delta) async {
     final next = (_uiScale + delta).clamp(0.4, 1.4);
     setState(() => _uiScale = next);
     await ref.read(uiScaleProvider.notifier).set(next);
+  }
+
+  Future<void> _changeWeatherScale(double delta) async {
+    final next = (_weatherScale + delta).clamp(0.5, 2.0);
+    setState(() => _weatherScale = next);
+    await ref.read(weatherDisplaySettingsProvider.notifier).setWeatherScale(next);
+  }
+
+  Future<void> _changeRadarScale(double delta) async {
+    final next = (_radarScale + delta).clamp(0.5, 2.0);
+    setState(() => _radarScale = next);
+    await ref.read(weatherDisplaySettingsProvider.notifier).setRadarScale(next);
+  }
+
+  Future<void> _changeRadarDimming(double delta) async {
+    final next = (_radarDimming + delta).clamp(0.0, 0.9);
+    setState(() => _radarDimming = next);
+    await ref.read(weatherDisplaySettingsProvider.notifier).setRadarDimming(next);
   }
 
   Future<void> _renameFavorite(FavoriteChannel channel) async {
@@ -148,7 +203,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 onTap: () async {
                   final v = !_weatherEnabled;
                   setState(() => _weatherEnabled = v);
-                  await repo.setWeatherEnabled(v);
+                  await ref.read(weatherDisplaySettingsProvider.notifier).setWeatherEnabled(v);
                 },
               ),
             ),
@@ -161,9 +216,116 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 onTap: () async {
                   final v = !_radarEnabled;
                   setState(() => _radarEnabled = v);
-                  await repo.setRadarEnabled(v);
+                  await ref.read(weatherDisplaySettingsProvider.notifier).setRadarEnabled(v);
                 },
               ),
+            ),
+            const SizedBox(height: 12),
+            Text('Standort für Wetter/Radar', style: Theme.of(context).textTheme.bodyLarge),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                SizedBox(
+                  width: 140,
+                  child: TextField(
+                    controller: _locationNameController,
+                    decoration: const InputDecoration(labelText: 'Ortsname'),
+                    onSubmitted: (_) => _saveLocation(),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                SizedBox(
+                  width: 140,
+                  child: TextField(
+                    controller: _latController,
+                    decoration: const InputDecoration(labelText: 'Breitengrad'),
+                    onSubmitted: (_) => _saveLocation(),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                SizedBox(
+                  width: 140,
+                  child: TextField(
+                    controller: _lonController,
+                    decoration: const InputDecoration(labelText: 'Längengrad'),
+                    onSubmitted: (_) => _saveLocation(),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                FocusTraversalOrder(
+                  order: NumericFocusOrder(nextOrder()),
+                  child: _TvIconButton(icon: Icons.check, onTap: _saveLocation),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text('Größe der Wetter-Kachel', style: Theme.of(context).textTheme.bodyLarge),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                FocusTraversalOrder(
+                  order: NumericFocusOrder(nextOrder()),
+                  child: _TvIconButton(icon: Icons.remove, onTap: () => _changeWeatherScale(-0.1)),
+                ),
+                SizedBox(
+                  width: 90,
+                  child: Text(
+                    '${(_weatherScale * 100).round()} %',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 18),
+                  ),
+                ),
+                FocusTraversalOrder(
+                  order: NumericFocusOrder(nextOrder()),
+                  child: _TvIconButton(icon: Icons.add, onTap: () => _changeWeatherScale(0.1)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text('Größe der Radar-Kachel', style: Theme.of(context).textTheme.bodyLarge),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                FocusTraversalOrder(
+                  order: NumericFocusOrder(nextOrder()),
+                  child: _TvIconButton(icon: Icons.remove, onTap: () => _changeRadarScale(-0.1)),
+                ),
+                SizedBox(
+                  width: 90,
+                  child: Text(
+                    '${(_radarScale * 100).round()} %',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 18),
+                  ),
+                ),
+                FocusTraversalOrder(
+                  order: NumericFocusOrder(nextOrder()),
+                  child: _TvIconButton(icon: Icons.add, onTap: () => _changeRadarScale(0.1)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text('Radar abdunkeln (für abends)', style: Theme.of(context).textTheme.bodyLarge),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                FocusTraversalOrder(
+                  order: NumericFocusOrder(nextOrder()),
+                  child: _TvIconButton(icon: Icons.remove, onTap: () => _changeRadarDimming(-0.1)),
+                ),
+                SizedBox(
+                  width: 90,
+                  child: Text(
+                    '${(_radarDimming * 100).round()} %',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 18),
+                  ),
+                ),
+                FocusTraversalOrder(
+                  order: NumericFocusOrder(nextOrder()),
+                  child: _TvIconButton(icon: Icons.add, onTap: () => _changeRadarDimming(0.1)),
+                ),
+              ],
             ),
             const SizedBox(height: 12),
             Text('Größe der Oberfläche', style: Theme.of(context).textTheme.bodyLarge),
@@ -252,6 +414,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 selected: false,
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const RtlSdrTestScreen()),
+                ),
+              ),
+            ),
+            FocusTraversalOrder(
+              order: NumericFocusOrder(nextOrder()),
+              child: _TvChoiceTile(
+                label: 'DAB+ Sender verwalten',
+                selected: false,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const DabStationsScreen()),
                 ),
               ),
             ),
