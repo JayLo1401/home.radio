@@ -702,7 +702,12 @@ class DabUsbPlugin :
         // earlier debugging session - synchronous file I/O on the playback
         // thread for every PCM chunk is exactly the kind of extra work that
         // has no business being in the real playback path.
-        val player = DabAudioPlayer().also { it.start() }
+        // This plugin is permanently unmatched/dead code now (see its own
+        // doc comment) - no audio-focus-loss handling worth wiring up here,
+        // just keeping this call site compiling against DabAudioPlayer's
+        // now-required constructor params (see that class's own doc comment
+        // for why they're there).
+        val player = DabAudioPlayer(context) {}.also { it.start() }
         audioPlayer = player
         var framesFed = 0L
         var ausDecoded = 0L

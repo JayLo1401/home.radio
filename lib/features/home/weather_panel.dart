@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:full_svg_flutter/full_svg_flutter.dart' as full_svg;
 import 'package:weather_svg_icons/weather_svg_icons.dart';
 
 import '../../data/models/hourly_forecast.dart';
@@ -84,24 +85,9 @@ class _WeatherPanelState extends State<WeatherPanel> {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
-            child: Row(
-              children: [
-                const Icon(Icons.place_rounded, color: Colors.white70, size: 16),
-                const SizedBox(width: 4),
-                Text(
-                  widget.locationName,
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16),
-                ),
-                const SizedBox(width: 8),
-                const Text('· Heute', style: TextStyle(color: Colors.white54, fontSize: 13)),
-              ],
-            ),
+            child: _HeaderRow(locationName: widget.locationName),
           ),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16),
-            child: _HeaderRow(),
-          ),
-          const Divider(height: 8, color: Colors.white12, thickness: 1),
+          const SizedBox(height: 8),
           Expanded(
             child: hours == null
                 ? Center(
@@ -117,14 +103,29 @@ class _WeatherPanelState extends State<WeatherPanel> {
                     ? const Center(
                         child: Text('Keine Daten', style: TextStyle(color: Colors.white54, fontSize: 12)),
                       )
-                    : ListView.separated(
+                    // A row per hour used to carry its own "10:00" label,
+                    // which reads as the weather *at* 10:00 rather than what
+                    // it actually is: an hourly average for the interval
+                    // *starting* at 10:00. Interleaving a thin boundary line
+                    // (carrying the label) between each hour's content row -
+                    // one extra trailing line for the last interval's end -
+                    // makes that interval reading explicit: "10:00" and
+                    // "11:00" both sit on their own line, with that hour's
+                    // icon/temp/wind/rain in between.
+                    : ListView.builder(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                        itemCount: hours.length,
-                        separatorBuilder: (_, _) => const Divider(height: 1, color: Colors.white10),
-                        itemBuilder: (context, index) => _HourRow(
-                          hour: hours[index],
-                          icon: _conditionIcons[hours[index].condition]!,
-                        ),
+                        itemCount: hours.length * 2 + 1,
+                        itemBuilder: (context, index) {
+                          if (index.isEven) {
+                            final k = index ~/ 2;
+                            final boundaryTime = k < hours.length
+                                ? hours[k].time
+                                : hours[k - 1].time.add(const Duration(hours: 1));
+                            return _HourBoundary(time: boundaryTime);
+                          }
+                          final hour = hours[index ~/ 2];
+                          return _HourRow(hour: hour, icon: _conditionIcons[hour.condition]!);
+                        },
                       ),
           ),
         ],
@@ -133,21 +134,82 @@ class _WeatherPanelState extends State<WeatherPanel> {
   }
 }
 
-class _HeaderRow extends StatelessWidget {
-  const _HeaderRow();
+// Shared column geometry between the header, the boundary lines and the
+// hour rows, so everything lines up: the boundary line's time label sits in
+// [_timeColWidth], the icon in [_iconColWidth], then temp, then the wind and
+// rain badges get equal fixed-width columns of their own (both are the same
+// kind of colour-coded pill now, so they read as one consistent pair).
+const _timeColWidth = 54.0;
+const _iconColWidth = 40.0;
+const _tempColWidth = 58.0;
+const _badgeColWidth = 108.0;
+const _colGap = 14.0;
 
-  static const _style = TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.w600);
+/// Same size/weight as the temp column's text, per explicit request - the
+/// wind/rain badges used to run a size smaller.
+const _badgeTextStyle = TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w600);
+
+class _HeaderRow extends StatelessWidget {
+  const _HeaderRow({required this.locationName});
+
+  final String locationName;
+
+  static const _style = TextStyle(color: Colors.white38, fontSize: 13, fontWeight: FontWeight.w600);
 
   @override
   Widget build(BuildContext context) {
-    return const Row(
+    return Row(
       children: [
-        SizedBox(width: 38, child: Text('Zeit', style: _style)),
-        SizedBox(width: 30),
-        SizedBox(width: 40, child: Text('Temp', style: _style)),
-        Expanded(child: Text('Wind', style: _style)),
-        Text('Regen', style: _style),
+        SizedBox(
+          width: _timeColWidth + _iconColWidth + 10,
+          child: Row(
+            children: [
+              const Icon(Icons.place_rounded, color: Colors.white70, size: 16),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  locationName,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16),
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(width: _tempColWidth, child: const Text('Temp', style: _style)),
+        const SizedBox(width: _colGap),
+        SizedBox(width: _badgeColWidth, child: const Center(child: Text('Wind km/h', style: _style))),
+        const SizedBox(width: _colGap),
+        SizedBox(width: _badgeColWidth, child: const Center(child: Text('Regen l/m²', style: _style))),
       ],
+    );
+  }
+}
+
+/// The thin "10:00 ----" line between two hours' content - see the doc
+/// comment on the ListView.builder above for why the label moved here
+/// instead of living on the content row itself.
+class _HourBoundary extends StatelessWidget {
+  const _HourBoundary({required this.time});
+
+  final DateTime time;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 1),
+      child: Row(
+        children: [
+          SizedBox(
+            width: _timeColWidth,
+            child: Text(
+              '${time.hour.toString().padLeft(2, '0')}:00',
+              style: const TextStyle(color: Colors.white70, fontSize: 15, fontWeight: FontWeight.w700),
+            ),
+          ),
+          Expanded(child: Container(height: 1, color: Colors.white24)),
+        ],
+      ),
     );
   }
 }
@@ -162,52 +224,51 @@ class _HourRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final windKmh = (hour.windSpeedMs * 3.6).round();
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
+          const SizedBox(width: _timeColWidth),
           SizedBox(
-            width: 40,
-            // No explicit fontSize: inherits the app's default text size, so
-            // this matches the station name text size in FavoritesSidebar.
-            child: Text(
-              '${hour.time.hour.toString().padLeft(2, '0')}:00',
-              style: const TextStyle(color: Colors.white60),
+            width: _iconColWidth,
+            // weather_svg_icons' own WeatherSvgIcon widget renders static
+            // icons through flutter_svg/vector_graphics, whose <mask>
+            // support is incomplete - several of this icon set's icons
+            // (e.g. "partly cloudy") draw their sun inside a masked group,
+            // which silently disappeared entirely instead of compositing,
+            // leaving just the cloud with no sun (confirmed 2026-09-21: the
+            // SVG itself is correct, checked byte-for-byte against
+            // "overcast", which has no mask and always rendered fine).
+            // full_svg_flutter is a from-scratch SVG renderer with real
+            // mask support and a flutter_svg-compatible SvgPicture.asset
+            // API, so pointing it at the exact same (static, non-animated)
+            // asset file fixes this without touching the icon package.
+            child: full_svg.SvgPicture.asset(
+              icon.assetPath,
+              package: 'weather_svg_icons',
+              width: _iconColWidth,
+              height: _iconColWidth,
+              semanticsLabel: icon.name,
             ),
           ),
+          const SizedBox(width: 10),
           SizedBox(
-            width: 34,
-            child: WeatherSvgIcon(icon, size: 28),
-          ),
-          SizedBox(
-            width: 40,
+            width: _tempColWidth,
             child: Text(
               '${hour.tempC.round()}°',
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+              style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w600),
             ),
           ),
-          Expanded(
-            child: Row(
-              children: [
-                Icon(Icons.air_rounded, color: _windColor(windKmh), size: 16),
-                const SizedBox(width: 3),
-                Text(
-                  '$windKmh km/h',
-                  style: TextStyle(
-                    color: _windColor(windKmh),
-                    fontWeight: windKmh >= 20 ? FontWeight.w600 : FontWeight.normal,
-                  ),
-                ),
-              ],
-            ),
-          ),
+          const SizedBox(width: _colGap),
           SizedBox(
-            width: 68,
-            child: hour.rainMmPerHour >= 0.2
-                ? Align(
-                    alignment: Alignment.centerRight,
-                    child: _RainBadge(mmPerHour: hour.rainMmPerHour),
-                  )
-                : null,
+            width: _badgeColWidth,
+            child: Center(child: _WindBadge(kmh: windKmh)),
+          ),
+          const SizedBox(width: _colGap),
+          SizedBox(
+            width: _badgeColWidth,
+            child: Center(
+              child: hour.rainMmPerHour >= 0.2 ? _RainBadge(mmPerHour: hour.rainMmPerHour) : null,
+            ),
           ),
         ],
       ),
@@ -215,13 +276,41 @@ class _HourRow extends StatelessWidget {
   }
 }
 
-/// Same highlight idea as [_RainBadge], just as a plain colour tier instead
-/// of a badge background: calm under 10 km/h, noticeable up to 20 km/h,
-/// strong above that.
-Color _windColor(int kmh) {
-  if (kmh >= 20) return Colors.redAccent;
-  if (kmh >= 10) return Colors.orangeAccent;
-  return Colors.white54;
+/// Same colour-coded pill as [_RainBadge] - calm wind fades in unobtrusively
+/// (low alpha, muted colour), strong wind gets an opaque, urgent red -
+/// instead of the previous plain (and easy to miss) tinted-text-only
+/// treatment, for visual consistency with the rain badge next to it. Capped
+/// at [_maxKmh]; text is just the number now, since the unit moved to the
+/// column header.
+class _WindBadge extends StatelessWidget {
+  const _WindBadge({required this.kmh});
+
+  final int kmh;
+
+  static const _maxKmh = 35.0;
+  static const _calm = Color(0xFF4A7A6B);
+  static const _strong = Color(0xFFD32F2F);
+
+  @override
+  Widget build(BuildContext context) {
+    final t = (kmh / _maxKmh).clamp(0.0, 1.0);
+    final background = Color.lerp(_calm, _strong, t)!.withValues(alpha: 0.35 + 0.55 * t);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.air_rounded, color: Colors.white, size: 20),
+          const SizedBox(width: 4),
+          Text('$kmh', style: _badgeTextStyle),
+        ],
+      ),
+    );
+  }
 }
 
 /// Precipitation badge: background blueness scales with the hourly amount
@@ -242,7 +331,7 @@ class _RainBadge extends StatelessWidget {
     final t = (mmPerHour / _maxMm).clamp(0.0, 1.0);
     final background = Color.lerp(_lightBlue, _deepBlue, t)!.withValues(alpha: 0.35 + 0.55 * t);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
       decoration: BoxDecoration(
         color: background,
         borderRadius: BorderRadius.circular(20),
@@ -250,9 +339,9 @@ class _RainBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.water_drop_rounded, color: Colors.white, size: 13),
-          const SizedBox(width: 3),
-          Text('${mmPerHour.toStringAsFixed(1)} l', style: const TextStyle(color: Colors.white)),
+          const Icon(Icons.water_drop_rounded, color: Colors.white, size: 20),
+          const SizedBox(width: 4),
+          Text('${mmPerHour.toStringAsFixed(1)} l', style: _badgeTextStyle),
         ],
       ),
     );

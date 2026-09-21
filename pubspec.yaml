@@ -35,6 +35,7 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
   weather_svg_icons: ^0.3.0
+  full_svg_flutter: ^1.5.1
   flutter_riverpod: ^3.4.3
   just_audio: ^0.10.6
   drift: ^2.35.0

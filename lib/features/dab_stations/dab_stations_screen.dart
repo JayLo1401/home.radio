@@ -61,7 +61,7 @@ class _DabStationsScreenState extends ConsumerState<DabStationsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final stations = ref.watch(dabStationsStreamProvider).value ?? const <DabStation>[];
+    final stations = ref.watch(sortedDabStationsProvider).value ?? const <DabStation>[];
     final favorites = ref.watch(favoritesStreamProvider).value ?? const <FavoriteChannel>[];
     final dabFavorites = favorites.where((c) => c.sourceType == FavoriteSourceType.dab).toList();
 
@@ -94,14 +94,18 @@ class _DabStationsScreenState extends ConsumerState<DabStationsScreen> {
             else
               ...dabFavorites.map((c) => _FavoriteRow(channel: c)),
             const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: Text('Alle DAB+ Sender', style: Theme.of(context).textTheme.titleLarge),
-                ),
-                if (stations.isNotEmpty) _LogoFetchButton(stations: stations),
-              ],
-            ),
+            Text('Alle DAB+ Sender', style: Theme.of(context).textTheme.titleLarge),
+            if (stations.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                children: [
+                  _LogoReceiveButton(stations: stations),
+                  _LogoFetchButton(stations: stations),
+                ],
+              ),
+            ],
             const SizedBox(height: 8),
             if (stations.isEmpty)
               const Text(
@@ -122,17 +126,143 @@ class _DabStationsScreenState extends ConsumerState<DabStationsScreen> {
   }
 }
 
+/// Tunes through every known station in turn and waits for a real DAB+ MOT
+/// slideshow image (see DabRtlSdrService.fetchLogos's own doc comment) - the
+/// actual broadcast logo/cover art, not a best-effort internet name lookup
+/// like [_LogoFetchButton]. Slower (some stations take 10-30s to send a
+/// slide, some never do) and runs against *every* station, not just ones
+/// missing a logo - a captured broadcast image is authoritative for its
+/// station, so it's meant to replace whatever [_LogoFetchButton] guessed
+/// from a name search, not just fill gaps. [DabStationsRepository.setLogoPath]
+/// writes it to [DabStation.logoLocalPath], which every logo display in the
+/// app (favorites sidebar, now-playing banner, and _StationRow/_FavoriteRow
+/// below) already prefers over [DabStation.logoUrl] when both are set - that
+/// precedence, not any deletion of the stored URL, is what makes a captured
+/// broadcast image actually override a previously internet-sourced one.
+class _LogoReceiveButton extends ConsumerStatefulWidget {
+  final List<DabStation> stations;
+  const _LogoReceiveButton({required this.stations});
+
+  @override
+  ConsumerState<_LogoReceiveButton> createState() => _LogoReceiveButtonState();
+}
+
+class _LogoReceiveButtonState extends ConsumerState<_LogoReceiveButton> {
+  bool _running = false;
+  String? _progressText;
+  StreamSubscription<Map<String, dynamic>>? _sub;
+
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _start() async {
+    // Same "point the decoder at the configured RTL-SDR source first" step
+    // _ScanPanelState._startScan() does - fetchLogos() needs a live tuner
+    // session exactly like a scan does.
+    final settings = ref.read(settingsRepositoryProvider);
+    final ownUsb = await settings.getRtlSdrAutoStartOwnService();
+    final connected = ownUsb
+        ? await ref.read(dabRtlSdrServiceProvider).useDirectUsb()
+        : await ref.read(dabRtlSdrServiceProvider).setServer(
+              host: await settings.getRtlSdrHost(),
+              port: await settings.getRtlSdrPort(),
+            );
+    if (!connected) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('DAB+-Decoder konnte nicht gestartet werden.')),
+        );
+      }
+      return;
+    }
+    setState(() {
+      _running = true;
+      _progressText = null;
+    });
+    final stationsRepo = ref.read(dabStationsRepositoryProvider);
+    final favoritesRepo = ref.read(favoritesRepositoryProvider);
+    var found = 0;
+    _sub = ref.read(dabRtlSdrServiceProvider).events.listen((event) async {
+      if (!mounted) return;
+      switch (event['type']) {
+        case 'logoScanProgress':
+          final index = event['index'] as int;
+          final total = event['total'] as int;
+          setState(() => _progressText = 'Sender ${index + 1}/$total…');
+        case 'logoFound':
+          found++;
+          final freqKhz = event['freqKhz'] as int;
+          final serviceId = event['serviceId'] as int;
+          final path = event['path'] as String;
+          await stationsRepo.setLogoPath(freqKhz: freqKhz, serviceId: serviceId, logoLocalPath: path);
+          final matchingFavorite = (ref.read(favoritesStreamProvider).value ?? const <FavoriteChannel>[])
+              .where((c) => c.dabFreqKhz == freqKhz && c.dabServiceId == serviceId)
+              .firstOrNull;
+          if (matchingFavorite != null) {
+            await favoritesRepo.updateLogoLocalPath(matchingFavorite.programNumber, path);
+          }
+        case 'logoScanFinished':
+          await _sub?.cancel();
+          _sub = null;
+          if (mounted) {
+            setState(() {
+              _running = false;
+              _progressText = null;
+            });
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Senderlogos per Empfang aktualisiert: $found von ${widget.stations.length} gefunden.'),
+              ),
+            );
+          }
+      }
+    });
+    await ref.read(dabRtlSdrServiceProvider).fetchLogos(
+          widget.stations.map((s) => (freqKhz: s.freqKhz, serviceId: s.serviceId)).toList(),
+        );
+  }
+
+  Future<void> _stop() async {
+    await ref.read(dabRtlSdrServiceProvider).stopLogoFetch();
+    await _sub?.cancel();
+    _sub = null;
+    if (mounted) {
+      setState(() {
+        _running = false;
+        _progressText = null;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (_running && _progressText != null) ...[
+          Text(_progressText!, style: const TextStyle(color: Colors.white54, fontSize: 12)),
+          const SizedBox(width: 8),
+        ],
+        TextButton.icon(
+          onPressed: _running ? _stop : _start,
+          icon: Icon(_running ? Icons.stop : Icons.settings_input_antenna),
+          label: Text(_running ? 'Stoppen' : 'Senderlogos per Empfang holen'),
+        ),
+      ],
+    );
+  }
+}
+
 /// Looks up a logo for every known station that doesn't have one yet, via
-/// [_findLogoUrl] (Radio-Browser, matched by cleaned-up station name) -
-/// pure Dart/HTTP, no tuning/USB involved at all, so this is fast even for
-/// dozens of stations. Replaces an earlier version of this button that tuned
-/// to each station in turn and waited (10-30s each) for a real DAB+ MOT
-/// slideshow image - that gave *some* stations a logo, but it was usually
-/// just whatever was "now playing" (album/cover art), not a stable station
-/// logo, and left most stations empty since not every station even sends
-/// one. A broadcast slideshow image is still shown, just only live during
-/// current playback now (see home_screen.dart's _onDabEvent), not as this
-/// persistent logo.
+/// [_findLogoUrl] (Radio-Browser, matched by cleaned-up station name) - pure
+/// Dart/HTTP, no tuning/USB involved at all, so this is fast even for dozens
+/// of stations, and a reasonable fallback for whatever [_LogoReceiveButton]
+/// couldn't get a broadcast image for (or hasn't been run yet). Only ever
+/// fills in *missing* logos - never overwrites one already found (by either
+/// button), unlike [_LogoReceiveButton].
 class _LogoFetchButton extends ConsumerStatefulWidget {
   final List<DabStation> stations;
   const _LogoFetchButton({required this.stations});
@@ -432,11 +562,18 @@ class _FavoriteRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final localPath = channel.logoLocalPath;
+    final url = channel.logoUrl;
+    // A captured broadcast image (logoLocalPath) takes priority over an
+    // internet-guessed one (logoUrl) - same precedence FavoritesSidebar/
+    // NowPlayingBanner already use, see _LogoReceiveButton's doc comment.
+    final ImageProvider? image =
+        localPath != null ? FileImage(File(localPath)) : (url != null ? CachedNetworkImageProvider(url) : null);
     return ListTile(
       contentPadding: EdgeInsets.zero,
       leading: CircleAvatar(
-        backgroundImage: channel.logoUrl != null ? CachedNetworkImageProvider(channel.logoUrl!) : null,
-        child: channel.logoUrl == null ? Text('${channel.programNumber}') : null,
+        backgroundImage: image,
+        child: image == null ? Text('${channel.programNumber}') : null,
       ),
       title: Text(channel.displayName),
       subtitle: Text('${channel.dabFreqKhz} kHz'),
@@ -559,11 +696,13 @@ class _StationRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final logoUrl = station.logoUrl;
     final logoPath = station.logoLocalPath;
+    // A captured broadcast image (logoLocalPath) takes priority over an
+    // internet-guessed one (logoUrl) - see _LogoReceiveButton's doc comment.
     return ListTile(
       contentPadding: EdgeInsets.zero,
-      leading: logoUrl != null
-          ? CircleAvatar(backgroundImage: CachedNetworkImageProvider(logoUrl))
-          : (logoPath == null ? null : CircleAvatar(backgroundImage: FileImage(File(logoPath)))),
+      leading: logoPath != null
+          ? CircleAvatar(backgroundImage: FileImage(File(logoPath)))
+          : (logoUrl == null ? null : CircleAvatar(backgroundImage: CachedNetworkImageProvider(logoUrl))),
       title: Text(station.displayLabel),
       subtitle: Text(
         '${station.ensembleLabel ?? "Ensemble unbekannt"} · ${station.channelLabel} · ${station.freqKhz} kHz',

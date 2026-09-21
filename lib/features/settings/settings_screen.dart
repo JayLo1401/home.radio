@@ -19,6 +19,7 @@ class SettingsScreen extends ConsumerStatefulWidget {
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   AutostartMode _mode = AutostartMode.lastStation;
   int? _fixedProgramNumber;
+  DabSortMode _dabSortMode = DabSortMode.byEnsembleThenAlphabet;
   bool _weatherEnabled = true;
   bool _radarEnabled = true;
   double _uiScale = 1.0;
@@ -48,6 +49,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final repo = ref.read(settingsRepositoryProvider);
     final mode = await repo.getAutostartMode();
     final fixed = await repo.getFixedProgramNumber();
+    final dabSortMode = await repo.getDabSortMode();
     final weather = await repo.getWeatherEnabled();
     final radar = await repo.getRadarEnabled();
     final lat = await repo.getWeatherLat();
@@ -61,6 +63,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     setState(() {
       _mode = mode;
       _fixedProgramNumber = fixed;
+      _dabSortMode = dabSortMode;
       _weatherEnabled = weather;
       _radarEnabled = radar;
       _uiScale = scale;
@@ -404,6 +407,31 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                 ),
               ),
+            const Divider(height: 32),
+            Text('DAB+ Sender sortieren', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 8),
+            FocusTraversalOrder(
+              order: NumericFocusOrder(nextOrder()),
+              child: _TvChoiceTile(
+                label: 'Nach Sendern und Alphabet',
+                selected: _dabSortMode == DabSortMode.byEnsembleThenAlphabet,
+                onTap: () async {
+                  setState(() => _dabSortMode = DabSortMode.byEnsembleThenAlphabet);
+                  await ref.read(dabSortModeProvider.notifier).set(DabSortMode.byEnsembleThenAlphabet);
+                },
+              ),
+            ),
+            FocusTraversalOrder(
+              order: NumericFocusOrder(nextOrder()),
+              child: _TvChoiceTile(
+                label: 'Nach Alphabet',
+                selected: _dabSortMode == DabSortMode.byAlphabet,
+                onTap: () async {
+                  setState(() => _dabSortMode = DabSortMode.byAlphabet);
+                  await ref.read(dabSortModeProvider.notifier).set(DabSortMode.byAlphabet);
+                },
+              ),
+            ),
             const Divider(height: 32),
             Text('Technik', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 8),

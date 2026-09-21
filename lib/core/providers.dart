@@ -5,7 +5,7 @@ import '../data/db/database.dart';
 import '../data/models/favorite_channel.dart';
 import '../data/repositories/dab_stations_repository.dart';
 import '../data/repositories/favorites_repository.dart';
-import '../data/repositories/settings_repository.dart';
+import '../data/repositories/settings_repository.dart' show DabSortMode, SettingsRepository;
 import '../data/services/audio_player_service.dart';
 import '../data/services/dab_rtlsdr_service.dart';
 import '../data/services/dab_usb_service.dart';
@@ -30,6 +30,31 @@ final dabStationsRepositoryProvider = Provider<DabStationsRepository>((ref) {
 
 final dabStationsStreamProvider = StreamProvider<List<DabStation>>((ref) {
   return ref.watch(dabStationsRepositoryProvider).watchAll();
+});
+
+class DabSortModeNotifier extends Notifier<DabSortMode> {
+  @override
+  DabSortMode build() {
+    final repo = ref.watch(settingsRepositoryProvider);
+    repo.getDabSortMode().then((v) => state = v);
+    return DabSortMode.byEnsembleThenAlphabet;
+  }
+
+  Future<void> set(DabSortMode mode) async {
+    state = mode;
+    await ref.read(settingsRepositoryProvider).setDabSortMode(mode);
+  }
+}
+
+final dabSortModeProvider = NotifierProvider<DabSortModeNotifier, DabSortMode>(DabSortModeNotifier.new);
+
+/// [dabStationsStreamProvider], sorted per [dabSortModeProvider] - what
+/// FavoritesSidebar's DAB-Sender tab and DabStationsScreen actually display,
+/// so both stay consistent with each other and with the user's setting.
+final sortedDabStationsProvider = Provider<AsyncValue<List<DabStation>>>((ref) {
+  final sortMode = ref.watch(dabSortModeProvider);
+  final stationsAsync = ref.watch(dabStationsStreamProvider);
+  return stationsAsync.whenData((stations) => sortDabStations(stations, sortMode));
 });
 
 final settingsRepositoryProvider = Provider<SettingsRepository>((ref) {
@@ -101,6 +126,36 @@ class CurrentProgramNumber extends Notifier<int?> {
 
 final currentProgramNumberProvider =
     NotifierProvider<CurrentProgramNumber, int?>(CurrentProgramNumber.new);
+
+enum SidebarCategory { favorites, dabStations }
+
+/// The user's explicit tab choice in FavoritesSidebar, if they've made one -
+/// null means "follow whatever's currently playing" (see
+/// [effectiveSidebarCategoryProvider]). Shared here rather than kept as that
+/// widget's private State since HomeScreen's remote-control channel-up/down
+/// handling needs to know which list "next/previous station" steps through,
+/// same as the sidebar itself.
+class SidebarCategoryNotifier extends Notifier<SidebarCategory?> {
+  @override
+  SidebarCategory? build() => null;
+
+  void set(SidebarCategory? category) => state = category;
+}
+
+final sidebarCategoryProvider =
+    NotifierProvider<SidebarCategoryNotifier, SidebarCategory?>(SidebarCategoryNotifier.new);
+
+/// The tab actually shown/stepped-through right now: the user's explicit
+/// choice if any, otherwise whichever list the currently playing station
+/// came from - currentDabStationProvider is only ever non-null for a
+/// station played straight from the DAB-Sender tab (a favorite match uses
+/// currentProgramNumberProvider instead), including by autostart restoring
+/// last session's pick before the user has touched either tab.
+final effectiveSidebarCategoryProvider = Provider<SidebarCategory>((ref) {
+  final manual = ref.watch(sidebarCategoryProvider);
+  if (manual != null) return manual;
+  return ref.watch(currentDabStationProvider) != null ? SidebarCategory.dabStations : SidebarCategory.favorites;
+});
 
 /// The DAB+ station currently tuned via the sidebar's "DAB-Sender" category
 /// (see FavoritesSidebar) - i.e. played directly, without being a favorite

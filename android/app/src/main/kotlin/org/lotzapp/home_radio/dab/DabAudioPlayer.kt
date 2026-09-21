@@ -1,8 +1,12 @@
 package org.lotzapp.home_radio.dab
 
+import android.content.Context
 import android.media.AudioAttributes
+import android.media.AudioFocusRequest
 import android.media.AudioFormat
+import android.media.AudioManager
 import android.media.AudioTrack
+import android.os.Build
 import android.os.Process
 import android.util.Log
 import java.util.concurrent.atomic.AtomicBoolean
@@ -31,7 +35,19 @@ import java.util.concurrent.locks.ReentrantLock
  * every buffer size tried. This mirrors what actually works instead of
  * guessing at another buffer size.
  */
-class DabAudioPlayer {
+/**
+ * @param onAudioFocusLost Called when another app (e.g. Spotify) takes over
+ * audio focus while this is playing - DAB+ is a native AudioTrack, entirely
+ * outside Flutter's own audio_session/just_audio integration (see
+ * AudioPlayerService, which only governs the internet-radio path), so
+ * without explicitly requesting focus here neither direction of "don't play
+ * two things at once" worked: Android had no reason to signal us to stop,
+ * and we never told Android we needed the speaker in the first place either.
+ */
+class DabAudioPlayer(
+    private val context: Context,
+    private val onAudioFocusLost: () -> Unit,
+) {
     /** Circular byte buffer with wraparound, guarded by [lock]. */
     private class RingBuffer(val capacity: Int) {
         private val buf = ByteArray(capacity)
@@ -133,9 +149,64 @@ class DabAudioPlayer {
     @Volatile private var trackWriteCount = 0L
     val pcmWriteCount: Long get() = trackWriteCount
 
+    private val audioManager: AudioManager by lazy {
+        context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    }
+    private var focusRequest: AudioFocusRequest? = null
+    private val focusChangeListener =
+        AudioManager.OnAudioFocusChangeListener { change ->
+            when (change) {
+                AudioManager.AUDIOFOCUS_LOSS, AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
+                    // DAB+ is a live broadcast with no "ducking" concept
+                    // that makes sense (there's nothing to duck to, unlike
+                    // a paused music track) - even a transient loss just
+                    // stops outright; the Dart side re-tunes from scratch
+                    // if the user presses Play again.
+                    Log.i(TAG, "DabAudioPlayer: audio focus lost ($change), stopping")
+                    onAudioFocusLost()
+                }
+            }
+        }
+
+    private fun requestAudioFocus() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val request =
+                AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+                    .setAudioAttributes(
+                        AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_MEDIA)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                            .build(),
+                    )
+                    .setOnAudioFocusChangeListener(focusChangeListener)
+                    .build()
+            focusRequest = request
+            audioManager.requestAudioFocus(request)
+        } else {
+            @Suppress("DEPRECATION")
+            audioManager.requestAudioFocus(
+                focusChangeListener,
+                AudioManager.STREAM_MUSIC,
+                AudioManager.AUDIOFOCUS_GAIN,
+            )
+        }
+    }
+
+    private fun abandonAudioFocus() {
+        val request = focusRequest
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && request != null) {
+            audioManager.abandonAudioFocusRequest(request)
+        } else {
+            @Suppress("DEPRECATION")
+            audioManager.abandonAudioFocus(focusChangeListener)
+        }
+        focusRequest = null
+    }
+
     fun start() {
         if (running) return
         running = true
+        requestAudioFocus()
         thread = Thread({ runLoop() }, "DabAudioPlayer").apply { start() }
     }
 
@@ -145,6 +216,7 @@ class DabAudioPlayer {
         thread = null
         ringBuffer?.reset()
         releaseTrack()
+        abandonAudioFocus()
     }
 
     /**

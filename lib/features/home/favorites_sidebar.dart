@@ -10,8 +10,6 @@ import '../../data/db/database.dart' show DabStation;
 import '../../data/models/favorite_channel.dart';
 import '../../data/repositories/dab_stations_repository.dart' show DabStationDisplay;
 
-enum _SidebarCategory { favorites, dabStations }
-
 /// Categorized, scrollable list of stations shown on the right edge of the
 /// home screen: "Favoriten" (favorites sorted by program number) and
 /// "DAB-Sender" (every DAB+ station ever found by a scan - see
@@ -32,16 +30,18 @@ class FavoritesSidebar extends ConsumerStatefulWidget {
 }
 
 class _FavoritesSidebarState extends ConsumerState<FavoritesSidebar> {
-  _SidebarCategory _category = _SidebarCategory.favorites;
-
   @override
   Widget build(BuildContext context) {
     final currentProgramNumber = ref.watch(currentProgramNumberProvider);
     final currentDabStation = ref.watch(currentDabStationProvider);
+    // Shared with HomeScreen's remote-control channel-up/down handling - see
+    // that provider's own doc comment for why the category lives there
+    // instead of as this widget's own private State.
+    final category = ref.watch(effectiveSidebarCategoryProvider);
 
     return Container(
-      width: 320,
-      color: Colors.black.withValues(alpha: 0.55),
+      width: 380,
+      color: Colors.black,
       child: Column(
         children: [
           Padding(
@@ -51,23 +51,23 @@ class _FavoritesSidebarState extends ConsumerState<FavoritesSidebar> {
                 Expanded(
                   child: _CategoryTab(
                     label: 'Favoriten',
-                    selected: _category == _SidebarCategory.favorites,
-                    onTap: () => setState(() => _category = _SidebarCategory.favorites),
+                    selected: category == SidebarCategory.favorites,
+                    onTap: () => ref.read(sidebarCategoryProvider.notifier).set(SidebarCategory.favorites),
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: _CategoryTab(
                     label: 'DAB-Sender',
-                    selected: _category == _SidebarCategory.dabStations,
-                    onTap: () => setState(() => _category = _SidebarCategory.dabStations),
+                    selected: category == SidebarCategory.dabStations,
+                    onTap: () => ref.read(sidebarCategoryProvider.notifier).set(SidebarCategory.dabStations),
                   ),
                 ),
               ],
             ),
           ),
           Expanded(
-            child: _category == _SidebarCategory.favorites
+            child: category == SidebarCategory.favorites
                 ? _FavoritesList(currentProgramNumber: currentProgramNumber, onSelect: widget.onSelect)
                 : _DabStationsList(
                     currentDabStation: currentDabStation,
@@ -156,18 +156,21 @@ class _FavoritesList extends ConsumerWidget {
             ),
           );
         }
-        return ListView.builder(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          itemCount: favorites.length,
-          itemBuilder: (context, index) {
-            final channel = favorites[index];
-            final isCurrent = channel.programNumber == currentProgramNumber;
-            return _FavoriteRow(
-              channel: channel,
-              isCurrent: isCurrent,
-              onSelect: () => onSelect(channel),
-            );
-          },
+        return Scrollbar(
+          thumbVisibility: true,
+          child: ListView.builder(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            itemCount: favorites.length,
+            itemBuilder: (context, index) {
+              final channel = favorites[index];
+              final isCurrent = channel.programNumber == currentProgramNumber;
+              return _FavoriteRow(
+                channel: channel,
+                isCurrent: isCurrent,
+                onSelect: () => onSelect(channel),
+              );
+            },
+          ),
         );
       },
     );
@@ -182,7 +185,7 @@ class _DabStationsList extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final stationsAsync = ref.watch(dabStationsStreamProvider);
+    final stationsAsync = ref.watch(sortedDabStationsProvider);
     return stationsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(
@@ -203,19 +206,22 @@ class _DabStationsList extends ConsumerWidget {
           );
         }
         final current = currentDabStation;
-        return ListView.builder(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          itemCount: stations.length,
-          itemBuilder: (context, index) {
-            final station = stations[index];
-            final isCurrent =
-                current != null && current.freqKhz == station.freqKhz && current.serviceId == station.serviceId;
-            return _DabStationRow(
-              station: station,
-              isCurrent: isCurrent,
-              onSelect: () => onSelect(station),
-            );
-          },
+        return Scrollbar(
+          thumbVisibility: true,
+          child: ListView.builder(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            itemCount: stations.length,
+            itemBuilder: (context, index) {
+              final station = stations[index];
+              final isCurrent =
+                  current != null && current.freqKhz == station.freqKhz && current.serviceId == station.serviceId;
+              return _DabStationRow(
+                station: station,
+                isCurrent: isCurrent,
+                onSelect: () => onSelect(station),
+              );
+            },
+          ),
         );
       },
     );
@@ -239,6 +245,41 @@ class _DabStationRow extends StatefulWidget {
 
 class _DabStationRowState extends State<_DabStationRow> {
   bool _focused = false;
+  final _focusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.isCurrent) _claimFocus();
+  }
+
+  @override
+  void didUpdateWidget(covariant _DabStationRow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Not just the initial-mount case (e.g. right after autostart, or after
+    // this tab was just opened for it - see _FavoritesSidebarState): a
+    // remote's next/previous-station keys (see HomeScreen's key handling)
+    // change which station is playing while this same row stays mounted,
+    // so isCurrent flips on an *existing* widget - a mount-time-only
+    // mechanism like `autofocus` never sees that. Guarded on the actual
+    // false->true transition so an unrelated rebuild (isCurrent already
+    // true, e.g. a station-list refresh) doesn't keep re-stealing focus.
+    if (widget.isCurrent && !oldWidget.isCurrent) _claimFocus();
+  }
+
+  void _claimFocus() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _focusNode.requestFocus();
+      Scrollable.ensureVisible(context, alignment: 0.5);
+    });
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -248,6 +289,7 @@ class _DabStationRowState extends State<_DabStationRow> {
       child: TvFocusHighlight(
         focused: _focused,
         child: InkWell(
+          focusNode: _focusNode,
           borderRadius: BorderRadius.circular(12),
           focusColor: Colors.transparent,
           onFocusChange: (v) => setState(() => _focused = v),
@@ -276,6 +318,7 @@ class _DabStationRowState extends State<_DabStationRow> {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: Colors.white,
+                          fontSize: 17,
                           fontWeight: widget.isCurrent ? FontWeight.bold : FontWeight.normal,
                         ),
                       ),
@@ -283,7 +326,7 @@ class _DabStationRowState extends State<_DabStationRow> {
                         '${station.ensembleLabel ?? "Ensemble unbekannt"} · ${station.channelLabel}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Colors.white54, fontSize: 12),
+                        style: const TextStyle(color: Colors.white54, fontSize: 13),
                       ),
                     ],
                   ),
@@ -314,6 +357,35 @@ class _FavoriteRow extends StatefulWidget {
 
 class _FavoriteRowState extends State<_FavoriteRow> {
   bool _focused = false;
+  final _focusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.isCurrent) _claimFocus();
+  }
+
+  @override
+  void didUpdateWidget(covariant _FavoriteRow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // See _DabStationRowState.didUpdateWidget for why this - not just
+    // initState - is needed.
+    if (widget.isCurrent && !oldWidget.isCurrent) _claimFocus();
+  }
+
+  void _claimFocus() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _focusNode.requestFocus();
+      Scrollable.ensureVisible(context, alignment: 0.5);
+    });
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -323,6 +395,7 @@ class _FavoriteRowState extends State<_FavoriteRow> {
       child: TvFocusHighlight(
         focused: _focused,
         child: InkWell(
+          focusNode: _focusNode,
           borderRadius: BorderRadius.circular(12),
           focusColor: Colors.transparent,
           onFocusChange: (v) => setState(() => _focused = v),
@@ -355,16 +428,24 @@ class _FavoriteRowState extends State<_FavoriteRow> {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: Colors.white,
+                      fontSize: 17,
                       fontWeight:
                           widget.isCurrent ? FontWeight.bold : FontWeight.normal,
                     ),
                   ),
                 ),
-                if (channel.sourceType == FavoriteSourceType.dab)
-                  const Padding(
-                    padding: EdgeInsets.only(left: 4),
-                    child: Icon(Icons.radio, size: 16, color: Colors.white38),
+                const SizedBox(width: 6),
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  // Same plain-icon treatment for both, just the icon
+                  // differs - matches the globe used for internet radio
+                  // instead of standing out as its own filled colour badge.
+                  child: Icon(
+                    channel.sourceType == FavoriteSourceType.dab ? Icons.radio : Icons.public,
+                    size: 18,
+                    color: Colors.white38,
                   ),
+                ),
               ],
             ),
           ),

@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 
 import '../db/database.dart';
+import 'settings_repository.dart' show DabSortMode;
 
 /// Persisted "all DAB+ stations ever found by a scan" list - independent of
 /// [FavoritesRepository]/Favorites, so stations can be browsed and favorited
@@ -77,4 +78,30 @@ extension DabStationDisplay on DabStation {
     final custom = customLabel;
     return custom == null || custom.isEmpty ? stationLabel : custom;
   }
+}
+
+/// DAB+ station labels routinely start with decorative characters - "* ORF"
+/// or "!RADIO" are both real, observed-over-the-air labels, not decode bugs
+/// (see DabStationsRepository's other doc comments) - which would otherwise
+/// all sort together at one end instead of where the station's real name
+/// alphabetically belongs. Strips any leading run of `*`, `!` or whitespace
+/// before comparing, case-insensitively.
+String _dabSortKey(String label) => label.replaceFirst(RegExp(r'^[*!\s]+'), '').toLowerCase();
+
+/// Sorts a station list per [DabSortMode] - done client-side (not as a SQL
+/// ORDER BY) specifically so [_dabSortKey]'s normalization can be applied;
+/// see [DabSortMode]'s own doc comment for why this list isn't just sorted
+/// in the database query.
+List<DabStation> sortDabStations(List<DabStation> stations, DabSortMode mode) {
+  final sorted = [...stations];
+  int byName(DabStation a, DabStation b) => _dabSortKey(a.displayLabel).compareTo(_dabSortKey(b.displayLabel));
+  if (mode == DabSortMode.byAlphabet) {
+    sorted.sort(byName);
+  } else {
+    sorted.sort((a, b) {
+      final byEnsemble = _dabSortKey(a.ensembleLabel ?? '').compareTo(_dabSortKey(b.ensembleLabel ?? ''));
+      return byEnsemble != 0 ? byEnsemble : byName(a, b);
+    });
+  }
+  return sorted;
 }

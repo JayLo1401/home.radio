@@ -25,6 +25,47 @@ class RadioAudioHandler extends BaseAudioHandler {
     _player.playerStateStream.listen(_broadcastPlayerState);
   }
 
+  // The actual station play/pause/skip logic lives in HomeScreen (it needs
+  // favorites/DAB-station lists, the DAB tuner, etc. that this handler has
+  // no business owning) - these are what Android calls into for hardware
+  // media-button presses, Bluetooth headset controls, the notification's
+  // own buttons and Assistant "pause music" style requests, including while
+  // the app is backgrounded, none of which reach HomeScreen's own in-app
+  // KeyEvent handling (that only sees events while the app is foregrounded -
+  // see its own doc comment). Bound once, right after HomeScreen resolves
+  // this handler.
+  Future<void> Function()? _onPlay;
+  Future<void> Function()? _onPause;
+  Future<void> Function()? _onSkipNext;
+  Future<void> Function()? _onSkipPrevious;
+
+  void bindControls({
+    required Future<void> Function() onPlay,
+    required Future<void> Function() onPause,
+    required Future<void> Function() onSkipNext,
+    required Future<void> Function() onSkipPrevious,
+  }) {
+    _onPlay = onPlay;
+    _onPause = onPause;
+    _onSkipNext = onSkipNext;
+    _onSkipPrevious = onSkipPrevious;
+  }
+
+  static const _systemActions = {
+    MediaAction.play,
+    MediaAction.pause,
+    MediaAction.stop,
+    MediaAction.skipToNext,
+    MediaAction.skipToPrevious,
+  };
+
+  List<MediaControl> _controlsFor(bool playing) => [
+        MediaControl.skipToPrevious,
+        playing ? MediaControl.pause : MediaControl.play,
+        MediaControl.skipToNext,
+        MediaControl.stop,
+      ];
+
   void setChannel(FavoriteChannel channel, {required bool playing}) {
     mediaItem.add(
       MediaItem(
@@ -36,8 +77,8 @@ class RadioAudioHandler extends BaseAudioHandler {
     );
     playbackState.add(
       playbackState.value.copyWith(
-        controls: [MediaControl.stop],
-        systemActions: const {MediaAction.stop},
+        controls: _controlsFor(playing),
+        systemActions: _systemActions,
         playing: playing,
         processingState: AudioProcessingState.ready,
       ),
@@ -58,8 +99,8 @@ class RadioAudioHandler extends BaseAudioHandler {
     );
     playbackState.add(
       playbackState.value.copyWith(
-        controls: [MediaControl.stop],
-        systemActions: const {MediaAction.stop},
+        controls: _controlsFor(playing),
+        systemActions: _systemActions,
         playing: playing,
         processingState: AudioProcessingState.ready,
       ),
@@ -74,9 +115,38 @@ class RadioAudioHandler extends BaseAudioHandler {
   }
 
   @override
+  Future<void> play() async {
+    await _onPlay?.call();
+  }
+
+  @override
+  Future<void> pause() async {
+    await _onPause?.call();
+  }
+
+  @override
+  Future<void> skipToNext() async {
+    await _onSkipNext?.call();
+  }
+
+  @override
+  Future<void> skipToPrevious() async {
+    await _onSkipPrevious?.call();
+  }
+
+  /// Treated the same as [pause] (not a hard stop that forgets the station)
+  /// for consistency with every other control surface (in-app remote-key
+  /// handling, the notification's own Play/Pause button) - see HomeScreen's
+  /// key handling for why "stop" without a resumable position doesn't mean
+  /// much more than "pause" for a live stream anyway.
+  @override
   Future<void> stop() async {
-    await _player.stop();
-    playbackState.add(playbackState.value.copyWith(playing: false));
+    if (_onPause != null) {
+      await _onPause!();
+    } else {
+      await _player.stop();
+      playbackState.add(playbackState.value.copyWith(playing: false));
+    }
   }
 
   void _broadcastPlayerState(just_audio.PlayerState state) {
@@ -85,8 +155,8 @@ class RadioAudioHandler extends BaseAudioHandler {
     if (_player.currentUrl == null) return;
     playbackState.add(
       playbackState.value.copyWith(
-        controls: [MediaControl.stop],
-        systemActions: const {MediaAction.stop},
+        controls: _controlsFor(state.playing),
+        systemActions: _systemActions,
         playing: state.playing,
         processingState: _mapProcessingState(state.processingState),
       ),

@@ -37,7 +37,7 @@ class NowPlayingBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     final displayName = this.displayName;
     return Container(
-      height: 110,
+      height: 122,
       color: Colors.black.withValues(alpha: 0.7),
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
       child: displayName == null
@@ -62,7 +62,7 @@ class NowPlayingBanner extends StatelessWidget {
                               programNumber != null ? '$programNumber · $displayName' : displayName,
                               style: const TextStyle(
                                 color: Colors.white,
-                                fontSize: 24,
+                                fontSize: 32,
                                 fontWeight: FontWeight.bold,
                               ),
                               overflow: TextOverflow.ellipsis,
@@ -82,14 +82,14 @@ class NowPlayingBanner extends StatelessWidget {
                           ],
                         ],
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 6),
                       Text(
                         errorMessage ??
                             subtitle ??
                             (isPlaying ? 'Wiedergabe läuft' : 'Pausiert'),
                         style: TextStyle(
                           color: errorMessage != null ? Colors.redAccent : Colors.white70,
-                          fontSize: 16,
+                          fontSize: 22,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),

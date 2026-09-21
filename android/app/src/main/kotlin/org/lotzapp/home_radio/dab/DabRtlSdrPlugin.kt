@@ -664,7 +664,41 @@ class DabRtlSdrPlugin :
                         attempt++
                         nativeSetFrequency(freqKhz * 1000)
                         nativeRestart(false)
-                        val player = DabAudioPlayer().also { it.start() }
+                        // lateinit, not `val player = DabAudioPlayer(...) { ...player... }`,
+                        // so the callback below can compare against it - see
+                        // that callback's own comment for why it needs to.
+                        lateinit var player: DabAudioPlayer
+                        player =
+                            DabAudioPlayer(context) {
+                                // Another app (e.g. Spotify) just took over
+                                // audio focus - see DabAudioPlayer's own doc
+                                // comment. Posted onto the main looper since
+                                // this fires from an AudioManager callback
+                                // thread, and stopPlayback() touches native
+                                // JNI state / the audioPlayer field the same
+                                // way the rest of this class's main-thread-
+                                // driven calls do.
+                                mainHandler.post {
+                                    // A fast station switch (or this same
+                                    // retry loop's own re-tune) already
+                                    // abandons this exact player's audio
+                                    // focus and requests it again for a new
+                                    // one - Android doesn't always process
+                                    // that as gapless, and can fire a real
+                                    // AUDIOFOCUS_LOSS callback for the old,
+                                    // already-superseded request even though
+                                    // it's this same app re-requesting, not
+                                    // an actual other app. Without this
+                                    // check, that stale callback landed on
+                                    // whatever station had since started
+                                    // playing and wrongly reported "another
+                                    // app is playing audio" for it.
+                                    if (audioPlayer !== player) return@post
+                                    Log.i(TAG, "playService: audio focus lost, stopping DAB+ playback")
+                                    stopPlayback()
+                                    emit(mapOf("type" to "audioFocusLost"))
+                                }
+                            }.also { it.start() }
                         audioPlayer = player
                         ok = false
                         // Used to be a blind 1.5s sleep before the first

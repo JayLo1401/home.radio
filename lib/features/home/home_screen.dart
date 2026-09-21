@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 
@@ -6,7 +9,8 @@ import '../../core/providers.dart';
 import '../../core/theme.dart';
 import '../../data/db/database.dart' show DabStation;
 import '../../data/models/favorite_channel.dart';
-import '../../data/repositories/dab_stations_repository.dart' show DabStationDisplay;
+import '../../data/repositories/dab_stations_repository.dart'
+    show DabStationDisplay;
 import '../../data/repositories/settings_repository.dart' show AutostartMode;
 import '../dab_stations/dab_stations_screen.dart';
 import '../search_internet/internet_radio_search_screen.dart';
@@ -63,6 +67,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     });
     ref.read(dabRtlSdrServiceProvider).events.listen(_onDabEvent);
     ref.read(rtlSdrUsbServiceProvider).events.listen(_onUsbDeviceEvent);
+    // Lets Android's own MediaSession (hardware media buttons, Bluetooth
+    // headset controls, the notification's own buttons, Assistant "pause
+    // music") actually control playback, including while backgrounded - see
+    // RadioAudioHandler.bindControls's own doc comment for why this can't
+    // just reuse HomeScreen's in-app remote-key handling.
+    ref.read(radioAudioHandlerProvider.future).then(
+          (handler) => handler.bindControls(
+            onPlay: _resumeCurrentPlayback,
+            onPause: _pauseCurrentPlayback,
+            onSkipNext: () => _stepStation(1),
+            onSkipPrevious: () => _stepStation(-1),
+          ),
+          onError: (_) {},
+        );
     // _autostart() must wait for _initDabServer() to actually finish (USB
     // permission request + native rtl_tcp service startup can take a
     // couple of seconds, or longer the very first time) rather than racing
@@ -94,6 +112,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         // comment for why this deliberately does NOT touch the station's
         // persistent logo/DB row).
         setState(() => _liveMotLogoPath = event['path'] as String);
+      case 'audioFocusLost':
+        // Another app (e.g. Spotify) started playing and took over audio
+        // focus - the native side already stopped the tuner/decoder itself
+        // (see DabRtlSdrPlugin's DabAudioPlayer instantiation), this just
+        // brings the UI in line with that so it doesn't keep claiming
+        // "playing" while nothing is actually coming out of the speaker.
+        setState(() {
+          _dabTuned = false;
+          _dabStatusText = 'Pausiert - eine andere App spielt Audio ab.';
+        });
       case 'connectionMessage':
         // Deliberately not guarded on _dabTuned (unlike the cases above):
         // a manual retry after a drop resets _dabTuned to false *before*
@@ -104,8 +132,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         // "Quelle nicht erreichbar" text once it's set.
         final isError = event['isError'] as bool? ?? false;
         setState(() {
-          _dabConnectionWarning =
-              isError ? 'Verbindung zur RTL-SDR-Quelle verloren - versuche erneut zu verbinden…' : null;
+          _dabConnectionWarning = isError
+              ? 'Verbindung zur RTL-SDR-Quelle verloren - versuche erneut zu verbinden…'
+              : null;
         });
     }
   }
@@ -121,7 +150,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (type != 'deviceDetached' && type != 'deviceAttached') return;
     () async {
       if (!mounted) return;
-      if (!await ref.read(settingsRepositoryProvider).getRtlSdrAutoStartOwnService()) {
+      if (!await ref
+          .read(settingsRepositoryProvider)
+          .getRtlSdrAutoStartOwnService()) {
         return; // only direct-USB mode actually owns the dongle itself
       }
       if (type == 'deviceDetached') {
@@ -131,7 +162,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         setState(() {
           _dabServerReady = false;
           _dabTuned = false;
-          if (wasDabPlaying) _dabStatusText = 'USB-Stick getrennt - warte auf Wiederanschluss…';
+          if (wasDabPlaying) {
+            _dabStatusText = 'USB-Stick getrennt - warte auf Wiederanschluss…';
+          }
         });
       } else {
         if (_dabServerReady) return; // was never actually interrupted
@@ -149,18 +182,33 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (!mounted || !_dabServerReady) return;
     final currentDabStation = ref.read(currentDabStationProvider);
     if (currentDabStation != null) {
-      final stations = await ref.read(dabStationsRepositoryProvider).watchAll().first;
+      final stations = await ref
+          .read(dabStationsRepositoryProvider)
+          .watchAll()
+          .first;
       final station = stations
-          .where((s) => s.freqKhz == currentDabStation.freqKhz && s.serviceId == currentDabStation.serviceId)
+          .where(
+            (s) =>
+                s.freqKhz == currentDabStation.freqKhz &&
+                s.serviceId == currentDabStation.serviceId,
+          )
           .firstOrNull;
       if (station != null && mounted) await _playDabStation(station);
       return;
     }
     final currentProgram = ref.read(currentProgramNumberProvider);
     if (currentProgram == null) return;
-    final favorites = await ref.read(favoritesRepositoryProvider).watchFavorites().first;
-    final channel = favorites.where((c) => c.programNumber == currentProgram).firstOrNull;
-    if (channel != null && channel.dabFreqKhz != null && channel.dabServiceId != null && mounted) {
+    final favorites = await ref
+        .read(favoritesRepositoryProvider)
+        .watchFavorites()
+        .first;
+    final channel = favorites
+        .where((c) => c.programNumber == currentProgram)
+        .firstOrNull;
+    if (channel != null &&
+        channel.dabFreqKhz != null &&
+        channel.dabServiceId != null &&
+        mounted) {
       await _play(channel);
     }
   }
@@ -179,7 +227,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final dab = ref.read(dabRtlSdrServiceProvider);
     final ok = await settings.getRtlSdrAutoStartOwnService()
         ? await dab.useDirectUsb()
-        : await dab.setServer(host: await settings.getRtlSdrHost(), port: await settings.getRtlSdrPort());
+        : await dab.setServer(
+            host: await settings.getRtlSdrHost(),
+            port: await settings.getRtlSdrPort(),
+          );
     if (mounted) setState(() => _dabServerReady = ok);
   }
 
@@ -188,7 +239,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final mode = await settings.getAutostartMode();
 
     if (mode == AutostartMode.fixedStation) {
-      final favorites = await ref.read(favoritesRepositoryProvider).watchFavorites().first;
+      final favorites = await ref
+          .read(favoritesRepositoryProvider)
+          .watchFavorites()
+          .first;
       if (favorites.isEmpty) return;
       final programNumber = await settings.getFixedProgramNumber();
       final channel = favorites.firstWhere(
@@ -206,9 +260,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final lastDabFreq = lastPlayed?.dabFreqKhz;
     final lastDabServiceId = lastPlayed?.dabServiceId;
     if (lastDabFreq != null && lastDabServiceId != null) {
-      final stations = await ref.read(dabStationsRepositoryProvider).watchAll().first;
+      final stations = await ref
+          .read(dabStationsRepositoryProvider)
+          .watchAll()
+          .first;
       final station = stations
-          .where((s) => s.freqKhz == lastDabFreq && s.serviceId == lastDabServiceId)
+          .where(
+            (s) => s.freqKhz == lastDabFreq && s.serviceId == lastDabServiceId,
+          )
           .firstOrNull;
       if (station != null) {
         if (mounted) await _playDabStation(station);
@@ -216,7 +275,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       }
     }
 
-    final favorites = await ref.read(favoritesRepositoryProvider).watchFavorites().first;
+    final favorites = await ref
+        .read(favoritesRepositoryProvider)
+        .watchFavorites()
+        .first;
     if (favorites.isEmpty) return;
     final channel = favorites.firstWhere(
       (c) => c.programNumber == lastPlayed?.favoriteProgramNumber,
@@ -230,15 +292,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   /// lazily (not blocking app startup on it, see that provider's doc
   /// comment), so this silently does nothing if it isn't ready yet or fails,
   /// rather than holding up actual playback for it.
-  void _setNowPlayingFavorite(FavoriteChannel channel, {required bool playing}) {
-    ref.read(radioAudioHandlerProvider.future).then(
+  void _setNowPlayingFavorite(
+    FavoriteChannel channel, {
+    required bool playing,
+  }) {
+    ref
+        .read(radioAudioHandlerProvider.future)
+        .then(
           (handler) => handler.setChannel(channel, playing: playing),
           onError: (_) {},
         );
   }
 
   void _setNowPlayingDabStation(DabStation station, {required bool playing}) {
-    ref.read(radioAudioHandlerProvider.future).then(
+    ref
+        .read(radioAudioHandlerProvider.future)
+        .then(
           (handler) => handler.setDabStation(station, playing: playing),
           onError: (_) {},
         );
@@ -256,7 +325,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     });
     ref.read(currentDabStationProvider.notifier).set(null);
     ref.read(currentProgramNumberProvider.notifier).set(channel.programNumber);
-    ref.read(settingsRepositoryProvider).setLastPlayedFavorite(channel.programNumber);
+    ref
+        .read(settingsRepositoryProvider)
+        .setLastPlayedFavorite(channel.programNumber);
 
     final url = channel.internetStreamUrl;
     if (url != null) {
@@ -271,7 +342,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final freqKhz = channel.dabFreqKhz;
     final serviceId = channel.dabServiceId;
     if (freqKhz == null || serviceId == null) return;
-    await _playDab(freqKhz: freqKhz, serviceId: serviceId, onPlaying: () => _setNowPlayingFavorite(channel, playing: true));
+    await _playDab(
+      freqKhz: freqKhz,
+      serviceId: serviceId,
+      onPlaying: () => _setNowPlayingFavorite(channel, playing: true),
+    );
   }
 
   /// Plays a DAB+ station directly from the sidebar's "DAB-Sender" category
@@ -290,8 +365,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       _dabConnectionWarning = null;
     });
     ref.read(currentProgramNumberProvider.notifier).set(null);
-    ref.read(currentDabStationProvider.notifier).set((freqKhz: station.freqKhz, serviceId: station.serviceId));
-    ref.read(settingsRepositoryProvider).setLastPlayedDabStation(station.freqKhz, station.serviceId);
+    ref.read(currentDabStationProvider.notifier).set((
+      freqKhz: station.freqKhz,
+      serviceId: station.serviceId,
+    ));
+    ref
+        .read(settingsRepositoryProvider)
+        .setLastPlayedDabStation(station.freqKhz, station.serviceId);
 
     await ref.read(audioPlayerServiceProvider).stop();
     await _playDab(
@@ -313,16 +393,148 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     required VoidCallback onPlaying,
   }) async {
     if (mounted) setState(() => _dabStatusText = 'Sender wird gesucht…');
-    final ok = await ref.read(dabRtlSdrServiceProvider).playService(freqKhz: freqKhz, serviceId: serviceId);
+    final ok = await ref
+        .read(dabRtlSdrServiceProvider)
+        .playService(freqKhz: freqKhz, serviceId: serviceId);
     if (!mounted) return;
     setState(() {
       _dabTuned = ok;
       _dabStatusText = ok
           ? null
           : (_dabConnectionWarning ??
-              (_dabServerReady ? 'Kein Empfang auf dieser Frequenz.' : 'RTL-SDR-Quelle nicht erreichbar.'));
+                (_dabServerReady
+                    ? 'Kein Empfang auf dieser Frequenz.'
+                    : 'RTL-SDR-Quelle nicht erreichbar.'));
     });
     if (ok) onPlaying();
+  }
+
+  /// Whether the currently selected station (favorite or a raw DAB+ station
+  /// - see [_play]/[_playDabStation]) is a DAB+ one, for the remote-control
+  /// Play/Pause/Stop handling below, which needs different actions for DAB+
+  /// (tune/detune) vs. internet radio (actual audio pause/resume).
+  bool get _isDabSelected {
+    final programNumber = ref.read(currentProgramNumberProvider);
+    if (programNumber != null) {
+      final favorites =
+          ref.read(favoritesStreamProvider).value ?? const <FavoriteChannel>[];
+      final channel = favorites
+          .where((c) => c.programNumber == programNumber)
+          .firstOrNull;
+      if (channel != null) return channel.sourceType == FavoriteSourceType.dab;
+    }
+    return ref.read(currentDabStationProvider) != null;
+  }
+
+  /// DAB+ has no real "pause" (it's a live broadcast) - stopping the
+  /// tune/decode pipeline is the closest equivalent, and resuming re-tunes
+  /// (see [_resumeDabAfterReconnect], reused here since it already does
+  /// exactly that for whatever's currently selected).
+  Future<void> _pauseCurrentPlayback() async {
+    if (_isDabSelected) {
+      await ref.read(dabRtlSdrServiceProvider).stopPlayback();
+      if (mounted) setState(() => _dabTuned = false);
+    } else {
+      await ref.read(audioPlayerServiceProvider).pause();
+    }
+  }
+
+  Future<void> _resumeCurrentPlayback() async {
+    if (_isDabSelected) {
+      await _resumeDabAfterReconnect();
+    } else {
+      await ref.read(audioPlayerServiceProvider).resume();
+    }
+  }
+
+  Future<void> _togglePlayPause() async {
+    final playing = _isDabSelected
+        ? _dabTuned
+        : (_playerState?.playing ?? false);
+    await (playing ? _pauseCurrentPlayback() : _resumeCurrentPlayback());
+  }
+
+  /// Moves to the previous/next station in whichever list the sidebar is
+  /// currently showing (see [effectiveSidebarCategoryProvider]) - the
+  /// remote's channel-up/down-style keys step through that list the same
+  /// way tapping/D-Pad-selecting a row in it would, wrapping around at
+  /// either end.
+  Future<void> _stepStation(int direction) async {
+    if (ref.read(effectiveSidebarCategoryProvider) ==
+        SidebarCategory.dabStations) {
+      final stations =
+          ref.read(sortedDabStationsProvider).value ?? const <DabStation>[];
+      if (stations.isEmpty) return;
+      final current = ref.read(currentDabStationProvider);
+      final index = current == null
+          ? -1
+          : stations.indexWhere(
+              (s) =>
+                  s.freqKhz == current.freqKhz &&
+                  s.serviceId == current.serviceId,
+            );
+      final nextIndex =
+          ((index == -1 ? 0 : index + direction) % stations.length +
+              stations.length) %
+          stations.length;
+      await _playDabStation(stations[nextIndex]);
+    } else {
+      final favorites =
+          ref.read(favoritesStreamProvider).value ?? const <FavoriteChannel>[];
+      if (favorites.isEmpty) return;
+      final current = ref.read(currentProgramNumberProvider);
+      final index = current == null
+          ? -1
+          : favorites.indexWhere((c) => c.programNumber == current);
+      final nextIndex =
+          ((index == -1 ? 0 : index + direction) % favorites.length +
+              favorites.length) %
+          favorites.length;
+      await _play(favorites[nextIndex]);
+    }
+  }
+
+  /// Physical remote-control keys - previous/next track and page/channel
+  /// up/down both step through the currently shown station list (whichever
+  /// of the two really arrives depends on the remote/Android TV box, so both
+  /// are mapped to the same action rather than guessing one); play/pause and
+  /// stop control playback, including for internet radio. Attached to a
+  /// plain (non-autofocus) [Focus] wrapping the whole screen - unhandled key
+  /// events bubble up the Focus tree to it regardless of which row/button
+  /// currently has D-Pad focus, but *only* while this screen's own Focus
+  /// subtree is actually part of the focused chain, i.e. not while Settings/
+  /// DAB-Sender-Suche/etc. are pushed on top (Navigator gives each route its
+  /// own FocusScope), which is exactly the "not in Einstellungen etc."
+  /// restriction that was asked for - no manual route-tracking needed.
+  KeyEventResult _handleKey(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    final key = event.logicalKey;
+    if (key == LogicalKeyboardKey.mediaTrackPrevious ||
+        key == LogicalKeyboardKey.pageDown ||
+        key == LogicalKeyboardKey.channelDown) {
+      _stepStation(-1);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.mediaTrackNext ||
+        key == LogicalKeyboardKey.pageUp ||
+        key == LogicalKeyboardKey.channelUp) {
+      _stepStation(1);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.mediaPlayPause) {
+      _togglePlayPause();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.mediaPlay) {
+      _resumeCurrentPlayback();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.mediaPause ||
+        key == LogicalKeyboardKey.mediaStop) {
+      _pauseCurrentPlayback();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
   }
 
   @override
@@ -334,66 +546,109 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         : favorites.where((c) => c.programNumber == currentProgram).firstOrNull;
 
     final currentDabStation = ref.watch(currentDabStationProvider);
-    final currentRawDabStation = currentChannel != null || currentDabStation == null
+    final currentRawDabStation =
+        currentChannel != null || currentDabStation == null
         ? null
         : (ref.watch(dabStationsStreamProvider).value ?? const <DabStation>[])
-            .where((s) => s.freqKhz == currentDabStation.freqKhz && s.serviceId == currentDabStation.serviceId)
-            .firstOrNull;
+              .where(
+                (s) =>
+                    s.freqKhz == currentDabStation.freqKhz &&
+                    s.serviceId == currentDabStation.serviceId,
+              )
+              .firstOrNull;
 
-    final isDab = currentChannel?.sourceType == FavoriteSourceType.dab || currentRawDabStation != null;
+    final isDab =
+        currentChannel?.sourceType == FavoriteSourceType.dab ||
+        currentRawDabStation != null;
     final isPlaying = isDab ? _dabTuned : (_playerState?.playing ?? false);
-    final isBuffering = !isDab &&
+    final isBuffering =
+        !isDab &&
         (_playerState?.processingState == ProcessingState.buffering ||
             _playerState?.processingState == ProcessingState.loading);
     final subtitle = isDab ? _dabStatusText : _icyTitle;
     final errorMessage = isDab ? _dabConnectionWarning : _playbackError;
 
-    return Scaffold(
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          BackgroundLayer(
-            logoLocalPath: currentChannel?.logoLocalPath ?? currentRawDabStation?.logoLocalPath,
-            logoUrl: currentChannel?.logoUrl ?? currentRawDabStation?.logoUrl,
-          ),
-          SafeArea(
-            child: Column(
-              children: [
-                _MenuBar(
-                  onOpenDabStations: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const DabStationsScreen()),
+    return Focus(
+      onKeyEvent: _handleKey,
+      child: Scaffold(
+        backgroundColor: const Color(0xFF05070A),
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            SafeArea(
+              child: Column(
+                children: [
+                  _MenuBar(
+                    onOpenDabStations: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const DabStationsScreen(),
+                      ),
+                    ),
+                    onOpenInternetSearch: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const InternetRadioSearchScreen(),
+                      ),
+                    ),
+                    onOpenSettings: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                    ),
                   ),
-                  onOpenInternetSearch: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const InternetRadioSearchScreen()),
+                  Expanded(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(
+                          // The dimmed station-logo background used to cover
+                          // the whole screen, including the sidebar/top/bottom
+                          // bars - now that those all have their own opaque
+                          // background, it only makes sense - and is only
+                          // visible - behind the weather/radar tiles, so it's
+                          // scoped (and BoxFit.cover-fitted) to just this area.
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              BackgroundLayer(
+                                logoLocalPath:
+                                    currentChannel?.logoLocalPath ??
+                                    currentRawDabStation?.logoLocalPath,
+                                logoUrl:
+                                    currentChannel?.logoUrl ??
+                                    currentRawDabStation?.logoUrl,
+                              ),
+                              const _WeatherRadarColumn(),
+                            ],
+                          ),
+                        ),
+                        FavoritesSidebar(
+                          onSelect: _play,
+                          onSelectDabStation: _playDabStation,
+                        ),
+                      ],
+                    ),
                   ),
-                  onOpenSettings: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                  NowPlayingBanner(
+                    programNumber: currentChannel?.programNumber,
+                    displayName:
+                        currentChannel?.displayName ??
+                        currentRawDabStation?.displayLabel,
+                    logoUrl:
+                        currentChannel?.logoUrl ??
+                        currentRawDabStation?.logoUrl,
+                    logoLocalPath:
+                        _liveMotLogoPath ??
+                        currentChannel?.logoLocalPath ??
+                        currentRawDabStation?.logoLocalPath,
+                    isPlaying: isPlaying,
+                    isBuffering: isBuffering,
+                    subtitle: (subtitle?.isEmpty ?? true) ? null : subtitle,
+                    errorMessage: errorMessage,
+                    snrDb: (isDab && isPlaying) ? _dabSnrDb : null,
                   ),
-                ),
-                Expanded(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const Expanded(child: _WeatherRadarColumn()),
-                      FavoritesSidebar(onSelect: _play, onSelectDabStation: _playDabStation),
-                    ],
-                  ),
-                ),
-                NowPlayingBanner(
-                  programNumber: currentChannel?.programNumber,
-                  displayName: currentChannel?.displayName ?? currentRawDabStation?.displayLabel,
-                  logoUrl: currentChannel?.logoUrl ?? currentRawDabStation?.logoUrl,
-                  logoLocalPath: _liveMotLogoPath ?? currentChannel?.logoLocalPath ?? currentRawDabStation?.logoLocalPath,
-                  isPlaying: isPlaying,
-                  isBuffering: isBuffering,
-                  subtitle: (subtitle?.isEmpty ?? true) ? null : subtitle,
-                  errorMessage: errorMessage,
-                  snrDb: (isDab && isPlaying) ? _dabSnrDb : null,
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -448,7 +703,11 @@ class _WeatherRadarColumn extends ConsumerWidget {
                 width: _tileBaseWidth * settings.radarScale,
                 height: _tileBaseHeight * settings.radarScale,
                 radius: _tileRadius,
-                child: RadarPanel(lat: settings.lat, lon: settings.lon, dimming: settings.radarDimming),
+                child: RadarPanel(
+                  lat: settings.lat,
+                  lon: settings.lon,
+                  dimming: settings.radarDimming,
+                ),
               ),
           ],
         ),
@@ -458,7 +717,12 @@ class _WeatherRadarColumn extends ConsumerWidget {
 }
 
 class _Tile extends StatelessWidget {
-  const _Tile({required this.width, required this.height, required this.radius, required this.child});
+  const _Tile({
+    required this.width,
+    required this.height,
+    required this.radius,
+    required this.child,
+  });
 
   final double width;
   final double height;
@@ -476,7 +740,11 @@ class _Tile extends StatelessWidget {
           decoration: BoxDecoration(
             border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
             boxShadow: [
-              BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 12, offset: const Offset(0, 4)),
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.4),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
             ],
           ),
           child: child,
@@ -499,38 +767,119 @@ class _MenuBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      child: Row(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: Image.asset('assets/icon/applogo1.png', width: 36, height: 36),
-          ),
-          const SizedBox(width: 10),
-          const Text(
-            'Home Radio',
-            style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          const Spacer(),
-          _MenuBarButton(
-            icon: Icons.radio,
-            label: 'DAB Sender suchen',
-            onPressed: onOpenDabStations,
-          ),
-          const SizedBox(width: 4),
-          _MenuBarButton(
-            icon: Icons.public,
-            label: 'Internetradio suchen',
-            onPressed: onOpenInternetSearch,
-          ),
-          const SizedBox(width: 4),
-          _MenuBarButton(
-            icon: Icons.settings,
-            label: 'Einstellungen',
-            onPressed: onOpenSettings,
-          ),
-        ],
+    return Container(
+      // Same treatment as NowPlayingBanner at the bottom, so the top and
+      // bottom bars read as one consistent pair framing the content.
+      color: Colors.black.withValues(alpha: 0.7),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      // A Row can't center the clock against the bar's own width once the
+      // left (logo/title) and right (buttons) groups are different widths -
+      // it'd only ever sit in the middle of the *remaining* space between
+      // them. A Stack with each group Align-ed to its own edge and the
+      // clock centered on the whole bar gets a true center regardless of
+      // how wide either side group is.
+      child: SizedBox(
+        height: 36,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.asset(
+                      'assets/icon/applogo1.png',
+                      width: 36,
+                      height: 36,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  const Text(
+                    'Home Radio',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const _Clock(),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _MenuBarButton(
+                    icon: Icons.radio,
+                    label: 'DAB Sender suchen',
+                    onPressed: onOpenDabStations,
+                  ),
+                  const SizedBox(width: 4),
+                  _MenuBarButton(
+                    icon: Icons.public,
+                    label: 'Internetradio suchen',
+                    onPressed: onOpenInternetSearch,
+                  ),
+                  const SizedBox(width: 4),
+                  _MenuBarButton(
+                    icon: Icons.settings,
+                    label: 'Einstellungen',
+                    onPressed: onOpenSettings,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Live "HH:mm" clock, ticking every second but only rebuilding when the
+/// displayed minute actually changes.
+class _Clock extends StatefulWidget {
+  const _Clock();
+
+  @override
+  State<_Clock> createState() => _ClockState();
+}
+
+class _ClockState extends State<_Clock> {
+  late String _text = _format(DateTime.now());
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      final text = _format(DateTime.now());
+      if (text != _text) setState(() => _text = text);
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  static String _format(DateTime t) =>
+      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      _text,
+      style: const TextStyle(
+        color: Colors.white,
+        fontSize: 20,
+        fontWeight: FontWeight.w700,
       ),
     );
   }
@@ -578,7 +927,10 @@ class _MenuBarButtonState extends State<_MenuBarButton> {
                 child: _focused
                     ? Padding(
                         padding: const EdgeInsets.only(left: 8),
-                        child: Text(widget.label, style: const TextStyle(color: Colors.white)),
+                        child: Text(
+                          widget.label,
+                          style: const TextStyle(color: Colors.white),
+                        ),
                       )
                     : const SizedBox(height: 24),
               ),

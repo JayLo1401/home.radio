@@ -2,6 +2,15 @@ import '../db/database.dart';
 
 enum AutostartMode { lastStation, fixedStation }
 
+/// How "Alle DAB+ Sender" (FavoritesSidebar's DAB-Sender tab and
+/// DabStationsScreen) is ordered - grouped by ensemble/multiplex first (the
+/// previous, only behaviour) so stations sharing one transmitter/frequency
+/// stay together, or purely alphabetically across all of them regardless of
+/// ensemble. Applied client-side (see DabStationsRepository.sortDabStations)
+/// rather than in SQL, since the "ignore a leading */space/!" comparison it
+/// uses isn't expressible as a plain SQL ORDER BY.
+enum DabSortMode { byEnsembleThenAlphabet, byAlphabet }
+
 /// Either a favorite's program number or a DAB+ station played directly from
 /// "Alle DAB+ Sender" without being favorited (see FavoritesSidebar) - the
 /// latter has no program number of its own, so [AutostartMode.lastStation]
@@ -45,6 +54,7 @@ class SettingsRepository {
   static const _keyRtlSdrHost = 'rtl_sdr_host';
   static const _keyRtlSdrPort = 'rtl_sdr_port';
   static const _keyRtlSdrMode = 'rtl_sdr_mode'; // 'own' | 'external'
+  static const _keyDabSortMode = 'dab_sort_mode'; // 'ensemble' | 'alphabet'
 
   final AppDatabase _db;
   SettingsRepository(this._db);
@@ -207,4 +217,12 @@ class SettingsRepository {
 
   Future<void> setRtlSdrMode({required bool ownUsbService}) =>
       _db.setSetting(_keyRtlSdrMode, ownUsbService ? 'own' : 'external');
+
+  Future<DabSortMode> getDabSortMode() async {
+    final v = await _db.getSetting(_keyDabSortMode);
+    return v == 'alphabet' ? DabSortMode.byAlphabet : DabSortMode.byEnsembleThenAlphabet;
+  }
+
+  Future<void> setDabSortMode(DabSortMode mode) => _db.setSetting(
+      _keyDabSortMode, mode == DabSortMode.byAlphabet ? 'alphabet' : 'ensemble');
 }

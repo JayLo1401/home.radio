@@ -30,6 +30,17 @@ class AudioPlayerService {
     if (_sessionConfigured) return;
     final session = await AudioSession.instance;
     await session.configure(const AudioSessionConfiguration.music());
+    // just_audio requests audio focus on play() via this same configured
+    // session, but doesn't react to *losing* it on its own - without this,
+    // starting e.g. Spotify and pressing play there didn't stop our own
+    // stream, so both played over each other. Nothing here re-requests
+    // focus/resumes when the interruption ends, even a transient one (a
+    // notification sound, briefly) - the user switched to something else on
+    // purpose, and having the radio suddenly start talking over it again on
+    // its own would be more surprising than helpful.
+    session.interruptionEventStream.listen((event) {
+      if (event.begin) _player.pause();
+    });
     _sessionConfigured = true;
   }
 
@@ -54,6 +65,13 @@ class AudioPlayerService {
     _currentUrl = null;
     await _player.stop();
   }
+
+  /// Pause/resume in place, unlike [stop] - keeps [_currentUrl] loaded so a
+  /// remote's Play/Pause/Stop keys can resume the same station rather than
+  /// needing a full re-tune (see HomeScreen's key handling).
+  Future<void> pause() => _player.pause();
+
+  Future<void> resume() => _player.play();
 
   Future<void> dispose() async {
     await _player.dispose();

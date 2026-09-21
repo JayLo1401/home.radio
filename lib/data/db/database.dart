@@ -140,14 +140,11 @@ class AppDatabase extends _$AppDatabase {
     );
   }
 
-  Stream<List<DabStation>> watchDabStations() {
-    return (select(dabStations)
-          ..orderBy([
-            (s) => OrderingTerm.asc(s.ensembleLabel),
-            (s) => OrderingTerm.asc(s.stationLabel),
-          ]))
-        .watch();
-  }
+  // Unsorted at the SQL level on purpose - the user-configurable sort order
+  // (see DabSortMode) needs a "strip leading */!/space" comparison that
+  // isn't expressible as a plain ORDER BY, so sorting happens client-side
+  // instead (DabStationsRepository.sortDabStations).
+  Stream<List<DabStation>> watchDabStations() => select(dabStations).watch();
 
   Future<void> upsertDabStation(DabStationsCompanion entry) {
     return into(dabStations).insertOnConflictUpdate(entry);
