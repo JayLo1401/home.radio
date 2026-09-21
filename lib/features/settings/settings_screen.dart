@@ -8,6 +8,7 @@ import '../../data/repositories/settings_repository.dart';
 import '../dab_stations/dab_stations_screen.dart';
 import '../rtlsdr/rtl_sdr_test_screen.dart';
 import '../shared/rename_dialog.dart';
+import 'location_settings_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -20,16 +21,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   AutostartMode _mode = AutostartMode.lastStation;
   int? _fixedProgramNumber;
   DabSortMode _dabSortMode = DabSortMode.byEnsembleThenAlphabet;
+  bool _showClockDate = false;
   bool _weatherEnabled = true;
   bool _radarEnabled = true;
   double _uiScale = 1.0;
   double _weatherScale = 1.0;
+  double _weatherContentScale = 1.0;
+  bool _weatherSpanTwoTiles = true;
   double _radarScale = 1.0;
+  int _radarZoom = SettingsRepository.defaultRadarZoom;
   double _radarDimming = 0.0;
+  bool _sunEnabled = true;
+  double _sunScale = 1.0;
   bool _loaded = false;
-  final _latController = TextEditingController();
-  final _lonController = TextEditingController();
-  final _locationNameController = TextEditingController();
 
   @override
   void initState() {
@@ -37,54 +41,42 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _load();
   }
 
-  @override
-  void dispose() {
-    _latController.dispose();
-    _lonController.dispose();
-    _locationNameController.dispose();
-    super.dispose();
-  }
-
   Future<void> _load() async {
     final repo = ref.read(settingsRepositoryProvider);
     final mode = await repo.getAutostartMode();
     final fixed = await repo.getFixedProgramNumber();
     final dabSortMode = await repo.getDabSortMode();
+    final showClockDate = await repo.getShowClockDate();
     final weather = await repo.getWeatherEnabled();
     final radar = await repo.getRadarEnabled();
-    final lat = await repo.getWeatherLat();
-    final lon = await repo.getWeatherLon();
-    final locationName = await repo.getWeatherLocationName();
     final weatherScale = await repo.getWeatherTileScale();
+    final weatherContentScale = await repo.getWeatherContentScale();
+    final weatherSpanTwoTiles = await repo.getWeatherSpanTwoTiles();
     final radarScale = await repo.getRadarTileScale();
+    final radarZoom = await repo.getRadarZoom();
     final radarDimming = await repo.getRadarDimming();
+    final sunEnabled = await repo.getSunEnabled();
+    final sunScale = await repo.getSunTileScale();
     final scale = ref.read(uiScaleProvider);
     if (!mounted) return;
     setState(() {
       _mode = mode;
       _fixedProgramNumber = fixed;
       _dabSortMode = dabSortMode;
+      _showClockDate = showClockDate;
       _weatherEnabled = weather;
       _radarEnabled = radar;
       _uiScale = scale;
       _weatherScale = weatherScale;
+      _weatherContentScale = weatherContentScale;
+      _weatherSpanTwoTiles = weatherSpanTwoTiles;
       _radarScale = radarScale;
+      _radarZoom = radarZoom;
       _radarDimming = radarDimming;
-      _latController.text = lat.toString();
-      _lonController.text = lon.toString();
-      _locationNameController.text = locationName;
+      _sunEnabled = sunEnabled;
+      _sunScale = sunScale;
       _loaded = true;
     });
-  }
-
-  Future<void> _saveLocation() async {
-    final lat = double.tryParse(_latController.text.replaceAll(',', '.'));
-    final lon = double.tryParse(_lonController.text.replaceAll(',', '.'));
-    if (lat == null || lon == null) return;
-    final name = _locationNameController.text.trim();
-    await ref
-        .read(weatherDisplaySettingsProvider.notifier)
-        .setLocation(lat, lon, name.isEmpty ? 'Standort' : name);
   }
 
   Future<void> _changeUiScale(double delta) async {
@@ -99,16 +91,34 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     await ref.read(weatherDisplaySettingsProvider.notifier).setWeatherScale(next);
   }
 
+  Future<void> _changeWeatherContentScale(double delta) async {
+    final next = (_weatherContentScale + delta).clamp(0.5, 2.0);
+    setState(() => _weatherContentScale = next);
+    await ref.read(weatherDisplaySettingsProvider.notifier).setWeatherContentScale(next);
+  }
+
   Future<void> _changeRadarScale(double delta) async {
     final next = (_radarScale + delta).clamp(0.5, 2.0);
     setState(() => _radarScale = next);
     await ref.read(weatherDisplaySettingsProvider.notifier).setRadarScale(next);
   }
 
+  Future<void> _changeRadarZoom(int delta) async {
+    final next = (_radarZoom + delta).clamp(SettingsRepository.minRadarZoom, SettingsRepository.maxRadarZoom);
+    setState(() => _radarZoom = next);
+    await ref.read(weatherDisplaySettingsProvider.notifier).setRadarZoom(next);
+  }
+
   Future<void> _changeRadarDimming(double delta) async {
     final next = (_radarDimming + delta).clamp(0.0, 0.9);
     setState(() => _radarDimming = next);
     await ref.read(weatherDisplaySettingsProvider.notifier).setRadarDimming(next);
+  }
+
+  Future<void> _changeSunScale(double delta) async {
+    final next = (_sunScale + delta).clamp(0.5, 2.0);
+    setState(() => _sunScale = next);
+    await ref.read(weatherDisplaySettingsProvider.notifier).setSunScale(next);
   }
 
   Future<void> _renameFavorite(FavoriteChannel channel) async {
@@ -126,6 +136,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final favorites = ref.watch(favoritesStreamProvider).value ?? const <FavoriteChannel>[];
+    final locationName = ref.watch(weatherDisplaySettingsProvider).locationName;
     final repo = ref.read(settingsRepositoryProvider);
 
     if (!_loaded) {
@@ -140,6 +151,95 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     // the geometric "nearest" focusable widget.
     var order = 0.0;
     double nextOrder() => order += 1;
+
+    // A +/- scale/zoom control, e.g. "Größe der Wetter-Kachel: 100%" - was
+    // repeated seven times with only the label/value/callbacks differing.
+    Widget scaleRow({required String label, required String valueLabel, required void Function(int direction) onChange}) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: Theme.of(context).textTheme.bodyLarge),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                FocusTraversalOrder(
+                  order: NumericFocusOrder(nextOrder()),
+                  child: _TvIconButton(icon: Icons.remove, onTap: () => onChange(-1)),
+                ),
+                SizedBox(
+                  width: 90,
+                  child: Text(valueLabel, textAlign: TextAlign.center, style: const TextStyle(fontSize: 18)),
+                ),
+                FocusTraversalOrder(
+                  order: NumericFocusOrder(nextOrder()),
+                  child: _TvIconButton(icon: Icons.add, onTap: () => onChange(1)),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
+    // A tile's own "<Name> anzeigen" on/off toggle.
+    Widget tileToggle(String label, bool selected, void Function(bool) onChanged) {
+      return FocusTraversalOrder(
+        order: NumericFocusOrder(nextOrder()),
+        child: _TvChoiceTile(
+          label: label,
+          selected: selected,
+          asToggle: true,
+          onTap: () => onChanged(!selected),
+        ),
+      );
+    }
+
+    // One tile's settings, sub-headed under the "Kacheln" section below -
+    // was previously just flatly listed one after another under a single
+    // "Anzeige" heading together with everything else, which stopped being
+    // readable once there were three tiles' worth of settings to scroll
+    // past. The on/off switch *is* the group header (left-aligned, like
+    // every other control here) rather than a separate indented row under
+    // a plain title - and the rest of the group only shows up while it's
+    // actually relevant, i.e. while the tile is enabled.
+    Widget tileGroup({
+      required String title,
+      required bool enabled,
+      required void Function(bool) onToggleEnabled,
+      required List<Widget> children,
+    }) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(width: 4, height: 18, color: Theme.of(context).colorScheme.primary),
+                const SizedBox(width: 4),
+                FocusTraversalOrder(
+                  order: NumericFocusOrder(nextOrder()),
+                  child: _TvChoiceTile(
+                    label: title,
+                    selected: enabled,
+                    asToggle: true,
+                    bold: true,
+                    onTap: () => onToggleEnabled(!enabled),
+                  ),
+                ),
+              ],
+            ),
+            if (enabled)
+              Padding(
+                padding: const EdgeInsets.only(left: 16),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: children),
+              ),
+          ],
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(title: const Text('Einstellungen')),
@@ -197,165 +297,100 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             const Divider(height: 32),
             Text('Anzeige', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 8),
+            tileToggle('Datum neben der Uhrzeit anzeigen', _showClockDate, (v) async {
+              setState(() => _showClockDate = v);
+              await ref.read(showClockDateProvider.notifier).set(v);
+            }),
+            scaleRow(
+              label: 'Größe der Oberfläche',
+              valueLabel: '${(_uiScale * 100).round()} %',
+              onChange: (d) => _changeUiScale(d * 0.1),
+            ),
+            const Divider(height: 32),
+            Text('Kacheln', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 8),
+            // Its own sub-page, not inline text fields here (see
+            // LocationSettingsScreen's own doc comment for why: D-Pad down
+            // couldn't get past a focused TextField to reach the tile
+            // groups below).
             FocusTraversalOrder(
               order: NumericFocusOrder(nextOrder()),
               child: _TvChoiceTile(
-                label: 'Wetterprognose anzeigen',
-                selected: _weatherEnabled,
-                asToggle: true,
-                onTap: () async {
-                  final v = !_weatherEnabled;
-                  setState(() => _weatherEnabled = v);
-                  await ref.read(weatherDisplaySettingsProvider.notifier).setWeatherEnabled(v);
-                },
+                label: 'Standort einrichten ($locationName)',
+                selected: false,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const LocationSettingsScreen()),
+                ),
               ),
             ),
-            FocusTraversalOrder(
-              order: NumericFocusOrder(nextOrder()),
-              child: _TvChoiceTile(
-                label: 'Regenradar anzeigen',
-                selected: _radarEnabled,
-                asToggle: true,
-                onTap: () async {
-                  final v = !_radarEnabled;
-                  setState(() => _radarEnabled = v);
-                  await ref.read(weatherDisplaySettingsProvider.notifier).setRadarEnabled(v);
-                },
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text('Standort für Wetter/Radar', style: Theme.of(context).textTheme.bodyLarge),
-            const SizedBox(height: 8),
-            Row(
+            tileGroup(
+              title: 'Wetterprognose',
+              enabled: _weatherEnabled,
+              onToggleEnabled: (v) async {
+                setState(() => _weatherEnabled = v);
+                await ref.read(weatherDisplaySettingsProvider.notifier).setWeatherEnabled(v);
+              },
               children: [
-                SizedBox(
-                  width: 140,
-                  child: TextField(
-                    controller: _locationNameController,
-                    decoration: const InputDecoration(labelText: 'Ortsname'),
-                    onSubmitted: (_) => _saveLocation(),
-                  ),
+                tileToggle('Über 2 Kacheln (volle Höhe)', _weatherSpanTwoTiles, (v) async {
+                  setState(() => _weatherSpanTwoTiles = v);
+                  await ref.read(weatherDisplaySettingsProvider.notifier).setWeatherSpanTwoTiles(v);
+                }),
+                scaleRow(
+                  label: 'Größe der Kachel',
+                  valueLabel: '${(_weatherScale * 100).round()} %',
+                  onChange: (d) => _changeWeatherScale(d * 0.1),
                 ),
-                const SizedBox(width: 12),
-                SizedBox(
-                  width: 140,
-                  child: TextField(
-                    controller: _latController,
-                    decoration: const InputDecoration(labelText: 'Breitengrad'),
-                    onSubmitted: (_) => _saveLocation(),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                SizedBox(
-                  width: 140,
-                  child: TextField(
-                    controller: _lonController,
-                    decoration: const InputDecoration(labelText: 'Längengrad'),
-                    onSubmitted: (_) => _saveLocation(),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                FocusTraversalOrder(
-                  order: NumericFocusOrder(nextOrder()),
-                  child: _TvIconButton(icon: Icons.check, onTap: _saveLocation),
+                scaleRow(
+                  // Separate from the tile size above - this scales the
+                  // forecast content (icon/text/badges) inside the tile,
+                  // independently of how big the tile itself is.
+                  label: 'Größe des Inhalts',
+                  valueLabel: '${(_weatherContentScale * 100).round()} %',
+                  onChange: (d) => _changeWeatherContentScale(d * 0.1),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            Text('Größe der Wetter-Kachel', style: Theme.of(context).textTheme.bodyLarge),
-            const SizedBox(height: 8),
-            Row(
+            tileGroup(
+              title: 'Regenradar',
+              enabled: _radarEnabled,
+              onToggleEnabled: (v) async {
+                setState(() => _radarEnabled = v);
+                await ref.read(weatherDisplaySettingsProvider.notifier).setRadarEnabled(v);
+              },
               children: [
-                FocusTraversalOrder(
-                  order: NumericFocusOrder(nextOrder()),
-                  child: _TvIconButton(icon: Icons.remove, onTap: () => _changeWeatherScale(-0.1)),
+                scaleRow(
+                  label: 'Größe der Kachel',
+                  valueLabel: '${(_radarScale * 100).round()} %',
+                  onChange: (d) => _changeRadarScale(d * 0.1),
                 ),
-                SizedBox(
-                  width: 90,
-                  child: Text(
-                    '${(_weatherScale * 100).round()} %',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 18),
-                  ),
+                scaleRow(
+                  // Not the same thing as the tile size above - this is the
+                  // map's own default zoom level (how much of the
+                  // surrounding area it shows at once), independent of the
+                  // tile's size.
+                  label: 'Zoom-Stufe',
+                  valueLabel: '$_radarZoom',
+                  onChange: (d) => _changeRadarZoom(d),
                 ),
-                FocusTraversalOrder(
-                  order: NumericFocusOrder(nextOrder()),
-                  child: _TvIconButton(icon: Icons.add, onTap: () => _changeWeatherScale(0.1)),
+                scaleRow(
+                  label: 'Abdunkeln (für abends)',
+                  valueLabel: '${(_radarDimming * 100).round()} %',
+                  onChange: (d) => _changeRadarDimming(d * 0.1),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            Text('Größe der Radar-Kachel', style: Theme.of(context).textTheme.bodyLarge),
-            const SizedBox(height: 8),
-            Row(
+            tileGroup(
+              title: 'Sonne & Mond',
+              enabled: _sunEnabled,
+              onToggleEnabled: (v) async {
+                setState(() => _sunEnabled = v);
+                await ref.read(weatherDisplaySettingsProvider.notifier).setSunEnabled(v);
+              },
               children: [
-                FocusTraversalOrder(
-                  order: NumericFocusOrder(nextOrder()),
-                  child: _TvIconButton(icon: Icons.remove, onTap: () => _changeRadarScale(-0.1)),
-                ),
-                SizedBox(
-                  width: 90,
-                  child: Text(
-                    '${(_radarScale * 100).round()} %',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 18),
-                  ),
-                ),
-                FocusTraversalOrder(
-                  order: NumericFocusOrder(nextOrder()),
-                  child: _TvIconButton(icon: Icons.add, onTap: () => _changeRadarScale(0.1)),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text('Radar abdunkeln (für abends)', style: Theme.of(context).textTheme.bodyLarge),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                FocusTraversalOrder(
-                  order: NumericFocusOrder(nextOrder()),
-                  child: _TvIconButton(icon: Icons.remove, onTap: () => _changeRadarDimming(-0.1)),
-                ),
-                SizedBox(
-                  width: 90,
-                  child: Text(
-                    '${(_radarDimming * 100).round()} %',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 18),
-                  ),
-                ),
-                FocusTraversalOrder(
-                  order: NumericFocusOrder(nextOrder()),
-                  child: _TvIconButton(icon: Icons.add, onTap: () => _changeRadarDimming(0.1)),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text('Größe der Oberfläche', style: Theme.of(context).textTheme.bodyLarge),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                FocusTraversalOrder(
-                  order: NumericFocusOrder(nextOrder()),
-                  child: _TvIconButton(
-                    icon: Icons.remove,
-                    onTap: () => _changeUiScale(-0.1),
-                  ),
-                ),
-                SizedBox(
-                  width: 90,
-                  child: Text(
-                    '${(_uiScale * 100).round()} %',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 18),
-                  ),
-                ),
-                FocusTraversalOrder(
-                  order: NumericFocusOrder(nextOrder()),
-                  child: _TvIconButton(
-                    icon: Icons.add,
-                    onTap: () => _changeUiScale(0.1),
-                  ),
+                scaleRow(
+                  label: 'Größe der Kachel',
+                  valueLabel: '${(_sunScale * 100).round()} %',
+                  onChange: (d) => _changeSunScale(d * 0.1),
                 ),
               ],
             ),
@@ -470,6 +505,7 @@ class _TvChoiceTile extends StatefulWidget {
   final bool selected;
   final bool asToggle;
   final bool compact;
+  final bool bold;
   final VoidCallback onTap;
 
   const _TvChoiceTile({
@@ -478,6 +514,7 @@ class _TvChoiceTile extends StatefulWidget {
     required this.onTap,
     this.asToggle = false,
     this.compact = false,
+    this.bold = false,
   });
 
   @override
@@ -517,7 +554,11 @@ class _TvChoiceTileState extends State<_TvChoiceTile> {
               const SizedBox(width: 10),
               Text(
                 widget.label,
-                style: const TextStyle(fontSize: 16, color: Colors.white),
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.white,
+                  fontWeight: widget.bold ? FontWeight.bold : FontWeight.normal,
+                ),
               ),
             ],
           ),

@@ -213,6 +213,27 @@ class DabAudioPlayer(
     fun stop() {
         running = false
         thread?.interrupt()
+        // Without this, releaseTrack() below could run concurrently with
+        // runLoop() still mid-iteration on the old thread - Thread.interrupt()
+        // doesn't abort a blocking AudioTrack.write() call (unlike
+        // Thread.sleep(), that one isn't interruptible), so on a station
+        // that was actively underrunning (write() blocked waiting for
+        // buffer space - exactly the case that was actually observed) the
+        // old thread could still be inside write() on the *same* AudioTrack
+        // object this is about to stop()/release() out from under it. Not
+        // just a correctness race: each station switch that hit it left
+        // that stale thread lingering, and the next switch's own playback
+        // setup competing with it for the audio pipeline - stacking up
+        // over repeated fast switches (e.g. the remote's next/previous
+        // station keys) into the growing slowdown/timeout that was
+        // actually reported, not a one-off glitch. 500ms comfortably
+        // covers a normal loop iteration; if it's ever not enough, the
+        // Exception catch already in runLoop()'s write() call keeps a
+        // genuine race from crashing instead of just logging it.
+        try {
+            thread?.join(500)
+        } catch (_: InterruptedException) {
+        }
         thread = null
         ringBuffer?.reset()
         releaseTrack()

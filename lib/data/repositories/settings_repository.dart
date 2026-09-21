@@ -44,8 +44,13 @@ class SettingsRepository {
   static const _keyWeatherLon = 'weather_lon';
   static const _keyWeatherLocationName = 'weather_location_name';
   static const _keyWeatherTileScale = 'weather_tile_scale';
+  static const _keyWeatherContentScale = 'weather_content_scale';
+  static const _keyWeatherSpanTwoTiles = 'weather_span_two_tiles';
   static const _keyRadarTileScale = 'radar_tile_scale';
+  static const _keyRadarZoom = 'radar_zoom';
   static const _keyRadarDimming = 'radar_dimming';
+  static const _keySunEnabled = 'sun_enabled';
+  static const _keySunTileScale = 'sun_tile_scale';
   static const _keyUiScale = 'ui_scale';
   static const _keyFtpHost = 'ftp_host';
   static const _keyFtpUser = 'ftp_user';
@@ -55,6 +60,7 @@ class SettingsRepository {
   static const _keyRtlSdrPort = 'rtl_sdr_port';
   static const _keyRtlSdrMode = 'rtl_sdr_mode'; // 'own' | 'external'
   static const _keyDabSortMode = 'dab_sort_mode'; // 'ensemble' | 'alphabet'
+  static const _keyShowClockDate = 'show_clock_date';
 
   final AppDatabase _db;
   SettingsRepository(this._db);
@@ -147,10 +153,43 @@ class SettingsRepository {
 
   Future<void> setWeatherTileScale(double scale) => _db.setSetting(_keyWeatherTileScale, '$scale');
 
+  /// Separate from [getWeatherTileScale] - that resizes the tile's own box
+  /// (and therefore how much of the app it takes up), this scales the
+  /// forecast content *within* it (icon/text/badge sizes, column widths),
+  /// so a small tile can still show larger, more readable content, or a
+  /// large tile can show denser/smaller content, independently of each
+  /// other.
+  Future<double> getWeatherContentScale() async =>
+      double.tryParse(await _db.getSetting(_keyWeatherContentScale) ?? '') ?? defaultTileScale;
+
+  Future<void> setWeatherContentScale(double scale) => _db.setSetting(_keyWeatherContentScale, '$scale');
+
+  /// Whether the weather forecast tile spans the full height of the other
+  /// two tiles stacked next to it (radar + sun/moon), rather than just
+  /// being one normal-height tile itself - see _WeatherRadarColumn's own
+  /// doc comment. Only the forecast tile has this option; radar/sun always
+  /// just sit at their own single height in that stacked column.
+  Future<bool> getWeatherSpanTwoTiles() async => (await _db.getSetting(_keyWeatherSpanTwoTiles)) != 'false';
+
+  Future<void> setWeatherSpanTwoTiles(bool span) => _db.setSetting(_keyWeatherSpanTwoTiles, '$span');
+
   Future<double> getRadarTileScale() async =>
       double.tryParse(await _db.getSetting(_keyRadarTileScale) ?? '') ?? defaultTileScale;
 
   Future<void> setRadarTileScale(double scale) => _db.setSetting(_keyRadarTileScale, '$scale');
+
+  // wo-cloud's own "wrm" URL parameter (see RadarPanel) - how far the
+  // embedded map is zoomed in by default, i.e. how much of the surrounding
+  // area is visible at once. Previously only ever the hardcoded default (9)
+  // RadarPanel itself used - not otherwise configurable.
+  static const defaultRadarZoom = 9;
+  static const minRadarZoom = 5;
+  static const maxRadarZoom = 13;
+
+  Future<int> getRadarZoom() async =>
+      int.tryParse(await _db.getSetting(_keyRadarZoom) ?? '') ?? defaultRadarZoom;
+
+  Future<void> setRadarZoom(int zoom) => _db.setSetting(_keyRadarZoom, '$zoom');
 
   static const defaultRadarDimming = 0.0;
 
@@ -161,6 +200,15 @@ class SettingsRepository {
       double.tryParse(await _db.getSetting(_keyRadarDimming) ?? '') ?? defaultRadarDimming;
 
   Future<void> setRadarDimming(double dimming) => _db.setSetting(_keyRadarDimming, '$dimming');
+
+  Future<bool> getSunEnabled() async => (await _db.getSetting(_keySunEnabled)) != 'false';
+
+  Future<void> setSunEnabled(bool enabled) => _db.setSetting(_keySunEnabled, '$enabled');
+
+  Future<double> getSunTileScale() async =>
+      double.tryParse(await _db.getSetting(_keySunTileScale) ?? '') ?? defaultTileScale;
+
+  Future<void> setSunTileScale(double scale) => _db.setSetting(_keySunTileScale, '$scale');
 
   // Default is intentionally below 100%: unscaled Material widget sizes look
   // oversized on a 65" TV viewed from a couch/terrace distance.
@@ -225,4 +273,8 @@ class SettingsRepository {
 
   Future<void> setDabSortMode(DabSortMode mode) => _db.setSetting(
       _keyDabSortMode, mode == DabSortMode.byAlphabet ? 'alphabet' : 'ensemble');
+
+  Future<bool> getShowClockDate() async => (await _db.getSetting(_keyShowClockDate)) == 'true';
+
+  Future<void> setShowClockDate(bool value) => _db.setSetting(_keyShowClockDate, '$value');
 }

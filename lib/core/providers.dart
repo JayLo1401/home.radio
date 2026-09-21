@@ -48,6 +48,24 @@ class DabSortModeNotifier extends Notifier<DabSortMode> {
 
 final dabSortModeProvider = NotifierProvider<DabSortModeNotifier, DabSortMode>(DabSortModeNotifier.new);
 
+/// Whether the top bar's clock also shows the current weekday+date next to
+/// the time (see _Clock in home_screen.dart).
+class ShowClockDateNotifier extends Notifier<bool> {
+  @override
+  bool build() {
+    final repo = ref.watch(settingsRepositoryProvider);
+    repo.getShowClockDate().then((v) => state = v);
+    return false;
+  }
+
+  Future<void> set(bool value) async {
+    state = value;
+    await ref.read(settingsRepositoryProvider).setShowClockDate(value);
+  }
+}
+
+final showClockDateProvider = NotifierProvider<ShowClockDateNotifier, bool>(ShowClockDateNotifier.new);
+
 /// [dabStationsStreamProvider], sorted per [dabSortModeProvider] - what
 /// FavoritesSidebar's DAB-Sender tab and DabStationsScreen actually display,
 /// so both stay consistent with each other and with the user's setting.
@@ -200,8 +218,13 @@ class WeatherDisplaySettings {
     required this.lon,
     required this.locationName,
     required this.weatherScale,
+    required this.weatherContentScale,
+    required this.weatherSpanTwoTiles,
     required this.radarScale,
+    required this.radarZoom,
     required this.radarDimming,
+    required this.sunEnabled,
+    required this.sunScale,
   });
 
   final bool weatherEnabled;
@@ -210,8 +233,22 @@ class WeatherDisplaySettings {
   final double lon;
   final String locationName;
   final double weatherScale;
+  // Independent of weatherScale (the tile's own box size) - scales the
+  // forecast content within it instead, so the tile size and how
+  // large/dense its content looks can be tuned separately. See
+  // SettingsRepository.getWeatherContentScale's own doc comment.
+  final double weatherContentScale;
+  // Whether the weather tile spans the full height of radar+sun stacked
+  // next to it, or is just a single normal-height tile itself - see
+  // SettingsRepository.getWeatherSpanTwoTiles's own doc comment.
+  final bool weatherSpanTwoTiles;
   final double radarScale;
+  // How far the embedded radar map is zoomed in by default - see
+  // SettingsRepository.getRadarZoom's own doc comment.
+  final int radarZoom;
   final double radarDimming;
+  final bool sunEnabled;
+  final double sunScale;
 
   WeatherDisplaySettings copyWith({
     bool? weatherEnabled,
@@ -220,8 +257,13 @@ class WeatherDisplaySettings {
     double? lon,
     String? locationName,
     double? weatherScale,
+    double? weatherContentScale,
+    bool? weatherSpanTwoTiles,
     double? radarScale,
+    int? radarZoom,
     double? radarDimming,
+    bool? sunEnabled,
+    double? sunScale,
   }) {
     return WeatherDisplaySettings(
       weatherEnabled: weatherEnabled ?? this.weatherEnabled,
@@ -230,8 +272,13 @@ class WeatherDisplaySettings {
       lon: lon ?? this.lon,
       locationName: locationName ?? this.locationName,
       weatherScale: weatherScale ?? this.weatherScale,
+      weatherContentScale: weatherContentScale ?? this.weatherContentScale,
+      weatherSpanTwoTiles: weatherSpanTwoTiles ?? this.weatherSpanTwoTiles,
       radarScale: radarScale ?? this.radarScale,
+      radarZoom: radarZoom ?? this.radarZoom,
       radarDimming: radarDimming ?? this.radarDimming,
+      sunEnabled: sunEnabled ?? this.sunEnabled,
+      sunScale: sunScale ?? this.sunScale,
     );
   }
 }
@@ -255,8 +302,13 @@ class WeatherDisplaySettingsNotifier extends Notifier<WeatherDisplaySettings> {
       lon: SettingsRepository.defaultLon,
       locationName: SettingsRepository.defaultLocationName,
       weatherScale: SettingsRepository.defaultTileScale,
+      weatherContentScale: SettingsRepository.defaultTileScale,
+      weatherSpanTwoTiles: true,
       radarScale: SettingsRepository.defaultTileScale,
+      radarZoom: SettingsRepository.defaultRadarZoom,
       radarDimming: SettingsRepository.defaultRadarDimming,
+      sunEnabled: true,
+      sunScale: SettingsRepository.defaultTileScale,
     );
   }
 
@@ -268,7 +320,12 @@ class WeatherDisplaySettingsNotifier extends Notifier<WeatherDisplaySettings> {
       lon: await repo.getWeatherLon(),
       locationName: await repo.getWeatherLocationName(),
       weatherScale: await repo.getWeatherTileScale(),
+      weatherContentScale: await repo.getWeatherContentScale(),
+      weatherSpanTwoTiles: await repo.getWeatherSpanTwoTiles(),
       radarScale: await repo.getRadarTileScale(),
+      radarZoom: await repo.getRadarZoom(),
+      sunEnabled: await repo.getSunEnabled(),
+      sunScale: await repo.getSunTileScale(),
       radarDimming: await repo.getRadarDimming(),
     );
   }
@@ -293,14 +350,39 @@ class WeatherDisplaySettingsNotifier extends Notifier<WeatherDisplaySettings> {
     await ref.read(settingsRepositoryProvider).setWeatherTileScale(scale);
   }
 
+  Future<void> setWeatherContentScale(double scale) async {
+    state = state.copyWith(weatherContentScale: scale);
+    await ref.read(settingsRepositoryProvider).setWeatherContentScale(scale);
+  }
+
+  Future<void> setWeatherSpanTwoTiles(bool span) async {
+    state = state.copyWith(weatherSpanTwoTiles: span);
+    await ref.read(settingsRepositoryProvider).setWeatherSpanTwoTiles(span);
+  }
+
   Future<void> setRadarScale(double scale) async {
     state = state.copyWith(radarScale: scale);
     await ref.read(settingsRepositoryProvider).setRadarTileScale(scale);
   }
 
+  Future<void> setRadarZoom(int zoom) async {
+    state = state.copyWith(radarZoom: zoom);
+    await ref.read(settingsRepositoryProvider).setRadarZoom(zoom);
+  }
+
   Future<void> setRadarDimming(double dimming) async {
     state = state.copyWith(radarDimming: dimming);
     await ref.read(settingsRepositoryProvider).setRadarDimming(dimming);
+  }
+
+  Future<void> setSunEnabled(bool enabled) async {
+    state = state.copyWith(sunEnabled: enabled);
+    await ref.read(settingsRepositoryProvider).setSunEnabled(enabled);
+  }
+
+  Future<void> setSunScale(double scale) async {
+    state = state.copyWith(sunScale: scale);
+    await ref.read(settingsRepositoryProvider).setSunTileScale(scale);
   }
 }
 

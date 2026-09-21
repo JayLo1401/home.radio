@@ -139,7 +139,7 @@ class _PlayingPulseState extends State<_PlayingPulse> with SingleTickerProviderS
 
   @override
   Widget build(BuildContext context) {
-    final color = Theme.of(context).colorScheme.primary;
+    const color = Colors.greenAccent;
     return SizedBox(
       width: 28,
       height: 24,

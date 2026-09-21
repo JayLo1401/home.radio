@@ -19,6 +19,7 @@ import 'background_layer.dart';
 import 'favorites_sidebar.dart';
 import 'now_playing_banner.dart';
 import 'radar_panel.dart';
+import 'sun_moon_panel.dart';
 import 'weather_panel.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -381,6 +382,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
+  /// Bumped on every [_playDab] call (whether from the user picking a
+  /// station or an auto-retry firing below) so a retry scheduled for one
+  /// attempt can tell whether it's since been superseded - by the user
+  /// switching stations, or by another retry already having fired - and
+  /// bail out instead of fighting over the tuner with whatever's current.
+  int _dabPlayGeneration = 0;
+
   /// Shared DAB+ playback path for both [_play] (favorites) and
   /// [_playDabStation]: tunes+decodes via the RTL-SDR/welle.io pipeline
   /// (DabRtlSdrService) and waits for the result - unlike the old
@@ -392,20 +400,37 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     required int serviceId,
     required VoidCallback onPlaying,
   }) async {
-    if (mounted) setState(() => _dabStatusText = 'Sender wird gesucht…');
+    final myGeneration = ++_dabPlayGeneration;
+    if (mounted) setState(() => _dabStatusText = 'Sender wird getunt…');
     final ok = await ref
         .read(dabRtlSdrServiceProvider)
         .playService(freqKhz: freqKhz, serviceId: serviceId);
-    if (!mounted) return;
+    if (!mounted || myGeneration != _dabPlayGeneration) return;
+    // Weak/absent reception ("Kein Signal!", server up but no usable
+    // signal on this frequency) is often transient - a brief fade, or the
+    // tuner needing another cycle - so keep retrying every second,
+    // indefinitely, rather than leaving the user stuck on a dead station
+    // until they manually reselect it. Not applied to the other two
+    // failure cases:
+    // "_dabConnectionWarning" already has its own auto-reconnect loop (see
+    // 'connectionMessage' in _onDabEvent), and "server not reachable" means
+    // there's no DAB+ source at all to retry against.
+    final noSignal = !ok && _dabConnectionWarning == null && _dabServerReady;
     setState(() {
       _dabTuned = ok;
       _dabStatusText = ok
           ? null
           : (_dabConnectionWarning ??
                 (_dabServerReady
-                    ? 'Kein Empfang auf dieser Frequenz.'
+                    ? (noSignal ? 'Kein Signal! - Versuche erneut…' : 'Kein Signal!')
                     : 'RTL-SDR-Quelle nicht erreichbar.'));
     });
+    if (noSignal) {
+      Future.delayed(const Duration(seconds: 1), () {
+        if (!mounted || myGeneration != _dabPlayGeneration) return;
+        _playDab(freqKhz: freqKhz, serviceId: serviceId, onPlaying: onPlaying);
+      });
+    }
     if (ok) onPlaying();
   }
 
@@ -654,19 +679,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 }
 
-/// Hourly forecast and rain radar as compact tiles, centered in the
-/// available area (both axes) - deliberately *not* filling the whole space
-/// (there's no need for either to be that big). Sized from a base size
-/// scaled by the user's per-tile size setting (see WeatherDisplaySettings'
-/// doc comment). Uses [Wrap] rather than a fixed [Row] specifically so more
-/// tiles can be added later (e.g. a second radar layer, a webcam) without
-/// redoing the layout - it wraps to a new centered row by itself once tiles
-/// no longer fit side by side, instead of overflowing or needing a scrollbar.
+/// Hourly forecast, rain radar and sun/moon as compact tiles, centered in
+/// the available area (both axes) - deliberately *not* filling the whole
+/// space (there's no need for any of them to be that big). Sized from a
+/// base size scaled by the user's per-tile size setting (see
+/// WeatherDisplaySettings' own doc comment).
+///
+/// The weather tile can span the full height of the other two stacked on
+/// top of each other next to it ("von ganz oben bis ganz nach unten" - see
+/// WeatherDisplaySettings.weatherSpanTwoTiles, on by default) rather than
+/// sitting in the same flow as everything else, which is why this isn't a
+/// single [Wrap] of same-sized tiles anymore: it's an explicit two-column
+/// layout, with the right column's total height (radar + sun, whichever are
+/// actually enabled) driving the left column's single tile's height so
+/// their bottoms line up - unless that setting is off, in which case the
+/// weather tile is just its own single-tile height like the other two.
 class _WeatherRadarColumn extends ConsumerWidget {
   const _WeatherRadarColumn();
 
-  // Both tiles share the same base size (widescreen, not square) so that at
-  // 100% they line up as one visually consistent group.
+  // All three tiles share the same base width (widescreen, not square) so
+  // that at 100% they line up as one visually consistent group.
   static const _tileBaseWidth = 420.0;
   static const _tileBaseHeight = 260.0;
   static const _tileRadius = 16.0;
@@ -675,39 +707,74 @@ class _WeatherRadarColumn extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(weatherDisplaySettingsProvider);
-    if (!settings.weatherEnabled && !settings.radarEnabled) {
+    if (!settings.weatherEnabled && !settings.radarEnabled && !settings.sunEnabled) {
       return const SizedBox.shrink();
     }
+
+    final rightColumnTiles = <Widget>[
+      if (settings.radarEnabled)
+        _Tile(
+          width: _tileBaseWidth * settings.radarScale,
+          height: _tileBaseHeight * settings.radarScale,
+          radius: _tileRadius,
+          child: RadarPanel(
+            lat: settings.lat,
+            lon: settings.lon,
+            zoom: settings.radarZoom,
+            dimming: settings.radarDimming,
+          ),
+        ),
+      if (settings.sunEnabled)
+        _Tile(
+          width: _tileBaseWidth * settings.sunScale,
+          height: _tileBaseHeight * settings.sunScale,
+          radius: _tileRadius,
+          child: SunMoonPanel(lat: settings.lat, lon: settings.lon, contentScale: settings.sunScale),
+        ),
+    ];
+    final rightColumnHeight = rightColumnTiles.isEmpty
+        ? 0.0
+        : [
+              if (settings.radarEnabled) _tileBaseHeight * settings.radarScale,
+              if (settings.sunEnabled) _tileBaseHeight * settings.sunScale,
+            ].reduce((a, b) => a + b) +
+            _tileGap * (rightColumnTiles.length - 1);
+
+    final weatherTile = settings.weatherEnabled
+        ? _Tile(
+            width: _tileBaseWidth * settings.weatherScale,
+            height: settings.weatherSpanTwoTiles && rightColumnHeight > 0
+                ? rightColumnHeight
+                : _tileBaseHeight * settings.weatherScale,
+            radius: _tileRadius,
+            child: WeatherPanel(
+              locationName: settings.locationName,
+              lat: settings.lat,
+              lon: settings.lon,
+              contentScale: settings.weatherContentScale,
+            ),
+          )
+        : null;
+
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
-        child: Wrap(
-          alignment: WrapAlignment.center,
-          runAlignment: WrapAlignment.center,
-          spacing: _tileGap,
-          runSpacing: _tileGap,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (settings.weatherEnabled)
-              _Tile(
-                width: _tileBaseWidth * settings.weatherScale,
-                height: _tileBaseHeight * settings.weatherScale,
-                radius: _tileRadius,
-                child: WeatherPanel(
-                  locationName: settings.locationName,
-                  lat: settings.lat,
-                  lon: settings.lon,
-                ),
-              ),
-            if (settings.radarEnabled)
-              _Tile(
-                width: _tileBaseWidth * settings.radarScale,
-                height: _tileBaseHeight * settings.radarScale,
-                radius: _tileRadius,
-                child: RadarPanel(
-                  lat: settings.lat,
-                  lon: settings.lon,
-                  dimming: settings.radarDimming,
-                ),
+            ?weatherTile,
+            if (weatherTile != null && rightColumnTiles.isNotEmpty) const SizedBox(width: _tileGap),
+            if (rightColumnTiles.isNotEmpty)
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final (i, tile) in rightColumnTiles.indexed) ...[
+                    if (i > 0) const SizedBox(height: _tileGap),
+                    tile,
+                  ],
+                ],
               ),
           ],
         ),
@@ -771,7 +838,7 @@ class _MenuBar extends StatelessWidget {
       // Same treatment as NowPlayingBanner at the bottom, so the top and
       // bottom bars read as one consistent pair framing the content.
       color: Colors.black.withValues(alpha: 0.7),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       // A Row can't center the clock against the bar's own width once the
       // left (logo/title) and right (buttons) groups are different widths -
       // it'd only ever sit in the middle of the *remaining* space between
@@ -779,7 +846,10 @@ class _MenuBar extends StatelessWidget {
       // clock centered on the whole bar gets a true center regardless of
       // how wide either side group is.
       child: SizedBox(
-        height: 36,
+        // Tall enough for the two-line logo/title group ("Home Radio" +
+        // "Powered by Jay") - was 36 (just the logo's own height) before
+        // that second line existed.
+        height: 44,
         child: Stack(
           alignment: Alignment.center,
           children: [
@@ -797,13 +867,27 @@ class _MenuBar extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 10),
-                  const Text(
-                    'Home Radio',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  const Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Home Radio',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        'Powered by Jay',
+                        style: TextStyle(
+                          color: Colors.green,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -842,24 +926,33 @@ class _MenuBar extends StatelessWidget {
 }
 
 /// Live "HH:mm" clock, ticking every second but only rebuilding when the
-/// displayed minute actually changes.
-class _Clock extends StatefulWidget {
+/// displayed minute actually changes - optionally with the current weekday
+/// and date to its left (see [showClockDateProvider]/SettingsScreen).
+class _Clock extends ConsumerStatefulWidget {
   const _Clock();
 
   @override
-  State<_Clock> createState() => _ClockState();
+  ConsumerState<_Clock> createState() => _ClockState();
 }
 
-class _ClockState extends State<_Clock> {
-  late String _text = _format(DateTime.now());
+class _ClockState extends ConsumerState<_Clock> {
+  late String _timeText = _formatTime(DateTime.now());
+  late String _dateText = _formatDate(DateTime.now());
   Timer? _timer;
 
   @override
   void initState() {
     super.initState();
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      final text = _format(DateTime.now());
-      if (text != _text) setState(() => _text = text);
+      final now = DateTime.now();
+      final time = _formatTime(now);
+      final date = _formatDate(now);
+      if (time != _timeText || date != _dateText) {
+        setState(() {
+          _timeText = time;
+          _dateText = date;
+        });
+      }
     });
   }
 
@@ -869,18 +962,52 @@ class _ClockState extends State<_Clock> {
     super.dispose();
   }
 
-  static String _format(DateTime t) =>
+  static String _formatTime(DateTime t) =>
       '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+  static const _weekdays = [
+    'Montag',
+    'Dienstag',
+    'Mittwoch',
+    'Donnerstag',
+    'Freitag',
+    'Samstag',
+    'Sonntag',
+  ];
+
+  static String _formatDate(DateTime t) {
+    final weekday = _weekdays[t.weekday - 1];
+    final day = t.day.toString().padLeft(2, '0');
+    final month = t.month.toString().padLeft(2, '0');
+    return '$weekday $day.$month.${t.year}';
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      _text,
-      style: const TextStyle(
-        color: Colors.white,
-        fontSize: 20,
-        fontWeight: FontWeight.w700,
-      ),
+    final showDate = ref.watch(showClockDateProvider);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (showDate) ...[
+          Text(
+            _dateText,
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(width: 12),
+        ],
+        Text(
+          _timeText,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
     );
   }
 }

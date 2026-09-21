@@ -11,11 +11,23 @@ import '../../data/services/geosphere_weather_service.dart';
 /// from GeoSphere Austria (see GeoSphereWeatherService's doc comment for
 /// why - Austria-specific, free, no API key).
 class WeatherPanel extends StatefulWidget {
-  const WeatherPanel({super.key, required this.locationName, required this.lat, required this.lon});
+  const WeatherPanel({
+    super.key,
+    required this.locationName,
+    required this.lat,
+    required this.lon,
+    this.contentScale = 1.0,
+  });
 
   final String locationName;
   final double lat;
   final double lon;
+
+  /// Scales the forecast content (icon/text/badge sizes, column widths)
+  /// independently of the tile's own box size (see WeatherDisplaySettings'
+  /// own doc comment for why those are kept separate) - 1.0 is this
+  /// widget's own natural/previous fixed sizing.
+  final double contentScale;
 
   @override
   State<WeatherPanel> createState() => _WeatherPanelState();
@@ -72,6 +84,7 @@ class _WeatherPanelState extends State<WeatherPanel> {
   @override
   Widget build(BuildContext context) {
     final hours = _hours;
+    final metrics = _Metrics(widget.contentScale);
     return DecoratedBox(
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -85,7 +98,7 @@ class _WeatherPanelState extends State<WeatherPanel> {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
-            child: _HeaderRow(locationName: widget.locationName),
+            child: _HeaderRow(locationName: widget.locationName, metrics: metrics),
           ),
           const SizedBox(height: 8),
           Expanded(
@@ -121,10 +134,10 @@ class _WeatherPanelState extends State<WeatherPanel> {
                             final boundaryTime = k < hours.length
                                 ? hours[k].time
                                 : hours[k - 1].time.add(const Duration(hours: 1));
-                            return _HourBoundary(time: boundaryTime);
+                            return _HourBoundary(time: boundaryTime, metrics: metrics);
                           }
                           final hour = hours[index ~/ 2];
-                          return _HourRow(hour: hour, icon: _conditionIcons[hour.condition]!);
+                          return _HourRow(hour: hour, icon: _conditionIcons[hour.condition]!, metrics: metrics);
                         },
                       ),
           ),
@@ -134,53 +147,77 @@ class _WeatherPanelState extends State<WeatherPanel> {
   }
 }
 
-// Shared column geometry between the header, the boundary lines and the
-// hour rows, so everything lines up: the boundary line's time label sits in
-// [_timeColWidth], the icon in [_iconColWidth], then temp, then the wind and
-// rain badges get equal fixed-width columns of their own (both are the same
-// kind of colour-coded pill now, so they read as one consistent pair).
-const _timeColWidth = 54.0;
-const _iconColWidth = 40.0;
-const _tempColWidth = 58.0;
-const _badgeColWidth = 108.0;
-const _colGap = 14.0;
+// Shared column geometry between the header, the boundary lines and the hour
+// rows, so everything lines up: the boundary line's time label sits in
+// timeColWidth, the icon in iconColWidth, then temp - all fixed widths, left-
+// aligned. Wind is centered in whatever space remains after that (an
+// Expanded at the call site, not a metric here), and Regen gets a fixed-
+// width column flush against the right edge - Temp left/Wind centered/Regen
+// right, rather than all three bunched up together next to the icon. The
+// badge column still comfortably fits the widest realistic content ("5.0 l",
+// "35" km/h) at scale 1.0, verified against actual glyph widths, not just
+// eyeballed. All of it scales with WeatherPanel.contentScale.
+class _Metrics {
+  const _Metrics(this.scale);
 
-/// Same size/weight as the temp column's text, per explicit request - the
-/// wind/rain badges used to run a size smaller.
-const _badgeTextStyle = TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w600);
+  final double scale;
+
+  double get timeColWidth => 54 * scale;
+  // Extra breathing room between the time label/boundary line and the
+  // icon/content that follows - previously butted right up against it.
+  double get leftGap => 8 * scale;
+  double get iconColWidth => 40 * scale;
+  double get tempColWidth => 50 * scale;
+  double get badgeColWidth => 94 * scale;
+  double get headerFontSize => 13 * scale;
+  double get boundaryFontSize => 15 * scale;
+  double get tempFontSize => 22 * scale;
+  double get badgeFontSize => 22 * scale;
+  double get badgeIconSize => 20 * scale;
+  double get locationFontSize => 16 * scale;
+  double get locationIconSize => 16 * scale;
+
+  TextStyle get badgeTextStyle =>
+      TextStyle(color: Colors.white, fontSize: badgeFontSize, fontWeight: FontWeight.w600);
+}
 
 class _HeaderRow extends StatelessWidget {
-  const _HeaderRow({required this.locationName});
+  const _HeaderRow({required this.locationName, required this.metrics});
 
   final String locationName;
-
-  static const _style = TextStyle(color: Colors.white38, fontSize: 13, fontWeight: FontWeight.w600);
+  final _Metrics metrics;
 
   @override
   Widget build(BuildContext context) {
+    final style = TextStyle(color: Colors.white38, fontSize: metrics.headerFontSize, fontWeight: FontWeight.w600);
     return Row(
       children: [
         SizedBox(
-          width: _timeColWidth + _iconColWidth + 10,
+          width: metrics.timeColWidth + metrics.leftGap + metrics.iconColWidth + 10,
           child: Row(
             children: [
-              const Icon(Icons.place_rounded, color: Colors.white70, size: 16),
+              Icon(Icons.place_rounded, color: Colors.white70, size: metrics.locationIconSize),
               const SizedBox(width: 4),
               Expanded(
                 child: Text(
                   locationName,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: metrics.locationFontSize,
+                  ),
                 ),
               ),
             ],
           ),
         ),
-        SizedBox(width: _tempColWidth, child: const Text('Temp', style: _style)),
-        const SizedBox(width: _colGap),
-        SizedBox(width: _badgeColWidth, child: const Center(child: Text('Wind km/h', style: _style))),
-        const SizedBox(width: _colGap),
-        SizedBox(width: _badgeColWidth, child: const Center(child: Text('Regen l/m²', style: _style))),
+        SizedBox(width: metrics.tempColWidth, child: Text('Temp', style: style)),
+        // Wind centered in whatever space is left between Temp and Regen,
+        // Regen flush against the card's right edge - matches how the
+        // badges themselves are now laid out below (see _HourRow).
+        Expanded(child: Center(child: Text('Wind km/h', style: style))),
+        SizedBox(width: metrics.badgeColWidth, child: Center(child: Text('Regen l/m²', style: style))),
       ],
     );
   }
@@ -190,9 +227,10 @@ class _HeaderRow extends StatelessWidget {
 /// comment on the ListView.builder above for why the label moved here
 /// instead of living on the content row itself.
 class _HourBoundary extends StatelessWidget {
-  const _HourBoundary({required this.time});
+  const _HourBoundary({required this.time, required this.metrics});
 
   final DateTime time;
+  final _Metrics metrics;
 
   @override
   Widget build(BuildContext context) {
@@ -201,12 +239,17 @@ class _HourBoundary extends StatelessWidget {
       child: Row(
         children: [
           SizedBox(
-            width: _timeColWidth,
+            width: metrics.timeColWidth,
             child: Text(
               '${time.hour.toString().padLeft(2, '0')}:00',
-              style: const TextStyle(color: Colors.white70, fontSize: 15, fontWeight: FontWeight.w700),
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: metrics.boundaryFontSize,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
+          SizedBox(width: metrics.leftGap),
           Expanded(child: Container(height: 1, color: Colors.white24)),
         ],
       ),
@@ -215,10 +258,11 @@ class _HourBoundary extends StatelessWidget {
 }
 
 class _HourRow extends StatelessWidget {
-  const _HourRow({required this.hour, required this.icon});
+  const _HourRow({required this.hour, required this.icon, required this.metrics});
 
   final HourlyForecast hour;
   final WeatherSvgIconData icon;
+  final _Metrics metrics;
 
   @override
   Widget build(BuildContext context) {
@@ -227,9 +271,10 @@ class _HourRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
-          const SizedBox(width: _timeColWidth),
+          SizedBox(width: metrics.timeColWidth),
+          SizedBox(width: metrics.leftGap),
           SizedBox(
-            width: _iconColWidth,
+            width: metrics.iconColWidth,
             // weather_svg_icons' own WeatherSvgIcon widget renders static
             // icons through flutter_svg/vector_graphics, whose <mask>
             // support is incomplete - several of this icon set's icons
@@ -245,29 +290,28 @@ class _HourRow extends StatelessWidget {
             child: full_svg.SvgPicture.asset(
               icon.assetPath,
               package: 'weather_svg_icons',
-              width: _iconColWidth,
-              height: _iconColWidth,
+              width: metrics.iconColWidth,
+              height: metrics.iconColWidth,
               semanticsLabel: icon.name,
             ),
           ),
           const SizedBox(width: 10),
           SizedBox(
-            width: _tempColWidth,
+            width: metrics.tempColWidth,
             child: Text(
               '${hour.tempC.round()}°',
-              style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w600),
+              style: TextStyle(color: Colors.white, fontSize: metrics.tempFontSize, fontWeight: FontWeight.w600),
             ),
           ),
-          const SizedBox(width: _colGap),
+          // Wind centered in whatever space is left between Temp and Regen,
+          // Regen flush against the card's right edge, rather than both
+          // badges just sitting in their own narrow columns right next to
+          // Temp - matches the header above.
+          Expanded(child: Center(child: _WindBadge(kmh: windKmh, metrics: metrics))),
           SizedBox(
-            width: _badgeColWidth,
-            child: Center(child: _WindBadge(kmh: windKmh)),
-          ),
-          const SizedBox(width: _colGap),
-          SizedBox(
-            width: _badgeColWidth,
+            width: metrics.badgeColWidth,
             child: Center(
-              child: hour.rainMmPerHour >= 0.2 ? _RainBadge(mmPerHour: hour.rainMmPerHour) : null,
+              child: hour.rainMmPerHour >= 0.2 ? _RainBadge(mmPerHour: hour.rainMmPerHour, metrics: metrics) : null,
             ),
           ),
         ],
@@ -283,9 +327,10 @@ class _HourRow extends StatelessWidget {
 /// at [_maxKmh]; text is just the number now, since the unit moved to the
 /// column header.
 class _WindBadge extends StatelessWidget {
-  const _WindBadge({required this.kmh});
+  const _WindBadge({required this.kmh, required this.metrics});
 
   final int kmh;
+  final _Metrics metrics;
 
   static const _maxKmh = 35.0;
   static const _calm = Color(0xFF4A7A6B);
@@ -296,7 +341,7 @@ class _WindBadge extends StatelessWidget {
     final t = (kmh / _maxKmh).clamp(0.0, 1.0);
     final background = Color.lerp(_calm, _strong, t)!.withValues(alpha: 0.35 + 0.55 * t);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      padding: EdgeInsets.symmetric(horizontal: 9 * metrics.scale, vertical: 4 * metrics.scale),
       decoration: BoxDecoration(
         color: background,
         borderRadius: BorderRadius.circular(20),
@@ -304,9 +349,9 @@ class _WindBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.air_rounded, color: Colors.white, size: 20),
+          Icon(Icons.air_rounded, color: Colors.white, size: metrics.badgeIconSize),
           const SizedBox(width: 4),
-          Text('$kmh', style: _badgeTextStyle),
+          Text('$kmh', style: metrics.badgeTextStyle),
         ],
       ),
     );
@@ -318,9 +363,10 @@ class _WindBadge extends StatelessWidget {
 /// rains, capped at [_maxMm]) - text/icon are always white, since even the
 /// lightest badge shade needs the contrast.
 class _RainBadge extends StatelessWidget {
-  const _RainBadge({required this.mmPerHour});
+  const _RainBadge({required this.mmPerHour, required this.metrics});
 
   final double mmPerHour;
+  final _Metrics metrics;
 
   static const _maxMm = 5.0;
   static const _lightBlue = Color(0xFF4FA3E0);
@@ -331,7 +377,7 @@ class _RainBadge extends StatelessWidget {
     final t = (mmPerHour / _maxMm).clamp(0.0, 1.0);
     final background = Color.lerp(_lightBlue, _deepBlue, t)!.withValues(alpha: 0.35 + 0.55 * t);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      padding: EdgeInsets.symmetric(horizontal: 9 * metrics.scale, vertical: 4 * metrics.scale),
       decoration: BoxDecoration(
         color: background,
         borderRadius: BorderRadius.circular(20),
@@ -339,9 +385,9 @@ class _RainBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.water_drop_rounded, color: Colors.white, size: 20),
+          Icon(Icons.water_drop_rounded, color: Colors.white, size: metrics.badgeIconSize),
           const SizedBox(width: 4),
-          Text('${mmPerHour.toStringAsFixed(1)} l', style: _badgeTextStyle),
+          Text('${mmPerHour.toStringAsFixed(1)} l', style: metrics.badgeTextStyle),
         ],
       ),
     );

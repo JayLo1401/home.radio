@@ -21,6 +21,7 @@ import java.io.FileOutputStream
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import org.json.JSONArray
 
 /**
@@ -107,6 +108,19 @@ class DabRtlSdrPlugin :
 
     private fun isRtlSdr(device: UsbDevice) = (device.vendorId to device.productId) in knownRtlSdrIds
     private var audioPlayer: DabAudioPlayer? = null
+
+    // Bumped on every "playService" call, so an in-flight retry loop (see
+    // that handler below) can tell it's been superseded by a newer request
+    // and bail out immediately instead of continuing to compete with the
+    // new one for the single shared native tuner session - fast repeated
+    // station switches (rapid manual taps, or the remote's next/previous
+    // keys) used to leave old attempts running to their full ~8s+4s
+    // timeout in the background, each one re-tuning/re-restarting the
+    // native session out from under whichever attempt was *supposed* to be
+    // current, which is exactly what made later switches in a quick
+    // sequence get progressively slower and eventually time out.
+    private val playRequestId = AtomicInteger(0)
+
     private val scanRunning = AtomicBoolean(false)
     private var scanThread: Thread? = null
     private val logoFetchRunning = AtomicBoolean(false)
@@ -635,6 +649,7 @@ class DabRtlSdrPlugin :
                 stopScanIfRunning()
                 stopLogoFetchIfRunning()
                 stopPlayback()
+                val myRequestId = playRequestId.incrementAndGet()
                 Thread {
                     /*
                      * nativePlayService() returning true only means the
@@ -657,10 +672,21 @@ class DabRtlSdrPlugin :
                      * a fresh app start specifically) before trusting it,
                      * and do one full retune+retry if none arrives.
                      */
+                    // True once a *newer* playService() call has come in -
+                    // see playRequestId's own doc comment. Checked at every
+                    // point this loop is about to do more (possibly slow)
+                    // work, so a superseded attempt gives up the shared
+                    // tuner immediately instead of continuing to fight the
+                    // new request for it.
+                    fun superseded() = playRequestId.get() != myRequestId
                     var ok = false
                     var pcmVerified = false
                     var attempt = 0
                     while (!pcmVerified && attempt < 2) {
+                        if (superseded()) {
+                            mainHandler.post { result.success(false) }
+                            return@Thread
+                        }
                         attempt++
                         nativeSetFrequency(freqKhz * 1000)
                         nativeRestart(false)
@@ -718,7 +744,7 @@ class DabRtlSdrPlugin :
                             return@Thread
                         }
                         val deadline = System.currentTimeMillis() + 8000
-                        while (!ok && System.currentTimeMillis() < deadline) {
+                        while (!ok && !superseded() && System.currentTimeMillis() < deadline) {
                             ok = nativePlayService(serviceId)
                             if (!ok) {
                                 try {
@@ -728,16 +754,24 @@ class DabRtlSdrPlugin :
                                 }
                             }
                         }
+                        if (superseded()) {
+                            mainHandler.post { result.success(false) }
+                            return@Thread
+                        }
                         if (!ok) break // never even resolved the service - retrying won't help, report it as-is
 
                         val writeCountAtStart = player.pcmWriteCount
                         val pcmDeadline = System.currentTimeMillis() + 4000
-                        while (player.pcmWriteCount == writeCountAtStart && System.currentTimeMillis() < pcmDeadline) {
+                        while (player.pcmWriteCount == writeCountAtStart && !superseded() && System.currentTimeMillis() < pcmDeadline) {
                             try {
                                 Thread.sleep(200)
                             } catch (_: InterruptedException) {
                                 break
                             }
+                        }
+                        if (superseded()) {
+                            mainHandler.post { result.success(false) }
+                            return@Thread
                         }
                         pcmVerified = player.pcmWriteCount > writeCountAtStart
                         if (!pcmVerified && attempt < 2) {
@@ -754,8 +788,15 @@ class DabRtlSdrPlugin :
                 }.start()
             }
             "stopPlayback" -> {
-                stopPlayback()
-                result.success(null)
+                // onMethodCall runs on the platform/UI thread - stopPlayback()
+                // now briefly joins the old playback thread (see
+                // DabAudioPlayer.stop()'s own comment for why), so this needs
+                // to be off the main thread the same way resetSession()
+                // already is, to avoid a visible stutter on every stop.
+                Thread {
+                    stopPlayback()
+                    mainHandler.post { result.success(null) }
+                }.start()
             }
             "resetSession" -> {
                 // Called from Dart when RtlSdrUsbService reports the known
