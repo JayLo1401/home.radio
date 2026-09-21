@@ -370,9 +370,14 @@ Future<String?> _showLogoUrlDialog(BuildContext context, {required String statio
 /// DAB+ station labels often carry decorative padding ("*GRUEN-WEISS*",
 /// stray pipes/dashes used as visual borders in the original 16-char FIG 1/1
 /// label) that a plain Radio-Browser name search won't match at all -
-/// strip everything but letters/digits/spaces first, and if that finds
-/// nothing, retry with just the first word (station names are frequently
-/// "Name slogan/suffix").
+/// strip everything but letters/digits/spaces first (this also turns
+/// dashes into spaces, since they're not in the allowed set either), and if
+/// that finds nothing, retry prefixed with "Radio " - a lot of DAB+ labels
+/// drop that word entirely (just "GRUEN-WEISS") while the station is
+/// actually catalogued under "Radio Gruen-Weiss" or similar on Radio-Browser,
+/// and this alone resolves most "no logo found" cases in practice. Only
+/// after that still comes up empty does this fall back to just the first
+/// word (station names are frequently "Name slogan/suffix").
 Future<String?> _findLogoUrl(WidgetRef ref, String stationName) async {
   final cleaned = stationName.replaceAll(RegExp(r'[^\w\säöüÄÖÜß]'), ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
   if (cleaned.isEmpty) return null;
@@ -381,6 +386,11 @@ Future<String?> _findLogoUrl(WidgetRef ref, String stationName) async {
     final results = await api.search(name: cleaned, limit: 5);
     final hit = results.where((s) => s.favicon != null && s.favicon!.isNotEmpty).firstOrNull;
     if (hit != null) return hit.favicon;
+    if (!cleaned.toLowerCase().startsWith('radio ')) {
+      final withRadio = await api.search(name: 'Radio $cleaned', limit: 5);
+      final radioHit = withRadio.where((s) => s.favicon != null && s.favicon!.isNotEmpty).firstOrNull;
+      if (radioHit != null) return radioHit.favicon;
+    }
     final firstWord = cleaned.split(' ').first;
     if (firstWord.length >= 3 && firstWord != cleaned) {
       final broader = await api.search(name: firstWord, limit: 5);

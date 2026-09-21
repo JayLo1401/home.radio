@@ -51,6 +51,7 @@ jmethodID m_onRsErrors = nullptr;
 jmethodID m_onAacErrors = nullptr;
 jmethodID m_onMot = nullptr;
 jmethodID m_onSnr = nullptr;
+jmethodID m_onConnectionMessage = nullptr;
 
 /* Attaches the calling thread to the JVM if needed. welle.io's OFDM/decoder
  * threads are created internally by the vendored library (std::thread), not
@@ -133,6 +134,22 @@ public:
             LOGW("%s %s", text.c_str(), text2.c_str());
         } else {
             LOGI("%s %s", text.c_str(), text2.c_str());
+        }
+        // Forwarded to Kotlin/Dart (2026-09-19) - this is how
+        // CRTL_TCP_Client::handleDisconnect()/receiveAndReconnect() report
+        // the TCP connection to an rtl_tcp source (e.g. our own USB-TCP
+        // service, or a separate machine like a Raspberry Pi) being lost or
+        // restored. Used to only go to logcat, so a mid-playback drop
+        // showed no UI feedback at all beyond silence - see
+        // nativeOnConnectionMessage()/home_screen.dart's _onDabEvent for
+        // where this actually reaches the Now Playing banner.
+        JNIEnv* env = attachedEnv();
+        if (env && g_listener && m_onConnectionMessage) {
+            std::string combined = text2.empty() ? text : (text + text2);
+            jstring jText = env->NewStringUTF(combined.c_str());
+            env->CallVoidMethod(g_listener, m_onConnectionMessage,
+                                 static_cast<jboolean>(level == message_level_t::Error), jText);
+            env->DeleteLocalRef(jText);
         }
     }
 
@@ -231,6 +248,7 @@ void registerListenerAndMethods(JNIEnv* env, jobject thiz)
     m_onAacErrors = env->GetMethodID(cls, "nativeOnAacErrors", "(I)V");
     m_onMot = env->GetMethodID(cls, "nativeOnMot", "([BI)V");
     m_onSnr = env->GetMethodID(cls, "nativeOnSnr", "(F)V");
+    m_onConnectionMessage = env->GetMethodID(cls, "nativeOnConnectionMessage", "(ZLjava/lang/String;)V");
     env->ExceptionClear();
 }
 
@@ -285,14 +303,22 @@ Java_org_lotzapp_home_1radio_dab_DabRtlSdrPlugin_nativeCreate(JNIEnv* env, jobje
      * CRTL_TCP_Client always forces *manual* tuner gain (see its own
      * receiveData() comment: "the AGC is implemented in software" - which
      * welle.io's GUI provides but this bridge does not) and otherwise
-     * defaults to gain index 0, the lowest step (~0 dB for the R820T) -
-     * far too little to pull DAB+ out of the noise floor. Request the
-     * highest gain step instead; getGainCount() is safe to call before any
-     * connection exists (it falls back to the R820T table, the common
-     * case, until the real tuner type is known) and the setting is
-     * re-applied automatically on every (re)connect.
+     * defaults to gain index 0, the lowest step (~0 dB for the R820T).
+     * This used to request the HIGHEST step instead, reasoning that 0 dB
+     * is too weak to pull DAB+ out of the noise floor - reverted
+     * (2026-09-19, see the same fix/reasoning in
+     * DirectRtlSdrInput::openFromFd()) after the real welle.io app
+     * reported "ADC overloaded" against the same dongle/antenna: starting
+     * at max gain means every (re)tune spends however long
+     * agcTimer()/CRTL_TCP_Client's one-step-per-tick overload response
+     * takes to walk back down feeding the OFDM decoder genuinely clipped,
+     * corrupted samples - worse than starting a bit low and letting it
+     * climb up towards the right level instead. getGainCount() is safe to
+     * call before any connection exists (falls back to the R820T table,
+     * the common case, until the real tuner type is known) and the
+     * setting is re-applied automatically on every (re)connect.
      */
-    tcpInput->setGain(tcpInput->getGainCount() - 1);
+    tcpInput->setGain(tcpInput->getGainCount() / 6);
     session->input = std::move(tcpInput);
     RadioReceiverOptions options;
     session->receiver = std::make_unique<RadioReceiver>(session->controller, *session->input, options, 1);

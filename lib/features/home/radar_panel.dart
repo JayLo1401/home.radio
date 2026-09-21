@@ -35,7 +35,10 @@ class _RadarPanelState extends State<RadarPanel> {
       ..setBackgroundColor(Colors.black)
       ..setNavigationDelegate(
         NavigationDelegate(
-          onPageFinished: (url) => debugPrint('DabProbe: RadarPanel loaded $url'),
+          onPageFinished: (url) {
+            debugPrint('DabProbe: RadarPanel loaded $url');
+            _controller.runJavaScript(_hideControlsJs);
+          },
           onWebResourceError: (error) => debugPrint(
             'DabProbe: RadarPanel error: ${error.errorCode} ${error.description} (${error.url})',
           ),
@@ -43,6 +46,37 @@ class _RadarPanelState extends State<RadarPanel> {
       )
       ..loadRequest(_radarUri(widget.lat, widget.lon, widget.zoom));
   }
+
+  /// wo-cloud's own on-map UI chrome (zoom +/-, layer switcher, the bottom
+  /// time-scrubber/playback bar, the fullscreen toggle, the legend/info
+  /// button, the distance scale bar and the "Impressum" link) - identified
+  /// via a headless-Chrome DOM dump of the live page (2026-09-21), since
+  /// it's an Angular SPA and nothing in its shipped bundles is visible from
+  /// the raw HTML/CSS alone. These are Angular custom-element tag names, not
+  /// generated/obfuscated class names, so they're stable across the app's
+  /// own minified builds. Injected as a stylesheet (not removed from the
+  /// DOM) so it keeps applying as Angular renders the page after this
+  /// point, and so the underlying widget stays fully functional (e.g.
+  /// pinch-zoom gestures) - only its own drawn controls disappear.
+  ///
+  /// The top-left clock badge is deliberately kept - it's how you can tell
+  /// the radar frame on screen is actually current, not a stale/cached one
+  /// - but its little drag-to-scrub mini-timeline underneath the time text
+  /// is itself a control, so just that part is hidden and the badge is made
+  /// non-interactive (`pointer-events: none`) so it can't be dragged.
+  static const _hideControlsJs = '''
+    (function() {
+      var css = 'wo-control-container.top-right,'
+        + 'wo-control-container.bottom,'
+        + 'wo-distance-indicator,'
+        + '.wo-imprint { display: none !important; }'
+        + 'wo-control-container.top-left wo-time-control-slider { display: none !important; }'
+        + 'wo-control-container.top-left { pointer-events: none !important; }';
+      var style = document.createElement('style');
+      style.textContent = css;
+      document.head.appendChild(style);
+    })();
+  ''';
 
   @override
   void didUpdateWidget(covariant RadarPanel oldWidget) {

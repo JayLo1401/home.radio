@@ -1,15 +1,10 @@
 package org.lotzapp.home_radio.dab
 
-import android.content.Context
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioTrack
 import android.os.Process
 import android.util.Log
-import java.io.File
-import java.io.RandomAccessFile
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.locks.ReentrantLock
 
@@ -36,7 +31,7 @@ import java.util.concurrent.locks.ReentrantLock
  * every buffer size tried. This mirrors what actually works instead of
  * guessing at another buffer size.
  */
-class DabAudioPlayer(private val dumpContext: Context? = null) {
+class DabAudioPlayer {
     /** Circular byte buffer with wraparound, guarded by [lock]. */
     private class RingBuffer(val capacity: Int) {
         private val buf = ByteArray(capacity)
@@ -122,21 +117,25 @@ class DabAudioPlayer(private val dumpContext: Context? = null) {
     private val configLock = ReentrantLock()
     private val configuring = AtomicBoolean(false)
 
-    // TEMP (2026-09-16): dumps exactly what's sent to the AudioTrack to a
-    // WAV file, so the actual playback timeline can be inspected/measured
-    // offline instead of relying on how a stutter is described by ear -
-    // requested after "is it really just small stutters?" came up.
-    private var wavOut: RandomAccessFile? = null
-    private var wavFile: File? = null
-    private var wavBytesWritten = 0L
-    private var wavSampleRate = 0
-    private var wavChannels = 0
-    private val wavMaxBytes = 8_000_000L // ~40s of 48kHz stereo 16-bit PCM
+    // Which AudioTrack instance the fade-in has already been kicked off
+    // for - see runLoop()'s own comment on why that happens there now,
+    // not right after creating the track in ensureConfigured().
+    @Volatile private var fadeStartedForTrack: AudioTrack? = null
+
+    // How many times PCM was actually handed to AudioTrack.write() - the
+    // real "is audio actually reaching the speaker" signal, as opposed to
+    // native decode merely having produced PCM (see submit()'s own doc
+    // comment: that can succeed while ensureConfigured() keeps failing -
+    // e.g. right after a fresh app start, before the audio subsystem is
+    // fully ready - leaving every chunk silently dropped with no
+    // AudioTrack to write to at all). DabRtlSdrPlugin's "playService"
+    // watches this to verify a "playing" report is actually true.
+    @Volatile private var trackWriteCount = 0L
+    val pcmWriteCount: Long get() = trackWriteCount
 
     fun start() {
         if (running) return
         running = true
-        if (dumpContext != null) startWavDump()
         thread = Thread({ runLoop() }, "DabAudioPlayer").apply { start() }
     }
 
@@ -145,7 +144,6 @@ class DabAudioPlayer(private val dumpContext: Context? = null) {
         thread?.interrupt()
         thread = null
         ringBuffer?.reset()
-        finalizeWavDump()
         releaseTrack()
     }
 
@@ -270,7 +268,24 @@ class DabAudioPlayer(private val dumpContext: Context? = null) {
             val n = ring.read(readBuf, size)
             if (n > 0) {
                 try {
-                    writePcm(readBuf, n)
+                    val track = audioTrack
+                    val written = track?.write(readBuf, 0, n) ?: -1
+                    if (written > 0) {
+                        trackWriteCount++
+                        // Kick off the fade-in on the very first real write
+                        // for this track, not back when ensureConfigured()
+                        // created it - the ring buffer needing to fill up
+                        // to chunkSize first (the check just above) means
+                        // there can be a real gap between "AudioTrack
+                        // exists" and "actual playback begins", during
+                        // which a fade timer started too early would
+                        // already be back at full volume by the time
+                        // anything audible actually starts.
+                        if (track != null && fadeStartedForTrack !== track) {
+                            fadeStartedForTrack = track
+                            fadeIn(track)
+                        }
+                    }
                 } catch (e: Exception) {
                     Log.w(TAG, "DabAudioPlayer: playback error: ${e.message}")
                 }
@@ -324,16 +339,11 @@ class DabAudioPlayer(private val dumpContext: Context? = null) {
                 .setBufferSizeInBytes(minBufSize)
                 .setTransferMode(AudioTrack.MODE_STREAM)
                 .build()
-            // Fade in over ~300ms instead of jumping straight to full volume:
-            // the ring buffer takes a moment to fill and the OFDM/AAC pipeline
-            // is still settling right after a fresh tune, so the first chunks
-            // written here are the ones most likely to contain a genuine
-            // small gap/glitch - masking that at low volume is standard
-            // practice (other DAB/radio players do the same) rather than
-            // something a buffering fix alone can get rid of.
+            // Starts silent; runLoop() kicks off the actual fade-in once
+            // real playback begins (see that function's own comment for
+            // why not here).
             newTrack.setVolume(0f)
             newTrack.play()
-            fadeIn(newTrack)
 
             val bytesPerSecond = sampleRateHz * channels * 2 // 16-bit PCM
             val ringBytes = bytesPerSecond * DabTuning.audioBufferMs / 1000
@@ -357,7 +367,7 @@ class DabAudioPlayer(private val dumpContext: Context? = null) {
 
     private fun fadeIn(track: AudioTrack) {
         Thread {
-            val steps = 30
+            val steps = 90
             val stepMs = 10L
             for (i in 1..steps) {
                 if (audioTrack !== track) return@Thread // superseded by a newer station/track
@@ -385,75 +395,9 @@ class DabAudioPlayer(private val dumpContext: Context? = null) {
         } catch (_: Exception) {
         }
         audioTrack = null
+        fadeStartedForTrack = null
         configuredSampleRate = -1
         configuredChannels = -1
-    }
-
-    private fun startWavDump() {
-        try {
-            val dir = dumpContext?.getExternalFilesDir(null)
-            val file = File(dir, "dab_audio_dump.wav")
-            val raf = RandomAccessFile(file, "rw")
-            raf.setLength(0)
-            raf.write(ByteArray(44)) // placeholder header, patched in on finalize
-            wavFile = file
-            wavOut = raf
-            wavBytesWritten = 0
-            Log.i(TAG, "WAV dump started: ${file.absolutePath}")
-        } catch (e: Exception) {
-            Log.w(TAG, "WAV dump start failed: ${e.message}")
-        }
-    }
-
-    private fun writePcm(pcm: ByteArray, len: Int) {
-        audioTrack?.write(pcm, 0, len)
-        val out = wavOut ?: return
-        if (wavBytesWritten >= wavMaxBytes) {
-            finalizeWavDump()
-            return
-        }
-        try {
-            wavSampleRate = configuredSampleRate.takeIf { it > 0 } ?: wavSampleRate
-            wavChannels = configuredChannels.takeIf { it > 0 } ?: wavChannels
-            out.write(pcm, 0, len)
-            wavBytesWritten += len
-        } catch (e: Exception) {
-            Log.w(TAG, "WAV dump write failed: ${e.message}")
-        }
-    }
-
-    private fun finalizeWavDump() {
-        val out = wavOut ?: return
-        wavOut = null
-        try {
-            val header = buildWavHeader(wavBytesWritten, wavSampleRate.takeIf { it > 0 } ?: 48000, wavChannels.takeIf { it > 0 } ?: 2)
-            out.seek(0)
-            out.write(header)
-            out.close()
-            Log.i(TAG, "WAV dump complete: ${wavFile?.absolutePath} ($wavBytesWritten bytes)")
-        } catch (e: Exception) {
-            Log.w(TAG, "WAV dump finalize failed: ${e.message}")
-        }
-    }
-
-    private fun buildWavHeader(dataLen: Long, sampleRateHz: Int, channels: Int): ByteArray {
-        val byteRate = sampleRateHz * channels * 2
-        val blockAlign = channels * 2
-        val buffer = ByteBuffer.allocate(44).order(ByteOrder.LITTLE_ENDIAN)
-        buffer.put("RIFF".toByteArray())
-        buffer.putInt((36 + dataLen).toInt())
-        buffer.put("WAVE".toByteArray())
-        buffer.put("fmt ".toByteArray())
-        buffer.putInt(16)
-        buffer.putShort(1) // PCM
-        buffer.putShort(channels.toShort())
-        buffer.putInt(sampleRateHz)
-        buffer.putInt(byteRate)
-        buffer.putShort(blockAlign.toShort())
-        buffer.putShort(16) // bits per sample
-        buffer.put("data".toByteArray())
-        buffer.putInt(dataLen.toInt())
-        return buffer.array()
     }
 
     companion object {

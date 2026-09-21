@@ -55,18 +55,19 @@ bool DirectRtlSdrInput::openFromFd(int fd)
 	}
 	// Manual gain (matches CRTL_TCP_Client - the hardware AGC is not used,
 	// this class implements the same kind of software AGC instead). Start
-	// at the HIGHEST step, same as CRTL_TCP_Client's own nativeCreate()
-	// (see dabcore_jni.cpp): 0 dB is far too weak to pull DAB+ out of the
-	// noise floor, and agcLoop() below will back off automatically if this
-	// overloads. An earlier version of this function started at a middle
-	// step "to avoid top-step oscillation before the hysteresis kicks in" -
-	// that reasoning doesn't hold up (the very first agcLoop() tick, 50ms
-	// later, already has the same overload-based decrease available) and
-	// left the tuner under-driven for extended stretches, which likely
-	// contributed to real DAB+ playback instability despite the OFDM
-	// decoder's own coarse SNR estimate still reading strong.
+	// LOW rather than at the top step. An earlier version of this function
+	// started at the highest step (reasoning: 0 dB is too weak to pull
+	// DAB+ out of the noise floor on a weak signal) - reverted (2026-09-19)
+	// after the real welle.io app, tested against the same dongle/antenna,
+	// reported "ADC overloaded" and this project's own agcLoop() below only
+	// backs an overload off one gain step per 50ms tick: starting at the
+	// top on a strong-signal setup means several hundred ms of genuinely
+	// clipped, corrupted samples on every single (re)tune before it even
+	// reaches a usable gain - actively worse for OFDM sync than a station
+	// merely being a bit weak while agcLoop() climbs up towards the right
+	// level from here, which is the safer direction to start from wrong in.
 	rtlsdr_set_tuner_gain_mode(dev, 1);
-	int startIndex = gainTable.empty() ? 0 : static_cast<int>(gainTable.size()) - 1;
+	int startIndex = gainTable.empty() ? 0 : static_cast<int>(gainTable.size()) / 6;
 	gainIndex.store(startIndex);
 	if (!gainTable.empty()) {
 		rtlsdr_set_tuner_gain(dev, gainTable[startIndex]);
@@ -123,6 +124,15 @@ void DirectRtlSdrInput::readLoop()
 	rtlsdr_reset_buffer(dev);
 	int r = rtlsdr_read_async(dev, &DirectRtlSdrInput::rtlsdrCallbackStatic, this, 0, 0);
 	LOGI("readLoop: rtlsdr_read_async returned %d", r);
+	// A retry-on-failure version of this loop was tried here (2026-09-19)
+	// after a Xiaomi Mi Box repeatedly hit rtlsdr_read_async() returning
+	// -1/LIBUSB_ERROR_IO - but it made that device's playback go from
+	// "plays, audibly choppy" to producing no audio at all. Immediately
+	// re-issuing rtlsdr_read_async() (plus rtlsdr_reset_buffer()) right
+	// after a failure likely raced against agcLoop()'s own concurrent USB
+	// control transfers (gain changes) on the same already-marginal
+	// connection, making the instability worse instead of recovering from
+	// it. Reverted; a failure here still ends the session same as before.
 }
 
 int64_t DirectRtlSdrInput::nowUs()

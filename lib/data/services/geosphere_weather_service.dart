@@ -53,11 +53,20 @@ class GeoSphereWeatherService {
     final u10m = series('u10m');
     final v10m = series('v10m');
     final tcc = series('tcc');
-    final cutoff = _cutoff(DateTime.now());
+    final now = DateTime.now();
+    final cutoff = _cutoff(now);
+    // The API returns the whole day starting near midnight, not "from now" -
+    // nothing filtered out hours already in the past, so a user checking in
+    // the afternoon saw the morning's (long-stale, since-revised) forecast
+    // at the top of the list instead of the current hour. Only keep the
+    // current hour onward (truncated to the hour, so "now" itself isn't
+    // dropped for being a few minutes into it).
+    final currentHour = DateTime(now.year, now.month, now.day, now.hour);
 
     final result = <HourlyForecast>[];
     for (var i = 0; i < timestamps.length; i++) {
       final time = DateTime.parse(timestamps[i]).toLocal();
+      if (time.isBefore(currentHour)) continue;
       if (time.isAfter(cutoff)) break;
       final temp = t2m[i] ?? 0;
       // rr_acc is accumulated since forecast start - the hourly amount is

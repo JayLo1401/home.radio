@@ -702,7 +702,7 @@ class DabUsbPlugin :
         // earlier debugging session - synchronous file I/O on the playback
         // thread for every PCM chunk is exactly the kind of extra work that
         // has no business being in the real playback path.
-        val player = DabAudioPlayer(null).also { it.start() }
+        val player = DabAudioPlayer().also { it.start() }
         audioPlayer = player
         var framesFed = 0L
         var ausDecoded = 0L

@@ -1,6 +1,25 @@
 cmake_minimum_required(VERSION 3.18.1)
 project(dabnative)
 
+# The Android NDK does NOT enable NEON SIMD by default for the armeabi-v7a
+# (32-bit ARM) target - unlike arm64-v8a, where NEON/ASIMD is mandatory per
+# the AArch64 spec and always on, 32-bit ARM only gets it if explicitly
+# requested. Everything built here - welle.io's OFDM/FFT/Viterbi DSP code,
+# fdk-aac's decoder - is exactly the kind of floating-point-heavy work NEON
+# accelerates.
+#
+# This was added, then reverted (2026-09-19) while chasing a 32-bit-only
+# Android TV box's 100% Reed-Solomon failure rate, on the (wrong)
+# suspicion that NEON auto-vectorization was introducing an unaligned-
+# access correctness bug. Re-enabled (2026-09-21) once the real causes
+# (ADC-overload initial gain, an unoptimized debug build) were found and
+# fixed instead - confirmed the RS failures persisted identically with
+# NEON on AND off, clearing it. Back in for the real, unrelated
+# performance benefit it was always expected to give this target.
+if(ANDROID_ABI STREQUAL "armeabi-v7a")
+    add_compile_options(-mfpu=neon -mfloat-abi=softfp)
+endif()
+
 # Fraunhofer FDK AAC (fdk-aac/, vendored from github.com/mstorsjo/fdk-aac
 # v2.0.3) - the same production-grade AAC decoder DABlin/OMRI-based DAB+
 # players use (and that many Android builds ship for MediaCodec itself),

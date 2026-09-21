@@ -41,6 +41,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   // image from a previous station never lingers.
   String? _liveMotLogoPath;
 
+  // Shown (in place of the normal DAB subtitle, styled as an error) when
+  // the rtl_tcp source connection drops mid-playback (see
+  // DabRtlSdrPlugin.nativeOnConnectionMessage/CRTL_TCP_Client's own
+  // handleDisconnect()/receiveAndReconnect(), which now keeps retrying on
+  // its own) - cleared again once a reconnect succeeds.
+  String? _dabConnectionWarning;
+
   @override
   void initState() {
     super.initState();
@@ -87,6 +94,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         // comment for why this deliberately does NOT touch the station's
         // persistent logo/DB row).
         setState(() => _liveMotLogoPath = event['path'] as String);
+      case 'connectionMessage':
+        // Deliberately not guarded on _dabTuned (unlike the cases above):
+        // a manual retry after a drop resets _dabTuned to false *before*
+        // calling playService() again (see _play()/_playDabStation()'s own
+        // reset block), so a guard here would silently swallow exactly the
+        // events that explain why that retry is failing - _playDab() below
+        // prefers this message over its own generic "Kein Empfang"/
+        // "Quelle nicht erreichbar" text once it's set.
+        final isError = event['isError'] as bool? ?? false;
+        setState(() {
+          _dabConnectionWarning =
+              isError ? 'Verbindung zur RTL-SDR-Quelle verloren - versuche erneut zu verbinden…' : null;
+        });
     }
   }
 
@@ -232,6 +252,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       _dabTuned = false;
       _dabSnrDb = null;
       _liveMotLogoPath = null;
+      _dabConnectionWarning = null;
     });
     ref.read(currentDabStationProvider.notifier).set(null);
     ref.read(currentProgramNumberProvider.notifier).set(channel.programNumber);
@@ -266,6 +287,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       _dabTuned = false;
       _dabSnrDb = null;
       _liveMotLogoPath = null;
+      _dabConnectionWarning = null;
     });
     ref.read(currentProgramNumberProvider.notifier).set(null);
     ref.read(currentDabStationProvider.notifier).set((freqKhz: station.freqKhz, serviceId: station.serviceId));
@@ -297,7 +319,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       _dabTuned = ok;
       _dabStatusText = ok
           ? null
-          : (_dabServerReady ? 'Kein Empfang auf dieser Frequenz.' : 'RTL-SDR-Quelle nicht erreichbar.');
+          : (_dabConnectionWarning ??
+              (_dabServerReady ? 'Kein Empfang auf dieser Frequenz.' : 'RTL-SDR-Quelle nicht erreichbar.'));
     });
     if (ok) onPlaying();
   }
@@ -323,7 +346,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         (_playerState?.processingState == ProcessingState.buffering ||
             _playerState?.processingState == ProcessingState.loading);
     final subtitle = isDab ? _dabStatusText : _icyTitle;
-    final errorMessage = isDab ? null : _playbackError;
+    final errorMessage = isDab ? _dabConnectionWarning : _playbackError;
 
     return Scaffold(
       body: Stack(

@@ -143,6 +143,18 @@ class DabRtlSdrPlugin :
 
     // --- callbacks invoked FROM native code (see dabcore_jni.cpp's
     // GetMethodID calls) - names/signatures must match exactly. ---
+
+    // Counts real audio callbacks so "playService" (see onMethodCall) can
+    // (used to also carry a logcat line per native callback here - sync
+    // change, RS/AAC error counts, PCM-call counting - added while chasing
+    // a device-specific "reports playing, zero PCM ever delivered" bug
+    // (2026-09-19). Removed now that the actual root causes (ADC-overload
+    // initial gain, an unoptimized debug build) are understood and fixed;
+    // "playService"'s own playback verification below uses
+    // DabAudioPlayer.pcmWriteCount now instead, a stronger signal than a
+    // plain PCM-arrived counter here ever was - see that field's own doc
+    // comment for why.)
+
     private fun nativeOnSyncChange(sync: Boolean) {
         emit(mapOf("type" to "syncChange", "sync" to sync))
     }
@@ -157,6 +169,19 @@ class DabRtlSdrPlugin :
 
     private fun nativeOnDynamicLabel(label: String) {
         emit(mapOf("type" to "dynamicLabel", "label" to label))
+    }
+
+    /**
+     * The rtl_tcp source connection was lost/restored/failed to (re)connect
+     * (see CRTL_TCP_Client::handleDisconnect()/receiveAndReconnect() in
+     * rtl_tcp.cpp - it now keeps retrying on its own instead of giving up
+     * after one failed attempt, see that function's own comment). TCP-only:
+     * direct-USB mode has no server connection to lose, so this never fires
+     * there.
+     */
+    private fun nativeOnConnectionMessage(isError: Boolean, message: String) {
+        Log.i(TAG, "nativeOnConnectionMessage: isError=$isError message=$message")
+        emit(mapOf("type" to "connectionMessage", "isError" to isError, "message" to message))
     }
 
     private fun nativeOnAudioPcm(pcm: ByteArray, sampleRate: Int, channels: Int) {
@@ -610,49 +635,87 @@ class DabRtlSdrPlugin :
                 stopScanIfRunning()
                 stopLogoFetchIfRunning()
                 stopPlayback()
-                nativeSetFrequency(freqKhz * 1000)
-                nativeRestart(false)
                 Thread {
-                    // Give the OFDM processor a moment to (re-)sync and
-                    // populate the FIC/service list before asking it to
-                    // resolve+play a specific service - playService()
-                    // returning false the instant after restart() would
-                    // otherwise be the common case, not a real failure.
-                    //
-                    // A single fixed 2.5s sleep then one attempt used to be
-                    // the whole story here - fine on an already-warmed-up
-                    // session, but how long OFDM sync/FIC-subchannel
-                    // resolution actually takes varies a lot per channel
-                    // (scanBand3() already accounts for this with its own
-                    // adaptive per-channel timing) and is worst right after
-                    // a cold app start (fresh AGC convergence, no prior lock
-                    // on anything) - exactly when this showed up as "Kein
-                    // Empfang auf dieser Frequenz" on the very first
-                    // autostart. Retry for longer instead of giving up after
-                    // one shot.
-                    try {
-                        Thread.sleep(1500)
-                    } catch (_: InterruptedException) {
-                        return@Thread
-                    }
-                    val player = DabAudioPlayer(null).also { it.start() }
-                    audioPlayer = player
+                    /*
+                     * nativePlayService() returning true only means the
+                     * service was resolved and registered for MSC decode -
+                     * it is NOT proof that real audio is actually flowing.
+                     * DLS/PAD text can still arrive on a mostly-broken
+                     * tune (observed: banner shows real radiotext, but
+                     * never any sound), which used to leave the UI stuck
+                     * reporting "playing" indefinitely. Manually re-
+                     * selecting the same station always fixed it, i.e. a
+                     * full fresh tune+decode init was enough - so retry
+                     * that automatically instead of requiring the user to
+                     * notice and do it by hand: after a "successful"
+                     * playService(), wait briefly for at least one chunk to
+                     * actually reach AudioTrack.write() (see
+                     * DabAudioPlayer.pcmWriteCount's own doc comment for why
+                     * this checks that and not just "did native decode
+                     * produce PCM" - that alone wasn't a strong enough
+                     * signal either, seen failing the same way right after
+                     * a fresh app start specifically) before trusting it,
+                     * and do one full retune+retry if none arrives.
+                     */
                     var ok = false
-                    val deadline = System.currentTimeMillis() + 8000
-                    while (!ok && System.currentTimeMillis() < deadline) {
-                        ok = nativePlayService(serviceId)
-                        if (!ok) {
+                    var pcmVerified = false
+                    var attempt = 0
+                    while (!pcmVerified && attempt < 2) {
+                        attempt++
+                        nativeSetFrequency(freqKhz * 1000)
+                        nativeRestart(false)
+                        val player = DabAudioPlayer().also { it.start() }
+                        audioPlayer = player
+                        ok = false
+                        // Used to be a blind 1.5s sleep before the first
+                        // playService() attempt at all, on top of this same
+                        // retry loop below - on a station that syncs/
+                        // resolves its FIC data quickly, that was 1.5s of
+                        // pure dead time nothing needed. Poll from
+                        // (almost) the instant restart() is issued instead;
+                        // a station that's genuinely slow to lock still
+                        // gets the same ~8s ceiling as before, a fast one
+                        // now starts noticeably sooner. The 200ms poll
+                        // interval (down from 500ms) trims a bit more off
+                        // the typical case too.
+                        try {
+                            Thread.sleep(150)
+                        } catch (_: InterruptedException) {
+                            return@Thread
+                        }
+                        val deadline = System.currentTimeMillis() + 8000
+                        while (!ok && System.currentTimeMillis() < deadline) {
+                            ok = nativePlayService(serviceId)
+                            if (!ok) {
+                                try {
+                                    Thread.sleep(200)
+                                } catch (_: InterruptedException) {
+                                    break
+                                }
+                            }
+                        }
+                        if (!ok) break // never even resolved the service - retrying won't help, report it as-is
+
+                        val writeCountAtStart = player.pcmWriteCount
+                        val pcmDeadline = System.currentTimeMillis() + 4000
+                        while (player.pcmWriteCount == writeCountAtStart && System.currentTimeMillis() < pcmDeadline) {
                             try {
-                                Thread.sleep(500)
+                                Thread.sleep(200)
                             } catch (_: InterruptedException) {
                                 break
                             }
                         }
+                        pcmVerified = player.pcmWriteCount > writeCountAtStart
+                        if (!pcmVerified && attempt < 2) {
+                            Log.w(TAG, "playService: 'playing' but no PCM arrived, retrying full tune (attempt $attempt)")
+                            stopPlayback()
+                        }
                     }
-                    currentContext = if (ok) freqKhz to serviceId else null
+                    val reallyOk = ok && pcmVerified
+                    currentContext = if (reallyOk) freqKhz to serviceId else null
                     mainHandler.post {
-                        emit(mapOf("type" to "playbackStatus", "status" to if (ok) "playing" else "error"))
-                        result.success(ok)
+                        emit(mapOf("type" to "playbackStatus", "status" to if (reallyOk) "playing" else "error"))
+                        result.success(reallyOk)
                     }
                 }.start()
             }

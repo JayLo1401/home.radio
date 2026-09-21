@@ -1,13 +1,22 @@
 <#
 .SYNOPSIS
-    Builds the debug APK and installs it on one or more selected adb devices.
+    Builds the debug or release APK and installs it on one or more selected
+    adb devices.
 
 .DESCRIPTION
     Lists every device currently visible to `adb devices` (with model/
     manufacturer looked up per device so they're actually distinguishable -
     plain serials/hostnames aren't), lets you pick one, several, or all of
-    them, builds the debug APK via Gradle, then installs it on each chosen
+    them, builds the chosen APK via Gradle, then installs it on each chosen
     device in turn.
+
+.PARAMETER Release
+    Build/install the release APK instead of debug. The native C++ DAB+
+    decoder (OFDM/FFT/Viterbi/Reed-Solomon) compiles with zero optimization
+    (-O0) in a debug build - release enables normal compiler optimization,
+    which matters a lot for that code specifically. Uses the debug signing
+    config (see app/build.gradle.kts), so no separate release keystore is
+    needed for this kind of on-device testing.
 
 .PARAMETER SkipBuild
     Install the most recently built APK without rebuilding first.
@@ -15,13 +24,17 @@
 .EXAMPLE
     ./scripts/deploy.ps1
 .EXAMPLE
-    ./scripts/deploy.ps1 -SkipBuild
+    ./scripts/deploy.ps1 -Release
+.EXAMPLE
+    ./scripts/deploy.ps1 -Release -SkipBuild
 #>
 param(
+    [switch]$Release,
     [switch]$SkipBuild
 )
 
 $ErrorActionPreference = 'Stop'
+$variant = if ($Release) { 'release' } else { 'debug' }
 
 function Find-Adb {
     $cmd = Get-Command adb -ErrorAction SilentlyContinue
@@ -39,7 +52,7 @@ function Find-Adb {
 
 $adb = Find-Adb
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$apkPath = Join-Path $repoRoot "build\app\outputs\apk\debug\app-debug.apk"
+$apkPath = Join-Path $repoRoot "build\app\outputs\apk\$variant\app-$variant.apk"
 
 # --- Discover devices -------------------------------------------------
 $rawDevices = & $adb devices | Select-Object -Skip 1 | Where-Object { $_.Trim() -ne "" }
@@ -102,10 +115,11 @@ if ($chosen.Count -eq 0) {
 # --- Build --------------------------------------------------------------
 if (-not $SkipBuild) {
     Write-Host ""
-    Write-Host "Baue Debug-APK..." -ForegroundColor Cyan
+    Write-Host ("Baue {0}-APK..." -f $variant) -ForegroundColor Cyan
     Push-Location $repoRoot
     try {
-        & "$repoRoot\android\gradlew.bat" -p android ":app:assembleDebug"
+        $gradleTask = if ($Release) { ":app:assembleRelease" } else { ":app:assembleDebug" }
+        & "$repoRoot\android\gradlew.bat" -p android $gradleTask
         if ($LASTEXITCODE -ne 0) { throw "Gradle build failed (exit code $LASTEXITCODE)." }
     } finally {
         Pop-Location
@@ -119,7 +133,7 @@ if (-not (Test-Path $apkPath)) {
 # --- Install --------------------------------------------------------------
 Write-Host ""
 foreach ($d in $chosen) {
-    Write-Host ("Installiere auf {0} {1} ({2})..." -f $d.Manufacturer, $d.Model, $d.Serial) -ForegroundColor Cyan
+    Write-Host ("Installiere {0}-APK auf {1} {2} ({3})..." -f $variant, $d.Manufacturer, $d.Model, $d.Serial) -ForegroundColor Cyan
     & $adb -s $d.Serial install -r $apkPath
     if ($LASTEXITCODE -eq 0) {
         Write-Host "  OK" -ForegroundColor Green

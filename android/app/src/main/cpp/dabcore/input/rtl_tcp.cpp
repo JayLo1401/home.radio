@@ -30,6 +30,7 @@
  *
  */
 
+#include <chrono>
 #include <iostream>
 #include <sys/time.h>
 #ifdef __ANDROID__
@@ -469,18 +470,36 @@ void CRTL_TCP_Client::receiveAndReconnect()
                 }
                 firstData = true;
                 reset(); // Clear buffers
+
+                radioController.onMessage(message_level_t::Information,
+                        QT_TRANSLATE_NOOP("CRadioController", "Connected to server "),
+                        serverAddress + ":" + std::to_string(serverPort));
             }
             else {
                 std::clog << "RTL_TCP_CLIENT: Could not connect to server" <<
                     std::endl;
 
-                agcRunning = false;
-                rtlsdrRunning = false;
+                /*
+                 * Fixed for home_radio (2026-09-19): this used to set
+                 * rtlsdrRunning = false on ANY failed connect attempt -
+                 * including a plain reconnect after the server dropped
+                 * mid-playback (handleDisconnect() only sets connected =
+                 * false, it doesn't touch rtlsdrRunning) - meaning a single
+                 * failed reconnect gave up forever, with the app never
+                 * automatically recovering even once the server (e.g. the
+                 * rtl_tcp instance on a separate Raspberry Pi) came back.
+                 * Keep retrying instead, with a short backoff so a
+                 * persistently unreachable server doesn't spin this thread
+                 * at 100% CPU; only stop()/nativeStop() should end this
+                 * loop now.
+                 */
                 lock.unlock();
 
                 radioController.onMessage(message_level_t::Error,
                         QT_TRANSLATE_NOOP("CRadioController", "Connection failed to server "),
                         serverAddress + ":" + std::to_string(serverPort));
+
+                std::this_thread::sleep_for(std::chrono::seconds(2));
             }
         }
 
