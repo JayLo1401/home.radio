@@ -9,6 +9,7 @@ import '../dab_stations/dab_stations_screen.dart';
 import '../rtlsdr/rtl_sdr_test_screen.dart';
 import '../shared/rename_dialog.dart';
 import 'location_settings_screen.dart';
+import 'order_settings_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -137,6 +138,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Widget build(BuildContext context) {
     final favorites = ref.watch(favoritesStreamProvider).value ?? const <FavoriteChannel>[];
     final locationName = ref.watch(weatherDisplaySettingsProvider).locationName;
+    final orderSettings = ref.watch(orderSettingsProvider);
     final repo = ref.read(settingsRepositoryProvider);
 
     if (!_loaded) {
@@ -376,6 +378,51 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   label: 'Abdunkeln (für abends)',
                   valueLabel: '${(_radarDimming * 100).round()} %',
                   onChange: (d) => _changeRadarDimming(d * 0.1),
+                ),
+              ],
+            ),
+            tileGroup(
+              title: 'Bestellung (nur an Bestelltagen)',
+              enabled: orderSettings.enabled,
+              onToggleEnabled: (v) => ref.read(orderSettingsProvider.notifier).setEnabled(v),
+              children: [
+                FocusTraversalOrder(
+                  order: NumericFocusOrder(nextOrder()),
+                  child: _TvChoiceTile(
+                    label: orderSettings.user.isEmpty || orderSettings.password.isEmpty
+                        ? 'Verbindung einrichten (noch nicht angemeldet)'
+                        : 'Verbindung einrichten (${orderSettings.user})',
+                    selected: false,
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const OrderSettingsScreen()),
+                    ),
+                  ),
+                ),
+                scaleRow(
+                  label: 'Aktualisieren alle',
+                  valueLabel: '${orderSettings.pollSeconds} s',
+                  onChange: (d) =>
+                      ref.read(orderSettingsProvider.notifier).setPollSeconds(orderSettings.pollSeconds + d * 5),
+                ),
+                scaleRow(
+                  label: 'Anzeigedauer „Bitte abholen“',
+                  valueLabel: '${orderSettings.pickupDisplaySeconds} s',
+                  onChange: (d) => ref
+                      .read(orderSettingsProvider.notifier)
+                      .setPickupDisplaySeconds(orderSettings.pickupDisplaySeconds + d * 10),
+                ),
+                tileToggle(
+                  'Ton bei „Bitte abholen“',
+                  orderSettings.pickupSound,
+                  (v) => ref.read(orderSettingsProvider.notifier).setPickupSound(v),
+                ),
+                FocusTraversalOrder(
+                  order: NumericFocusOrder(nextOrder()),
+                  child: _TvChoiceTile(
+                    label: '„Bitte abholen“ testen',
+                    selected: false,
+                    onTap: () => ref.read(pickupProvider.notifier).showDemo(),
+                  ),
                 ),
               ],
             ),

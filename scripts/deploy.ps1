@@ -50,6 +50,38 @@ function Find-Adb {
     throw "adb.exe not found. Set ANDROID_HOME or add platform-tools to PATH."
 }
 
+# Gradle needs JDK 17+, but without JAVA_HOME gradlew just takes whatever
+# `java` is first on PATH - often an old Oracle Java 8 (java8path). Prefer
+# an explicitly set JAVA_HOME if it's new enough, otherwise Android Studio's
+# bundled JBR (the same JDK Flutter/Android Studio builds with).
+function Get-JavaMajorVersion([string]$javaHome) {
+    $releaseFile = Join-Path $javaHome "release"
+    if (-not (Test-Path $releaseFile)) { return 0 }
+    $line = Select-String -Path $releaseFile -Pattern '^JAVA_VERSION="(\d+)(?:\.(\d+))?' | Select-Object -First 1
+    if (-not $line) { return 0 }
+    $major = [int]$line.Matches[0].Groups[1].Value
+    # Java 8 and older report "1.8.0_xxx".
+    if ($major -eq 1) { $major = [int]$line.Matches[0].Groups[2].Value }
+    return $major
+}
+
+function Set-BuildJavaHome {
+    if ($env:JAVA_HOME -and (Get-JavaMajorVersion $env:JAVA_HOME) -ge 17) { return }
+    $candidates = @(
+        "$env:ProgramFiles\Android\Android Studio\jbr",
+        "$env:LOCALAPPDATA\Programs\Android Studio\jbr",
+        "$env:ProgramFiles\Android\Android Studio\jre"
+    )
+    foreach ($c in $candidates) {
+        if ((Get-JavaMajorVersion $c) -ge 17) {
+            $env:JAVA_HOME = $c
+            Write-Host "Verwende JDK: $c" -ForegroundColor DarkGray
+            return
+        }
+    }
+    throw "Kein JDK 17+ gefunden. JAVA_HOME auf ein JDK 17+ setzen (z.B. Android Studio\jbr)."
+}
+
 $adb = Find-Adb
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $apkPath = Join-Path $repoRoot "build\app\outputs\apk\$variant\app-$variant.apk"
@@ -116,6 +148,7 @@ if ($chosen.Count -eq 0) {
 if (-not $SkipBuild) {
     Write-Host ""
     Write-Host ("Baue {0}-APK..." -f $variant) -ForegroundColor Cyan
+    Set-BuildJavaHome
     Push-Location $repoRoot
     try {
         $gradleTask = if ($Release) { ":app:assembleRelease" } else { ":app:assembleDebug" }

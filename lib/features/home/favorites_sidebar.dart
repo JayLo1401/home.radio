@@ -1,10 +1,10 @@
 import 'dart:io';
 
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers.dart';
+import '../../core/retrying_network_image.dart';
 import '../../core/theme.dart';
 import '../../data/db/database.dart' show DabStation;
 import '../../data/models/favorite_channel.dart';
@@ -489,13 +489,13 @@ class _Logo extends StatelessWidget {
     if (url != null) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(8),
-        child: CachedNetworkImage(
+        child: RetryingNetworkImage(
           imageUrl: url,
           width: size,
           height: size,
           fit: BoxFit.cover,
-          placeholder: (_, _) => placeholder,
-          errorWidget: (_, _, _) => placeholder,
+          placeholder: (_) => placeholder,
+          errorWidget: (_) => placeholder,
         ),
       );
     }

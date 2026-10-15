@@ -6,6 +6,7 @@ import 'package:weather_svg_icons/weather_svg_icons.dart';
 
 import '../../data/models/hourly_forecast.dart';
 import '../../data/services/geosphere_weather_service.dart';
+import '../../data/services/sun_moon_service.dart';
 
 /// Vertical (top-to-bottom) hourly forecast for the rest of today, sourced
 /// from GeoSphere Austria (see GeoSphereWeatherService's doc comment for
@@ -55,15 +56,34 @@ class _WeatherPanelState extends State<WeatherPanel> {
   @override
   void dispose() {
     _refreshTimer?.cancel();
+    _retryTimer?.cancel();
     super.dispose();
   }
 
+  // Retries a failed load on its own (5s, 10s, 20s, ... capped at 60s)
+  // instead of waiting for the next 30-minute refresh - on autostart right
+  // after boot the network is often not up yet, which used to leave the
+  // tile stuck on "Wetter nicht verfügbar" for half an hour.
+  Timer? _retryTimer;
+  int _failedAttempts = 0;
+
   Future<void> _load() async {
+    _retryTimer?.cancel();
     try {
       final hours = await _service.getHourlyForecast(lat: widget.lat, lon: widget.lon);
-      if (mounted) setState(() => _hours = hours);
+      _failedAttempts = 0;
+      if (mounted) {
+        setState(() {
+          _hours = hours;
+          _error = null;
+        });
+      }
     } catch (e) {
-      if (mounted) setState(() => _error = e.toString());
+      if (!mounted) return;
+      setState(() => _error = e.toString());
+      final delaySeconds = (5 * (1 << _failedAttempts)).clamp(5, 60);
+      _failedAttempts = (_failedAttempts + 1).clamp(0, 4);
+      _retryTimer = Timer(Duration(seconds: delaySeconds), _load);
     }
   }
 
@@ -80,6 +100,28 @@ class _WeatherPanelState extends State<WeatherPanel> {
     WeatherCondition.pouring: WeatherSvgIcons.extremeRain,
     WeatherCondition.snowy: WeatherSvgIcons.snow,
   };
+
+  // Night variants (moon instead of sun) for the conditions whose day icon
+  // actually shows a sun - the rest (overcast/rain/snow) have no sun to swap.
+  static const _nightConditionIcons = {
+    WeatherCondition.clear: WeatherSvgIcons.clearNight,
+    WeatherCondition.mostlyClear: WeatherSvgIcons.mostlyClearNight,
+    WeatherCondition.partlyCloudy: WeatherSvgIcons.partlyCloudyNight,
+  };
+
+  final _sunMoonService = SunMoonService();
+
+  /// Whether [hour]'s interval (it's an hourly average starting at
+  /// hour.time - see the ListView's own doc comment) is mostly at night,
+  /// judged by its midpoint against that day's sunrise/sunset.
+  bool _isNight(HourlyForecast hour) {
+    final mid = hour.time.add(const Duration(minutes: 30));
+    final times = _sunMoonService.sunTimes(date: mid, lat: widget.lat, lon: widget.lon);
+    return mid.isBefore(times.sunrise) || mid.isAfter(times.sunset);
+  }
+
+  WeatherSvgIconData _iconFor(HourlyForecast hour) =>
+      (_isNight(hour) ? _nightConditionIcons[hour.condition] : null) ?? _conditionIcons[hour.condition]!;
 
   @override
   Widget build(BuildContext context) {
@@ -105,7 +147,10 @@ class _WeatherPanelState extends State<WeatherPanel> {
             child: hours == null
                 ? Center(
                     child: _error != null
-                        ? const Text('Wetter nicht verfügbar', style: TextStyle(color: Colors.white54, fontSize: 12))
+                        ? const Text(
+                            'Wetter nicht verfügbar - versuche erneut…',
+                            style: TextStyle(color: Colors.white54, fontSize: 12),
+                          )
                         : const SizedBox(
                             width: 20,
                             height: 20,
@@ -137,7 +182,7 @@ class _WeatherPanelState extends State<WeatherPanel> {
                             return _HourBoundary(time: boundaryTime, metrics: metrics);
                           }
                           final hour = hours[index ~/ 2];
-                          return _HourRow(hour: hour, icon: _conditionIcons[hour.condition]!, metrics: metrics);
+                          return _HourRow(hour: hour, icon: _iconFor(hour), metrics: metrics);
                         },
                       ),
           ),

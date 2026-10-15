@@ -18,6 +18,7 @@ import '../settings/settings_screen.dart';
 import 'background_layer.dart';
 import 'favorites_sidebar.dart';
 import 'now_playing_banner.dart';
+import 'order_panel.dart';
 import 'radar_panel.dart';
 import 'sun_moon_panel.dart';
 import 'weather_panel.dart';
@@ -416,6 +417,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     // 'connectionMessage' in _onDabEvent), and "server not reachable" means
     // there's no DAB+ source at all to retry against.
     final noSignal = !ok && _dabConnectionWarning == null && _dabServerReady;
+    // An rtl_tcp source over the network that couldn't be reached at all -
+    // most commonly an autostart right after boot, before the network is
+    // up, which used to leave this stuck on "nicht erreichbar" for good.
+    // Direct-USB mode is excluded: it has no network dependency, and a
+    // replugged dongle already re-inits via _onUsbDeviceEvent.
+    final sourceUnreachable =
+        !ok &&
+        _dabConnectionWarning == null &&
+        !_dabServerReady &&
+        !await ref.read(settingsRepositoryProvider).getRtlSdrAutoStartOwnService();
+    if (!mounted || myGeneration != _dabPlayGeneration) return;
     setState(() {
       _dabTuned = ok;
       _dabStatusText = ok
@@ -423,10 +435,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           : (_dabConnectionWarning ??
                 (_dabServerReady
                     ? (noSignal ? 'Kein Signal! - Versuche erneut…' : 'Kein Signal!')
-                    : 'RTL-SDR-Quelle nicht erreichbar.'));
+                    : (sourceUnreachable
+                          ? 'RTL-SDR-Quelle nicht erreichbar - versuche erneut…'
+                          : 'RTL-SDR-Quelle nicht erreichbar.')));
     });
     if (noSignal) {
       Future.delayed(const Duration(seconds: 1), () {
+        if (!mounted || myGeneration != _dabPlayGeneration) return;
+        _playDab(freqKhz: freqKhz, serviceId: serviceId, onPlaying: onPlaying);
+      });
+    }
+    if (sourceUnreachable) {
+      Future.delayed(const Duration(seconds: 5), () async {
+        if (!mounted || myGeneration != _dabPlayGeneration) return;
+        await _initDabServer();
         if (!mounted || myGeneration != _dabPlayGeneration) return;
         _playDab(freqKhz: freqKhz, serviceId: serviceId, onPlaying: onPlaying);
       });
@@ -707,7 +729,8 @@ class _WeatherRadarColumn extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(weatherDisplaySettingsProvider);
-    if (!settings.weatherEnabled && !settings.radarEnabled && !settings.sunEnabled) {
+    final orderDay = ref.watch(orderDayProvider);
+    if (!settings.weatherEnabled && !settings.radarEnabled && !settings.sunEnabled && orderDay == null) {
       return const SizedBox.shrink();
     }
 
@@ -740,12 +763,22 @@ class _WeatherRadarColumn extends ConsumerWidget {
             ].reduce((a, b) => a + b) +
             _tileGap * (rightColumnTiles.length - 1);
 
+    // On an order day (see orderDayProvider) the order tile goes under the
+    // weather tile: a full-height weather tile is split in half to make
+    // room for it, so the left column's bottom still lines up with the
+    // right one's; otherwise (single-height weather tile, or no weather
+    // tile at all) it just gets its own normal tile height below.
+    final weatherSpans = settings.weatherSpanTwoTiles && rightColumnHeight > 0;
+    final splitWeather = orderDay != null && settings.weatherEnabled && weatherSpans;
+    final halfHeight = (rightColumnHeight - _tileGap) / 2;
+    final leftWidth = _tileBaseWidth * settings.weatherScale;
+
     final weatherTile = settings.weatherEnabled
         ? _Tile(
-            width: _tileBaseWidth * settings.weatherScale,
-            height: settings.weatherSpanTwoTiles && rightColumnHeight > 0
-                ? rightColumnHeight
-                : _tileBaseHeight * settings.weatherScale,
+            width: leftWidth,
+            height: splitWeather
+                ? halfHeight
+                : (weatherSpans ? rightColumnHeight : _tileBaseHeight * settings.weatherScale),
             radius: _tileRadius,
             child: WeatherPanel(
               locationName: settings.locationName,
@@ -756,6 +789,22 @@ class _WeatherRadarColumn extends ConsumerWidget {
           )
         : null;
 
+    final orderTile = orderDay != null
+        ? _Tile(
+            width: leftWidth,
+            height: splitWeather ? halfHeight : _tileBaseHeight * settings.weatherScale,
+            radius: _tileRadius,
+            child: OrderPanel(day: orderDay),
+          )
+        : null;
+
+    final leftColumn = weatherTile != null && orderTile != null
+        ? Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [weatherTile, const SizedBox(height: _tileGap), orderTile],
+          )
+        : weatherTile ?? orderTile;
+
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -763,8 +812,8 @@ class _WeatherRadarColumn extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ?weatherTile,
-            if (weatherTile != null && rightColumnTiles.isNotEmpty) const SizedBox(width: _tileGap),
+            ?leftColumn,
+            if (leftColumn != null && rightColumnTiles.isNotEmpty) const SizedBox(width: _tileGap),
             if (rightColumnTiles.isNotEmpty)
               Column(
                 mainAxisSize: MainAxisSize.min,

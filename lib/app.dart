@@ -3,7 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/providers.dart';
 import 'core/theme.dart';
+import 'features/home/pickup_overlay.dart';
 import 'features/splash/splash_screen.dart';
+
+// Lets PickupPopupHost (which sits above the navigator, in MaterialApp's
+// builder) open its popup as a dialog route on it.
+final _navigatorKey = GlobalKey<NavigatorState>();
 
 class HomeRadioApp extends ConsumerWidget {
   const HomeRadioApp({super.key});
@@ -15,7 +20,14 @@ class HomeRadioApp extends ConsumerWidget {
       title: 'Home Radio',
       debugShowCheckedModeBanner: false,
       theme: buildTvTheme(),
-      builder: (context, child) => _UiScaleWrapper(scale: uiScale, child: child!),
+      navigatorKey: _navigatorKey,
+      // The "Bitte abholen" popup opens over every route (not just the
+      // home screen), so a completed order is announced even while e.g.
+      // Settings is open.
+      builder: (context, child) => _UiScaleWrapper(
+        scale: uiScale,
+        child: PickupPopupHost(navigatorKey: _navigatorKey, child: child!),
+      ),
       home: const SplashScreen(),
     );
   }

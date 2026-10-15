@@ -1,7 +1,8 @@
 import 'dart:io';
 
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+
+import '../../core/retrying_network_image.dart';
 
 /// Full-screen background. Phase 1: dark background, optionally with a
 /// dimmed station logo. Phase 3 replaces this with FTP-synced photos.
@@ -29,12 +30,12 @@ class BackgroundLayer extends StatelessWidget {
               child: localPath != null
                   ? Image.file(File(localPath),
                       fit: BoxFit.cover, width: double.infinity, height: double.infinity)
-                  : CachedNetworkImage(
+                  : RetryingNetworkImage(
                       imageUrl: url!,
                       fit: BoxFit.cover,
                       width: double.infinity,
                       height: double.infinity,
-                      errorWidget: (_, _, _) => const SizedBox.shrink(),
+                      errorWidget: (_) => const SizedBox.shrink(),
                     ),
             ),
     );

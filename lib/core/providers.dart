@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -7,8 +10,10 @@ import '../data/repositories/dab_stations_repository.dart';
 import '../data/repositories/favorites_repository.dart';
 import '../data/repositories/settings_repository.dart' show DabSortMode, SettingsRepository;
 import '../data/services/audio_player_service.dart';
+import '../data/services/chime_service.dart';
 import '../data/services/dab_rtlsdr_service.dart';
 import '../data/services/dab_usb_service.dart';
+import '../data/services/order_service.dart';
 import '../data/services/radio_audio_handler.dart';
 import '../data/services/radio_browser_api_service.dart';
 import '../data/services/rtl_sdr_service.dart';
@@ -142,8 +147,7 @@ class CurrentProgramNumber extends Notifier<int?> {
   void set(int? programNumber) => state = programNumber;
 }
 
-final currentProgramNumberProvider =
-    NotifierProvider<CurrentProgramNumber, int?>(CurrentProgramNumber.new);
+final currentProgramNumberProvider = NotifierProvider<CurrentProgramNumber, int?>(CurrentProgramNumber.new);
 
 enum SidebarCategory { favorites, dabStations }
 
@@ -160,8 +164,9 @@ class SidebarCategoryNotifier extends Notifier<SidebarCategory?> {
   void set(SidebarCategory? category) => state = category;
 }
 
-final sidebarCategoryProvider =
-    NotifierProvider<SidebarCategoryNotifier, SidebarCategory?>(SidebarCategoryNotifier.new);
+final sidebarCategoryProvider = NotifierProvider<SidebarCategoryNotifier, SidebarCategory?>(
+  SidebarCategoryNotifier.new,
+);
 
 /// The tab actually shown/stepped-through right now: the user's explicit
 /// choice if any, otherwise whichever list the currently playing station
@@ -186,8 +191,9 @@ class CurrentDabStation extends Notifier<({int freqKhz, int serviceId})?> {
   void set(({int freqKhz, int serviceId})? value) => state = value;
 }
 
-final currentDabStationProvider =
-    NotifierProvider<CurrentDabStation, ({int freqKhz, int serviceId})?>(CurrentDabStation.new);
+final currentDabStationProvider = NotifierProvider<CurrentDabStation, ({int freqKhz, int serviceId})?>(
+  CurrentDabStation.new,
+);
 
 /// Global UI scale factor (1.0 = 100%), persisted and applied app-wide via a
 /// MediaQuery/Transform wrapper in [HomeRadioApp] so every screen respects
@@ -386,5 +392,305 @@ class WeatherDisplaySettingsNotifier extends Notifier<WeatherDisplaySettings> {
   }
 }
 
-final weatherDisplaySettingsProvider =
-    NotifierProvider<WeatherDisplaySettingsNotifier, WeatherDisplaySettings>(WeatherDisplaySettingsNotifier.new);
+final weatherDisplaySettingsProvider = NotifierProvider<WeatherDisplaySettingsNotifier, WeatherDisplaySettings>(
+  WeatherDisplaySettingsNotifier.new,
+);
+
+/// bestell_manager connection for the order tile (see OrderService/
+/// orderDayProvider) - [loaded] is false until the persisted values are
+/// actually in, so nothing gets polled with the placeholder defaults first.
+class OrderSettings {
+  const OrderSettings({
+    required this.enabled,
+    required this.baseUrl,
+    required this.user,
+    required this.password,
+    required this.pollSeconds,
+    required this.pickupDisplaySeconds,
+    required this.pickupSound,
+    this.loaded = true,
+  });
+
+  final bool enabled;
+  final String baseUrl;
+  final String user;
+  final String password;
+  final int pollSeconds;
+
+  /// How long the "Bitte abholen" overlay stays up after the last newly
+  /// completed order, and whether a chime plays for each new batch - see
+  /// PickupNotifier.
+  final int pickupDisplaySeconds;
+  final bool pickupSound;
+  final bool loaded;
+
+  bool get isConfigured =>
+      loaded && enabled && baseUrl.trim().isNotEmpty && user.trim().isNotEmpty && password.isNotEmpty;
+
+  /// Everything that decides *what* gets polled - deliberately excludes
+  /// [pollSeconds], so changing only the interval doesn't restart
+  /// orderDayProvider (and briefly drop the tile).
+  ({bool configured, String baseUrl, String user, String password}) get connection =>
+      (configured: isConfigured, baseUrl: baseUrl, user: user, password: password);
+
+  OrderSettings copyWith({
+    bool? enabled,
+    String? baseUrl,
+    String? user,
+    String? password,
+    int? pollSeconds,
+    int? pickupDisplaySeconds,
+    bool? pickupSound,
+  }) {
+    return OrderSettings(
+      enabled: enabled ?? this.enabled,
+      baseUrl: baseUrl ?? this.baseUrl,
+      user: user ?? this.user,
+      password: password ?? this.password,
+      pollSeconds: pollSeconds ?? this.pollSeconds,
+      pickupDisplaySeconds: pickupDisplaySeconds ?? this.pickupDisplaySeconds,
+      pickupSound: pickupSound ?? this.pickupSound,
+      loaded: loaded,
+    );
+  }
+}
+
+class OrderSettingsNotifier extends Notifier<OrderSettings> {
+  @override
+  OrderSettings build() {
+    final repo = ref.watch(settingsRepositoryProvider);
+    _load(repo);
+    return const OrderSettings(
+      enabled: true,
+      baseUrl: SettingsRepository.defaultOrderBaseUrl,
+      user: SettingsRepository.defaultOrderUser,
+      password: '',
+      pollSeconds: SettingsRepository.defaultOrderPollSeconds,
+      pickupDisplaySeconds: SettingsRepository.defaultPickupDisplaySeconds,
+      pickupSound: true,
+      loaded: false,
+    );
+  }
+
+  Future<void> _load(SettingsRepository repo) async {
+    state = OrderSettings(
+      enabled: await repo.getOrderEnabled(),
+      baseUrl: await repo.getOrderBaseUrl(),
+      user: await repo.getOrderUser(),
+      password: await repo.getOrderPassword(),
+      pollSeconds: await repo.getOrderPollSeconds(),
+      pickupDisplaySeconds: await repo.getPickupDisplaySeconds(),
+      pickupSound: await repo.getPickupSound(),
+    );
+  }
+
+  Future<void> setPickupDisplaySeconds(int seconds) async {
+    final clamped = seconds.clamp(
+      SettingsRepository.minPickupDisplaySeconds,
+      SettingsRepository.maxPickupDisplaySeconds,
+    );
+    state = state.copyWith(pickupDisplaySeconds: clamped);
+    await ref.read(settingsRepositoryProvider).setPickupDisplaySeconds(clamped);
+  }
+
+  Future<void> setPickupSound(bool enabled) async {
+    state = state.copyWith(pickupSound: enabled);
+    await ref.read(settingsRepositoryProvider).setPickupSound(enabled);
+  }
+
+  Future<void> setEnabled(bool enabled) async {
+    state = state.copyWith(enabled: enabled);
+    await ref.read(settingsRepositoryProvider).setOrderEnabled(enabled);
+  }
+
+  Future<void> setApi({required String baseUrl, required String user, required String password}) async {
+    state = state.copyWith(baseUrl: baseUrl, user: user, password: password);
+    await ref.read(settingsRepositoryProvider).setOrderApi(baseUrl: baseUrl, user: user, password: password);
+  }
+
+  Future<void> setPollSeconds(int seconds) async {
+    final clamped = seconds.clamp(SettingsRepository.minOrderPollSeconds, SettingsRepository.maxOrderPollSeconds);
+    state = state.copyWith(pollSeconds: clamped);
+    await ref.read(settingsRepositoryProvider).setOrderPollSeconds(clamped);
+  }
+}
+
+final orderSettingsProvider = NotifierProvider<OrderSettingsNotifier, OrderSettings>(OrderSettingsNotifier.new);
+
+final orderServiceProvider = Provider<OrderService>((ref) => OrderService());
+
+/// Today's order day (null = none, not configured, or unreachable), polled
+/// at the user's chosen interval (OrderSettings.pollSeconds, 5-60s) while
+/// configured - the kitchen's status changes over the evening as courses
+/// are switched, and creating/deleting the order day should show up
+/// near-live. Cheap: one small request, and the state is only replaced when
+/// something actually changed (see OrderDay's ==), so an unchanged poll
+/// doesn't rebuild the tiles. A failed request (e.g. no network yet right
+/// after boot) retries after 15s, and keeps showing the last known order
+/// day meanwhile rather than flickering the tile away.
+class OrderDayNotifier extends Notifier<OrderDay?> {
+  static const _errorRetryInterval = Duration(seconds: 15);
+
+  Timer? _timer;
+
+  @override
+  OrderDay? build() {
+    final connection = ref.watch(orderSettingsProvider.select((s) => s.connection));
+    ref.onDispose(() => _timer?.cancel());
+    if (!connection.configured) return null;
+    Future.microtask(() => _poll(connection));
+    return null;
+  }
+
+  Future<void> _poll(({bool configured, String baseUrl, String user, String password}) connection) async {
+    _timer?.cancel();
+    final result = await ref
+        .read(orderServiceProvider)
+        .fetchToday(baseUrl: connection.baseUrl, user: connection.user, password: connection.password, previous: state);
+    // Connection settings changed while this request was in flight -
+    // build() has already started a fresh poll loop for the new ones.
+    final settings = ref.read(orderSettingsProvider);
+    if (settings.connection != connection) return;
+    if (result.status == OrderFetchStatus.error) {
+      _timer = Timer(_errorRetryInterval, () => _poll(connection));
+      return;
+    }
+    if (result.day != state) state = result.day;
+    // Read fresh each round, so a changed interval applies from the next
+    // poll on without restarting anything.
+    _timer = Timer(Duration(seconds: settings.pollSeconds), () => _poll(connection));
+  }
+}
+
+final orderDayProvider = NotifierProvider<OrderDayNotifier, OrderDay?>(OrderDayNotifier.new);
+
+final chimeServiceProvider = Provider<ChimeService>((ref) => ChimeService(ref.watch(audioPlayerServiceProvider)));
+
+/// What the "Bitte abholen" overlay currently shows - every order newly
+/// completed since it last appeared, oldest first.
+class PickupAnnouncement {
+  const PickupAnnouncement(this.items);
+
+  final List<ReadyItem> items;
+}
+
+/// Drives the "Bitte abholen" overlay from bestell_manager's
+/// `/api/v1/ready`: polled at the same interval as the order tile, but only
+/// while there actually is an order day today (see orderDayProvider) -
+/// otherwise not at all.
+///
+/// Each completion has a unique key; keys already seen are remembered so
+/// every completion is announced exactly once. One first seen with an age
+/// beyond the display duration (e.g. right after the app started) is only
+/// marked as seen, not announced - per the server's own clock, so the
+/// radio's clock being off doesn't matter. New completions are added to an
+/// overlay that's already up (many soups often finish at once) and restart
+/// its display duration; the chime plays once per batch of new entries,
+/// not once per entry.
+class PickupNotifier extends Notifier<PickupAnnouncement?> {
+  final _seenKeys = <String>{};
+  Timer? _pollTimer;
+  Timer? _hideTimer;
+
+  @override
+  PickupAnnouncement? build() {
+    final connection = ref.watch(orderSettingsProvider.select((s) => s.connection));
+    final hasOrderDay = ref.watch(orderDayProvider.select((day) => day != null));
+    ref.onDispose(() {
+      _pollTimer?.cancel();
+      _hideTimer?.cancel();
+    });
+    if (!connection.configured || !hasOrderDay) return null;
+    Future.microtask(() => _poll(connection));
+    return null;
+  }
+
+  Future<void> _poll(({bool configured, String baseUrl, String user, String password}) connection) async {
+    _pollTimer?.cancel();
+    final displaySeconds = ref.read(orderSettingsProvider).pickupDisplaySeconds;
+    final items = await ref
+        .read(orderServiceProvider)
+        .fetchReady(
+          baseUrl: connection.baseUrl,
+          user: connection.user,
+          password: connection.password,
+          // Must cover at least the display duration, so nothing that
+          // should still be announced has already dropped out of the list.
+          seconds: math.max(120, displaySeconds),
+        );
+    final settings = ref.read(orderSettingsProvider);
+    if (settings.connection != connection) return;
+    if (items != null) _handle(items, settings);
+    _pollTimer = Timer(Duration(seconds: settings.pollSeconds), () => _poll(connection));
+  }
+
+  void _handle(List<ReadyItem> items, OrderSettings settings) {
+    final fresh = <ReadyItem>[];
+    for (final item in items) {
+      if (!_seenKeys.add(item.key)) continue;
+      if (item.ageSeconds <= settings.pickupDisplaySeconds) fresh.add(item);
+    }
+    // A key only ever leaves the response by aging out of its time window,
+    // and never comes back (a re-completion gets a new key) - so only the
+    // keys still in the response need remembering, which keeps this set
+    // bounded no matter how long the evening runs.
+    _seenKeys.retainAll(items.map((i) => i.key));
+    if (fresh.isEmpty) return;
+    _announce(fresh, settings);
+  }
+
+  void _announce(List<ReadyItem> fresh, OrderSettings settings) {
+    state = PickupAnnouncement([...?state?.items, ...fresh]);
+    _hideTimer?.cancel();
+    _hideTimer = Timer(Duration(seconds: settings.pickupDisplaySeconds), () => state = null);
+    if (settings.pickupSound) ref.read(chimeServiceProvider).play();
+  }
+
+  /// The user closed the popup themselves - drop the current announcement
+  /// (its entries stay marked as seen); the next new completion opens a
+  /// fresh one.
+  void dismiss() {
+    _hideTimer?.cancel();
+    state = null;
+  }
+
+  /// Settings' "Anzeige testen" - shows the overlay with made-up entries
+  /// (including a batch of identical soups) so it can be checked on the TV
+  /// without a real order day.
+  void showDemo() {
+    final stamp = DateTime.now().millisecondsSinceEpoch;
+    const soups = ['Anna · Tisch 3', 'Ben', 'Carla', 'David', 'Eva', 'Franz', 'Gabi', 'Hans', 'Ida', 'Jakob'];
+    _announce([
+      for (final (i, guest) in soups.indexed)
+        ReadyItem(
+          key: 'demo-$stamp-$i',
+          number: i + 1,
+          guest: guest,
+          itemName: 'Kürbiscremesuppe',
+          itemIcon: '🎃',
+          options: '',
+          ageSeconds: 0,
+        ),
+      ReadyItem(
+        key: 'demo-$stamp-ice',
+        number: 11,
+        guest: 'Lena',
+        itemName: 'Eisbecher',
+        itemIcon: '🍨',
+        options: 'Erdbeereis, mit Schokosauce',
+        ageSeconds: 0,
+      ),
+      ReadyItem(
+        key: 'demo-$stamp-ice2',
+        number: 12,
+        guest: 'Max',
+        itemName: 'Eisbecher',
+        itemIcon: '🍨',
+        options: 'Vanilleeis, ohne Sauce',
+        ageSeconds: 0,
+      ),
+    ], ref.read(orderSettingsProvider));
+  }
+}
+
+final pickupProvider = NotifierProvider<PickupNotifier, PickupAnnouncement?>(PickupNotifier.new);

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
@@ -39,12 +41,34 @@ class _RadarPanelState extends State<RadarPanel> {
             debugPrint('DabProbe: RadarPanel loaded $url');
             _controller.runJavaScript(_hideControlsJs);
           },
-          onWebResourceError: (error) => debugPrint(
-            'DabProbe: RadarPanel error: ${error.errorCode} ${error.description} (${error.url})',
-          ),
+          onWebResourceError: (error) {
+            debugPrint(
+              'DabProbe: RadarPanel error: ${error.errorCode} ${error.description} (${error.url})',
+            );
+            // The page itself failed (not just one tile/script) - typically
+            // because the network isn't up yet on an autostart right after
+            // boot. Without this the WebView just kept showing its error
+            // page forever; retry until it actually loads.
+            if (error.isForMainFrame ?? true) _scheduleRetry();
+          },
         ),
       )
       ..loadRequest(_radarUri(widget.lat, widget.lon, widget.zoom));
+  }
+
+  Timer? _retryTimer;
+
+  void _scheduleRetry() {
+    _retryTimer?.cancel();
+    _retryTimer = Timer(const Duration(seconds: 10), () {
+      if (mounted) _controller.loadRequest(_radarUri(widget.lat, widget.lon, widget.zoom));
+    });
+  }
+
+  @override
+  void dispose() {
+    _retryTimer?.cancel();
+    super.dispose();
   }
 
   /// wo-cloud's own on-map UI chrome (zoom +/-, layer switcher, the bottom

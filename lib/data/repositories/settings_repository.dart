@@ -61,6 +61,13 @@ class SettingsRepository {
   static const _keyRtlSdrMode = 'rtl_sdr_mode'; // 'own' | 'external'
   static const _keyDabSortMode = 'dab_sort_mode'; // 'ensemble' | 'alphabet'
   static const _keyShowClockDate = 'show_clock_date';
+  static const _keyOrderEnabled = 'order_enabled';
+  static const _keyOrderBaseUrl = 'order_base_url';
+  static const _keyOrderUser = 'order_user';
+  static const _keyOrderPassword = 'order_password';
+  static const _keyOrderPollSeconds = 'order_poll_seconds';
+  static const _keyPickupDisplaySeconds = 'pickup_display_seconds';
+  static const _keyPickupSound = 'pickup_sound';
 
   final AppDatabase _db;
   SettingsRepository(this._db);
@@ -277,4 +284,55 @@ class SettingsRepository {
   Future<bool> getShowClockDate() async => (await _db.getSetting(_keyShowClockDate)) == 'true';
 
   Future<void> setShowClockDate(bool value) => _db.setSetting(_keyShowClockDate, '$value');
+
+  // bestell_manager's order-day API (see OrderService) - logs in with the
+  // host's own bestell_manager account (e-mail + password), so each radio
+  // shows its own host's order day. No default credentials: nothing is
+  // polled until they've been entered.
+  static const defaultOrderBaseUrl = 'https://bestellung.jaycloud.at';
+  static const defaultOrderUser = '';
+
+  Future<bool> getOrderEnabled() async => (await _db.getSetting(_keyOrderEnabled)) != 'false';
+
+  Future<void> setOrderEnabled(bool enabled) => _db.setSetting(_keyOrderEnabled, '$enabled');
+
+  Future<String> getOrderBaseUrl() async => (await _db.getSetting(_keyOrderBaseUrl)) ?? defaultOrderBaseUrl;
+
+  Future<String> getOrderUser() async => (await _db.getSetting(_keyOrderUser)) ?? defaultOrderUser;
+
+  Future<String> getOrderPassword() async => (await _db.getSetting(_keyOrderPassword)) ?? '';
+
+  // How often the order tile asks bestell_manager for today's status - the
+  // user's own trade-off between "live" and load, 5..60s.
+  static const defaultOrderPollSeconds = 5;
+  static const minOrderPollSeconds = 5;
+  static const maxOrderPollSeconds = 60;
+
+  Future<int> getOrderPollSeconds() async =>
+      (int.tryParse(await _db.getSetting(_keyOrderPollSeconds) ?? '') ?? defaultOrderPollSeconds)
+          .clamp(minOrderPollSeconds, maxOrderPollSeconds);
+
+  Future<void> setOrderPollSeconds(int seconds) => _db.setSetting(_keyOrderPollSeconds, '$seconds');
+
+  // How long the "Bitte abholen" overlay stays up after the last newly
+  // completed order (see PickupNotifier).
+  static const defaultPickupDisplaySeconds = 30;
+  static const minPickupDisplaySeconds = 10;
+  static const maxPickupDisplaySeconds = 300;
+
+  Future<int> getPickupDisplaySeconds() async =>
+      (int.tryParse(await _db.getSetting(_keyPickupDisplaySeconds) ?? '') ?? defaultPickupDisplaySeconds)
+          .clamp(minPickupDisplaySeconds, maxPickupDisplaySeconds);
+
+  Future<void> setPickupDisplaySeconds(int seconds) => _db.setSetting(_keyPickupDisplaySeconds, '$seconds');
+
+  Future<bool> getPickupSound() async => (await _db.getSetting(_keyPickupSound)) != 'false';
+
+  Future<void> setPickupSound(bool enabled) => _db.setSetting(_keyPickupSound, '$enabled');
+
+  Future<void> setOrderApi({required String baseUrl, required String user, required String password}) async {
+    await _db.setSetting(_keyOrderBaseUrl, baseUrl);
+    await _db.setSetting(_keyOrderUser, user);
+    await _db.setSetting(_keyOrderPassword, password);
+  }
 }

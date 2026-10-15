@@ -61,8 +61,14 @@ class _SunMoonPanelState extends State<SunMoonPanel> {
   void dispose() {
     _dailyRefreshTimer?.cancel();
     _tickTimer?.cancel();
+    _uvRetryTimer?.cancel();
     super.dispose();
   }
+
+  // A failed UV fetch (typically: network not up yet right after an
+  // autostart at boot) is retried after a minute rather than only on the
+  // next hourly refresh.
+  Timer? _uvRetryTimer;
 
   void _computeAstronomy() {
     final now = DateTime.now();
@@ -73,12 +79,14 @@ class _SunMoonPanelState extends State<SunMoonPanel> {
   }
 
   Future<void> _loadUv() async {
+    _uvRetryTimer?.cancel();
     try {
       final uv = await _uvService.getCurrentUvIndex(lat: widget.lat, lon: widget.lon);
       if (mounted) setState(() => _uvIndex = uv);
     } catch (_) {
       // UV is an extra, not core to the panel - fails silently rather than
       // showing an error state for what's otherwise a fully working card.
+      if (mounted) _uvRetryTimer = Timer(const Duration(minutes: 1), _loadUv);
     }
   }
 

@@ -23,6 +23,14 @@ class RadioAudioHandler extends BaseAudioHandler {
 
   RadioAudioHandler(this._player) {
     _player.playerStateStream.listen(_broadcastPlayerState);
+    // Internet radio's "now playing" (ICY StreamTitle) as the MediaItem's
+    // artist line, so the notification/Home Assistant show the current
+    // song too, not just the station name.
+    _player.icyTitleStream.listen((title) {
+      final item = mediaItem.value;
+      if (item == null || _player.currentUrl == null) return;
+      mediaItem.add(item.copyWith(artist: title));
+    });
   }
 
   // The actual station play/pause/skip logic lives in HomeScreen (it needs

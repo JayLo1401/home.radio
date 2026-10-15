@@ -1,8 +1,9 @@
 import 'dart:io';
 import 'dart:math' as math;
 
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+
+import '../../core/retrying_network_image.dart';
 
 /// Bottom banner showing the currently playing station, logo and metadata.
 /// Source-agnostic (internet radio vs. DAB+, favorite or a DAB+ station
@@ -196,13 +197,13 @@ class _BannerLogo extends StatelessWidget {
     if (logoUrl != null) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(10),
-        child: CachedNetworkImage(
+        child: RetryingNetworkImage(
           imageUrl: logoUrl!,
           width: size,
           height: size,
           fit: BoxFit.cover,
-          placeholder: (_, _) => placeholder,
-          errorWidget: (_, _, _) => placeholder,
+          placeholder: (_) => placeholder,
+          errorWidget: (_) => placeholder,
         ),
       );
     }

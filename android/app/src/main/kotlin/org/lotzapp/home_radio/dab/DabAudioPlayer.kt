@@ -206,12 +206,14 @@ class DabAudioPlayer(
     fun start() {
         if (running) return
         running = true
+        active = this
         requestAudioFocus()
         thread = Thread({ runLoop() }, "DabAudioPlayer").apply { start() }
     }
 
     fun stop() {
         running = false
+        if (active === this) active = null
         thread?.interrupt()
         // Without this, releaseTrack() below could run concurrently with
         // runLoop() still mid-iteration on the old thread - Thread.interrupt()
@@ -465,7 +467,7 @@ class DabAudioPlayer(
             for (i in 1..steps) {
                 if (audioTrack !== track) return@Thread // superseded by a newer station/track
                 try {
-                    track.setVolume(i.toFloat() / steps)
+                    track.setVolume(i.toFloat() / steps * duckLevel)
                 } catch (_: Exception) {
                     return@Thread
                 }
@@ -493,8 +495,33 @@ class DabAudioPlayer(
         configuredChannels = -1
     }
 
+    /** Applies the current [duckLevel] right away (fade-in, if still running, picks it up on its own). */
+    private fun applyDuckLevel() {
+        val track = audioTrack ?: return
+        if (fadeStartedForTrack !== track) return // not audible yet - fadeIn() will use duckLevel
+        try {
+            track.setVolume(duckLevel)
+        } catch (_: Exception) {
+        }
+    }
+
     companion object {
         private const val TAG = "DabProbe"
         private const val MAX_CHUNK_BYTES = 65536
+
+        /**
+         * Volume multiplier for DAB+ playback, 1.0 = normal - lowered
+         * briefly while ChimePlugin's bell plays over the radio, so the
+         * bell is actually audible instead of drowned out.
+         */
+        @Volatile var duckLevel = 1f
+            private set
+
+        @Volatile private var active: DabAudioPlayer? = null
+
+        fun setDuckLevel(level: Float) {
+            duckLevel = level.coerceIn(0f, 1f)
+            active?.applyDuckLevel()
+        }
     }
 }
