@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../core/retrying_network_image.dart';
+import '../../data/models/audio_quality.dart';
 
 /// Bottom banner showing the currently playing station, logo and metadata.
 /// Source-agnostic (internet radio vs. DAB+, favorite or a DAB+ station
@@ -21,6 +22,10 @@ class NowPlayingBanner extends StatelessWidget {
   final String? errorMessage;
   final double? snrDb;
 
+  /// Bitrate/codec of what's playing (internet radio or DAB+), shown
+  /// discreetly next to the station name - null while unknown/not playing.
+  final AudioQuality? quality;
+
   const NowPlayingBanner({
     super.key,
     required this.programNumber,
@@ -32,6 +37,7 @@ class NowPlayingBanner extends StatelessWidget {
     this.subtitle,
     this.errorMessage,
     this.snrDb,
+    this.quality,
   });
 
   @override
@@ -81,6 +87,10 @@ class NowPlayingBanner extends StatelessWidget {
                               size: 28,
                             ),
                           ],
+                          if (quality != null) ...[
+                            const SizedBox(width: 12),
+                            _QualityLabel(quality: quality!),
+                          ],
                         ],
                       ),
                       const SizedBox(height: 6),
@@ -113,6 +123,33 @@ class NowPlayingBanner extends StatelessWidget {
                   ),
               ],
             ),
+    );
+  }
+}
+
+/// "88 kbps · HE-AAC v2" - deliberately understated (small, thin outline,
+/// muted colour) so it's there at a glance without competing with the
+/// station name. Colour runs red (poor) through yellow to green (good) by
+/// [AudioQuality.score], which accounts for the codec, not just the number.
+class _QualityLabel extends StatelessWidget {
+  const _QualityLabel({required this.quality});
+
+  final AudioQuality quality;
+
+  @override
+  Widget build(BuildContext context) {
+    // Hue 0 (red) .. 120 (green); low saturation keeps it muted.
+    final color = HSVColor.fromAHSV(1, 120 * quality.score, 0.55, 0.9).toColor();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withValues(alpha: 0.45)),
+      ),
+      child: Text(
+        quality.label,
+        style: TextStyle(color: color.withValues(alpha: 0.85), fontSize: 15, fontWeight: FontWeight.w600),
+      ),
     );
   }
 }

@@ -22,6 +22,7 @@
 
 #include <jni.h>
 #include <android/log.h>
+#include <chrono>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -52,6 +53,7 @@ jmethodID m_onAacErrors = nullptr;
 jmethodID m_onMot = nullptr;
 jmethodID m_onSnr = nullptr;
 jmethodID m_onConnectionMessage = nullptr;
+jmethodID m_onAudioFormat = nullptr;
 
 /* Attaches the calling thread to the JVM if needed. welle.io's OFDM/decoder
  * threads are created internally by the vendored library (std::thread), not
@@ -163,10 +165,11 @@ class AndroidProgrammeHandler : public ProgrammeHandlerInterface {
 public:
     void onFrameErrors(int) override {}
 
-    void onNewAudio(std::vector<int16_t>&& audioData, int sampleRate, const std::string&) override
+    void onNewAudio(std::vector<int16_t>&& audioData, int sampleRate, const std::string& format) override
     {
         JNIEnv* env = attachedEnv();
         if (!env || !g_listener || !m_onAudioPcm) return;
+        reportAudioFormat(env, format);
         // Always stereo-interleaved (see DecoderAdapter::PutAudio - it
         // upmixes mono to stereo itself), native/little-endian int16 PCM -
         // exactly what DabAudioPlayer already expects on the Kotlin side.
@@ -216,6 +219,28 @@ public:
     }
 
     void onPADLengthError(size_t, size_t) override {}
+
+private:
+    std::string m_lastFormat;
+    std::chrono::steady_clock::time_point m_lastFormatReport{};
+
+    /* The decoder's audio format summary (e.g. "HE-AAC v2, 48 kHz Stereo @
+     * 88 kbit/s" - see AUDIO_SERVICE_FORMAT::GetSummary) for the Now Playing
+     * banner's bitrate display. Arrives with every audio block (many per
+     * second), so it's only passed on when it changed or every few seconds
+     * - the latter so a newly tuned station with the very same format as
+     * the previous one still gets reported to a UI that just reset it. */
+    void reportAudioFormat(JNIEnv* env, const std::string& format)
+    {
+        if (!m_onAudioFormat || format.empty()) return;
+        const auto now = std::chrono::steady_clock::now();
+        if (format == m_lastFormat && now - m_lastFormatReport < std::chrono::seconds(3)) return;
+        m_lastFormat = format;
+        m_lastFormatReport = now;
+        jstring jFormat = env->NewStringUTF(format.c_str());
+        env->CallVoidMethod(g_listener, m_onAudioFormat, jFormat);
+        env->DeleteLocalRef(jFormat);
+    }
 };
 
 struct DabSession {
@@ -249,6 +274,7 @@ void registerListenerAndMethods(JNIEnv* env, jobject thiz)
     m_onMot = env->GetMethodID(cls, "nativeOnMot", "([BI)V");
     m_onSnr = env->GetMethodID(cls, "nativeOnSnr", "(F)V");
     m_onConnectionMessage = env->GetMethodID(cls, "nativeOnConnectionMessage", "(ZLjava/lang/String;)V");
+    m_onAudioFormat = env->GetMethodID(cls, "nativeOnAudioFormat", "(Ljava/lang/String;)V");
     env->ExceptionClear();
 }
 

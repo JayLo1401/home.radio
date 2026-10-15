@@ -8,6 +8,7 @@ import 'package:just_audio/just_audio.dart';
 import '../../core/providers.dart';
 import '../../core/theme.dart';
 import '../../data/db/database.dart' show DabStation;
+import '../../data/models/audio_quality.dart';
 import '../../data/models/favorite_channel.dart';
 import '../../data/repositories/dab_stations_repository.dart'
     show DabStationDisplay;
@@ -39,6 +40,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   bool _dabServerReady = false;
   double? _dabSnrDb;
 
+  // Bitrate/codec of what's playing, for the banner's quality label -
+  // internet radio from AudioPlayerService.qualityStream, DAB+ from the
+  // decoder's 'audioFormat' events (see _onDabEvent).
+  AudioQuality? _netQuality;
+  AudioQuality? _dabQuality;
+
   // A real DAB+ MOT slideshow image for whatever's currently playing (see
   // _onDabEvent's 'motLogo' case) - shown live in the Now Playing banner
   // only, never persisted as *the* station logo (see DabStation.logoUrl's
@@ -66,6 +73,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     });
     audio.errorStream.listen((e) {
       if (mounted) setState(() => _playbackError = e);
+    });
+    audio.qualityStream.listen((q) {
+      if (mounted) setState(() => _netQuality = q);
     });
     ref.read(dabRtlSdrServiceProvider).events.listen(_onDabEvent);
     ref.read(rtlSdrUsbServiceProvider).events.listen(_onUsbDeviceEvent);
@@ -107,6 +117,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         setState(() => _dabStatusText = label.isEmpty ? null : label);
       case 'snr' when _dabTuned:
         setState(() => _dabSnrDb = (event['snrDb'] as num).toDouble());
+      case 'audioFormat' when _dabTuned:
+        final quality = AudioQuality.fromDabFormat(event['format'] as String? ?? '');
+        if (quality != _dabQuality) setState(() => _dabQuality = quality);
       case 'motLogo' when _dabTuned:
         // A real DAB+ MOT slideshow image just arrived for whatever's
         // currently playing (see DabRtlSdrPlugin.nativeOnMot) - shown live
@@ -322,6 +335,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       _dabStatusText = null;
       _dabTuned = false;
       _dabSnrDb = null;
+      _dabQuality = null;
       _liveMotLogoPath = null;
       _dabConnectionWarning = null;
     });
@@ -363,6 +377,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       _dabStatusText = null;
       _dabTuned = false;
       _dabSnrDb = null;
+      _dabQuality = null;
       _liveMotLogoPath = null;
       _dabConnectionWarning = null;
     });
@@ -690,6 +705,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     subtitle: (subtitle?.isEmpty ?? true) ? null : subtitle,
                     errorMessage: errorMessage,
                     snrDb: (isDab && isPlaying) ? _dabSnrDb : null,
+                    quality: isPlaying ? (isDab ? _dabQuality : _netQuality) : null,
                   ),
                 ],
               ),

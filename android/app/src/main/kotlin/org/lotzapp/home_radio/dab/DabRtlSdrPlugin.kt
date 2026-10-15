@@ -198,6 +198,15 @@ class DabRtlSdrPlugin :
         emit(mapOf("type" to "connectionMessage", "isError" to isError, "message" to message))
     }
 
+    /**
+     * The decoder's audio format summary, e.g. "HE-AAC v2, 48 kHz Stereo @
+     * 88 kbit/s" - for the Now Playing banner's bitrate display. Throttled
+     * natively (see dabcore_jni.cpp's reportAudioFormat), not per audio block.
+     */
+    private fun nativeOnAudioFormat(format: String) {
+        emit(mapOf("type" to "audioFormat", "format" to format))
+    }
+
     private fun nativeOnAudioPcm(pcm: ByteArray, sampleRate: Int, channels: Int) {
         audioPlayer?.submit(pcm, sampleRate, channels)
     }

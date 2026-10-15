@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:audio_session/audio_session.dart';
 import 'package:just_audio/just_audio.dart';
 
+import '../models/audio_quality.dart';
 import 'icy_metadata_service.dart';
 
 /// Thin wrapper around [AudioPlayer] for internet-radio stream playback.
@@ -11,6 +12,10 @@ import 'icy_metadata_service.dart';
 class AudioPlayerService {
   AudioPlayerService() {
     _player.icyMetadataStream.listen((meta) {
+      final bitrate = meta?.headers?.bitrate;
+      if (bitrate != null && bitrate > 0 && _quality == null) {
+        _setQuality(AudioQuality(kbps: bitrate, codec: null));
+      }
       final title = IcyMetadataService.cleanTitle(meta?.info?.title);
       if (title == null) return;
       _playerProvidesIcy = true;
@@ -32,6 +37,7 @@ class AudioPlayerService {
   final AudioPlayer _player = AudioPlayer();
   final _errorController = StreamController<String?>.broadcast();
   final _titleController = StreamController<String?>.broadcast();
+  final _qualityController = StreamController<AudioQuality?>.broadcast();
   final _icyService = IcyMetadataService();
   bool _sessionConfigured = false;
   String? _currentUrl;
@@ -53,7 +59,12 @@ class AudioPlayerService {
   /// retry succeeded).
   Stream<String?> get errorStream => _errorController.stream;
 
+  /// Bitrate/codec of the current stream, null while unknown - from the
+  /// stream's own headers/playlist (see [IcyMetadataService.fetchStreamInfo]).
+  Stream<AudioQuality?> get qualityStream => _qualityController.stream;
+
   String? _title;
+  AudioQuality? _quality;
   bool _playerProvidesIcy = false;
   Timer? _titlePollTimer;
 
@@ -63,17 +74,30 @@ class AudioPlayerService {
     _titleController.add(title);
   }
 
+  void _setQuality(AudioQuality? quality) {
+    if (quality == _quality) return;
+    _quality = quality;
+    _qualityController.add(quality);
+  }
+
   static const _titlePollInterval = Duration(seconds: 20);
 
   /// Polls the stream's ICY title ourselves for as long as just_audio
-  /// hasn't delivered one on its own (see [icyTitleStream]).
+  /// hasn't delivered one on its own (see [icyTitleStream]) - and at least
+  /// once regardless, for the stream's quality (bitrate/codec), which
+  /// just_audio only partly reports (bitrate at best, never the codec).
   void _startTitlePolling(String url) {
     _titlePollTimer?.cancel();
+    var qualityChecked = false;
     Future<void> poll() async {
-      if (_currentUrl != url || _playerProvidesIcy || !_player.playing) return;
-      final title = await _icyService.fetchStreamTitle(url);
-      if (_currentUrl != url || _playerProvidesIcy) return;
-      if (title != null) _setTitle(title);
+      if (_currentUrl != url || !_player.playing) return;
+      if (_playerProvidesIcy && qualityChecked) return;
+      final info = await _icyService.fetchStreamInfo(url);
+      if (_currentUrl != url) return;
+      qualityChecked = true;
+      final kbps = info.bitrateKbps;
+      if (kbps != null && kbps > 0) _setQuality(AudioQuality(kbps: kbps, codec: info.codec));
+      if (!_playerProvidesIcy && info.title != null) _setTitle(info.title);
     }
 
     // First poll shortly after start, giving just_audio a chance to deliver
@@ -127,6 +151,7 @@ class AudioPlayerService {
     _currentUrl = url;
     _playerProvidesIcy = false;
     _setTitle(null);
+    _setQuality(null);
     _startTitlePolling(url);
     await _start(url);
   }
@@ -162,6 +187,7 @@ class AudioPlayerService {
     _retryTimer?.cancel();
     _titlePollTimer?.cancel();
     _setTitle(null);
+    _setQuality(null);
     await _player.stop();
   }
 
@@ -202,5 +228,6 @@ class AudioPlayerService {
     await _player.dispose();
     await _errorController.close();
     await _titleController.close();
+    await _qualityController.close();
   }
 }

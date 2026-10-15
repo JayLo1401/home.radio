@@ -15,6 +15,20 @@ import 'dart:typed_data';
 ///   audio segment instead, which just_audio doesn't surface either. The
 ///   playlist is fetched, then just the ID3 tag at the start of its newest
 ///   segment (a few KB), not the whole segment.
+/// What [IcyMetadataService.fetchStreamInfo] could find out about a stream
+/// - any of it may be missing.
+class StreamInfo {
+  const StreamInfo({this.title, this.bitrateKbps, this.codec});
+
+  final String? title;
+  final int? bitrateKbps;
+
+  /// Short display name, e.g. "MP3", "AAC", "HE-AAC".
+  final String? codec;
+
+  static const empty = StreamInfo();
+}
+
 class IcyMetadataService {
   static const _timeout = Duration(seconds: 10);
   static const _maxPlaylistBytes = 256 * 1024;
@@ -22,27 +36,77 @@ class IcyMetadataService {
 
   /// The stream's current title, or null if it has none, carries it in a
   /// way not understood here, or couldn't be reached.
-  Future<String?> fetchStreamTitle(String url) async {
+  Future<String?> fetchStreamTitle(String url) async => (await fetchStreamInfo(url)).title;
+
+  /// Title plus audio quality (bitrate/codec) - for the quality, the
+  /// Shoutcast/Icecast `icy-br` header and Content-Type, for HLS the
+  /// playlist's BANDWIDTH/CODECS, or failing that the newest segment's size
+  /// divided by its duration.
+  Future<StreamInfo> fetchStreamInfo(String url) async {
     final client = HttpClient()..connectionTimeout = _timeout;
     try {
       final uri = Uri.parse(url);
       final response = await _get(client, uri, icy: true);
-      if (response.statusCode != 200) return null;
+      if (response.statusCode != 200) return StreamInfo.empty;
       final metaInt = int.tryParse(response.headers.value('icy-metaint') ?? '');
+      final icyBitrate = int.tryParse((response.headers.value('icy-br') ?? '').split(',').first.trim());
+      final mimeCodec = _codecFromMime(response.headers.contentType?.mimeType);
       if (metaInt != null && metaInt > 0) {
         final block = await _readFirstMetadataBlock(response, metaInt).timeout(_timeout);
-        return block == null ? null : parseStreamTitle(block);
+        return StreamInfo(
+          title: block == null ? null : parseStreamTitle(block),
+          bitrateKbps: icyBitrate,
+          codec: mimeCodec,
+        );
       }
       if (_looksLikeHls(uri, response.headers.contentType)) {
         final playlist = await _readText(response);
-        return await _titleFromHls(client, _finalUri(uri, response), playlist, depth: 0);
+        return await _infoFromHls(client, _finalUri(uri, response), playlist, depth: 0);
       }
-      return null;
+      // A plain stream without ICY metadata - at least the quality.
+      return StreamInfo(bitrateKbps: icyBitrate, codec: mimeCodec);
     } catch (_) {
-      return null;
+      return StreamInfo.empty;
     } finally {
       client.close(force: true);
     }
+  }
+
+  static String? _codecFromMime(String? mime) {
+    switch (mime?.toLowerCase()) {
+      case 'audio/mpeg':
+      case 'audio/mp3':
+        return 'MP3';
+      case 'audio/aac':
+      case 'audio/aacp':
+      case 'audio/x-aac':
+        return 'AAC';
+      case 'audio/ogg':
+      case 'application/ogg':
+        return 'OGG';
+      case 'audio/flac':
+        return 'FLAC';
+      default:
+        return null;
+    }
+  }
+
+  /// RFC 6381 codec strings as found in HLS CODECS attributes.
+  static String? _codecFromRfc6381(String codecs) {
+    final c = codecs.toLowerCase();
+    if (c.contains('mp4a.40.29')) return 'HE-AAC v2';
+    if (c.contains('mp4a.40.5')) return 'HE-AAC';
+    if (c.contains('mp4a.40.34') || c.contains('mp4a.6b')) return 'MP3';
+    if (c.contains('mp4a.40')) return 'AAC';
+    if (c.contains('opus')) return 'Opus';
+    return null;
+  }
+
+  static String? _codecFromSegment(String path) {
+    final p = path.toLowerCase();
+    if (p.endsWith('.aac')) return 'AAC';
+    if (p.endsWith('.mp3')) return 'MP3';
+    return null;
   }
 
   Future<HttpClientResponse> _get(HttpClient client, Uri uri, {bool icy = false}) async {
@@ -77,31 +141,60 @@ class IcyMetadataService {
     return utf8.decode(buffer.takeBytes(), allowMalformed: true);
   }
 
-  Future<String?> _titleFromHls(HttpClient client, Uri base, String playlist, {required int depth}) async {
-    if (!playlist.trimLeft().startsWith('#EXTM3U') || depth > 2) return null;
+  Future<StreamInfo> _infoFromHls(
+    HttpClient client,
+    Uri base,
+    String playlist, {
+    required int depth,
+    int? bandwidthKbps,
+    String? codec,
+  }) async {
+    if (!playlist.trimLeft().startsWith('#EXTM3U') || depth > 2) return StreamInfo.empty;
     final lines = const LineSplitter().convert(playlist).map((l) => l.trim()).toList();
     final uris = [
       for (final line in lines)
         if (line.isNotEmpty && !line.startsWith('#')) line,
     ];
-    if (uris.isEmpty) return null;
+    if (uris.isEmpty) return StreamInfo.empty;
 
     // Master playlist: every variant carries the same title - follow the
-    // first one to its media playlist.
-    if (lines.any((l) => l.startsWith('#EXT-X-STREAM-INF'))) {
+    // first one to its media playlist, taking its declared quality along.
+    final streamInf = lines.where((l) => l.startsWith('#EXT-X-STREAM-INF')).firstOrNull;
+    if (streamInf != null) {
+      final bandwidth = int.tryParse(RegExp(r'BANDWIDTH=(\d+)').firstMatch(streamInf)?.group(1) ?? '');
+      final codecs = RegExp(r'CODECS="([^"]*)"').firstMatch(streamInf)?.group(1);
       final variant = base.resolve(uris.first);
       final response = await _get(client, variant);
-      if (response.statusCode != 200) return null;
+      if (response.statusCode != 200) return StreamInfo.empty;
       final text = await _readText(response);
-      return _titleFromHls(client, _finalUri(variant, response), text, depth: depth + 1);
+      return _infoFromHls(
+        client,
+        _finalUri(variant, response),
+        text,
+        depth: depth + 1,
+        bandwidthKbps: bandwidth == null ? null : (bandwidth / 1000).round(),
+        codec: codecs == null ? null : _codecFromRfc6381(codecs),
+      );
     }
 
     // Media playlist: the newest segment carries the current title.
     final segment = base.resolve(uris.last);
     final response = await _get(client, segment);
-    if (response.statusCode != 200) return null;
+    if (response.statusCode != 200) return StreamInfo.empty;
+    // No declared bandwidth - estimate it from the segment's size and its
+    // #EXTINF duration (no need to download it for that).
+    var bitrate = bandwidthKbps;
+    if (bitrate == null && response.contentLength > 0) {
+      final lastExtInf = lines.lastWhere((l) => l.startsWith('#EXTINF:'), orElse: () => '');
+      final seconds = double.tryParse(RegExp(r'#EXTINF:([\d.]+)').firstMatch(lastExtInf)?.group(1) ?? '');
+      if (seconds != null && seconds > 0) bitrate = (response.contentLength * 8 / seconds / 1000).round();
+    }
     final tag = await _readId3Chain(response).timeout(_timeout);
-    return tag == null ? null : parseId3Title(tag);
+    return StreamInfo(
+      title: tag == null ? null : parseId3Title(tag),
+      bitrateKbps: bitrate,
+      codec: codec ?? _codecFromSegment(segment.path),
+    );
   }
 
   /// Reads just the ID3 tag(s) at the very start of an audio segment -
