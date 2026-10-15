@@ -7,11 +7,16 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
 
+    <!-- usesCleartextTraffic: many internet radio streams (e.g. Kronehit,
+         http://onair.krone.at/kronehit.mp3) are only offered over plain
+         http - without this Android blocks them outright and the station
+         just never starts. -->
     <application
         android:label="Home Radio"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
-        android:banner="@drawable/tv_banner">
+        android:banner="@drawable/tv_banner"
+        android:usesCleartextTraffic="true">
         <activity
             android:name=".MainActivity"
             android:exported="true"
