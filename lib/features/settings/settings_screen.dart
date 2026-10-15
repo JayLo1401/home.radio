@@ -8,6 +8,7 @@ import '../../data/repositories/settings_repository.dart';
 import '../dab_stations/dab_stations_screen.dart';
 import '../rtlsdr/rtl_sdr_test_screen.dart';
 import '../shared/rename_dialog.dart';
+import 'backup_settings_screen.dart';
 import 'location_settings_screen.dart';
 import 'order_settings_screen.dart';
 
@@ -534,6 +535,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 selected: false,
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const DabStationsScreen()),
+                ),
+              ),
+            ),
+            FocusTraversalOrder(
+              order: NumericFocusOrder(nextOrder()),
+              child: _TvChoiceTile(
+                label: 'Backup & Wiederherstellung',
+                selected: false,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const BackupSettingsScreen()),
                 ),
               ),
             ),

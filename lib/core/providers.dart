@@ -10,6 +10,7 @@ import '../data/repositories/dab_stations_repository.dart';
 import '../data/repositories/favorites_repository.dart';
 import '../data/repositories/settings_repository.dart' show DabSortMode, SettingsRepository;
 import '../data/services/audio_player_service.dart';
+import '../data/services/backup_service.dart';
 import '../data/services/chime_service.dart';
 import '../data/services/dab_rtlsdr_service.dart';
 import '../data/services/dab_usb_service.dart';
@@ -82,6 +83,10 @@ final sortedDabStationsProvider = Provider<AsyncValue<List<DabStation>>>((ref) {
 
 final settingsRepositoryProvider = Provider<SettingsRepository>((ref) {
   return SettingsRepository(ref.watch(databaseProvider));
+});
+
+final backupServiceProvider = Provider<BackupService>((ref) {
+  return BackupService(ref.watch(databaseProvider));
 });
 
 final radioBrowserApiServiceProvider = Provider<RadioBrowserApiService>((ref) {
