@@ -16,7 +16,6 @@ class MainActivity : AudioServiceActivity() {
         flutterEngine.plugins.add(RtlSdrPlugin())
         flutterEngine.plugins.add(RtlSdrUsbPlugin())
         flutterEngine.plugins.add(DabRtlSdrPlugin())
-        flutterEngine.plugins.add(ChimePlugin())
         flutterEngine.plugins.add(BackupPlugin())
     }
 }

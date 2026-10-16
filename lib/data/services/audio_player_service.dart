@@ -211,17 +211,6 @@ class AudioPlayerService {
     await _player.play();
   }
 
-  /// Smoothly changes the playback volume (1.0 = normal) - used to duck the
-  /// radio under the "Bitte abholen" bell (see ChimeService).
-  Future<void> rampVolume(double target, Duration duration) async {
-    const steps = 10;
-    final start = _player.volume;
-    for (var i = 1; i <= steps; i++) {
-      await _player.setVolume(start + (target - start) * i / steps);
-      await Future<void>.delayed(duration ~/ steps);
-    }
-  }
-
   Future<void> dispose() async {
     _retryTimer?.cancel();
     _titlePollTimer?.cancel();
