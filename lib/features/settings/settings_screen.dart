@@ -30,7 +30,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   double _weatherContentScale = 1.0;
   bool _weatherSpanTwoTiles = true;
   double _radarScale = 1.0;
-  int _radarZoom = SettingsRepository.defaultRadarZoom;
+  int _radarRadiusKm = SettingsRepository.defaultRadarRadiusKm;
   double _radarDimming = 0.0;
   bool _sunEnabled = true;
   double _sunScale = 1.0;
@@ -54,7 +54,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final weatherContentScale = await repo.getWeatherContentScale();
     final weatherSpanTwoTiles = await repo.getWeatherSpanTwoTiles();
     final radarScale = await repo.getRadarTileScale();
-    final radarZoom = await repo.getRadarZoom();
+    final radarRadiusKm = await repo.getRadarRadiusKm();
     final radarDimming = await repo.getRadarDimming();
     final sunEnabled = await repo.getSunEnabled();
     final sunScale = await repo.getSunTileScale();
@@ -72,7 +72,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       _weatherContentScale = weatherContentScale;
       _weatherSpanTwoTiles = weatherSpanTwoTiles;
       _radarScale = radarScale;
-      _radarZoom = radarZoom;
+      _radarRadiusKm = radarRadiusKm;
       _radarDimming = radarDimming;
       _sunEnabled = sunEnabled;
       _sunScale = sunScale;
@@ -104,10 +104,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     await ref.read(weatherDisplaySettingsProvider.notifier).setRadarScale(next);
   }
 
-  Future<void> _changeRadarZoom(int delta) async {
-    final next = (_radarZoom + delta).clamp(SettingsRepository.minRadarZoom, SettingsRepository.maxRadarZoom);
-    setState(() => _radarZoom = next);
-    await ref.read(weatherDisplaySettingsProvider.notifier).setRadarZoom(next);
+  Future<void> _changeRadarRadius(int direction) async {
+    const steps = SettingsRepository.radarRadiusSteps;
+    final i = (steps.indexOf(_radarRadiusKm) + direction).clamp(0, steps.length - 1);
+    final next = steps[i];
+    setState(() => _radarRadiusKm = next);
+    await ref.read(weatherDisplaySettingsProvider.notifier).setRadarRadiusKm(next);
   }
 
   Future<void> _changeRadarDimming(double delta) async {
@@ -365,13 +367,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   onChange: (d) => _changeRadarScale(d * 0.1),
                 ),
                 scaleRow(
-                  // Not the same thing as the tile size above - this is the
-                  // map's own default zoom level (how much of the
-                  // surrounding area it shows at once), independent of the
-                  // tile's size.
-                  label: 'Zoom-Stufe',
-                  valueLabel: '$_radarZoom',
-                  onChange: (d) => _changeRadarZoom(d),
+                  // Not the tile size above - how much of the map around the
+                  // location is shown (distance to the top/bottom edge).
+                  label: 'Umkreis um den Standort',
+                  valueLabel: '$_radarRadiusKm km',
+                  onChange: (d) => _changeRadarRadius(d),
                 ),
                 scaleRow(
                   label: 'Abdunkeln (für abends)',
@@ -500,6 +500,87 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   MaterialPageRoute(builder: (_) => const BackupSettingsScreen()),
                 ),
               ),
+            ),
+            const Divider(height: 32),
+            Text('Über', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 8),
+            // Focusable so the D-Pad can scroll down to it (plain text after
+            // the last focusable control would stay out of reach on a TV).
+            FocusTraversalOrder(
+              order: NumericFocusOrder(nextOrder()),
+              child: const _AboutBlock(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// App licence and the attributions the open data sources require
+/// (GeoSphere Austria and Open-Meteo are CC BY 4.0).
+class _AboutBlock extends StatefulWidget {
+  const _AboutBlock();
+
+  @override
+  State<_AboutBlock> createState() => _AboutBlockState();
+}
+
+class _AboutBlockState extends State<_AboutBlock> {
+  bool _focused = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final body = Theme.of(context).textTheme.bodyMedium;
+    final small = Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white60);
+    Widget line(String title, String text) => Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: body?.copyWith(fontWeight: FontWeight.w600)),
+              Text(text, style: small),
+            ],
+          ),
+        );
+    return Focus(
+      onFocusChange: (f) => setState(() => _focused = f),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: _focused ? Theme.of(context).colorScheme.primary : Colors.transparent, width: 2),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            line(
+              'Home Radio',
+              'PolyForm Noncommercial 1.0.0 - frei für private und nicht-kommerzielle Nutzung. '
+                  '© 2026 Jürgen Laschak, github.com/JayLo1401/home.radio',
+            ),
+            line(
+              'Wetterprognose',
+              'Daten: © GeoSphere Austria, lizenziert unter CC BY 4.0 (data.hub.geosphere.at)',
+            ),
+            line(
+              'UV-Index',
+              'Weather data by Open-Meteo.com, lizenziert unter CC BY 4.0',
+            ),
+            line(
+              'Internetradio',
+              'Sendersuche und Logos über das Community-Verzeichnis Radio Browser (radio-browser.info)',
+            ),
+            line(
+              'Wetterradar',
+              'Niederschlag, Niederschlagsart und Böen: © GeoSphere Austria, Nowcast (INCA), '
+                  'lizenziert unter CC BY 4.0. '
+                  'Wolken und Blitze: © EUMETSAT (MSG Cloud Mask, MTG FCI IR 10.5, MTG Lightning Imager; EUMETView). '
+                  'Grenzen, Seen, Flüsse, Orte: Natural Earth (gemeinfrei). '
+                  'Relief: produced using Copernicus WorldDEM-90 © DLR e.V. 2010-2014 and © Airbus Defence '
+                  'and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; '
+                  'all rights reserved.',
             ),
           ],
         ),

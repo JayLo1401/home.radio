@@ -11,7 +11,6 @@ import '../data/repositories/settings_repository.dart' show DabSortMode, Setting
 import '../data/services/audio_player_service.dart';
 import '../data/services/backup_service.dart';
 import '../data/services/dab_rtlsdr_service.dart';
-import '../data/services/dab_usb_service.dart';
 import '../data/services/radio_audio_handler.dart';
 import '../data/services/radio_browser_api_service.dart';
 import '../data/services/rtl_sdr_service.dart';
@@ -106,17 +105,11 @@ final radioAudioHandlerProvider = FutureProvider<RadioAudioHandler>((ref) async 
   return AudioService.init(
     builder: () => RadioAudioHandler(player),
     config: AudioServiceConfig(
-      androidNotificationChannelId: 'org.lotzapp.home_radio.audio',
+      androidNotificationChannelId: 'at.jaycloud.home.radio.audio',
       androidNotificationChannelName: 'Home Radio Wiedergabe',
       androidNotificationOngoing: true,
     ),
   );
-});
-
-final dabUsbServiceProvider = Provider<DabUsbService>((ref) {
-  final service = DabUsbService();
-  ref.onDispose(service.dispose);
-  return service;
 });
 
 final dabRtlSdrServiceProvider = Provider<DabRtlSdrService>((ref) {
@@ -229,7 +222,7 @@ class WeatherDisplaySettings {
     required this.weatherContentScale,
     required this.weatherSpanTwoTiles,
     required this.radarScale,
-    required this.radarZoom,
+    required this.radarRadiusKm,
     required this.radarDimming,
     required this.sunEnabled,
     required this.sunScale,
@@ -251,9 +244,8 @@ class WeatherDisplaySettings {
   // SettingsRepository.getWeatherSpanTwoTiles's own doc comment.
   final bool weatherSpanTwoTiles;
   final double radarScale;
-  // How far the embedded radar map is zoomed in by default - see
-  // SettingsRepository.getRadarZoom's own doc comment.
-  final int radarZoom;
+  // How much of the map the radar shows - see SettingsRepository.getRadarRadiusKm.
+  final int radarRadiusKm;
   final double radarDimming;
   final bool sunEnabled;
   final double sunScale;
@@ -268,7 +260,7 @@ class WeatherDisplaySettings {
     double? weatherContentScale,
     bool? weatherSpanTwoTiles,
     double? radarScale,
-    int? radarZoom,
+    int? radarRadiusKm,
     double? radarDimming,
     bool? sunEnabled,
     double? sunScale,
@@ -283,7 +275,7 @@ class WeatherDisplaySettings {
       weatherContentScale: weatherContentScale ?? this.weatherContentScale,
       weatherSpanTwoTiles: weatherSpanTwoTiles ?? this.weatherSpanTwoTiles,
       radarScale: radarScale ?? this.radarScale,
-      radarZoom: radarZoom ?? this.radarZoom,
+      radarRadiusKm: radarRadiusKm ?? this.radarRadiusKm,
       radarDimming: radarDimming ?? this.radarDimming,
       sunEnabled: sunEnabled ?? this.sunEnabled,
       sunScale: sunScale ?? this.sunScale,
@@ -313,7 +305,7 @@ class WeatherDisplaySettingsNotifier extends Notifier<WeatherDisplaySettings> {
       weatherContentScale: SettingsRepository.defaultTileScale,
       weatherSpanTwoTiles: true,
       radarScale: SettingsRepository.defaultTileScale,
-      radarZoom: SettingsRepository.defaultRadarZoom,
+      radarRadiusKm: SettingsRepository.defaultRadarRadiusKm,
       radarDimming: SettingsRepository.defaultRadarDimming,
       sunEnabled: true,
       sunScale: SettingsRepository.defaultTileScale,
@@ -331,12 +323,13 @@ class WeatherDisplaySettingsNotifier extends Notifier<WeatherDisplaySettings> {
       weatherContentScale: await repo.getWeatherContentScale(),
       weatherSpanTwoTiles: await repo.getWeatherSpanTwoTiles(),
       radarScale: await repo.getRadarTileScale(),
-      radarZoom: await repo.getRadarZoom(),
+      radarRadiusKm: await repo.getRadarRadiusKm(),
       sunEnabled: await repo.getSunEnabled(),
       sunScale: await repo.getSunTileScale(),
       radarDimming: await repo.getRadarDimming(),
     );
   }
+
 
   Future<void> setWeatherEnabled(bool enabled) async {
     state = state.copyWith(weatherEnabled: enabled);
@@ -373,9 +366,9 @@ class WeatherDisplaySettingsNotifier extends Notifier<WeatherDisplaySettings> {
     await ref.read(settingsRepositoryProvider).setRadarTileScale(scale);
   }
 
-  Future<void> setRadarZoom(int zoom) async {
-    state = state.copyWith(radarZoom: zoom);
-    await ref.read(settingsRepositoryProvider).setRadarZoom(zoom);
+  Future<void> setRadarRadiusKm(int km) async {
+    state = state.copyWith(radarRadiusKm: km);
+    await ref.read(settingsRepositoryProvider).setRadarRadiusKm(km);
   }
 
   Future<void> setRadarDimming(double dimming) async {

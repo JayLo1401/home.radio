@@ -2,15 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/services.dart';
 
-/// Dart bridge to [DabRtlSdrPlugin] (Kotlin) - real DAB+ decoding "so wie
-/// welle.io" on top of the RTL-SDR stick, via the vendored welle.io DAB
-/// core (see cpp/dabcore/). This replaces the old Raontech-chip-only
-/// [DabUsbService] for actual DAB+ reception; that class is kept only for
-/// its still-useful low-level USB diagnostics (see its own doc comment).
-///
-/// The decoder connects to an rtl_tcp-protocol source (see [setServer]) -
-/// our own USB-TCP service, an external driver app, or a network service,
-/// same three options already offered on RtlSdrTestScreen.
+/// Dart bridge to [DabRtlSdrPlugin] (Kotlin) - DAB+ reception with the
+/// app's own receiver (cpp/hrdab) on an RTL-SDR stick, opened either
+/// directly over USB ([useDirectUsb]) or through an rtl_tcp server
+/// ([setServer]: an external driver app or a network service).
 class DabRtlSdrService {
   static const _methodChannel = MethodChannel('home_radio/dab_rtlsdr');
   static const _eventChannel = EventChannel('home_radio/dab_rtlsdr/events');
@@ -30,19 +25,16 @@ class DabRtlSdrService {
     });
   }
 
-  /// Points the decoder's rtl_tcp client at [host]:[port]. Must be called
+  /// Points the receiver at the rtl_tcp server [host]:[port]. Must be called
   /// (at least once) before [scanBand3]/[tuneFrequency]/[playService].
+  /// Returns whether something actually listens there.
   Future<bool> setServer({String host = '127.0.0.1', int port = 1234}) async {
     final result = await _methodChannel.invokeMethod<bool>('setServer', {'host': host, 'port': port});
     return result ?? false;
   }
 
-  /// "Own USB service" mode's alternative to [setServer]: opens the RTL-SDR
-  /// dongle directly (no rtl_tcp TCP loopback) and feeds it straight to the
-  /// decoder - see DabRtlSdrPlugin.useDirectUsb()/direct_rtlsdr_input.h for
-  /// why. Mutually exclusive with RtlSdrUsbService's own TCP server on the
-  /// same dongle; callers should use this instead of that server + [setServer]
-  /// when "own USB service" is the configured RTL-SDR source.
+  /// "RTL-SDR-USB" mode's alternative to [setServer]: opens the stick
+  /// directly over USB (asking for the permission if needed).
   Future<bool> useDirectUsb() async {
     final result = await _methodChannel.invokeMethod<bool>('useDirectUsb');
     return result ?? false;

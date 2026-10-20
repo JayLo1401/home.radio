@@ -7,19 +7,16 @@ import '../../data/services/rtl_sdr_usb_service.dart';
 
 /// How the DAB+ decoder (and this screen's own test connection) reaches the
 /// RTL-SDR dongle:
-/// - [usb]: this app drives the dongle directly over USB (see
-///   direct_rtlsdr_input.h) - no rtl_tcp server/client involved at all.
+/// - [usb]: this app drives the dongle directly over USB (cpp/hrdab's own
+///   RTL2832U/R820T driver) - no rtl_tcp server/client involved at all.
 /// - [tcp]: a plain rtl_tcp client connection to host:port - either an
-///   external driver app on this same device (localhost), an external
-///   rtl_tcp service elsewhere on the network (e.g. a Raspberry Pi with the
-///   dongle attached), or a future rtl_tcp server of our own - all reached
-///   the exact same way, so they don't need separate options here.
+///   external driver app on this same device (localhost) or an rtl_tcp
+///   service elsewhere on the network (e.g. a Raspberry Pi with the dongle
+///   attached), both reached the exact same way.
 enum RtlSdrConnectionMode { usb, tcp }
 
-/// DAB+'s RTL-SDR setup/diagnostic screen (2026-09-17, renamed/reworked
-/// 2026-09-19 once DAB+ moved off the rtl_tcp server for USB mode - see
-/// direct_rtlsdr_input.h) - picks how the dongle is reached and lets that
-/// chain be verified independently of the DAB+ demodulation work itself.
+/// DAB+'s RTL-SDR setup/diagnostic screen - picks how the dongle is reached
+/// and lets that chain be verified independently of DAB+ decoding itself.
 class RtlSdrTestScreen extends ConsumerStatefulWidget {
   const RtlSdrTestScreen({super.key});
 

@@ -4,12 +4,6 @@ Eine Flutter-App für Android-TV-Boxen: DAB+-Radio (über einen RTL-SDR-USB-Stic
 Internetradio, Wetter, Regenradar und eine Sonne-&-Mond-Kachel, bedienbar komplett
 per Fernbedienung (D-Pad) auf einem großen TV.
 
-> ⚠️ **Lizenzhinweis:** Der native DAB+-Decoder dieser App enthält Code, der aus
-> mehreren GPL-/LGPL-lizenzierten Open-Source-Projekten portiert/übernommen wurde
-> (siehe [Lizenz](#lizenz) unten). Vor einer öffentlichen oder kommerziellen
-> Veröffentlichung (z. B. im Play Store) muss das geklärt werden - die App ist
-> aktuell **nicht** ohne Weiteres als Closed-Source-Produkt vertreibbar.
-
 ## Funktionen
 
 ### DAB+-Radio
@@ -48,8 +42,19 @@ per Fernbedienung (D-Pad) auf einem großen TV.
 - **Wetterprognose-Kachel**: Stundenvorhersage (Temperatur, Wind, Niederschlag)
   für den aktuellen Tag von **GeoSphere Austria** (AROME-Modell, kostenlos, ohne
   API-Key), automatische Aktualisierung alle 30 Minuten.
-- **Regenradar-Kachel**: eingebettetes interaktives Regenradar von
-  **wo-cloud.com**, zentriert auf den konfigurierten Standort.
+- **Wetterradar-Kachel**: eigenes, selbst gezeichnetes Radar aus offenen Daten
+  auf einer grünen Reliefkarte (Copernicus-Höhenmodell, Natural-Earth-Grenzen,
+  -Seen, -Flüsse und -Orte):
+  - Wolken weiß bis grau (EUMETSAT-Satellit, Infrarot + Wolkenmaske, 10 Minuten),
+  - Niederschlag nach Art und Intensität aus dem GeoSphere-Nowcast (INCA, 1 km,
+    15 Minuten, Österreich und Umgebung): Regen hell- bis dunkelblau, Schnee rosa
+    mit Schneeflocken, Schneeregen lila, gefrierender Regen rot, ab 50 mm/h
+    violett („Hagel möglich“ - der Datensatz kennt keinen eigenen Hagel),
+  - Blitze der letzten 5 Minuten als gelbe Punkte, größer und orange/rot bei
+    starker Aktivität (EUMETSAT MTG Lightning Imager; Erd- und Wolkenblitze
+    unterscheidet der Satellit nicht),
+  - Hinweise „Blitze x km“ und „Böen x km/h“ für den Standort.
+  Der gezeigte Umkreis um den Standort ist einstellbar (10 bis 500 km).
 - **Sonne-&-Mond-Kachel**: Sonnenaufgang/-untergang, Morgen-/Abenddämmerung,
   Sonnenhöchststand, Mondphase (alles lokal berechnet, NOAA-Sonnenstandsformeln)
   sowie der aktuelle **UV-Index** (live von **Open-Meteo**, kostenlos, ohne
@@ -84,8 +89,9 @@ per Fernbedienung (D-Pad) auf einem großen TV.
 
 ## Zielhardware
 - Android-TV-Box (Leanback-Launcher, Querformat).
-- RTL2832U-basierter RTL-SDR-USB-Stick (unterstützte Tuner: E4000, FC0012,
-  FC0013, FC2580, R820T/R828D via vendored `librtlsdr`).
+- RTL2832U-basierter RTL-SDR-USB-Stick mit R820T-, R820T2- oder R828D-Tuner
+  (eigener Treiber, siehe `cpp/hrdab/rtl2832.cpp`). Über `rtl_tcp` geht jeder
+  Stick, den der Server unterstützt.
 - Optional: ein zweites Gerät (z. B. Raspberry Pi) mit angeschlossenem Stick als
   `rtl_tcp`-Quelle im Netzwerk, falls der Stick nicht direkt am TV hängt.
 
@@ -99,9 +105,10 @@ flutter build apk --release
 adb install -r build/app/outputs/flutter-apk/app-release.apk
 ```
 
-> Der Release-Build ist aktuell noch mit dem **Debug-Keystore** signiert (siehe
-> `android/app/build.gradle.kts`) - für eine echte Veröffentlichung (Play Store o.
-> ä.) muss vorher ein eigener Upload-Keystore eingerichtet werden.
+> Der Release-Build wird mit dem gemeinsamen jaycloud-Schlüssel signiert
+> (`android/key.properties` oder `../keystore/signing.properties` neben dem
+> Projekt, nie im Git - siehe `android/app/build.gradle.kts`). Fehlt beides,
+> wird mit dem Debug-Keystore signiert.
 
 Für DAB+-Empfang: RTL-SDR-Stick anschließen (direkt oder über einen `rtl_tcp`-
 Server im Netz) und die Verbindung unter Einstellungen → „DAB+ RTL-SDR
@@ -112,44 +119,51 @@ Einrichtung“ konfigurieren.
 - **Persistenz**: `drift` (SQLite) für Sender/Favoriten, `shared_preferences` für
   einfache Einstellungen.
 - **Audio**: `just_audio`/`audio_service` für Internetradio inkl. MediaSession;
-  natives `AudioTrack` für den DAB+-PCM-Ausgang.
-- **DAB+-Kern**: natives C/C++ (JNI) - OFDM-Demodulation, FIC/MSC-Decoding,
-  Reed-Solomon, AAC-Decodierung; angesteuert über ein Kotlin-Plugin
-  (`DabRtlSdrPlugin`) und einen `MethodChannel`/`EventChannel` nach Flutter.
-- **Wetter/Radar/Sonne**: reine HTTP-Aufrufe (GeoSphere Austria, Open-Meteo) bzw.
-  ein eingebettetes WebView (wo-cloud.com) sowie lokal berechnete
-  Sonnenstands-/Mondphasenformeln.
+  für DAB+ dekodiert Androids eigener AAC-Decoder (`MediaCodec`) die
+  Audio-Units, Ausgabe über `AudioTrack` mit Vorpuffer und Taktausgleich
+  (`DabAacPlayer`).
+- **DAB+-Empfänger** (`android/app/src/main/cpp/hrdab/`, eigener Code nach ETSI
+  EN 300 401 / TS 102 563 / TS 101 756): OFDM-Synchronisation und
+  -Demodulation, FIC/MSC, Viterbi, Reed-Solomon, DAB+-Superframes, DLS und
+  MOT-Slideshow, dazu ein RTL2832U/R820T-Treiber direkt über usbfs und ein
+  `rtl_tcp`-Client; angesteuert über `IntegratedDabEngine`/`DabRtlSdrPlugin`
+  und einen `MethodChannel`/`EventChannel` nach Flutter. Ein Sender-Simulator
+  mit Selbsttest liegt in `android/app/src/test_native/hrdab/`
+  (`run_selftest.ps1`, läuft per adb auf einem Android-Gerät).
+- **Wetter/Radar/Sonne**: reine HTTP-Aufrufe (GeoSphere Austria, Open-Meteo,
+  EUMETView) sowie lokal berechnete Sonnenstands-/Mondphasenformeln. Das Radar
+  liest die Nowcast-netCDF-Dateien mit einem eigenen, minimalen HDF5-Leser
+  (`lib/data/services/hdf5_lite.dart`); die Karte ist ein aus Natural Earth
+  erzeugtes Asset (`assets/map/alpine_basemap.json`, Skript
+  `tools/make_basemap.py`).
 
 ## Lizenz
 
-**Es gibt aktuell keine einheitliche Projektlizenz.** Der native DAB+-Decoder
-dieser App wurde durch Portierung/Übernahme von Code aus mehreren bestehenden
-Open-Source-Projekten aufgebaut, jeweils mit Copyleft-Lizenzen:
+[PolyForm Noncommercial 1.0.0](LICENSE.md). Der Quellcode ist offen einsehbar.
+Nutzung und Änderung sind für private und nicht-kommerzielle Zwecke frei, auch für
+Vereine, Schulen und gemeinnützige Organisationen. **Kommerzielle Nutzung ist nicht
+erlaubt**, z. B. Home Radio zu verkaufen, als bezahlten Dienst anzubieten oder in
+kommerzielle Produkte einzubauen. Für eine kommerzielle Lizenz bitte über GitHub
+anfragen.
 
-| Komponente | Lizenz | Ursprung |
-|---|---|---|
-| DAB-Kern (OFDM/FIC/MSC, `android/app/src/main/cpp/dabcore/`) | GPL-2.0-or-later | [welle.io](https://github.com/AlbrechtL/welle.io) |
-| DAB+-Superframe-Decoder (in `dabcore` sowie eigenständig in `dab_native.cpp`) | GPLv3 | [DABlin](https://github.com/opendigitalradio/dablin) |
-| `Crc16.kt` | GPLv3 | DABlin |
-| `EnergyDispersal.kt` | GPL-2.0 | welle.io |
-| `librtlsdr` (`cpp/librtlsdr/`) | GPL-2.0 | [librtlsdr](https://github.com/steve-m/librtlsdr) |
-| `libusb` (`cpp/libusb/`) | LGPL-2.1 | [libusb](https://github.com/libusb/libusb) |
-| Reed-Solomon/FEC (`cpp/fec/`, `cpp/dabcore/libs/fec/`) | LGPL-2.1 | Phil Karns `libfec` |
-| Raontech-Tunertreiber-Port (`RaonTunerDriver.kt`, `FigParser.kt`) | LGPL-2.1 | [hradio/omri-usb](https://github.com/hradio/omri-usb) |
-| AAC-Decoder (`cpp/fdk-aac/`) | Fraunhofer-FDK-AAC-Lizenz (eigene Bedingungen, kein Patentgrant) | [fdk-aac](https://github.com/mstorsjo/fdk-aac) |
-| FFT (`cpp/dabcore/libs/kiss_fft/`) | BSD-3-Clause-artig | kiss_fft |
-| Alle `pubspec.yaml`-Pakete (Dart/Flutter) | MIT/BSD (permissiv) | diverse |
+Der DAB+-Empfänger (`android/app/src/main/cpp/hrdab/`) ist eigener Code nach den
+öffentlichen ETSI-Normen, es ist kein fremder Quellcode eingebunden. AAC/HE-AAC
+dekodiert der auf dem Android-Gerät vorhandene Decoder (`MediaCodec`). Die
+Flutter-/Dart-Pakete aus `pubspec.yaml` stehen unter ihren eigenen (permissiven)
+Lizenzen.
 
-Alle diese Ursprünge sind direkt in den jeweiligen Quelldateien als Kommentar
-dokumentiert. Bevor dieses Projekt außerhalb des privaten Gebrauchs
-weitergegeben, veröffentlicht oder verkauft wird, muss mindestens:
-- eine passende Projekt-`LICENSE`/`NOTICE`-Datei mit allen obigen Attributionen
-  ergänzt werden,
-- der vollständige Quellcode der GPL-/LGPL-Bestandteile den Empfängern der App
-  zugänglich gemacht werden (GPL/LGPL verbieten keinen Verkauf, verlangen aber
-  Quellcode-Verfügbarkeit),
-- die Nutzung des eingebetteten wo-cloud.com-Regenradars sowie des
-  FDK-AAC-Decoders (kein AAC-Patentgrant enthalten) rechtlich geprüft werden.
+Genutzte Daten und Dienste (Quellenangaben in der App unter Einstellungen → Über):
 
-Näheres siehe Commit-/Code-Kommentare in `android/app/src/main/cpp/CMakeLists.txt`
-und den jeweiligen Quelldateien.
+- Wetterprognose: [GeoSphere Austria](https://data.hub.geosphere.at/),
+  [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+- UV-Index: [Open-Meteo.com](https://open-meteo.com/), CC BY 4.0, freie API nur
+  für nicht-kommerzielle Nutzung.
+- Internetradio-Suche und -Logos: [Radio Browser](https://www.radio-browser.info/)
+  (Community-Verzeichnis).
+- Wetterradar: Niederschlag, Niederschlagsart und Böen von GeoSphere Austria
+  (Nowcast, CC BY 4.0); Wolken und Blitze © EUMETSAT (MSG Cloud Mask, MTG FCI
+  IR 10.5, MTG Lightning Imager über EUMETView, ohne Gebühren); Grenzen, Seen,
+  Flüsse, Orte [Natural Earth](https://www.naturalearthdata.com/) (gemeinfrei);
+  Relief „produced using Copernicus WorldDEM-90 © DLR e.V. 2010-2014 and © Airbus
+  Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union
+  and ESA; all rights reserved“ (`tools/make_relief.py`).

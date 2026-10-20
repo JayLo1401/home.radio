@@ -13,9 +13,8 @@ import '../../data/repositories/dab_stations_repository.dart' show DabStationDis
 import '../shared/program_number_dialog.dart';
 import '../shared/rename_dialog.dart';
 
-/// DAB+ reception over the RTL-SDR stick (real OFDM demodulation via the
-/// vendored welle.io core, see DabRtlSdrPlugin.kt/cpp/dabcore_jni.cpp): run
-/// a Band III scan and manage the resulting stations - every station a scan
+/// DAB+ reception over the RTL-SDR stick (the app's own receiver, see
+/// DabRtlSdrPlugin.kt/cpp/hrdab): run a Band III scan and manage the resulting stations - every station a scan
 /// has ever found is persisted (DabStationsRepository) so it can be
 /// favorited (with a program number) without re-scanning, listed separately
 /// from the merged favorites list ("Alle DAB+ Sender").
@@ -756,14 +755,11 @@ class _FoundChannel {
   });
 }
 
-/// DAB Band III scan panel: points the rtl_tcp-based DAB+ decoder
-/// (DabRtlSdrService/DabRtlSdrPlugin) at the configured RTL-SDR source (own
-/// USB-TCP service / external app / network service - same source
-/// RtlSdrTestScreen uses) and shows live progress; every locked ensemble's
-/// stations are persisted into DabStationsRepository as they're found. Each
-/// found service has a real "Anhören" (listen) button now - the vendored
-/// welle.io core actually decodes DAB+ audio, unlike the old Raontech-only
-/// pipeline where "Tunen" only did RF tuning without decoding.
+/// DAB Band III scan panel: points the DAB+ receiver (DabRtlSdrService/
+/// DabRtlSdrPlugin) at the configured RTL-SDR source (USB stick or rtl_tcp
+/// server - same choice as on RtlSdrTestScreen) and shows live progress;
+/// every locked ensemble's stations are persisted into DabStationsRepository
+/// as they're found, each with an "Anhören" (listen) button.
 class _ScanPanel extends ConsumerStatefulWidget {
   const _ScanPanel();
 
@@ -846,11 +842,8 @@ class _ScanPanelState extends ConsumerState<_ScanPanel> {
   }
 
   Future<void> _startScan() async {
-    // In "RTL-SDR-USB" (direct) mode there is no rtl_tcp server to connect
-    // to at all (see direct_rtlsdr_input.h) - this used to always call
-    // setServer() regardless of the configured mode, which in direct mode
-    // just failed its own "is anything listening" probe immediately
-    // (nothing ever was), making a scan impossible to even start.
+    // In "RTL-SDR-USB" mode there is no rtl_tcp server to probe - the stick
+    // is opened directly instead.
     final connected = _ownUsbMode
         ? await ref.read(dabRtlSdrServiceProvider).useDirectUsb()
         : await () async {

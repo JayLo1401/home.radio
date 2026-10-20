@@ -47,8 +47,8 @@ class FavoritesRepository {
   }
 
   /// [freqKhz]/[serviceId] identify the station's Band III channel and DAB
-  /// Service Id (SId) - enough to re-tune it natively via
-  /// DabUsbService.dabTuneFrequency, independent of any scan session.
+  /// Service Id (SId) - enough to re-tune it via
+  /// DabRtlSdrService.playService, independent of any scan session.
   Future<void> addDabService({
     required int programNumber,
     required String displayName,

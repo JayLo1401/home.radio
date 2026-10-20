@@ -24,8 +24,8 @@ class FavoriteChannel {
   String? get internetStreamUrl =>
       sourceType == FavoriteSourceType.internet ? sourceRef['streamUrl'] as String? : null;
 
-  /// DAB Band III channel frequency in kHz (see RaonTunerDriver.BAND3_CHANNELS
-  /// on the Kotlin side) this favorite's ensemble was found on.
+  /// DAB Band III channel frequency in kHz (see DabChannels.BAND3 on the
+  /// Kotlin side) this favorite's ensemble was found on.
   int? get dabFreqKhz =>
       sourceType == FavoriteSourceType.dab ? sourceRef['freqKhz'] as int? : null;
 

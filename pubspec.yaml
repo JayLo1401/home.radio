@@ -42,7 +42,6 @@ dependencies:
   path_provider: ^2.1.6
   path: ^1.9.1
   shared_preferences: ^2.5.5
-  webview_flutter: ^4.14.1
   cached_network_image: ^4.0.0
   http: ^1.6.0
   xml: ^7.0.1
@@ -85,6 +84,8 @@ flutter:
 
   assets:
     - assets/icon/applogo1.png
+    - assets/map/alpine_basemap.json
+    - assets/map/relief.jpg
 
   # To add assets to your application, add an assets section, like this:
   # assets:

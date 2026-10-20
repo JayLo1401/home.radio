@@ -129,7 +129,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       case 'audioFocusLost':
         // Another app (e.g. Spotify) started playing and took over audio
         // focus - the native side already stopped the tuner/decoder itself
-        // (see DabRtlSdrPlugin's DabAudioPlayer instantiation), this just
+        // (see DabRtlSdrPlugin's DabAacPlayer focus callback), this just
         // brings the UI in line with that so it doesn't keep claiming
         // "playing" while nothing is actually coming out of the speaker.
         setState(() {
@@ -228,14 +228,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   /// Points the DAB+ decoder (see DabRtlSdrService) at whichever RTL-SDR
-  /// source was configured in Settings/RtlSdrTestScreen. "Own USB service"
-  /// mode goes straight over USB (see [DabRtlSdrService.useDirectUsb] /
-  /// direct_rtlsdr_input.h) instead of through RtlSdrUsbService's rtl_tcp
-  /// TCP server - that server is now only started from RtlSdrTestScreen
-  /// itself for standalone testing, not auto-started here, since direct
-  /// mode and that server are mutually exclusive consumers of the same
-  /// dongle. An external app or network service still just gets a plain
-  /// rtl_tcp client connection, same as before.
+  /// source was configured in Settings/RtlSdrTestScreen: "RTL-SDR-USB" mode
+  /// opens the stick directly ([DabRtlSdrService.useDirectUsb]), otherwise
+  /// the receiver connects to the configured rtl_tcp server.
   Future<void> _initDabServer() async {
     final settings = ref.read(settingsRepositoryProvider);
     final dab = ref.read(dabRtlSdrServiceProvider);
@@ -405,11 +400,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   int _dabPlayGeneration = 0;
 
   /// Shared DAB+ playback path for both [_play] (favorites) and
-  /// [_playDabStation]: tunes+decodes via the RTL-SDR/welle.io pipeline
-  /// (DabRtlSdrService) and waits for the result - unlike the old
-  /// Raontech-chip pipeline, this is a single await rather than a
-  /// multi-stage event stream (tuning/resolvingSubchannel/playing/...), so
-  /// there's no USB permission/adapter-open dance to manage here either.
+  /// [_playDabStation]: tunes+decodes via the DAB+ receiver
+  /// (DabRtlSdrService) and waits for the result in a single await.
   Future<void> _playDab({
     required int freqKhz,
     required int serviceId,
@@ -757,7 +749,7 @@ class _WeatherRadarColumn extends ConsumerWidget {
           child: RadarPanel(
             lat: settings.lat,
             lon: settings.lon,
-            zoom: settings.radarZoom,
+            radiusKm: settings.radarRadiusKm.toDouble(),
             dimming: settings.radarDimming,
           ),
         ),

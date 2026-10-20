@@ -47,7 +47,7 @@ class SettingsRepository {
   static const _keyWeatherContentScale = 'weather_content_scale';
   static const _keyWeatherSpanTwoTiles = 'weather_span_two_tiles';
   static const _keyRadarTileScale = 'radar_tile_scale';
-  static const _keyRadarZoom = 'radar_zoom';
+  static const _keyRadarRadius = 'radar_radius_km';
   static const _keyRadarDimming = 'radar_dimming';
   static const _keySunEnabled = 'sun_enabled';
   static const _keySunTileScale = 'sun_tile_scale';
@@ -178,24 +178,23 @@ class SettingsRepository {
 
   Future<void> setRadarTileScale(double scale) => _db.setSetting(_keyRadarTileScale, '$scale');
 
-  // wo-cloud's own "wrm" URL parameter (see RadarPanel) - how far the
-  // embedded map is zoomed in by default, i.e. how much of the surrounding
-  // area is visible at once. Previously only ever the hardcoded default (9)
-  // RadarPanel itself used - not otherwise configurable.
-  static const defaultRadarZoom = 9;
-  static const minRadarZoom = 5;
-  static const maxRadarZoom = 13;
+  /// How much of the map the weather radar shows: the distance (km) from the
+  /// location to the tile's top/bottom edge (the wider sides show more).
+  static const radarRadiusSteps = [10, 20, 30, 50, 75, 100, 150, 200, 300, 500];
+  static const defaultRadarRadiusKm = 50;
 
-  Future<int> getRadarZoom() async =>
-      int.tryParse(await _db.getSetting(_keyRadarZoom) ?? '') ?? defaultRadarZoom;
+  Future<int> getRadarRadiusKm() async {
+    final v = int.tryParse(await _db.getSetting(_keyRadarRadius) ?? '');
+    return v != null && radarRadiusSteps.contains(v) ? v : defaultRadarRadiusKm;
+  }
 
-  Future<void> setRadarZoom(int zoom) => _db.setSetting(_keyRadarZoom, '$zoom');
+  Future<void> setRadarRadiusKm(int km) => _db.setSetting(_keyRadarRadius, '$km');
 
   static const defaultRadarDimming = 0.0;
 
   /// 0.0 = no dimming, 1.0 = fully black - a plain dark overlay over the
-  /// radar webview rather than a CSS/colour-invert dark mode, which would
-  /// risk distorting the map's own precipitation-intensity colour coding.
+  /// radar rather than a colour-invert dark mode, which would distort the
+  /// precipitation-intensity colour coding.
   Future<double> getRadarDimming() async =>
       double.tryParse(await _db.getSetting(_keyRadarDimming) ?? '') ?? defaultRadarDimming;
 
@@ -242,9 +241,8 @@ class SettingsRepository {
   static const defaultRtlSdrPort = 1234;
 
   /// The rtl_tcp-protocol source used by both the raw RTL-SDR test screen
-  /// and the DAB+ decoder - our own USB-TCP service, an external driver
-  /// app, or a network service (e.g. a Raspberry Pi), all reached the same
-  /// way (see RtlSdrTestScreen's mode selector).
+  /// and the DAB+ receiver in TCP mode - an external driver app or a
+  /// network service (e.g. a Raspberry Pi), see RtlSdrTestScreen.
   Future<String> getRtlSdrHost() async => (await _db.getSetting(_keyRtlSdrHost)) ?? defaultRtlSdrHost;
 
   Future<int> getRtlSdrPort() async =>
@@ -255,12 +253,9 @@ class SettingsRepository {
     await _db.setSetting(_keyRtlSdrPort, '$port');
   }
 
-  /// Whether the app should automatically (re-)start its own USB-TCP RTL-SDR
-  /// service (RtlSdrUsbService) at startup - set whenever the user actually
-  /// starts that service from RtlSdrTestScreen, so the dongle is ready
-  /// without any manual step the next time the app launches. 'external'
-  /// means the user picked an external driver app or a network service
-  /// instead, which this app has no business auto-starting.
+  /// Whether DAB+ uses the RTL-SDR stick directly over USB ('own',
+  /// "RTL-SDR-USB" on RtlSdrTestScreen) rather than an rtl_tcp server
+  /// ('external').
   Future<bool> getRtlSdrAutoStartOwnService() async => (await _db.getSetting(_keyRtlSdrMode)) == 'own';
 
   Future<void> setRtlSdrMode({required bool ownUsbService}) =>

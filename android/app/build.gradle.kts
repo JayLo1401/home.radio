@@ -1,3 +1,13 @@
+import java.util.Properties
+
+// Release-Signatur: android/key.properties (z. B. in CI aus Secrets erzeugt), sonst der
+// gemeinsame Schluessel aller jaycloud-Apps im Ordner "keystore" neben dem Projekt
+// (D:\github_private\keystore, nicht im Git), sonst der Debug-Schluessel.
+val signingProps = listOf(
+    rootProject.file("key.properties"),
+    rootProject.file("../../keystore/signing.properties"),
+).firstOrNull { it.exists() }?.let { f -> Properties().apply { f.inputStream().use { load(it) } } }
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
@@ -5,7 +15,7 @@ plugins {
 }
 
 android {
-    namespace = "org.lotzapp.home_radio"
+    namespace = "at.jaycloud.home.radio"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -16,7 +26,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "org.lotzapp.home_radio"
+        applicationId = "at.jaycloud.home.radio"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
@@ -31,24 +41,30 @@ android {
         }
     }
 
-    // Native DAB+ decoder (see src/main/cpp) - a JNI port of DABlin's
-    // SuperframeFilter + Phil Karn's real libfec RS(120,110) codec, used
-    // instead of a hand-ported Kotlin translation (see NativeDabDecoder.kt).
+    // Our own DAB+ receiver (src/main/cpp/hrdab).
     externalNativeBuild {
         cmake {
             path = file("src/main/cpp/CMakeLists.txt")
         }
     }
 
+    signingConfigs {
+        if (signingProps != null) {
+            create("release") {
+                storeFile = file(signingProps.getProperty("storeFile"))
+                storePassword = signingProps.getProperty("storePassword")
+                keyAlias = signingProps.getProperty("keyAlias")
+                keyPassword = signingProps.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
-            // Explicit (was implicit/default-on before, which is what let
-            // proguard-rules.pro's NativeDabDecoder keep rule go unnoticed
-            // until a release-ish build crashed every DAB+ playback attempt
-            // with NoSuchMethodError - found 2026-09-16).
+            signingConfig = signingConfigs.getByName(if (signingProps != null) "release" else "debug")
+            // Explicit, so the JNI callback keep rule in proguard-rules.pro
+            // is clearly needed (without it R8 strips the callbacks and DAB+
+            // playback dies with NoSuchMethodError).
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }

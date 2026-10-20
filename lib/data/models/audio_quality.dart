@@ -9,8 +9,8 @@ class AudioQuality {
   /// Short display name, e.g. "MP3", "AAC", "HE-AAC v2".
   final String? codec;
 
-  /// Parses welle.io's DAB+ format summary, e.g. "HE-AAC v2, 48 kHz Stereo
-  /// @ 88 kbit/s" (AUDIO_SERVICE_FORMAT::GetSummary).
+  /// Parses the DAB+ receiver's format summary, e.g. "HE-AAC v2, 48 kHz
+  /// Parametric Stereo @ 88 kbit/s" (AudioParams::describe in cpp/hrdab).
   static AudioQuality? fromDabFormat(String format) {
     final kbps = int.tryParse(RegExp(r'@\s*(\d+)\s*kbit/s').firstMatch(format)?.group(1) ?? '');
     if (kbps == null || kbps <= 0) return null;
