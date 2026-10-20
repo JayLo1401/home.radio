@@ -1,8 +1,30 @@
 # Home Radio
 
 Eine Flutter-App für Android-TV-Boxen: DAB+-Radio (über einen RTL-SDR-USB-Stick),
-Internetradio, Wetter, Regenradar und eine Sonne-&-Mond-Kachel, bedienbar komplett
+Internetradio, Wetter, Wetterradar und eine Sonne-&-Mond-Kachel, bedienbar komplett
 per Fernbedienung (D-Pad) auf einem großen TV.
+
+![Startbildschirm](screenshots/01_startbildschirm.png)
+
+## Warum diese App?
+
+DAB+ und Internetradio haben jeweils ihre Lücken: Manche Sender gibt es über DAB+
+gar nicht, und manche Internetstreams klingen deutlich schlechter als der gleiche
+Sender über DAB+. Home Radio führt beides in **einer gemeinsamen Senderliste**
+zusammen. Jeder Favorit bekommt eine Programmnummer wie ein klassischer Kanalplatz,
+egal ob er über DAB+ oder das Internet kommt. So hört man jeden Sender über den
+jeweils besseren Weg, ohne zwischen Apps zu wechseln.
+
+## Screenshots
+
+| | |
+|---|---|
+| ![Startbildschirm](screenshots/01_startbildschirm.png) | ![DAB+-Sender](screenshots/02_dab_sender.png) |
+| ![Einstellungen](screenshots/03_einstellungen.png) | ![Kacheln und Favoriten](screenshots/04_kacheln_und_favoriten.png) |
+| ![Über und Quellen](screenshots/05_ueber_und_quellen.png) | ![Standortsuche](screenshots/06_standortsuche.png) |
+
+Senderlogos sind in den Screenshots unkenntlich gemacht (Marken der jeweiligen
+Sender).
 
 ## Funktionen
 
@@ -62,8 +84,9 @@ per Fernbedienung (D-Pad) auf einem großen TV.
 - Jede Kachel einzeln aktivierbar, eigene Größen-/Zoom-/Inhaltsskalierung; die
   Wetterprognose-Kachel kann wahlweise über die volle Höhe der beiden anderen
   Kacheln gehen.
-- Gemeinsamer Standort (Name/Breitengrad/Längengrad) für alle drei Kacheln, frei
-  editierbar (keine Geokodierung, Standardwert Graz).
+- Gemeinsamer Standort für alle drei Kacheln: Ort per Name suchen
+  (OpenStreetMap/Nominatim) und aus der Trefferliste wählen, die Koordinaten
+  übernimmt die App (Standardwert Graz).
 
 ### TV-/Fernbedienungsbedienung
 - Vollständige D-Pad-Navigation (eigene Fokus-Reihenfolge in allen Listen/
@@ -158,6 +181,8 @@ Genutzte Daten und Dienste (Quellenangaben in der App unter Einstellungen → Ü
   [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 - UV-Index: [Open-Meteo.com](https://open-meteo.com/), CC BY 4.0, freie API nur
   für nicht-kommerzielle Nutzung.
+- Ortssuche für den Standort: [Nominatim](https://nominatim.org/) mit Daten
+  © OpenStreetMap-Mitwirkende (ODbL); nur einzelne Suchen beim Einrichten.
 - Internetradio-Suche und -Logos: [Radio Browser](https://www.radio-browser.info/)
   (Community-Verzeichnis).
 - Wetterradar: Niederschlag, Niederschlagsart und Böen von GeoSphere Austria

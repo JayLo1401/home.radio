@@ -573,6 +573,10 @@ class _AboutBlockState extends State<_AboutBlock> {
               'Sendersuche und Logos über das Community-Verzeichnis Radio Browser (radio-browser.info)',
             ),
             line(
+              'Ortssuche',
+              '© OpenStreetMap-Mitwirkende, Daten unter der Open Database License (ODbL), über Nominatim.',
+            ),
+            line(
               'Wetterradar',
               'Niederschlag, Niederschlagsart und Böen: © GeoSphere Austria, Nowcast (INCA), '
                   'lizenziert unter CC BY 4.0. '
