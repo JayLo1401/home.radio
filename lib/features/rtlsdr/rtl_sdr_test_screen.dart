@@ -1,22 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/popup_text_field.dart';
 import '../../core/providers.dart';
+import '../../data/repositories/settings_repository.dart' show ReceiverMode;
 import '../../data/services/rtl_sdr_service.dart';
 import '../../data/services/rtl_sdr_usb_service.dart';
 
-/// How the DAB+ decoder (and this screen's own test connection) reaches the
-/// RTL-SDR dongle:
-/// - [usb]: this app drives the dongle directly over USB (cpp/hrdab's own
-///   RTL2832U/R820T driver) - no rtl_tcp server/client involved at all.
-/// - [tcp]: a plain rtl_tcp client connection to host:port - either an
-///   external driver app on this same device (localhost) or an rtl_tcp
-///   service elsewhere on the network (e.g. a Raspberry Pi with the dongle
-///   attached), both reached the exact same way.
-enum RtlSdrConnectionMode { usb, tcp }
-
-/// DAB+'s RTL-SDR setup/diagnostic screen - picks how the dongle is reached
-/// and lets that chain be verified independently of DAB+ decoding itself.
+/// "Radio-Empfänger": whether and how DAB+ and FM reach the RTL-SDR receiver (see
+/// [ReceiverMode]) - "Kein Empfänger" for internet radio only - and a test
+/// connection that verifies the rtl_tcp chain independently of DAB+
+/// decoding itself.
 class RtlSdrTestScreen extends ConsumerStatefulWidget {
   const RtlSdrTestScreen({super.key});
 
@@ -34,7 +28,7 @@ class _RtlSdrTestScreenState extends ConsumerState<RtlSdrTestScreen> {
   RtlSdrStats? _lastStats;
   bool _autoGain = true;
 
-  RtlSdrConnectionMode _mode = RtlSdrConnectionMode.tcp;
+  late ReceiverMode _mode = ref.read(receiverModeProvider);
   List<RtlSdrUsbDevice> _usbDevices = [];
   bool _usbBusy = false;
 
@@ -49,12 +43,12 @@ class _RtlSdrTestScreenState extends ConsumerState<RtlSdrTestScreen> {
     final settings = ref.read(settingsRepositoryProvider);
     final host = await settings.getRtlSdrHost();
     final port = await settings.getRtlSdrPort();
-    final ownUsb = await settings.getRtlSdrAutoStartOwnService();
+    final mode = await settings.getReceiverMode();
     if (!mounted) return;
     setState(() {
       _hostController.text = host;
       _portController.text = '$port';
-      _mode = ownUsb ? RtlSdrConnectionMode.usb : RtlSdrConnectionMode.tcp;
+      _mode = mode;
     });
   }
 
@@ -90,11 +84,16 @@ class _RtlSdrTestScreenState extends ConsumerState<RtlSdrTestScreen> {
     if (mounted) setState(() => _usbBusy = false);
   }
 
-  Future<void> _selectMode(RtlSdrConnectionMode mode) async {
+  Future<void> _selectMode(ReceiverMode mode) async {
     setState(() => _mode = mode);
-    await ref.read(settingsRepositoryProvider).setRtlSdrMode(ownUsbService: mode == RtlSdrConnectionMode.usb);
-    if (mode == RtlSdrConnectionMode.usb) _refreshUsbDevices();
+    await ref.read(receiverModeProvider.notifier).set(mode);
+    if (mode == ReceiverMode.usb) _refreshUsbDevices();
   }
+
+  /// Saved right away, not only on "Verbinden" - DAB+ uses this server too.
+  Future<void> _saveServer() => ref
+      .read(settingsRepositoryProvider)
+      .setRtlSdrServer(_hostController.text.trim(), int.tryParse(_portController.text) ?? 1234);
 
   Future<void> _connect() async {
     setState(() => _connecting = true);
@@ -136,27 +135,35 @@ class _RtlSdrTestScreenState extends ConsumerState<RtlSdrTestScreen> {
   Widget build(BuildContext context) {
     final connected = _lastResult?.connected ?? false;
     return Scaffold(
-      appBar: AppBar(title: const Text('DAB+ RTL-SDR Einrichtung')),
+      appBar: AppBar(title: const Text('Radio-Empfänger (DAB+ & UKW)')),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Wie soll DAB+ den RTL-SDR-Stick ansprechen?',
+              'Für DAB+ und UKW braucht es einen RTL-SDR-Stick - direkt am Gerät oder über das Netzwerk. '
+              'Internetradio funktioniert auch ohne.',
               style: TextStyle(color: Colors.white70),
             ),
             const SizedBox(height: 8),
-            DropdownButton<RtlSdrConnectionMode>(
+            DropdownButton<ReceiverMode>(
               value: _mode,
               items: const [
-                DropdownMenuItem(value: RtlSdrConnectionMode.usb, child: Text('RTL-SDR-USB')),
-                DropdownMenuItem(value: RtlSdrConnectionMode.tcp, child: Text('RTL-SDR TCP')),
+                DropdownMenuItem(value: ReceiverMode.none, child: Text('Kein Empfänger (nur Internetradio)')),
+                DropdownMenuItem(value: ReceiverMode.usb, child: Text('RTL-SDR-Stick per USB')),
+                DropdownMenuItem(value: ReceiverMode.tcp, child: Text('RTL-SDR über Netzwerk (rtl_tcp)')),
               ],
               onChanged: connected ? null : (m) => m == null ? null : _selectMode(m),
             ),
             const SizedBox(height: 16),
-            if (_mode == RtlSdrConnectionMode.usb) ...[
+            if (_mode == ReceiverMode.none)
+              const Text(
+                'DAB+- und UKW-Sendersuche sowie die Reiter „DAB+“ und „FM“ sind ausgeblendet. '
+                'Vorhandene DAB+- und UKW-Favoriten bleiben erhalten, spielen aber erst wieder mit einem Empfänger.',
+                style: TextStyle(color: Colors.white70),
+              )
+            else if (_mode == ReceiverMode.usb) ...[
               const Text(
                 'DAB+ öffnet den Stick direkt über USB, ohne rtl_tcp-Umweg. '
                 'Kein separater "Dienst starten"-Schritt nötig - sobald ein Sender '
@@ -196,19 +203,21 @@ class _RtlSdrTestScreenState extends ConsumerState<RtlSdrTestScreen> {
                 children: [
                   Expanded(
                     flex: 2,
-                    child: TextField(
+                    child: PopupTextField(
                       controller: _hostController,
                       enabled: !connected,
-                      decoration: const InputDecoration(labelText: 'Host (IP)'),
+                      label: 'Host (IP)',
+                      onSubmitted: (_) => _saveServer(),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: TextField(
+                    child: PopupTextField(
                       controller: _portController,
                       enabled: !connected,
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'Port'),
+                      label: 'Port',
+                      onSubmitted: (_) => _saveServer(),
                     ),
                   ),
                 ],
@@ -237,10 +246,10 @@ class _RtlSdrTestScreenState extends ConsumerState<RtlSdrTestScreen> {
               Row(
                 children: [
                   Expanded(
-                    child: TextField(
+                    child: PopupTextField(
                       controller: _freqController,
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'Frequenz (Hz)'),
+                      label: 'Frequenz (Hz)',
                     ),
                   ),
                   const SizedBox(width: 12),

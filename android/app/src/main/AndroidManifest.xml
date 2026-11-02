@@ -58,6 +58,15 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <!-- Skia instead of Impeller: on the Xiaomi TV box the picture
+             froze after about 2 hours (input/station switching kept
+             working, only rendering stopped until the app restarted) -
+             Impeller's raster thread stalling on the box's GPU driver.
+             Read by FlutterLoader from the application's meta-data only -
+             inside <activity> it is silently ignored. -->
+        <meta-data
+            android:name="io.flutter.embedding.android.EnableImpeller"
+            android:value="false" />
 
         <!-- audio_service: MediaSession/notification so the current station
              shows up as a media card for Home Assistant and the TV launcher. -->

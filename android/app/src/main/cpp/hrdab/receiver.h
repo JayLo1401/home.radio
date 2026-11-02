@@ -13,7 +13,9 @@
 #include "byte_ring.h"
 #include "ensemble.h"
 #include "fic.h"
+#include "fm_demod.h"
 #include "msc.h"
+#include "nb_demod.h"
 #include "ofdm.h"
 #include "pad.h"
 #include "sample_source.h"
@@ -36,24 +38,71 @@ public:
     virtual void onAccessUnit(const uint8_t* data, int len, bool ok) = 0;
     virtual void onSlide(const std::vector<uint8_t>& data, int contentSubType) = 0;
     virtual void onStatus(bool isError, const std::string& message) = 0;
+
+    // FM (see FmSink); called on the FM thread.
+    virtual void onFmAudio(const int16_t* /*pcm*/, int /*frames*/) {}
+    virtual void onFmStatus(const FmStatus& /*status*/, float /*gainDb*/) {}
+    virtual void onFmRds(int /*pi*/, const std::string& /*ps*/, const std::string& /*rt*/) {}
+
+    // Narrowband (see NbSink); called on the NB thread. Report levels are
+    // dBFS - subtract gainDb to refer them to the tuner input.
+    virtual void onNbAudio(const int16_t* /*pcm*/, int /*frames*/) {}
+    virtual void onNbReport(const NbReport& /*report*/, float /*gainDb*/) {}
 };
 
 // Owns the whole receive chain: sample source -> OFDM thread -> decoder
-// thread (FIC, selected sub-channel, DAB+ super frames, PAD).
+// thread (FIC, selected sub-channel, DAB+ super frames, PAD), or, in FM
+// mode, sample source -> FM thread (FmDemod), or, in narrowband mode,
+// sample source -> NB thread (NbDemod). There is one stick, so the modes
+// take turns: switching stops the other mode's threads. DAB and FM always
+// run at 2.048 MS/s; NB sets its own rate and the others restore theirs.
 //
 // The threads are decoupled by queues that drop instead of blocking, so a
 // slow consumer (e.g. the audio output) can never stall the USB transfers
 // or the OFDM synchronisation.
 class Receiver : private OfdmSink, private FicListener, private SuperframeListener, private PadListener,
-                 private IqReader {
+                 private IqReader, private FmSink, private NbSink {
 public:
     Receiver(std::unique_ptr<SampleSource> source, ReceiverListener& listener);
     ~Receiver() override;
 
-    // Retunes (starting streaming on first use) and forgets the old ensemble.
+    // Retunes (starting streaming on first use, leaving FM mode) and forgets
+    // the old ensemble.
     bool tune(uint32_t hz);
-    // Stops streaming and decoding until the next tune().
+    // Stops streaming and decoding until the next tune()/fmTune().
     void halt();
+
+    // FM: tunes to a station (entering FM mode) and starts demodulating;
+    // audio, status and RDS go to the listener's onFm* methods.
+    bool fmTune(uint32_t hz);
+    // FM: measures the spectrum around `centerHz` (entering FM mode, no
+    // audio meanwhile) and returns the carriers found in [lowHz, highHz].
+    // Blocks for ~0.3-1 s.
+    bool fmSurvey(uint32_t centerHz, uint32_t lowHz, uint32_t highHz, std::vector<FmCarrier>& out);
+    FmDemod::Info fmInfo() { return fm_.info(); }
+    // {"valid","levelDb","snrDb","stereo","offsetHz","pilot","rdsSync","pi","ps","rt"};
+    // levelDb is the channel power referred to the tuner input (dBFS minus
+    // tuner gain), so it does not jump with the AGC. pi/ps/rt null if unknown.
+    std::string fmInfoJson();
+    // [{"freqKhz","levelDb","marginDb"}], levelDb as above.
+    std::string fmCarriersJson(const std::vector<FmCarrier>& carriers);
+    float gainDb() const { return source_->gainTenthsDb(gainIndex_) / 10.f; }
+
+    // Narrowband: leaves DAB/FM, switches the stick to `sampleRate` (see
+    // NbDemod::supportedRate), places the window around centerHz (or around
+    // freqHz if that would fall outside), monitors channelsHz and plays
+    // freqHz. Audio and reports go to the listener's onNb* methods.
+    bool nbStart(uint32_t sampleRate, uint32_t centerHz, const std::vector<uint32_t>& channelsHz, uint32_t freqHz,
+                 NbMode mode, float squelchDb);
+    // Changes the listened channel/mode; moves the window if freqHz is
+    // outside it. False when NB is not running.
+    bool nbTune(uint32_t freqHz, NbMode mode);
+    void nbSetSquelch(float squelchDb);
+    // Signal filters (see NbFilters); kept across nbStart/nbTune.
+    void nbSetFilters(const NbFilters& filters) { nb_.setFilters(filters); }
+    // New window centre and/or monitored channels. The listened channel
+    // stays; if it is outside the new window it is silent until nbTune.
+    bool nbSetChannels(uint32_t centerHz, const std::vector<uint32_t>& channelsHz);
 
     // Starts decoding a service's audio. False while the FIC has not yet
     // described its sub-channel, or when it is not a DAB+ service.
@@ -94,9 +143,23 @@ private:
     void onSlide(const std::vector<uint8_t>& data, int contentSubType) override;
     // IqReader
     int readIq(uint8_t* dst, int bytes) override;
+    // FmSink
+    bool onFmLevel(float rms, float clipRatio, bool settled) override;
+    void onFmAudio(const int16_t* pcm, int frames) override;
+    void onFmStatus(const FmStatus& status) override;
+    void onFmRds(int pi, const std::string& ps, const std::string& rt) override;
+    // NbSink
+    bool onNbLevel(float rms, float clipRatio, bool settled) override;
+    void onNbAudio(const int16_t* pcm, int frames) override;
+    void onNbReport(const NbReport& report) override;
 
-    bool startLocked();
+    enum class Mode { Dab, Fm, Nb };
+
+    bool startLocked(Mode mode);
+    bool nbRetuneLocked(uint32_t centerHz);
+    void nbConfigureLocked();
     void stopLocked();
+    bool adjustGain(float rms, float clipRatio, bool settled, std::chrono::milliseconds searchInterval);
     void decoderLoop();
     void pushItem(const int8_t* soft, bool lost);
     void applyServiceRequest();
@@ -110,12 +173,25 @@ private:
     SubchannelDecoder sub_;
     SuperframeDecoder superframe_;
     PadDecoder pad_;
+    FmDemod fm_;
+    NbDemod nb_;
 
     std::mutex lifecycleMutex_;
     bool running_ = false;
+    Mode mode_ = Mode::Dab; // of the running threads
     std::atomic<bool> stop_{false};
     std::thread ofdmThread_;
     std::thread decoderThread_;
+    std::thread fmThread_;
+    std::thread nbThread_;
+
+    // Narrowband state (lifecycleMutex_)
+    uint32_t nbRate_ = kSampleRate;
+    uint32_t nbLoHz_ = 0;
+    std::vector<uint32_t> nbChannels_;
+    uint32_t nbFreqHz_ = 0;
+    NbMode nbMode_ = NbMode::Auto;
+    int nbRetune_ = 0;
 
     // Frames from before the latest tune() must not reach the decoders.
     std::atomic<uint32_t> generation_{0};

@@ -14,6 +14,9 @@ constexpr int kChunkSamples = 16384;
 constexpr size_t kKeepBehind = 8192;   // history kept for negative timing steps
 constexpr int kWindowOffset = kGuardLen / 2; // FFT window starts mid-guard
 constexpr int kMaxCoarseShift = 45;   // carriers = kHz, ~ +-200 ppm in Band III
+// The most a tuner can plausibly be off in total (same ~200 ppm). A "lock"
+// further out is on noise or a neighbour, never the wanted ensemble.
+constexpr double kMaxOffsetHz = kMaxCoarseShift * 1000.0 + 1000.0;
 constexpr int kNullBlock = 64;
 constexpr int kNullWindowBlocks = 40; // 2560 of the 2656 null samples
 
@@ -71,6 +74,8 @@ void OfdmDemod::doReset()
     const uint32_t hz = pendingTunedHz_.load();
     if (tunedHz_ != 0 && hz != 0) freqOffsetHz_ *= static_cast<double>(hz) / tunedHz_;
     if (hz != 0) tunedHz_ = hz;
+    // Never carry an implausible offset over to the next channel.
+    if (std::abs(freqOffsetHz_) > kMaxOffsetHz) freqOffsetHz_ = 0;
     snrAcc_ = 0;
     snrCount_ = 0;
     // USB transfers already in flight and the tuner PLL settling still carry
@@ -308,6 +313,21 @@ bool OfdmDemod::acquire()
     consume(edge * kNullBlock - kNullLen - kNullBlock / 2);
     if (!ensure(kFrameLen + 2 * kSymbolLen)) return false;
 
+    // Steps 2 and 3 correct the carrier offset before it's known whether
+    // this attempt locks at all. A failed attempt must take its correction
+    // back: on an empty channel each one is noise, and kept they added up
+    // over a scan (to ~190 kHz, seen on a real device) until even real
+    // ensembles were out of the +-45 kHz coarse search range.
+    const double offsetBefore = freqOffsetHz_;
+    auto failRestoring = [&](long skip) {
+        const double applied = freqOffsetHz_ - offsetBefore;
+        if (applied != 0) {
+            freqOffsetHz_ = offsetBefore;
+            remix(head_, -applied);
+        }
+        return fail(skip);
+    };
+
     // 2. Fractional carrier offset from the cyclic prefixes.
     const float frac = cyclicPrefixOffsetHz(head_, 0);
     freqOffsetHz_ += frac;
@@ -317,7 +337,8 @@ bool OfdmDemod::acquire()
     spectrumAt(head_ + kNullLen + kWindowOffset, cur_.data());
     float coarseQuality = 0;
     const int shift = coarseOffset(cur_.data(), coarseQuality);
-    if (coarseQuality < 0.12f) return fail(kFrameLen / 2);
+    if (coarseQuality < 0.12f) return failRestoring(kFrameLen / 2);
+    if (std::abs(freqOffsetHz_ + shift * 1000.0) > kMaxOffsetHz) return failRestoring(kFrameLen / 2);
     if (shift != 0) {
         freqOffsetHz_ += shift * 1000.0;
         remix(head_, shift * 1000.0);
@@ -328,7 +349,7 @@ bool OfdmDemod::acquire()
     int peak = 0;
     float quality = 0;
     impulse(cur_.data(), peak, quality);
-    if (quality < 15.f) return fail(kFrameLen / 2);
+    if (quality < 15.f) return failRestoring(kFrameLen / 2);
     consume(wrapTiming(peak));
 
     locked_ = true;

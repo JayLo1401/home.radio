@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import '../models/audio_quality.dart';
+
 /// Reads a radio stream's current title ("artist - title") over its own
 /// short-lived HTTP connection - the fallback for when just_audio's own
 /// icyMetadataStream stays silent. Two kinds of stream are understood:
@@ -49,7 +51,8 @@ class IcyMetadataService {
       final response = await _get(client, uri, icy: true);
       if (response.statusCode != 200) return StreamInfo.empty;
       final metaInt = int.tryParse(response.headers.value('icy-metaint') ?? '');
-      final icyBitrate = int.tryParse((response.headers.value('icy-br') ?? '').split(',').first.trim());
+      final icyBr = int.tryParse((response.headers.value('icy-br') ?? '').split(',').first.trim());
+      final icyBitrate = icyBr == null ? null : AudioQuality.normalizeKbps(icyBr);
       final mimeCodec = _codecFromMime(response.headers.contentType?.mimeType);
       if (metaInt != null && metaInt > 0) {
         final block = await _readFirstMetadataBlock(response, metaInt).timeout(_timeout);

@@ -33,9 +33,14 @@ import java.util.concurrent.TimeUnit
  * run at exactly the same speed; when the buffer drifts out of a +-60 ms band
  * around the target, single sample frames are dropped or repeated (at most
  * one per 10 ms block - inaudible) until it is back in the band.
+ *
+ * FM uses the same output with ready-made PCM ([onPcm]): no codec, the
+ * decoder thread just idles. FM delivers audio continuously, so it gets by
+ * with a smaller [prebufferMs].
  */
 class DabAacPlayer(
     private val context: Context,
+    private val prebufferMs: Int = PREBUFFER_MS,
     private val onAudioFocusLost: () -> Unit,
 ) {
 
@@ -101,6 +106,13 @@ class DabAacPlayer(
     fun onAccessUnit(au: ByteArray, ok: Boolean) {
         if (!running) return
         if (!queue.offer(Item.Au(au, ok))) Log.w(TAG, "AU queue full, dropping")
+    }
+
+    /** Ready-made interleaved 16-bit PCM (FM). Only copies into the ring - safe on the native thread. */
+    fun onPcm(pcm: ShortArray, sampleRate: Int, channels: Int) {
+        if (!running) return
+        configureRing(sampleRate, channels)
+        pushPcm(pcm, silent = false)
     }
 
     // --- decoder thread ---
@@ -298,7 +310,7 @@ class DabAacPlayer(
                     fadeStep = 0
                 }
                 val frames = rate / 100 // 10 ms blocks
-                val prebufferSamples = rate * channels * PREBUFFER_MS / 1000
+                val prebufferSamples = rate * channels * prebufferMs / 1000
                 val targetSamples = prebufferSamples
                 val band = rate * channels * BAND_MS / 1000
                 var real = false

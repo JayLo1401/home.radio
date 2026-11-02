@@ -49,6 +49,7 @@ class BackupService {
       'createdAt': now.toIso8601String(),
       'favorites': (await _db.select(_db.favorites).get()).map((r) => r.toJson()).toList(),
       'dabStations': (await _db.select(_db.dabStations).get()).map((r) => r.toJson()).toList(),
+      'fmStations': (await _db.select(_db.fmStations).get()).map((r) => r.toJson()).toList(),
       'settings': (await _db.select(_db.settings).get()).map((r) => r.toJson()).toList(),
     };
     final content = const JsonEncoder.withIndent('  ').convert(data);
@@ -117,6 +118,7 @@ class BackupService {
 
     final List<Favorite> favorites;
     final List<DabStation> dabStations;
+    final List<FmStation> fmStations;
     final List<Setting> settings;
     try {
       // Locally captured logo files live in the app's private storage and
@@ -128,6 +130,10 @@ class BackupService {
       dabStations = rows('dabStations').map(DabStation.fromJson).map((s) {
         return _fileExists(s.logoLocalPath) ? s : s.copyWith(logoLocalPath: const Value(null));
       }).toList();
+      // Missing in backups from before FM existed - then simply none.
+      fmStations = rows('fmStations').map(FmStation.fromJson).map((s) {
+        return _fileExists(s.logoLocalPath) ? s : s.copyWith(logoLocalPath: const Value(null));
+      }).toList();
       settings = rows('settings').map(Setting.fromJson).toList();
     } catch (_) {
       throw const BackupFormatException('Das Backup ist beschädigt oder unvollständig.');
@@ -136,10 +142,12 @@ class BackupService {
     await _db.transaction(() async {
       await _db.delete(_db.favorites).go();
       await _db.delete(_db.dabStations).go();
+      await _db.delete(_db.fmStations).go();
       await _db.delete(_db.settings).go();
       await _db.batch((b) {
         b.insertAll(_db.favorites, favorites);
         b.insertAll(_db.dabStations, dabStations);
+        b.insertAll(_db.fmStations, fmStations);
         b.insertAll(_db.settings, settings);
       });
     });

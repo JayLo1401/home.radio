@@ -3,16 +3,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/country_names_de.dart';
-import '../../core/dpad_text_field.dart';
+import '../../core/country_regions.dart';
+import '../../core/popup_text_field.dart';
 import '../../core/providers.dart';
 import '../../data/models/internet_radio_station.dart';
 import '../shared/program_number_dialog.dart';
 
 /// Sender search screen. Genre/country filtering uses ordinary dropdowns
 /// (alphabetically sorted; countries shown in German), and the free-text
-/// name field uses [DpadTextField] so Up/Down can still leave it even
-/// without a real keyboard - mouse/keyboard users can simply click in and
-/// type as usual.
+/// name is a [PopupTextField] - typed in a dialog, so the remote's arrow
+/// keys never get stuck in an inline text field.
 class InternetRadioSearchScreen extends ConsumerStatefulWidget {
   const InternetRadioSearchScreen({super.key});
 
@@ -26,6 +26,8 @@ class _InternetRadioSearchScreenState
   final _nameController = TextEditingController();
   String? _selectedTag;
   String? _selectedCountryCode;
+  // Narrows the country dropdown (null = all regions).
+  WorldRegion? _region = WorldRegion.europe;
   List<String> _tags = const [];
   List<Map<String, String>> _countries = const [];
   List<InternetRadioStation> _results = const [];
@@ -145,13 +147,10 @@ class _InternetRadioSearchScreenState
                     width: 280,
                     child: FocusTraversalOrder(
                       order: NumericFocusOrder(nextOrder()),
-                      child: DpadTextField(
+                      child: PopupTextField(
                         controller: _nameController,
-                        decoration: const InputDecoration(
-                          labelText: 'Sendername (Tastatur/Maus)',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.search),
-                        ),
+                        label: 'Sendername',
+                        icon: Icons.search,
                         onSubmitted: (_) => _runSearch(),
                       ),
                     ),
@@ -177,17 +176,42 @@ class _InternetRadioSearchScreenState
                     ),
                   ),
                   SizedBox(
+                    width: 220,
+                    child: FocusTraversalOrder(
+                      order: NumericFocusOrder(nextOrder()),
+                      child: DropdownButtonFormField<WorldRegion?>(
+                        initialValue: _region,
+                        decoration: const InputDecoration(labelText: 'Region', border: OutlineInputBorder()),
+                        isExpanded: true,
+                        items: [
+                          const DropdownMenuItem(value: null, child: Text('Alle Regionen')),
+                          for (final r in WorldRegion.values) DropdownMenuItem(value: r, child: Text(r.label)),
+                        ],
+                        onChanged: (r) {
+                          final keep = _selectedCountryCode != null && (r == null || regionOf(_selectedCountryCode!) == r);
+                          setState(() {
+                            _region = r;
+                            if (!keep) _selectedCountryCode = null;
+                          });
+                          if (!keep) _runSearch();
+                        },
+                      ),
+                    ),
+                  ),
+                  SizedBox(
                     width: 260,
                     child: FocusTraversalOrder(
                       order: NumericFocusOrder(nextOrder()),
                       child: DropdownButtonFormField<String>(
+                        // Rebuilt per region, so a reset selection shows.
+                        key: ValueKey(_region),
                         initialValue: _selectedCountryCode,
                         decoration: const InputDecoration(
                             labelText: 'Land', border: OutlineInputBorder()),
                         isExpanded: true,
                         items: [
                           const DropdownMenuItem(value: null, child: Text('Alle Länder')),
-                          ..._countries.map(
+                          ..._countries.where((c) => _region == null || regionOf(c['code'] ?? '') == _region).map(
                             (c) => DropdownMenuItem(
                               value: c['code'],
                               child: Text(germanCountryName(c['code'] ?? '', c['name'] ?? '')),

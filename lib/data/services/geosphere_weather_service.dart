@@ -64,16 +64,25 @@ class GeoSphereWeatherService {
     final currentHour = DateTime(now.year, now.month, now.day, now.hour);
 
     final result = <HourlyForecast>[];
+    var missingHours = 0;
     for (var i = 0; i < timestamps.length; i++) {
       final time = DateTime.parse(timestamps[i]).toLocal();
       if (time.isBefore(currentHour)) continue;
       if (time.isAfter(cutoff)) break;
-      final temp = t2m[i] ?? 0;
+      // A model run GeoSphere hasn't fully published yet comes back with
+      // nulls instead of values - these used to be shown as "0° / 0 km/h"
+      // rows. Such hours are skipped rather than made up.
+      final temp = t2m[i], u = u10m[i], v = v10m[i];
+      if (temp == null || u == null || v == null) {
+        missingHours++;
+        continue;
+      }
       // rr_acc is accumulated since forecast start - the hourly amount is
       // the delta from the previous step (matches the reference GeoSphere
       // integration's approach; the very first step has no predecessor).
-      final rainHour = i == 0 ? (rrAcc[i] ?? 0) : math.max((rrAcc[i] ?? 0) - (rrAcc[i - 1] ?? 0), 0.0);
-      final windSpeed = math.sqrt(math.pow(u10m[i] ?? 0, 2) + math.pow(v10m[i] ?? 0, 2));
+      final rr = rrAcc[i], rrPrev = i == 0 ? 0.0 : rrAcc[i - 1];
+      final rainHour = rr == null || rrPrev == null ? 0.0 : math.max(rr - rrPrev, 0.0);
+      final windSpeed = math.sqrt(u * u + v * v);
       final cloudPct = (tcc[i] ?? 0) * 100;
       result.add(
         HourlyForecast(
@@ -85,6 +94,11 @@ class GeoSphereWeatherService {
           condition: _deriveCondition(rainHour, cloudPct, temp),
         ),
       );
+    }
+    // Nothing usable at all - fail, so the panel keeps showing the last
+    // good forecast and retries shortly instead of showing an empty list.
+    if (result.isEmpty && missingHours > 0) {
+      throw Exception('GeoSphere Austria returned no data for $missingHours hours');
     }
     return result;
   }

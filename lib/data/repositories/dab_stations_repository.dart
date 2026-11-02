@@ -69,6 +69,10 @@ class DabStationsRepository {
   }) {
     return _db.setDabStationLogoUrl(freqKhz, serviceId, logoUrl);
   }
+
+  /// A logo the user chose - see FavoritesRepository.setLogo.
+  Future<void> setLogo({required int freqKhz, required int serviceId, String? logoUrl, String? logoLocalPath}) =>
+      _db.setDabStationLogo(freqKhz, serviceId, logoUrl: logoUrl, logoLocalPath: logoLocalPath);
 }
 
 /// [DabStation.stationLabel] with any user-provided [DabStation.customLabel]
@@ -100,8 +104,16 @@ List<DabStation> sortDabStations(List<DabStation> stations, DabSortMode mode) {
   } else {
     sorted.sort((a, b) {
       final byEnsemble = _dabSortKey(a.ensembleLabel ?? '').compareTo(_dabSortKey(b.ensembleLabel ?? ''));
-      return byEnsemble != 0 ? byEnsemble : byName(a, b);
+      if (byEnsemble != 0) return byEnsemble;
+      // Same-named ensembles on different channels stay apart (each its
+      // own group in [DabSortMode.groupedByEnsemble]).
+      final byFreq = a.freqKhz.compareTo(b.freqKhz);
+      return byFreq != 0 ? byFreq : byName(a, b);
     });
   }
   return sorted;
 }
+
+/// Heading of a station's group in [DabSortMode.groupedByEnsemble] - also
+/// the group key: an ensemble is identified by its label and channel.
+String dabEnsembleHeading(DabStation s) => '${s.ensembleLabel ?? 'Ensemble unbekannt'} · ${s.channelLabel}';

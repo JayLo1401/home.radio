@@ -55,6 +55,7 @@ class FavoritesRepository {
     required int freqKhz,
     required int serviceId,
     String? logoUrl,
+    String? logoLocalPath,
   }) {
     return _db.upsertFavorite(
       FavoritesCompanion.insert(
@@ -62,10 +63,33 @@ class FavoritesRepository {
         sourceType: 'dab',
         displayName: displayName,
         logoUrl: Value(logoUrl),
+        logoLocalPath: Value(logoLocalPath),
         sourceRef: FavoriteChannel.encodeSourceRef({
           'freqKhz': freqKhz,
           'serviceId': serviceId,
         }),
+      ),
+    );
+  }
+
+  /// An FM (UKW) station as a favorite - [freqKhz] is all that's needed to
+  /// tune it again; [pi] (RDS) is kept to recognise the station.
+  Future<void> addFmStation({
+    required int programNumber,
+    required String displayName,
+    required int freqKhz,
+    int? pi,
+    String? logoUrl,
+    String? logoLocalPath,
+  }) {
+    return _db.upsertFavorite(
+      FavoritesCompanion.insert(
+        programNumber: Value(programNumber),
+        sourceType: 'fm',
+        displayName: displayName,
+        logoUrl: Value(logoUrl),
+        logoLocalPath: Value(logoLocalPath),
+        sourceRef: FavoriteChannel.encodeSourceRef({'freqKhz': freqKhz, 'pi': ?pi}),
       ),
     );
   }
@@ -100,6 +124,11 @@ class FavoritesRepository {
   /// DabStationsRepository.setLogoPath's doc comment.
   Future<void> updateLogoLocalPath(int programNumber, String logoLocalPath) =>
       _db.updateFavoriteLogoLocalPath(programNumber, logoLocalPath);
+
+  /// A logo the user chose: either an image URL or a received broadcast
+  /// image - the other one is cleared so the choice is what's shown.
+  Future<void> setLogo(int programNumber, {String? logoUrl, String? logoLocalPath}) =>
+      _db.setFavoriteLogo(programNumber, logoUrl: logoUrl, logoLocalPath: logoLocalPath);
 
   /// Removes the DAB favorite (if any) pointing at this exact station, by
   /// frequency + service id (there's no other stable key across scans).

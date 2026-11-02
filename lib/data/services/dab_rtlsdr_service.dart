@@ -40,7 +40,100 @@ class DabRtlSdrService {
     return result ?? false;
   }
 
-  Future<void> scanBand3() => _methodChannel.invokeMethod('scanBand3');
+  /// The whole of Band III, or with [onlyFreqKhz] just that one channel
+  /// (searched more patiently - see DabRtlSdrPlugin.scanBand3).
+  Future<void> scanBand3({int? onlyFreqKhz}) =>
+      _methodChannel.invokeMethod('scanBand3', {'freqKhz': ?onlyFreqKhz});
+
+  // FM (UKW) - same receiver and stick; starting FM leaves DAB+ and vice
+  // versa (one tuner). Events: fmStatus, fmRds, fmSeekResult,
+  // fmScanProgress, fmStationFound, fmScanFinished.
+
+  /// Switches to FM, tunes [freqKhz] and plays it.
+  Future<bool> fmPlay(int freqKhz) async =>
+      await _methodChannel.invokeMethod<bool>('fmPlay', {'freqKhz': freqKhz}) ?? false;
+
+  /// Retunes while FM is playing (manual tuning) - audio continues.
+  Future<bool> fmTune(int freqKhz) async =>
+      await _methodChannel.invokeMethod<bool>('fmTune', {'freqKhz': freqKhz}) ?? false;
+
+  /// Looks for the next station up or down from [fromKhz] and plays it;
+  /// the result arrives as an `fmSeekResult` event.
+  Future<void> fmSeek({required int fromKhz, required bool up}) =>
+      _methodChannel.invokeMethod('fmSeek', {'fromKhz': fromKhz, 'up': up});
+
+  Future<void> fmStop() => _methodChannel.invokeMethod('fmStop');
+
+  Future<void> fmScan() => _methodChannel.invokeMethod('fmScan');
+
+  Future<void> stopFmScan() => _methodChannel.invokeMethod('stopFmScan');
+
+  // Narrowband listening (CB radio, airband) - same receiver; leaves DAB+/FM.
+  // Events: nbStatus, nbActivity, nbSpectrum. Modes: auto, am, fm, usb, lsb.
+
+  Future<bool> nbStart({
+    required int sampleRate,
+    required int centerHz,
+    required List<int> channelsHz,
+    required int freqHz,
+    required String mode,
+    required double squelchDb,
+  }) async =>
+      await _methodChannel.invokeMethod<bool>('nbStart', {
+        'sampleRate': sampleRate,
+        'centerHz': centerHz,
+        'channelsHz': channelsHz,
+        'freqHz': freqHz,
+        'mode': mode,
+        'squelchDb': squelchDb,
+      }) ??
+      false;
+
+  Future<bool> nbTune({required int freqHz, required String mode}) async =>
+      await _methodChannel.invokeMethod<bool>('nbTune', {'freqHz': freqHz, 'mode': mode}) ?? false;
+
+  Future<void> nbSetSquelch(double squelchDb) => _methodChannel.invokeMethod('nbSetSquelch', {'squelchDb': squelchDb});
+
+  Future<bool> nbSetChannels({required int centerHz, required List<int> channelsHz}) async =>
+      await _methodChannel.invokeMethod<bool>('nbSetChannels', {'centerHz': centerHz, 'channelsHz': channelsHz}) ??
+      false;
+
+  Future<void> nbStop() => _methodChannel.invokeMethod('nbStop');
+
+  /// Signal filters for the listened channel: [bandwidthHz] (0 = mode
+  /// default), impulse [noiseBlanker], [voiceFilter] (300-3000 Hz) and
+  /// [agc] ("auto", "fast", "slow").
+  Future<void> nbSetFilters({
+    required int bandwidthHz,
+    required bool noiseBlanker,
+    required bool voiceFilter,
+    required String agc,
+  }) =>
+      _methodChannel.invokeMethod('nbSetFilters', {
+        'bandwidthHz': bandwidthHz,
+        'noiseBlanker': noiseBlanker,
+        'voiceFilter': voiceFilter,
+        'agc': agc,
+      });
+
+  /// FM band limits (kHz) and the smallest tuning step.
+  static const fmMinKhz = 87500, fmMaxKhz = 108000, fmStepKhz = 50;
+
+  /// Band III channels (label, kHz) - same list as DabChannels.BAND3 on the
+  /// Kotlin side, for picking one to search manually.
+  static const band3Channels = [
+    ('5A', 174928), ('5B', 176640), ('5C', 178352), ('5D', 180064),
+    ('6A', 181936), ('6B', 183648), ('6C', 185360), ('6D', 187072),
+    ('7A', 188928), ('7B', 190640), ('7C', 192352), ('7D', 194064),
+    ('8A', 195936), ('8B', 197648), ('8C', 199360), ('8D', 201072),
+    ('9A', 202928), ('9B', 204640), ('9C', 206352), ('9D', 208064),
+    ('10A', 209936), ('10N', 210096), ('10B', 211648), ('10C', 213360),
+    ('10D', 215072), ('11A', 216928), ('11N', 217088), ('11B', 218640),
+    ('11C', 220352), ('11D', 222064), ('12A', 223936), ('12N', 224096),
+    ('12B', 225648), ('12C', 227360), ('12D', 229072), ('13A', 230784),
+    ('13B', 232496), ('13C', 234208), ('13D', 235776), ('13E', 237488),
+    ('13F', 239200),
+  ];
 
   Future<void> stopScan() => _methodChannel.invokeMethod('stopScan');
 

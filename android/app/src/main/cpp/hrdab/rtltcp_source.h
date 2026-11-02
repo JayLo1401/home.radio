@@ -23,6 +23,9 @@ public:
     int gainCount() const override;
     bool setGainIndex(int index) override;
     int gainTenthsDb(int index) const override;
+    // Sent with command 0x02 on every (re)connect; the receiver only changes
+    // it while stopped, i.e. before the next connect.
+    bool setSampleRate(uint32_t hz) override;
 
 private:
     void loop();

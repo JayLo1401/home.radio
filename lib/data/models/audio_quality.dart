@@ -18,6 +18,11 @@ class AudioQuality {
     return AudioQuality(kbps: kbps, codec: codec.isEmpty ? null : codec);
   }
 
+  /// kbit/s from a bitrate that may be given in bit/s instead - ExoPlayer's
+  /// ICY headers always are, and some servers send icy-br that way too.
+  /// No real stream is 8000+ kbit/s, so anything from there on is bit/s.
+  static int normalizeKbps(int value) => value >= 8000 ? (value / 1000).round() : value;
+
   /// How good this sounds, 0 (poor) .. 1 (excellent) - not the raw bitrate:
   /// modern codecs sound better per kbit than MP3 (64 kbps HE-AAC, typical
   /// for DAB+, is roughly on par with 128 kbps MP3), so the bitrate is

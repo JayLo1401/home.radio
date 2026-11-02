@@ -40,13 +40,17 @@ Sender).
 - **Sendersuchlauf** über Band III, gefundene Sender werden dauerhaft gespeichert
   (unabhängig von Favoriten, jederzeit erneut favorisierbar ohne neuen Suchlauf).
 - **Favoriten mit Programmnummern** (wie ein klassischer Kanalplatz), gemeinsam für
-  DAB+- und Internetradio-Sender, umsortierbar.
-- **Senderlogos** auf zwei Arten:
-  - *„via Empfang"*: tunt automatisch alle Sender durch und wartet auf ein echtes,
-    über DAB+ ausgestrahltes MOT-Slideshow-Bild (authoritativ, überschreibt ein
-    zuvor per Internet gesetztes Logo).
-  - *Internet-Suche*: Logo-Lookup über die Radio-Browser-API, füllt nur fehlende
-    Logos auf; manuelle Korrektur/Auswahl bei Fehltreffern möglich.
+  DAB+-, UKW- und Internetradio-Sender. Die Senderleiste der Startseite hat die
+  Reiter ♥ (Favoriten), „DAB+“ und „FM“; Favoriten sind dort direkt bearbeitbar
+  (Stift-Symbol): umsortieren, umbenennen, entfernen.
+- **Senderlogos**:
+  - *„Fehlende Logos per Empfang holen“* (neben dem Suchlauf): tunt alle Sender
+    ohne Logo durch und wartet auf ein über DAB+ ausgestrahltes
+    MOT-Slideshow-Bild; vorhandene Logos bleiben unangetastet.
+  - *„Logo wählen“* pro Sender: „DAB-Logo holen“ (Bild genau dieses Senders
+    empfangen) oder aus Internet-Treffern der Radio-Browser-API wählen (breite
+    Suche über alle Namensteile, Treffer aus AT/DE/CH zuerst, mit Land zur
+    Kontrolle) oder eine eigene Bild-URL eintragen. Die Wahl gilt fest.
 - Automatischer Wiederholungsversuch bei „Kein Signal!“ (jede Sekunde, ohne
   Obergrenze), solange der Sender ausgewählt bleibt.
 - Live-Radiotext (DLS/PAD), Signalstärke-Anzeige (SNR), automatische
@@ -54,29 +58,60 @@ Sender).
 - Sortierung der Senderliste nach Ensemble oder Alphabet (ignoriert dabei
   dekorative Zeichen wie „*“/„!“ am Anfang echter Sendernamen).
 
+### UKW-Radio (FM)
+- Eigener UKW-Empfänger über denselben RTL-SDR-Stick wie DAB+ (eigener Code):
+  FM-Demodulation, Stereo (19-kHz-Pilot) mit automatischem Mono-Rückfall,
+  50-µs-Deemphasis und **RDS** (Sendername, Radiotext, PI-Kennung).
+- **Sendersuchlauf** über 87,5–108 MHz (50-kHz-Raster), gefundene Sender werden
+  mit RDS-Namen gespeichert.
+- **Manuell einstellen**: in 50-kHz-Schritten, Frequenz direkt eingeben oder
+  Suchen ◀◀/▶▶ zum nächsten Sender, mit Live-Anzeige von RDS-Name, Radiotext,
+  Stereo und Signal; als Sender oder direkt als Favorit speichern.
+- Sender umbenennen, Logo wählen (Internet-Suche oder eigene Bild-URL), als
+  Favorit mit Programmnummer speichern; eigener Reiter „FM“ in der Senderleiste.
+
+### Mithören: CB-, Amateur-, Flug- und Militärfunk
+- In den Einstellungen unter „Radio-Empfänger“ einzeln einschaltbar; jeweils ein
+  eigener Knopf oben links (durch eine Linie von den Radio-Knöpfen getrennt) und
+  eine eigene Vollbild-Seite - ohne Sender oder Favoriten, nur zum Zuhören.
+- **CB-Funk**: 40 Kanäle (AT) oder 80 (DE), AM, FM, USB, LSB oder automatische
+  Erkennung der Modulation.
+- **Amateurfunk**: 10 m, 6 m, 2 m, 70 cm und 23 cm (Kurzwelle darunter kann der
+  R820T2-Tuner nicht empfangen).
+- **Flugfunk** (118–137 MHz) und **Militärfunk** (225–400 MHz), AM im
+  25-kHz-Raster - nicht für die Allgemeinheit bestimmt: nur mithören, Inhalte
+  nicht aufzeichnen oder weitergeben.
+- Alle Kanäle im Empfangsfenster werden laufend gemessen: grün, solange gesendet
+  wird, danach langsam verblassend. Spektrum und Wasserfall des Fensters,
+  Rauschsperre, Suchlauf mit Halt auf aktiven Kanälen; mit der Fernbedienung
+  springen Weiter/Zurück zwischen den grünen Kanälen, links/rechts im Wasserfall
+  geht Kanal für Kanal.
+- **Signalfilter**: Filterbreite, Störaustaster, Sprachfilter (300–3000 Hz) und
+  Lautstärkeregelung, mit sinnvollen Voreinstellungen je Band.
+- **Bandbreite** (Abtastrate) wählbar: 0,96 / 1,44 / 2,048 MHz - über einen
+  Netzwerk-Stick (rtl_tcp) sind das rund 15 / 23 / 33 Mbit/s.
+
 ### Internetradio
 - Sendersuche nach Name/Genre/Land über die freie **Radio-Browser-API**
   (`api.radio-browser.info`), Ergebnisse direkt als Favorit mit Programmnummer
   speicherbar.
 - Wiedergabe inkl. Live-„Now Playing“-Text (ICY-StreamTitle).
 
-### Wetter, Regenradar, Sonne & Mond
+### Wetter, Wetterradar, Sonne & Mond
 - **Wetterprognose-Kachel**: Stundenvorhersage (Temperatur, Wind, Niederschlag)
   für den aktuellen Tag von **GeoSphere Austria** (AROME-Modell, kostenlos, ohne
   API-Key), automatische Aktualisierung alle 30 Minuten.
-- **Wetterradar-Kachel**: eigenes, selbst gezeichnetes Radar aus offenen Daten
-  auf einer grünen Reliefkarte (Copernicus-Höhenmodell, Natural-Earth-Grenzen,
-  -Seen, -Flüsse und -Orte):
-  - Wolken weiß bis grau (EUMETSAT-Satellit, Infrarot + Wolkenmaske, 10 Minuten),
-  - Niederschlag nach Art und Intensität aus dem GeoSphere-Nowcast (INCA, 1 km,
-    15 Minuten, Österreich und Umgebung): Regen hell- bis dunkelblau, Schnee rosa
-    mit Schneeflocken, Schneeregen lila, gefrierender Regen rot, ab 50 mm/h
-    violett („Hagel möglich“ - der Datensatz kennt keinen eigenen Hagel),
-  - Blitze der letzten 5 Minuten als gelbe Punkte, größer und orange/rot bei
-    starker Aktivität (EUMETSAT MTG Lightning Imager; Erd- und Wolkenblitze
-    unterscheidet der Satellit nicht),
-  - Hinweise „Blitze x km“ und „Böen x km/h“ für den Standort.
-  Der gezeigte Umkreis um den Standort ist einstellbar (10 bis 500 km).
+- **Wetterradar-Kachel**: zeigt ein Radar von einer frei eintragbaren Adresse,
+  entweder als Bild (PNG/JPG, Aktualisierung alle 2½ Minuten, z. B. vom eigenen
+  Radar-Server) oder als Webseite in einem eingebetteten Browser (z. B. eine
+  interaktive Radarkarte; nur zur Anzeige, die Fernbedienung bleibt auf dem
+  Startbildschirm). Optional mit Token („Authorization: Bearer …“).
+  Platzhalter in der Adresse werden ersetzt: `{lat}` `{lon}` (Standort), `{r}`
+  (Umkreis in km, 10 bis 500), `{zoom}` (Kartenzoom passend zum Umkreis),
+  `{w}` `{h}` (Kachelgröße in Pixeln), `{scale}` (Bildschirmdichte). Die App
+  selbst zeichnet kein Radar mehr und bringt keine Radarquelle mit; Rechte und
+  Nutzungsbedingungen liegen beim jeweiligen Anbieter, für die eingetragene
+  Quelle ist der Nutzer selbst verantwortlich.
 - **Sonne-&-Mond-Kachel**: Sonnenaufgang/-untergang, Morgen-/Abenddämmerung,
   Sonnenhöchststand, Mondphase (alles lokal berechnet, NOAA-Sonnenstandsformeln)
   sowie der aktuelle **UV-Index** (live von **Open-Meteo**, kostenlos, ohne
@@ -104,11 +139,15 @@ Sender).
   Favorit), konfigurierbar in den Einstellungen.
 
 ### Einstellungen
-- RTL-SDR-Verbindung (eigener USB-Modus vs. rtl_tcp-Server, Host/Port,
-  Geräteliste/Berechtigungen, Verbindungstest, Auto-Gain).
-- DAB+-Senderverwaltung (Suchlauf, Favoriten, alle gefundenen Sender, Logos).
-- Favoritenverwaltung (umsortieren, umbenennen, löschen).
+- DAB+-Empfänger: kein Empfänger (nur Internetradio - DAB+-Suche und der Reiter
+  „DAB-Sender“ werden ausgeblendet), RTL-SDR-Stick per USB oder über das Netzwerk
+  (rtl_tcp-Server, Host/Port, Geräteliste/Berechtigungen, Verbindungstest,
+  Auto-Gain).
 - Kacheleinstellungen (siehe oben), Standort, UI-Skalierung, Uhrzeit-Datum-Anzeige.
+- Backup & Wiederherstellung.
+
+DAB+-Sendersuche und -verwaltung (Suchlauf, alle gefundenen Sender, Logos)
+erreicht man über das Radio-Symbol oben auf der Startseite.
 
 ## Zielhardware
 - Android-TV-Box (Leanback-Launcher, Querformat).
@@ -134,8 +173,8 @@ adb install -r build/app/outputs/flutter-apk/app-release.apk
 > wird mit dem Debug-Keystore signiert.
 
 Für DAB+-Empfang: RTL-SDR-Stick anschließen (direkt oder über einen `rtl_tcp`-
-Server im Netz) und die Verbindung unter Einstellungen → „DAB+ RTL-SDR
-Einrichtung“ konfigurieren.
+Server im Netz) und die Verbindung unter Einstellungen → „DAB+-Empfänger“
+konfigurieren.
 
 ## Architektur (kurz)
 - **State Management**: Riverpod.
@@ -154,11 +193,8 @@ Einrichtung“ konfigurieren.
   mit Selbsttest liegt in `android/app/src/test_native/hrdab/`
   (`run_selftest.ps1`, läuft per adb auf einem Android-Gerät).
 - **Wetter/Radar/Sonne**: reine HTTP-Aufrufe (GeoSphere Austria, Open-Meteo,
-  EUMETView) sowie lokal berechnete Sonnenstands-/Mondphasenformeln. Das Radar
-  liest die Nowcast-netCDF-Dateien mit einem eigenen, minimalen HDF5-Leser
-  (`lib/data/services/hdf5_lite.dart`); die Karte ist ein aus Natural Earth
-  erzeugtes Asset (`assets/map/alpine_basemap.json`, Skript
-  `tools/make_basemap.py`).
+  Radarbild von der eingetragenen Quelle) sowie lokal berechnete
+  Sonnenstands-/Mondphasenformeln.
 
 ## Lizenz
 
@@ -185,10 +221,5 @@ Genutzte Daten und Dienste (Quellenangaben in der App unter Einstellungen → Ü
   © OpenStreetMap-Mitwirkende (ODbL); nur einzelne Suchen beim Einrichten.
 - Internetradio-Suche und -Logos: [Radio Browser](https://www.radio-browser.info/)
   (Community-Verzeichnis).
-- Wetterradar: Niederschlag, Niederschlagsart und Böen von GeoSphere Austria
-  (Nowcast, CC BY 4.0); Wolken und Blitze © EUMETSAT (MSG Cloud Mask, MTG FCI
-  IR 10.5, MTG Lightning Imager über EUMETView, ohne Gebühren); Grenzen, Seen,
-  Flüsse, Orte [Natural Earth](https://www.naturalearthdata.com/) (gemeinfrei);
-  Relief „produced using Copernicus WorldDEM-90 © DLR e.V. 2010-2014 and © Airbus
-  Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union
-  and ESA; all rights reserved“ (`tools/make_relief.py`).
+- Wetterradar: kommt von der selbst eingetragenen Quelle; Rechte und
+  Quellenangaben liegen beim jeweiligen Anbieter.

@@ -1283,12 +1283,576 @@ class DabStationsCompanion extends UpdateCompanion<DabStation> {
   }
 }
 
+class $FmStationsTable extends FmStations
+    with TableInfo<$FmStationsTable, FmStation> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $FmStationsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _freqKhzMeta = const VerificationMeta(
+    'freqKhz',
+  );
+  @override
+  late final GeneratedColumn<int> freqKhz = GeneratedColumn<int>(
+    'freq_khz',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _piMeta = const VerificationMeta('pi');
+  @override
+  late final GeneratedColumn<int> pi = GeneratedColumn<int>(
+    'pi',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _psNameMeta = const VerificationMeta('psName');
+  @override
+  late final GeneratedColumn<String> psName = GeneratedColumn<String>(
+    'ps_name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _customLabelMeta = const VerificationMeta(
+    'customLabel',
+  );
+  @override
+  late final GeneratedColumn<String> customLabel = GeneratedColumn<String>(
+    'custom_label',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _logoUrlMeta = const VerificationMeta(
+    'logoUrl',
+  );
+  @override
+  late final GeneratedColumn<String> logoUrl = GeneratedColumn<String>(
+    'logo_url',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _logoLocalPathMeta = const VerificationMeta(
+    'logoLocalPath',
+  );
+  @override
+  late final GeneratedColumn<String> logoLocalPath = GeneratedColumn<String>(
+    'logo_local_path',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _stereoMeta = const VerificationMeta('stereo');
+  @override
+  late final GeneratedColumn<bool> stereo = GeneratedColumn<bool>(
+    'stereo',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("stereo" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _levelDbMeta = const VerificationMeta(
+    'levelDb',
+  );
+  @override
+  late final GeneratedColumn<double> levelDb = GeneratedColumn<double>(
+    'level_db',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _lastSeenAtMeta = const VerificationMeta(
+    'lastSeenAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> lastSeenAt = GeneratedColumn<DateTime>(
+    'last_seen_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    freqKhz,
+    pi,
+    psName,
+    customLabel,
+    logoUrl,
+    logoLocalPath,
+    stereo,
+    levelDb,
+    lastSeenAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'fm_stations';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<FmStation> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('freq_khz')) {
+      context.handle(
+        _freqKhzMeta,
+        freqKhz.isAcceptableOrUnknown(data['freq_khz']!, _freqKhzMeta),
+      );
+    }
+    if (data.containsKey('pi')) {
+      context.handle(_piMeta, pi.isAcceptableOrUnknown(data['pi']!, _piMeta));
+    }
+    if (data.containsKey('ps_name')) {
+      context.handle(
+        _psNameMeta,
+        psName.isAcceptableOrUnknown(data['ps_name']!, _psNameMeta),
+      );
+    }
+    if (data.containsKey('custom_label')) {
+      context.handle(
+        _customLabelMeta,
+        customLabel.isAcceptableOrUnknown(
+          data['custom_label']!,
+          _customLabelMeta,
+        ),
+      );
+    }
+    if (data.containsKey('logo_url')) {
+      context.handle(
+        _logoUrlMeta,
+        logoUrl.isAcceptableOrUnknown(data['logo_url']!, _logoUrlMeta),
+      );
+    }
+    if (data.containsKey('logo_local_path')) {
+      context.handle(
+        _logoLocalPathMeta,
+        logoLocalPath.isAcceptableOrUnknown(
+          data['logo_local_path']!,
+          _logoLocalPathMeta,
+        ),
+      );
+    }
+    if (data.containsKey('stereo')) {
+      context.handle(
+        _stereoMeta,
+        stereo.isAcceptableOrUnknown(data['stereo']!, _stereoMeta),
+      );
+    }
+    if (data.containsKey('level_db')) {
+      context.handle(
+        _levelDbMeta,
+        levelDb.isAcceptableOrUnknown(data['level_db']!, _levelDbMeta),
+      );
+    }
+    if (data.containsKey('last_seen_at')) {
+      context.handle(
+        _lastSeenAtMeta,
+        lastSeenAt.isAcceptableOrUnknown(
+          data['last_seen_at']!,
+          _lastSeenAtMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {freqKhz};
+  @override
+  FmStation map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return FmStation(
+      freqKhz: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}freq_khz'],
+      )!,
+      pi: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}pi'],
+      ),
+      psName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}ps_name'],
+      ),
+      customLabel: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}custom_label'],
+      ),
+      logoUrl: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}logo_url'],
+      ),
+      logoLocalPath: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}logo_local_path'],
+      ),
+      stereo: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}stereo'],
+      )!,
+      levelDb: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}level_db'],
+      ),
+      lastSeenAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}last_seen_at'],
+      )!,
+    );
+  }
+
+  @override
+  $FmStationsTable createAlias(String alias) {
+    return $FmStationsTable(attachedDatabase, alias);
+  }
+}
+
+class FmStation extends DataClass implements Insertable<FmStation> {
+  final int freqKhz;
+  final int? pi;
+  final String? psName;
+  final String? customLabel;
+  final String? logoUrl;
+  final String? logoLocalPath;
+  final bool stereo;
+  final double? levelDb;
+  final DateTime lastSeenAt;
+  const FmStation({
+    required this.freqKhz,
+    this.pi,
+    this.psName,
+    this.customLabel,
+    this.logoUrl,
+    this.logoLocalPath,
+    required this.stereo,
+    this.levelDb,
+    required this.lastSeenAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['freq_khz'] = Variable<int>(freqKhz);
+    if (!nullToAbsent || pi != null) {
+      map['pi'] = Variable<int>(pi);
+    }
+    if (!nullToAbsent || psName != null) {
+      map['ps_name'] = Variable<String>(psName);
+    }
+    if (!nullToAbsent || customLabel != null) {
+      map['custom_label'] = Variable<String>(customLabel);
+    }
+    if (!nullToAbsent || logoUrl != null) {
+      map['logo_url'] = Variable<String>(logoUrl);
+    }
+    if (!nullToAbsent || logoLocalPath != null) {
+      map['logo_local_path'] = Variable<String>(logoLocalPath);
+    }
+    map['stereo'] = Variable<bool>(stereo);
+    if (!nullToAbsent || levelDb != null) {
+      map['level_db'] = Variable<double>(levelDb);
+    }
+    map['last_seen_at'] = Variable<DateTime>(lastSeenAt);
+    return map;
+  }
+
+  FmStationsCompanion toCompanion(bool nullToAbsent) {
+    return FmStationsCompanion(
+      freqKhz: Value(freqKhz),
+      pi: pi == null && nullToAbsent ? const Value.absent() : Value(pi),
+      psName: psName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(psName),
+      customLabel: customLabel == null && nullToAbsent
+          ? const Value.absent()
+          : Value(customLabel),
+      logoUrl: logoUrl == null && nullToAbsent
+          ? const Value.absent()
+          : Value(logoUrl),
+      logoLocalPath: logoLocalPath == null && nullToAbsent
+          ? const Value.absent()
+          : Value(logoLocalPath),
+      stereo: Value(stereo),
+      levelDb: levelDb == null && nullToAbsent
+          ? const Value.absent()
+          : Value(levelDb),
+      lastSeenAt: Value(lastSeenAt),
+    );
+  }
+
+  factory FmStation.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return FmStation(
+      freqKhz: serializer.fromJson<int>(json['freqKhz']),
+      pi: serializer.fromJson<int?>(json['pi']),
+      psName: serializer.fromJson<String?>(json['psName']),
+      customLabel: serializer.fromJson<String?>(json['customLabel']),
+      logoUrl: serializer.fromJson<String?>(json['logoUrl']),
+      logoLocalPath: serializer.fromJson<String?>(json['logoLocalPath']),
+      stereo: serializer.fromJson<bool>(json['stereo']),
+      levelDb: serializer.fromJson<double?>(json['levelDb']),
+      lastSeenAt: serializer.fromJson<DateTime>(json['lastSeenAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'freqKhz': serializer.toJson<int>(freqKhz),
+      'pi': serializer.toJson<int?>(pi),
+      'psName': serializer.toJson<String?>(psName),
+      'customLabel': serializer.toJson<String?>(customLabel),
+      'logoUrl': serializer.toJson<String?>(logoUrl),
+      'logoLocalPath': serializer.toJson<String?>(logoLocalPath),
+      'stereo': serializer.toJson<bool>(stereo),
+      'levelDb': serializer.toJson<double?>(levelDb),
+      'lastSeenAt': serializer.toJson<DateTime>(lastSeenAt),
+    };
+  }
+
+  FmStation copyWith({
+    int? freqKhz,
+    Value<int?> pi = const Value.absent(),
+    Value<String?> psName = const Value.absent(),
+    Value<String?> customLabel = const Value.absent(),
+    Value<String?> logoUrl = const Value.absent(),
+    Value<String?> logoLocalPath = const Value.absent(),
+    bool? stereo,
+    Value<double?> levelDb = const Value.absent(),
+    DateTime? lastSeenAt,
+  }) => FmStation(
+    freqKhz: freqKhz ?? this.freqKhz,
+    pi: pi.present ? pi.value : this.pi,
+    psName: psName.present ? psName.value : this.psName,
+    customLabel: customLabel.present ? customLabel.value : this.customLabel,
+    logoUrl: logoUrl.present ? logoUrl.value : this.logoUrl,
+    logoLocalPath: logoLocalPath.present
+        ? logoLocalPath.value
+        : this.logoLocalPath,
+    stereo: stereo ?? this.stereo,
+    levelDb: levelDb.present ? levelDb.value : this.levelDb,
+    lastSeenAt: lastSeenAt ?? this.lastSeenAt,
+  );
+  FmStation copyWithCompanion(FmStationsCompanion data) {
+    return FmStation(
+      freqKhz: data.freqKhz.present ? data.freqKhz.value : this.freqKhz,
+      pi: data.pi.present ? data.pi.value : this.pi,
+      psName: data.psName.present ? data.psName.value : this.psName,
+      customLabel: data.customLabel.present
+          ? data.customLabel.value
+          : this.customLabel,
+      logoUrl: data.logoUrl.present ? data.logoUrl.value : this.logoUrl,
+      logoLocalPath: data.logoLocalPath.present
+          ? data.logoLocalPath.value
+          : this.logoLocalPath,
+      stereo: data.stereo.present ? data.stereo.value : this.stereo,
+      levelDb: data.levelDb.present ? data.levelDb.value : this.levelDb,
+      lastSeenAt: data.lastSeenAt.present
+          ? data.lastSeenAt.value
+          : this.lastSeenAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FmStation(')
+          ..write('freqKhz: $freqKhz, ')
+          ..write('pi: $pi, ')
+          ..write('psName: $psName, ')
+          ..write('customLabel: $customLabel, ')
+          ..write('logoUrl: $logoUrl, ')
+          ..write('logoLocalPath: $logoLocalPath, ')
+          ..write('stereo: $stereo, ')
+          ..write('levelDb: $levelDb, ')
+          ..write('lastSeenAt: $lastSeenAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    freqKhz,
+    pi,
+    psName,
+    customLabel,
+    logoUrl,
+    logoLocalPath,
+    stereo,
+    levelDb,
+    lastSeenAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is FmStation &&
+          other.freqKhz == this.freqKhz &&
+          other.pi == this.pi &&
+          other.psName == this.psName &&
+          other.customLabel == this.customLabel &&
+          other.logoUrl == this.logoUrl &&
+          other.logoLocalPath == this.logoLocalPath &&
+          other.stereo == this.stereo &&
+          other.levelDb == this.levelDb &&
+          other.lastSeenAt == this.lastSeenAt);
+}
+
+class FmStationsCompanion extends UpdateCompanion<FmStation> {
+  final Value<int> freqKhz;
+  final Value<int?> pi;
+  final Value<String?> psName;
+  final Value<String?> customLabel;
+  final Value<String?> logoUrl;
+  final Value<String?> logoLocalPath;
+  final Value<bool> stereo;
+  final Value<double?> levelDb;
+  final Value<DateTime> lastSeenAt;
+  const FmStationsCompanion({
+    this.freqKhz = const Value.absent(),
+    this.pi = const Value.absent(),
+    this.psName = const Value.absent(),
+    this.customLabel = const Value.absent(),
+    this.logoUrl = const Value.absent(),
+    this.logoLocalPath = const Value.absent(),
+    this.stereo = const Value.absent(),
+    this.levelDb = const Value.absent(),
+    this.lastSeenAt = const Value.absent(),
+  });
+  FmStationsCompanion.insert({
+    this.freqKhz = const Value.absent(),
+    this.pi = const Value.absent(),
+    this.psName = const Value.absent(),
+    this.customLabel = const Value.absent(),
+    this.logoUrl = const Value.absent(),
+    this.logoLocalPath = const Value.absent(),
+    this.stereo = const Value.absent(),
+    this.levelDb = const Value.absent(),
+    this.lastSeenAt = const Value.absent(),
+  });
+  static Insertable<FmStation> custom({
+    Expression<int>? freqKhz,
+    Expression<int>? pi,
+    Expression<String>? psName,
+    Expression<String>? customLabel,
+    Expression<String>? logoUrl,
+    Expression<String>? logoLocalPath,
+    Expression<bool>? stereo,
+    Expression<double>? levelDb,
+    Expression<DateTime>? lastSeenAt,
+  }) {
+    return RawValuesInsertable({
+      if (freqKhz != null) 'freq_khz': freqKhz,
+      if (pi != null) 'pi': pi,
+      if (psName != null) 'ps_name': psName,
+      if (customLabel != null) 'custom_label': customLabel,
+      if (logoUrl != null) 'logo_url': logoUrl,
+      if (logoLocalPath != null) 'logo_local_path': logoLocalPath,
+      if (stereo != null) 'stereo': stereo,
+      if (levelDb != null) 'level_db': levelDb,
+      if (lastSeenAt != null) 'last_seen_at': lastSeenAt,
+    });
+  }
+
+  FmStationsCompanion copyWith({
+    Value<int>? freqKhz,
+    Value<int?>? pi,
+    Value<String?>? psName,
+    Value<String?>? customLabel,
+    Value<String?>? logoUrl,
+    Value<String?>? logoLocalPath,
+    Value<bool>? stereo,
+    Value<double?>? levelDb,
+    Value<DateTime>? lastSeenAt,
+  }) {
+    return FmStationsCompanion(
+      freqKhz: freqKhz ?? this.freqKhz,
+      pi: pi ?? this.pi,
+      psName: psName ?? this.psName,
+      customLabel: customLabel ?? this.customLabel,
+      logoUrl: logoUrl ?? this.logoUrl,
+      logoLocalPath: logoLocalPath ?? this.logoLocalPath,
+      stereo: stereo ?? this.stereo,
+      levelDb: levelDb ?? this.levelDb,
+      lastSeenAt: lastSeenAt ?? this.lastSeenAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (freqKhz.present) {
+      map['freq_khz'] = Variable<int>(freqKhz.value);
+    }
+    if (pi.present) {
+      map['pi'] = Variable<int>(pi.value);
+    }
+    if (psName.present) {
+      map['ps_name'] = Variable<String>(psName.value);
+    }
+    if (customLabel.present) {
+      map['custom_label'] = Variable<String>(customLabel.value);
+    }
+    if (logoUrl.present) {
+      map['logo_url'] = Variable<String>(logoUrl.value);
+    }
+    if (logoLocalPath.present) {
+      map['logo_local_path'] = Variable<String>(logoLocalPath.value);
+    }
+    if (stereo.present) {
+      map['stereo'] = Variable<bool>(stereo.value);
+    }
+    if (levelDb.present) {
+      map['level_db'] = Variable<double>(levelDb.value);
+    }
+    if (lastSeenAt.present) {
+      map['last_seen_at'] = Variable<DateTime>(lastSeenAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FmStationsCompanion(')
+          ..write('freqKhz: $freqKhz, ')
+          ..write('pi: $pi, ')
+          ..write('psName: $psName, ')
+          ..write('customLabel: $customLabel, ')
+          ..write('logoUrl: $logoUrl, ')
+          ..write('logoLocalPath: $logoLocalPath, ')
+          ..write('stereo: $stereo, ')
+          ..write('levelDb: $levelDb, ')
+          ..write('lastSeenAt: $lastSeenAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $FavoritesTable favorites = $FavoritesTable(this);
   late final $SettingsTable settings = $SettingsTable(this);
   late final $DabStationsTable dabStations = $DabStationsTable(this);
+  late final $FmStationsTable fmStations = $FmStationsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -1297,6 +1861,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     favorites,
     settings,
     dabStations,
+    fmStations,
   ];
 }
 
@@ -1982,6 +2547,288 @@ typedef $$DabStationsTableProcessedTableManager =
       DabStation,
       PrefetchHooks Function()
     >;
+typedef $$FmStationsTableCreateCompanionBuilder =
+    FmStationsCompanion Function({
+      Value<int> freqKhz,
+      Value<int?> pi,
+      Value<String?> psName,
+      Value<String?> customLabel,
+      Value<String?> logoUrl,
+      Value<String?> logoLocalPath,
+      Value<bool> stereo,
+      Value<double?> levelDb,
+      Value<DateTime> lastSeenAt,
+    });
+typedef $$FmStationsTableUpdateCompanionBuilder =
+    FmStationsCompanion Function({
+      Value<int> freqKhz,
+      Value<int?> pi,
+      Value<String?> psName,
+      Value<String?> customLabel,
+      Value<String?> logoUrl,
+      Value<String?> logoLocalPath,
+      Value<bool> stereo,
+      Value<double?> levelDb,
+      Value<DateTime> lastSeenAt,
+    });
+
+class $$FmStationsTableFilterComposer
+    extends Composer<_$AppDatabase, $FmStationsTable> {
+  $$FmStationsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get freqKhz => $composableBuilder(
+    column: $table.freqKhz,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get pi => $composableBuilder(
+    column: $table.pi,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get psName => $composableBuilder(
+    column: $table.psName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get customLabel => $composableBuilder(
+    column: $table.customLabel,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get logoUrl => $composableBuilder(
+    column: $table.logoUrl,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get logoLocalPath => $composableBuilder(
+    column: $table.logoLocalPath,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get stereo => $composableBuilder(
+    column: $table.stereo,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get levelDb => $composableBuilder(
+    column: $table.levelDb,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get lastSeenAt => $composableBuilder(
+    column: $table.lastSeenAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$FmStationsTableOrderingComposer
+    extends Composer<_$AppDatabase, $FmStationsTable> {
+  $$FmStationsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get freqKhz => $composableBuilder(
+    column: $table.freqKhz,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get pi => $composableBuilder(
+    column: $table.pi,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get psName => $composableBuilder(
+    column: $table.psName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get customLabel => $composableBuilder(
+    column: $table.customLabel,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get logoUrl => $composableBuilder(
+    column: $table.logoUrl,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get logoLocalPath => $composableBuilder(
+    column: $table.logoLocalPath,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get stereo => $composableBuilder(
+    column: $table.stereo,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get levelDb => $composableBuilder(
+    column: $table.levelDb,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get lastSeenAt => $composableBuilder(
+    column: $table.lastSeenAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$FmStationsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $FmStationsTable> {
+  $$FmStationsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get freqKhz =>
+      $composableBuilder(column: $table.freqKhz, builder: (column) => column);
+
+  GeneratedColumn<int> get pi =>
+      $composableBuilder(column: $table.pi, builder: (column) => column);
+
+  GeneratedColumn<String> get psName =>
+      $composableBuilder(column: $table.psName, builder: (column) => column);
+
+  GeneratedColumn<String> get customLabel => $composableBuilder(
+    column: $table.customLabel,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get logoUrl =>
+      $composableBuilder(column: $table.logoUrl, builder: (column) => column);
+
+  GeneratedColumn<String> get logoLocalPath => $composableBuilder(
+    column: $table.logoLocalPath,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get stereo =>
+      $composableBuilder(column: $table.stereo, builder: (column) => column);
+
+  GeneratedColumn<double> get levelDb =>
+      $composableBuilder(column: $table.levelDb, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get lastSeenAt => $composableBuilder(
+    column: $table.lastSeenAt,
+    builder: (column) => column,
+  );
+}
+
+class $$FmStationsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $FmStationsTable,
+          FmStation,
+          $$FmStationsTableFilterComposer,
+          $$FmStationsTableOrderingComposer,
+          $$FmStationsTableAnnotationComposer,
+          $$FmStationsTableCreateCompanionBuilder,
+          $$FmStationsTableUpdateCompanionBuilder,
+          (
+            FmStation,
+            BaseReferences<_$AppDatabase, $FmStationsTable, FmStation>,
+          ),
+          FmStation,
+          PrefetchHooks Function()
+        > {
+  $$FmStationsTableTableManager(_$AppDatabase db, $FmStationsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$FmStationsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$FmStationsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$FmStationsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> freqKhz = const Value.absent(),
+                Value<int?> pi = const Value.absent(),
+                Value<String?> psName = const Value.absent(),
+                Value<String?> customLabel = const Value.absent(),
+                Value<String?> logoUrl = const Value.absent(),
+                Value<String?> logoLocalPath = const Value.absent(),
+                Value<bool> stereo = const Value.absent(),
+                Value<double?> levelDb = const Value.absent(),
+                Value<DateTime> lastSeenAt = const Value.absent(),
+              }) => FmStationsCompanion(
+                freqKhz: freqKhz,
+                pi: pi,
+                psName: psName,
+                customLabel: customLabel,
+                logoUrl: logoUrl,
+                logoLocalPath: logoLocalPath,
+                stereo: stereo,
+                levelDb: levelDb,
+                lastSeenAt: lastSeenAt,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> freqKhz = const Value.absent(),
+                Value<int?> pi = const Value.absent(),
+                Value<String?> psName = const Value.absent(),
+                Value<String?> customLabel = const Value.absent(),
+                Value<String?> logoUrl = const Value.absent(),
+                Value<String?> logoLocalPath = const Value.absent(),
+                Value<bool> stereo = const Value.absent(),
+                Value<double?> levelDb = const Value.absent(),
+                Value<DateTime> lastSeenAt = const Value.absent(),
+              }) => FmStationsCompanion.insert(
+                freqKhz: freqKhz,
+                pi: pi,
+                psName: psName,
+                customLabel: customLabel,
+                logoUrl: logoUrl,
+                logoLocalPath: logoLocalPath,
+                stereo: stereo,
+                levelDb: levelDb,
+                lastSeenAt: lastSeenAt,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$FmStationsTable, FmStation>(table),
+                  BaseReferences<_$AppDatabase, $FmStationsTable, FmStation>(
+                    db,
+                    table,
+                    e,
+                  ),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$FmStationsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $FmStationsTable,
+      FmStation,
+      $$FmStationsTableFilterComposer,
+      $$FmStationsTableOrderingComposer,
+      $$FmStationsTableAnnotationComposer,
+      $$FmStationsTableCreateCompanionBuilder,
+      $$FmStationsTableUpdateCompanionBuilder,
+      (FmStation, BaseReferences<_$AppDatabase, $FmStationsTable, FmStation>),
+      FmStation,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -1992,4 +2839,6 @@ class $AppDatabaseManager {
       $$SettingsTableTableManager(_db, _db.settings);
   $$DabStationsTableTableManager get dabStations =>
       $$DabStationsTableTableManager(_db, _db.dabStations);
+  $$FmStationsTableTableManager get fmStations =>
+      $$FmStationsTableTableManager(_db, _db.fmStations);
 }

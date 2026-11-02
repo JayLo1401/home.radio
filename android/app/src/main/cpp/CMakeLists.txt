@@ -12,17 +12,24 @@ find_library(log-lib log)
 # hrdab: home_radio's own DAB+ receiver (see hrdab/common.h) - OFDM, FIC/MSC,
 # DAB+ super frames, PAD and an RTL2832U/R820T driver over usbfs. No
 # third-party code; AAC is decoded by Android's MediaCodec on the Kotlin side
-# (DabAacPlayer).
+# (DabAacPlayer). Also the FM (UKW) receiver with stereo decoder and RDS
+# (fm_demod, rds), sharing the same stick and sample stream, and the
+# narrowband receiver for CB/airband (nb_demod: AM/NFM/SSB, squelch, auto
+# mode, activity monitor).
 add_library(hrdab SHARED
     hrdab/charset.cpp
     hrdab/dab_tables.cpp
     hrdab/fft.cpp
     hrdab/fic.cpp
+    hrdab/fm_demod.cpp
+    hrdab/fm_dsp.cpp
     hrdab/hrdab_jni.cpp
     hrdab/msc.cpp
+    hrdab/nb_demod.cpp
     hrdab/ofdm.cpp
     hrdab/pad.cpp
     hrdab/r82xx.cpp
+    hrdab/rds.cpp
     hrdab/receiver.cpp
     hrdab/reed_solomon.cpp
     hrdab/rtl2832.cpp

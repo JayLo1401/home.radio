@@ -7,13 +7,17 @@ import 'package:just_audio/just_audio.dart';
 
 import '../../core/providers.dart';
 import '../../core/theme.dart';
-import '../../data/db/database.dart' show DabStation;
+import '../../data/db/database.dart' show DabStation, FmStation;
 import '../../data/models/audio_quality.dart';
+import '../../data/models/band_plan.dart';
 import '../../data/models/favorite_channel.dart';
 import '../../data/repositories/dab_stations_repository.dart'
     show DabStationDisplay;
-import '../../data/repositories/settings_repository.dart' show AutostartMode;
+import '../../data/repositories/fm_stations_repository.dart' show FmStationDisplay;
+import '../../data/repositories/settings_repository.dart' show AutostartMode, ReceiverMode;
 import '../dab_stations/dab_stations_screen.dart';
+import '../fm_stations/fm_stations_screen.dart';
+import '../scanner/scanner_screen.dart';
 import '../search_internet/internet_radio_search_screen.dart';
 import '../settings/settings_screen.dart';
 import 'background_layer.dart';
@@ -59,6 +63,34 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   // handleDisconnect()/receiveAndReconnect(), which now keeps retrying on
   // its own) - cleared again once a reconnect succeeds.
   String? _dabConnectionWarning;
+
+  // FM (UKW) playback - shares _dabTuned/_dabStatusText/_dabSnrDb with
+  // DAB+ (both are "the receiver"), plus what only FM has: the tuned
+  // frequency (null = not in FM mode), stereo and RDS name/radiotext.
+  int? _fmFreqKhz;
+  bool _fmStereo = false;
+  String? _fmPs;
+  String? _fmRt;
+
+  /// Clears everything describing the previous station, before a new one
+  /// starts - so nothing stale (radiotext, slideshow, signal) lingers.
+  void _resetPlaybackState() {
+    setState(() {
+      _playbackError = null;
+      _icyTitle = null;
+      _dabStatusText = null;
+      _dabTuned = false;
+      _dabSnrDb = null;
+      _dabQuality = null;
+      _liveMotLogoPath = null;
+      _dabConnectionWarning = null;
+      _fmFreqKhz = null;
+      _fmStereo = false;
+      _fmPs = null;
+      _fmRt = null;
+    });
+    ref.read(liveStationImageProvider.notifier).set(null);
+  }
 
   @override
   void initState() {
@@ -119,6 +151,29 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       case 'audioFormat' when _dabTuned:
         final quality = AudioQuality.fromDabFormat(event['format'] as String? ?? '');
         if (quality != _dabQuality) setState(() => _dabQuality = quality);
+      case 'fmStatus' when _dabTuned && _fmFreqKhz != null:
+        setState(() {
+          _dabSnrDb = (event['snrDb'] as num?)?.toDouble();
+          _fmStereo = event['stereo'] as bool? ?? false;
+        });
+      case 'fmRds' when _fmFreqKhz != null && event['freqKhz'] == _fmFreqKhz:
+        final ps = (event['ps'] as String?)?.trim();
+        final rt = (event['rt'] as String?)?.trim();
+        setState(() {
+          _fmPs = ps == null || ps.isEmpty ? null : ps;
+          _fmRt = rt == null || rt.isEmpty ? null : rt;
+        });
+        // A saved station learns its RDS name/PI as soon as it's heard.
+        final freqKhz = _fmFreqKhz!;
+        if (_fmPs != null &&
+            (ref.read(fmStationsStreamProvider).value ?? const <FmStation>[]).any((s) => s.freqKhz == freqKhz)) {
+          ref.read(fmStationsRepositoryProvider).upsert(
+                freqKhz: freqKhz,
+                pi: event['pi'] as int?,
+                psName: _fmPs,
+                stereo: _fmStereo,
+              );
+        }
       case 'motLogo' when _dabTuned:
         // A real DAB+ MOT slideshow image just arrived for whatever's
         // currently playing (see DabRtlSdrPlugin.nativeOnMot) - shown live
@@ -126,6 +181,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         // comment for why this deliberately does NOT touch the station's
         // persistent logo/DB row).
         setState(() => _liveMotLogoPath = event['path'] as String);
+        ref.read(liveStationImageProvider.notifier).set(_liveMotLogoPath);
       case 'audioFocusLost':
         // Another app (e.g. Spotify) started playing and took over audio
         // focus - the native side already stopped the tuner/decoder itself
@@ -194,6 +250,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   /// disconnected, since nothing resets them on a mere playback failure.
   Future<void> _resumeDabAfterReconnect() async {
     if (!mounted || !_dabServerReady) return;
+    final currentFm = ref.read(currentFmStationProvider);
+    if (currentFm != null) {
+      final station = (ref.read(fmStationsStreamProvider).value ?? const <FmStation>[])
+          .where((s) => s.freqKhz == currentFm)
+          .firstOrNull;
+      if (station != null) await _playFmStation(station);
+      return;
+    }
     final currentDabStation = ref.read(currentDabStationProvider);
     if (currentDabStation != null) {
       final stations = await ref
@@ -219,10 +283,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final channel = favorites
         .where((c) => c.programNumber == currentProgram)
         .firstOrNull;
-    if (channel != null &&
-        channel.dabFreqKhz != null &&
-        channel.dabServiceId != null &&
-        mounted) {
+    if (channel != null && channel.needsReceiver && mounted) {
       await _play(channel);
     }
   }
@@ -234,6 +295,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Future<void> _initDabServer() async {
     final settings = ref.read(settingsRepositoryProvider);
     final dab = ref.read(dabRtlSdrServiceProvider);
+    if (await settings.getReceiverMode() == ReceiverMode.none) {
+      if (mounted) setState(() => _dabServerReady = false);
+      return;
+    }
     final ok = await settings.getRtlSdrAutoStartOwnService()
         ? await dab.useDirectUsb()
         : await dab.setServer(
@@ -266,6 +331,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     // it's a favorite or a DAB+ station played directly from "Alle DAB+
     // Sender" without being one (see FavoritesSidebar/LastPlayed).
     final lastPlayed = await settings.getLastPlayed();
+    final lastFmFreq = lastPlayed?.fmFreqKhz;
+    if (lastFmFreq != null) {
+      final stations = await ref.read(fmStationsRepositoryProvider).watchAll().first;
+      final station = stations.where((s) => s.freqKhz == lastFmFreq).firstOrNull;
+      if (station != null) {
+        if (mounted) await _playFmStation(station);
+        return;
+      }
+    }
     final lastDabFreq = lastPlayed?.dabFreqKhz;
     final lastDabServiceId = lastPlayed?.dabServiceId;
     if (lastDabFreq != null && lastDabServiceId != null) {
@@ -323,17 +397,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Future<void> _play(FavoriteChannel channel) async {
-    setState(() {
-      _playbackError = null;
-      _icyTitle = null;
-      _dabStatusText = null;
-      _dabTuned = false;
-      _dabSnrDb = null;
-      _dabQuality = null;
-      _liveMotLogoPath = null;
-      _dabConnectionWarning = null;
-    });
+    _resetPlaybackState();
     ref.read(currentDabStationProvider.notifier).set(null);
+    ref.read(currentFmStationProvider.notifier).set(null);
     ref.read(currentProgramNumberProvider.notifier).set(channel.programNumber);
     ref
         .read(settingsRepositoryProvider)
@@ -341,7 +407,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     final url = channel.internetStreamUrl;
     if (url != null) {
-      await ref.read(dabRtlSdrServiceProvider).stopPlayback();
+      await _stopReceiver();
       await ref.read(audioPlayerServiceProvider).stop();
       _setNowPlayingFavorite(channel, playing: true);
       await ref.read(audioPlayerServiceProvider).playStream(url);
@@ -349,6 +415,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
 
     await ref.read(audioPlayerServiceProvider).stop();
+    final fmFreqKhz = channel.fmFreqKhz;
+    if (fmFreqKhz != null) {
+      await _playFm(fmFreqKhz, onPlaying: () => _setNowPlayingFavorite(channel, playing: true));
+      return;
+    }
     final freqKhz = channel.dabFreqKhz;
     final serviceId = channel.dabServiceId;
     if (freqKhz == null || serviceId == null) return;
@@ -365,17 +436,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   /// its identity the way [currentProgramNumberProvider] does for favorites,
   /// since it has no program number of its own.
   Future<void> _playDabStation(DabStation station) async {
-    setState(() {
-      _playbackError = null;
-      _icyTitle = null;
-      _dabStatusText = null;
-      _dabTuned = false;
-      _dabSnrDb = null;
-      _dabQuality = null;
-      _liveMotLogoPath = null;
-      _dabConnectionWarning = null;
-    });
+    _resetPlaybackState();
     ref.read(currentProgramNumberProvider.notifier).set(null);
+    ref.read(currentFmStationProvider.notifier).set(null);
     ref.read(currentDabStationProvider.notifier).set((
       freqKhz: station.freqKhz,
       serviceId: station.serviceId,
@@ -390,6 +453,92 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       serviceId: station.serviceId,
       onPlaying: () => _setNowPlayingDabStation(station, playing: true),
     );
+  }
+
+  /// Plays an FM station straight from the sidebar's FM tab - the FM
+  /// counterpart of [_playDabStation].
+  Future<void> _playFmStation(FmStation station) async {
+    _resetPlaybackState();
+    ref.read(currentProgramNumberProvider.notifier).set(null);
+    ref.read(currentDabStationProvider.notifier).set(null);
+    ref.read(currentFmStationProvider.notifier).set(station.freqKhz);
+    ref.read(settingsRepositoryProvider).setLastPlayedFmStation(station.freqKhz);
+    await ref.read(audioPlayerServiceProvider).stop();
+    await _playFm(station.freqKhz, onPlaying: () => _setNowPlayingFmStation(station, playing: true));
+  }
+
+  void _setNowPlayingFmStation(FmStation station, {required bool playing}) {
+    ref.read(radioAudioHandlerProvider.future).then(
+          (handler) => handler.setFmStation(station, playing: playing),
+          onError: (_) {},
+        );
+  }
+
+  /// Stops whatever the receiver is doing (DAB+ or FM) - before internet
+  /// radio, or on pause.
+  Future<void> _stopReceiver() async {
+    final dab = ref.read(dabRtlSdrServiceProvider);
+    await dab.stopPlayback();
+    // Unconditionally: callers may already have reset _fmFreqKhz.
+    await dab.fmStop();
+  }
+
+  /// Back from a screen that tunes the receiver on its own (scans, manual
+  /// FM tuning): whatever DAB+/FM station was playing here is silent now,
+  /// so it's tuned in again.
+  Future<void> _afterReceiverScreen() async {
+    if (!mounted || !ref.read(receiverInterruptedProvider)) return;
+    ref.read(receiverInterruptedProvider.notifier).set(false);
+    if (_isDabSelected) await _resumeCurrentPlayback();
+  }
+
+  /// Plays what another screen asked for (see [playRequestProvider]).
+  void _onPlayRequest(PlayRequest? request) {
+    if (request == null) return;
+    ref.read(playRequestProvider.notifier).clear();
+    // Playing something new is a fresh start, nothing to resume later.
+    ref.read(receiverInterruptedProvider.notifier).set(false);
+    if (request.dab case final station?) _playDabStation(station);
+    if (request.fm case final station?) _playFmStation(station);
+    if (request.favorite case final channel?) _play(channel);
+  }
+
+  /// Shared FM playback path for favorites and the FM tab. Uses the same
+  /// generation counter as [_playDab] - both drive the one tuner, so any
+  /// newer request supersedes an older retry of either kind.
+  Future<void> _playFm(int freqKhz, {required VoidCallback onPlaying}) async {
+    final myGeneration = ++_dabPlayGeneration;
+    if (ref.read(receiverModeProvider) == ReceiverMode.none) {
+      if (mounted) setState(() => _dabStatusText = 'Kein Radio-Empfänger eingerichtet (Einstellungen)');
+      return;
+    }
+    if (mounted) {
+      setState(() {
+        _fmFreqKhz = freqKhz;
+        _dabStatusText = 'Sender wird eingestellt…';
+      });
+    }
+    final ok = await ref.read(dabRtlSdrServiceProvider).fmPlay(freqKhz);
+    if (!mounted || myGeneration != _dabPlayGeneration) return;
+    setState(() {
+      _dabTuned = ok;
+      _dabStatusText = ok
+          ? null
+          : (_dabConnectionWarning ??
+              (_dabServerReady ? 'UKW-Empfang fehlgeschlagen.' : 'RTL-SDR-Quelle nicht erreichbar - versuche erneut…'));
+    });
+    if (ok) {
+      onPlaying();
+    } else if (!_dabServerReady) {
+      // Most commonly right after boot, before the source is up - same
+      // retry as DAB+.
+      Future.delayed(const Duration(seconds: 5), () async {
+        if (!mounted || myGeneration != _dabPlayGeneration) return;
+        await _initDabServer();
+        if (!mounted || myGeneration != _dabPlayGeneration) return;
+        _playFm(freqKhz, onPlaying: onPlaying);
+      });
+    }
   }
 
   /// Bumped on every [_playDab] call (whether from the user picking a
@@ -408,6 +557,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     required VoidCallback onPlaying,
   }) async {
     final myGeneration = ++_dabPlayGeneration;
+    // E.g. a DAB+ favorite left over from before "Kein Empfänger" was chosen.
+    if (ref.read(receiverModeProvider) == ReceiverMode.none) {
+      if (mounted) setState(() => _dabStatusText = 'Kein Radio-Empfänger eingerichtet (Einstellungen)');
+      return;
+    }
     if (mounted) setState(() => _dabStatusText = 'Sender wird getunt…');
     final ok = await ref
         .read(dabRtlSdrServiceProvider)
@@ -474,9 +628,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       final channel = favorites
           .where((c) => c.programNumber == programNumber)
           .firstOrNull;
-      if (channel != null) return channel.sourceType == FavoriteSourceType.dab;
+      if (channel != null) return channel.needsReceiver;
     }
-    return ref.read(currentDabStationProvider) != null;
+    return ref.read(currentDabStationProvider) != null || ref.read(currentFmStationProvider) != null;
   }
 
   /// DAB+ has no real "pause" (it's a live broadcast) - stopping the
@@ -485,7 +639,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   /// exactly that for whatever's currently selected).
   Future<void> _pauseCurrentPlayback() async {
     if (_isDabSelected) {
-      await ref.read(dabRtlSdrServiceProvider).stopPlayback();
+      await _stopReceiver();
       if (mounted) setState(() => _dabTuned = false);
     } else {
       await ref.read(audioPlayerServiceProvider).pause();
@@ -513,8 +667,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   /// way tapping/D-Pad-selecting a row in it would, wrapping around at
   /// either end.
   Future<void> _stepStation(int direction) async {
-    if (ref.read(effectiveSidebarCategoryProvider) ==
-        SidebarCategory.dabStations) {
+    // A listening band is open - its channels, not the radio stations.
+    if (ref.read(remoteStepOverrideProvider) case final step?) {
+      step(direction);
+      return;
+    }
+    final category = ref.read(effectiveSidebarCategoryProvider);
+    if (category == SidebarCategory.fmStations) {
+      final stations = ref.read(fmStationsStreamProvider).value ?? const <FmStation>[];
+      if (stations.isEmpty) return;
+      final index = stations.indexWhere((s) => s.freqKhz == ref.read(currentFmStationProvider));
+      final nextIndex = ((index == -1 ? 0 : index + direction) % stations.length + stations.length) % stations.length;
+      await _playFmStation(stations[nextIndex]);
+      return;
+    }
+    if (category == SidebarCategory.dabStations) {
       final stations =
           ref.read(sortedDabStationsProvider).value ?? const <DabStation>[];
       if (stations.isEmpty) return;
@@ -592,6 +759,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(playRequestProvider, (_, request) => _onPlayRequest(request));
+    final bands = ref.watch(listeningBandsProvider);
     final favorites = ref.watch(favoritesStreamProvider).value ?? const [];
     final currentProgram = ref.watch(currentProgramNumberProvider);
     final currentChannel = currentProgram == null
@@ -610,15 +779,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               )
               .firstOrNull;
 
-    final isDab =
-        currentChannel?.sourceType == FavoriteSourceType.dab ||
-        currentRawDabStation != null;
+    final currentFmFreq = ref.watch(currentFmStationProvider);
+    final currentRawFmStation = currentChannel != null || currentFmFreq == null
+        ? null
+        : (ref.watch(fmStationsStreamProvider).value ?? const <FmStation>[])
+            .where((s) => s.freqKhz == currentFmFreq)
+            .firstOrNull;
+
+    // DAB+ or FM - the receiver, not the internet player.
+    final isDab = (currentChannel?.needsReceiver ?? false) ||
+        currentRawDabStation != null ||
+        currentRawFmStation != null;
     final isPlaying = isDab ? _dabTuned : (_playerState?.playing ?? false);
     final isBuffering =
         !isDab &&
         (_playerState?.processingState == ProcessingState.buffering ||
             _playerState?.processingState == ProcessingState.loading);
-    final subtitle = isDab ? _dabStatusText : _icyTitle;
+    // FM: RDS radiotext (stereo/mono is the badge, see fmStereo below).
+    final subtitle = _fmFreqKhz != null
+        ? (_dabStatusText ?? _fmRt)
+        : (isDab ? _dabStatusText : _icyTitle);
     final errorMessage = isDab ? _dabConnectionWarning : _playbackError;
 
     return Focus(
@@ -632,11 +812,39 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               child: Column(
                 children: [
                   _MenuBar(
-                    onOpenDabStations: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const DabStationsScreen(),
-                      ),
-                    ),
+                    // No DAB+/FM station search without a receiver.
+                    onOpenDabStations: ref.watch(receiverModeProvider) == ReceiverMode.none
+                        ? null
+                        : () => Navigator.of(context)
+                            .push(MaterialPageRoute(builder: (_) => const DabStationsScreen()))
+                            .then((_) => _afterReceiverScreen()),
+                    listeningButtons: [
+                      if (ref.watch(receiverModeProvider) != ReceiverMode.none)
+                        for (final (enabled, icon, label, screen) in [
+                          (bands.cb, Icons.forum, 'CB-Funk', () => ScannerScreen(plan: cbBandPlan())),
+                          (
+                            bands.ham,
+                            Icons.cell_tower,
+                            'Amateurfunk',
+                            () => ScannerScreen(plan: hamBandPlans.first, variants: hamBandPlans),
+                          ),
+                          (bands.airband, Icons.flight, 'Flugfunk', () => ScannerScreen(plan: airBandPlan)),
+                          (bands.mil, Icons.shield_outlined, 'Militärfunk', () => ScannerScreen(plan: milBandPlan)),
+                        ])
+                          if (enabled)
+                            (
+                              icon,
+                              label,
+                              () => Navigator.of(context)
+                                  .push(MaterialPageRoute(builder: (_) => screen()))
+                                  .then((_) => _afterReceiverScreen()),
+                            ),
+                    ],
+                    onOpenFmStations: ref.watch(receiverModeProvider) == ReceiverMode.none
+                        ? null
+                        : () => Navigator.of(context)
+                            .push(MaterialPageRoute(builder: (_) => const FmStationsScreen()))
+                            .then((_) => _afterReceiverScreen()),
                     onOpenInternetSearch: () => Navigator.of(context).push(
                       MaterialPageRoute(
                         builder: (_) => const InternetRadioSearchScreen(),
@@ -663,10 +871,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               BackgroundLayer(
                                 logoLocalPath:
                                     currentChannel?.logoLocalPath ??
-                                    currentRawDabStation?.logoLocalPath,
+                                    currentRawDabStation?.logoLocalPath ??
+                                    currentRawFmStation?.logoLocalPath,
                                 logoUrl:
                                     currentChannel?.logoUrl ??
-                                    currentRawDabStation?.logoUrl,
+                                    currentRawDabStation?.logoUrl ??
+                                    currentRawFmStation?.logoUrl,
                               ),
                               const _WeatherRadarColumn(),
                             ],
@@ -675,6 +885,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         FavoritesSidebar(
                           onSelect: _play,
                           onSelectDabStation: _playDabStation,
+                          onSelectFmStation: _playFmStation,
+                          onEditDone: _afterReceiverScreen,
                         ),
                       ],
                     ),
@@ -683,20 +895,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     programNumber: currentChannel?.programNumber,
                     displayName:
                         currentChannel?.displayName ??
-                        currentRawDabStation?.displayLabel,
+                        currentRawDabStation?.displayLabel ??
+                        currentRawFmStation?.displayLabel,
                     logoUrl:
                         currentChannel?.logoUrl ??
-                        currentRawDabStation?.logoUrl,
+                        currentRawDabStation?.logoUrl ??
+                        currentRawFmStation?.logoUrl,
                     logoLocalPath:
                         _liveMotLogoPath ??
                         currentChannel?.logoLocalPath ??
-                        currentRawDabStation?.logoLocalPath,
+                        currentRawDabStation?.logoLocalPath ??
+                        currentRawFmStation?.logoLocalPath,
                     isPlaying: isPlaying,
                     isBuffering: isBuffering,
                     subtitle: (subtitle?.isEmpty ?? true) ? null : subtitle,
                     errorMessage: errorMessage,
                     snrDb: (isDab && isPlaying) ? _dabSnrDb : null,
                     quality: isPlaying ? (isDab ? _dabQuality : _netQuality) : null,
+                    fmStereo: isPlaying && _fmFreqKhz != null ? _fmStereo : null,
                   ),
                 ],
               ),
@@ -747,6 +963,10 @@ class _WeatherRadarColumn extends ConsumerWidget {
           height: _tileBaseHeight * settings.radarScale,
           radius: _tileRadius,
           child: RadarPanel(
+            urlTemplate: settings.radarUrl,
+            isWebPage: settings.radarIsWebPage,
+            webCss: settings.radarWebCss,
+            token: settings.radarAuthEnabled ? settings.radarToken : null,
             lat: settings.lat,
             lon: settings.lon,
             radiusKm: settings.radarRadiusKm.toDouble(),
@@ -851,12 +1071,19 @@ class _Tile extends StatelessWidget {
 }
 
 class _MenuBar extends StatelessWidget {
-  final VoidCallback onOpenDabStations;
+  /// Null hides the button (no receiver set up) - same for FM.
+  final VoidCallback? onOpenDabStations;
+  final VoidCallback? onOpenFmStations;
+  /// Listening bands (see ScannerScreen): icon, label, open - left of a
+  /// divider, apart from the radio buttons.
+  final List<(IconData, String, VoidCallback)> listeningButtons;
   final VoidCallback onOpenInternetSearch;
   final VoidCallback onOpenSettings;
 
   const _MenuBar({
     required this.onOpenDabStations,
+    required this.onOpenFmStations,
+    this.listeningButtons = const [],
     required this.onOpenInternetSearch,
     required this.onOpenSettings,
   });
@@ -927,12 +1154,35 @@ class _MenuBar extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  _MenuBarButton(
-                    icon: Icons.radio,
-                    label: 'DAB Sender suchen',
-                    onPressed: onOpenDabStations,
-                  ),
-                  const SizedBox(width: 4),
+                  // Listening bands (see ScannerScreen), set apart from the
+                  // radio buttons by a divider.
+                  for (final (icon, label, onOpen) in listeningButtons) ...[
+                    _MenuBarButton(icon: icon, label: label, onPressed: onOpen),
+                    const SizedBox(width: 4),
+                  ],
+                  if (listeningButtons.isNotEmpty)
+                    Container(
+                      width: 1,
+                      height: 28,
+                      margin: const EdgeInsets.symmetric(horizontal: 8),
+                      color: Colors.white24,
+                    ),
+                  if (onOpenDabStations case final onOpen?) ...[
+                    _MenuBarButton(
+                      icon: Icons.radio,
+                      label: 'DAB Sender suchen',
+                      onPressed: onOpen,
+                    ),
+                    const SizedBox(width: 4),
+                  ],
+                  if (onOpenFmStations case final onOpen?) ...[
+                    _MenuBarButton(
+                      icon: Icons.graphic_eq,
+                      label: 'UKW-Sender (FM)',
+                      onPressed: onOpen,
+                    ),
+                    const SizedBox(width: 4),
+                  ],
                   _MenuBarButton(
                     icon: Icons.public,
                     label: 'Internetradio suchen',

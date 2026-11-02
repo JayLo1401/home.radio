@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <cstring>
 #include <sstream>
 #include <sys/resource.h>
@@ -47,7 +48,9 @@ Receiver::Receiver(std::unique_ptr<SampleSource> source, ReceiverListener& liste
       ofdm_(*this, *this),
       fic_(ensemble_, *this),
       superframe_(*this),
-      pad_(*this)
+      pad_(*this),
+      fm_(*this, *this),
+      nb_(*this, *this)
 {
     source_->onStatus = [this](bool isError, const std::string& message) { listener_.onStatus(isError, message); };
 }
@@ -57,21 +60,43 @@ Receiver::~Receiver()
     halt();
 }
 
-bool Receiver::startLocked()
+bool Receiver::startLocked(Mode mode)
 {
-    if (running_) return true;
+    if (running_ && mode_ == mode) return true;
+    // Switching modes: the other mode's threads must not read the ring.
+    if (running_) stopLocked();
+    // DAB and FM need 2.048 MS/s; NB brings its own rate. The source is
+    // stopped here, which is when a rate change is allowed.
+    const uint32_t rate = mode == Mode::Nb ? nbRate_ : static_cast<uint32_t>(kSampleRate);
+    if (source_->sampleRate() != rate && !source_->setSampleRate(rate)) {
+        HR_LOGW("could not set the sample rate to %u", rate);
+        return false;
+    }
     ring_.reopen();
     stop_ = false;
     source_->setGainIndex(gainIndex_);
     if (!source_->start(ring_)) return false;
-    ofdmThread_ = std::thread([this] {
-        setpriority(PRIO_PROCESS, 0, -16);
-        ofdm_.run(stop_);
-    });
-    decoderThread_ = std::thread([this] {
-        setpriority(PRIO_PROCESS, 0, -10);
-        decoderLoop();
-    });
+    mode_ = mode;
+    if (mode == Mode::Nb) {
+        nbThread_ = std::thread([this] {
+            setpriority(PRIO_PROCESS, 0, -16);
+            nb_.run(stop_);
+        });
+    } else if (mode == Mode::Dab) {
+        ofdmThread_ = std::thread([this] {
+            setpriority(PRIO_PROCESS, 0, -16);
+            ofdm_.run(stop_);
+        });
+        decoderThread_ = std::thread([this] {
+            setpriority(PRIO_PROCESS, 0, -10);
+            decoderLoop();
+        });
+    } else {
+        fmThread_ = std::thread([this] {
+            setpriority(PRIO_PROCESS, 0, -16);
+            fm_.run(stop_);
+        });
+    }
     running_ = true;
     return true;
 }
@@ -84,6 +109,8 @@ void Receiver::stopLocked()
     queueCv_.notify_all();
     if (ofdmThread_.joinable()) ofdmThread_.join();
     if (decoderThread_.joinable()) decoderThread_.join();
+    if (fmThread_.joinable()) fmThread_.join();
+    if (nbThread_.joinable()) nbThread_.join();
     source_->stop();
     {
         std::lock_guard<std::mutex> lock(queueMutex_);
@@ -107,8 +134,130 @@ bool Receiver::tune(uint32_t hz)
         std::lock_guard<std::mutex> qlock(queueMutex_);
         queue_.clear();
     }
-    if (!startLocked()) return false;
+    if (!startLocked(Mode::Dab)) return false;
     return tuned;
+}
+
+bool Receiver::fmTune(uint32_t hz)
+{
+    std::lock_guard<std::mutex> lock(lifecycleMutex_);
+    stopService();
+    // Leave DAB before retuning, so the OFDM thread never sees FM samples.
+    if (running_ && mode_ != Mode::Fm) stopLocked();
+    const bool tuned = source_->setFrequency(hz - FmDemod::kIfShiftHz);
+    if (!tuned) HR_LOGW("fmTune: tuner did not accept %u Hz", hz);
+    fm_.requestPlay();
+    ring_.clear();
+    ring_.interrupt();
+    if (!startLocked(Mode::Fm)) return false;
+    return tuned;
+}
+
+bool Receiver::fmSurvey(uint32_t centerHz, uint32_t lowHz, uint32_t highHz, std::vector<FmCarrier>& out)
+{
+    out.clear();
+    std::lock_guard<std::mutex> lock(lifecycleMutex_);
+    stopService();
+    if (running_ && mode_ != Mode::Fm) stopLocked();
+    if (!source_->setFrequency(centerHz)) {
+        HR_LOGW("fmSurvey: tuner did not accept %u Hz", centerHz);
+        return false;
+    }
+    fm_.requestSurvey();
+    ring_.clear();
+    ring_.interrupt();
+    if (!startLocked(Mode::Fm)) return false;
+    std::vector<float> spectrum;
+    if (!fm_.waitSurvey(spectrum, 3000)) {
+        HR_LOGW("fmSurvey: no spectrum at %u Hz", centerHz);
+        return false;
+    }
+    out = findFmCarriers(spectrum, centerHz, lowHz, highHz);
+    return true;
+}
+
+// --- narrowband ---
+
+void Receiver::nbConfigureLocked()
+{
+    NbConfig cfg;
+    cfg.sampleRate = nbRate_;
+    cfg.loHz = nbLoHz_;
+    cfg.channelsHz = nbChannels_;
+    cfg.freqHz = nbFreqHz_;
+    cfg.mode = nbMode_;
+    cfg.retune = nbRetune_;
+    nb_.configure(cfg);
+}
+
+bool Receiver::nbRetuneLocked(uint32_t centerHz)
+{
+    std::vector<uint32_t> freqs = nbChannels_;
+    freqs.push_back(nbFreqHz_);
+    nbLoHz_ = NbDemod::placeLo(nbRate_, centerHz, freqs);
+    const bool tuned = source_->setFrequency(nbLoHz_);
+    if (!tuned) HR_LOGW("nb: tuner did not accept %u Hz", nbLoHz_);
+    nbRetune_++;
+    nbConfigureLocked();
+    ring_.clear();
+    ring_.interrupt();
+    if (!startLocked(Mode::Nb)) return false;
+    return tuned;
+}
+
+bool Receiver::nbStart(uint32_t sampleRate, uint32_t centerHz, const std::vector<uint32_t>& channelsHz,
+                       uint32_t freqHz, NbMode mode, float squelchDb)
+{
+    if (!NbDemod::supportedRate(sampleRate)) {
+        HR_LOGW("nbStart: unsupported sample rate %u", sampleRate);
+        return false;
+    }
+    std::lock_guard<std::mutex> lock(lifecycleMutex_);
+    stopService();
+    // Leave DAB/FM (or NB at another rate) before retuning: their threads
+    // must never see NB samples, and the rate only changes while stopped.
+    if (running_ && (mode_ != Mode::Nb || nbRate_ != sampleRate)) stopLocked();
+    nbRate_ = sampleRate;
+    nbChannels_ = channelsHz;
+    nbFreqHz_ = freqHz;
+    nbMode_ = mode;
+    nb_.setSquelch(squelchDb);
+    uint32_t center = centerHz;
+    if (!NbDemod::canListen(sampleRate, NbDemod::placeLo(sampleRate, center, {freqHz}), freqHz)) center = freqHz;
+    return nbRetuneLocked(center);
+}
+
+bool Receiver::nbTune(uint32_t freqHz, NbMode mode)
+{
+    std::lock_guard<std::mutex> lock(lifecycleMutex_);
+    if (!running_ || mode_ != Mode::Nb) return false;
+    nbFreqHz_ = freqHz;
+    nbMode_ = mode;
+    if (NbDemod::canListen(nbRate_, nbLoHz_, freqHz)) {
+        // Same window: only the channel chain restarts, no retune.
+        nbConfigureLocked();
+        return true;
+    }
+    return nbRetuneLocked(freqHz);
+}
+
+void Receiver::nbSetSquelch(float squelchDb)
+{
+    nb_.setSquelch(squelchDb);
+}
+
+bool Receiver::nbSetChannels(uint32_t centerHz, const std::vector<uint32_t>& channelsHz)
+{
+    std::lock_guard<std::mutex> lock(lifecycleMutex_);
+    if (!running_ || mode_ != Mode::Nb) return false;
+    nbChannels_ = channelsHz;
+    std::vector<uint32_t> freqs = nbChannels_;
+    freqs.push_back(nbFreqHz_);
+    if (NbDemod::placeLo(nbRate_, centerHz, freqs) == nbLoHz_) {
+        nbConfigureLocked();
+        return true;
+    }
+    return nbRetuneLocked(centerHz);
 }
 
 void Receiver::halt()
@@ -180,6 +329,40 @@ std::string Receiver::serviceListJson()
     return out.str();
 }
 
+std::string Receiver::fmInfoJson()
+{
+    const FmDemod::Info info = fm_.info();
+    char buf[256];
+    std::snprintf(buf, sizeof(buf),
+                  "{\"valid\":%s,\"levelDb\":%.1f,\"snrDb\":%.1f,\"stereo\":%s,\"offsetHz\":%.0f,\"pilot\":%.3f,"
+                  "\"rdsSync\":%s,\"pi\":",
+                  info.valid ? "true" : "false", info.status.levelDbfs - gainDb(), info.status.snrDb,
+                  info.status.stereo ? "true" : "false", info.status.offsetHz, info.status.pilot,
+                  info.rdsSync ? "true" : "false");
+    std::string out = buf;
+    out += info.pi >= 0 ? std::to_string(info.pi) : "null";
+    out += ",\"ps\":";
+    out += info.ps.empty() ? "null" : "\"" + jsonEscape(info.ps) + "\"";
+    out += ",\"rt\":";
+    out += info.rt.empty() ? "null" : "\"" + jsonEscape(info.rt) + "\"";
+    out += "}";
+    return out;
+}
+
+std::string Receiver::fmCarriersJson(const std::vector<FmCarrier>& carriers)
+{
+    std::string out = "[";
+    const float gain = gainDb();
+    for (size_t i = 0; i < carriers.size(); i++) {
+        char buf[96];
+        std::snprintf(buf, sizeof(buf), "%s{\"freqKhz\":%u,\"levelDb\":%.1f,\"marginDb\":%.1f}", i ? "," : "",
+                      carriers[i].freqHz / 1000, carriers[i].levelDbfs - gain, carriers[i].marginDb);
+        out += buf;
+    }
+    out += "]";
+    return out;
+}
+
 // --- OFDM thread ---
 
 int Receiver::readIq(uint8_t* dst, int bytes)
@@ -245,13 +428,17 @@ void Receiver::onSnr(float snrDb)
 
 void Receiver::onLevel(float rms, float clipRatio)
 {
+    adjustGain(rms, clipRatio, synced_, std::chrono::milliseconds(250));
+}
+
+bool Receiver::adjustGain(float rms, float clipRatio, bool synced, std::chrono::milliseconds searchInterval)
+{
     // Software AGC on the tuner's LNA/mixer gain. While searching it reacts
     // quickly; once synchronised it only steps for clear over/under drive,
     // since every gain change briefly disturbs the signal.
     const auto now = std::chrono::steady_clock::now();
-    const bool synced = synced_;
-    const auto minInterval = std::chrono::milliseconds(synced ? 2000 : 250);
-    if (now - lastGainChange_ < minInterval) return;
+    const auto minInterval = synced ? std::chrono::milliseconds(2000) : searchInterval;
+    if (now - lastGainChange_ < minInterval) return false;
     int step = 0;
     if (!synced && rms > 0.f) {
         // Searching: jump most of the way to the target level at once
@@ -269,15 +456,57 @@ void Receiver::onLevel(float rms, float clipRatio)
         if (rms < 0.05f) step = 1;
         else if (rms > 0.55f) step = -1;
     }
-    if (step == 0) return;
+    if (step == 0) return false;
     int g = gainIndex_ + step;
     if (g < 0) g = 0;
     if (g >= source_->gainCount()) g = source_->gainCount() - 1;
-    if (g == gainIndex_) return;
+    if (g == gainIndex_) return false;
     gainIndex_ = g;
     lastGainChange_ = now;
     source_->setGainIndex(g);
     HR_LOGI("AGC: rms %.3f clip %.4f -> gain %.1f dB", rms, clipRatio, source_->gainTenthsDb(g) / 10.0);
+    return true;
+}
+
+// --- FM thread ---
+
+bool Receiver::onFmLevel(float rms, float clipRatio, bool settled)
+{
+    // FmDemod paces its reports and waits for the new gain to arrive itself,
+    // so no extra hold-off while searching.
+    return adjustGain(rms, clipRatio, settled, std::chrono::milliseconds(0));
+}
+
+void Receiver::onFmAudio(const int16_t* pcm, int frames)
+{
+    listener_.onFmAudio(pcm, frames);
+}
+
+void Receiver::onFmStatus(const FmStatus& status)
+{
+    listener_.onFmStatus(status, gainDb());
+}
+
+void Receiver::onFmRds(int pi, const std::string& ps, const std::string& rt)
+{
+    listener_.onFmRds(pi, ps, rt);
+}
+
+// --- NB thread ---
+
+bool Receiver::onNbLevel(float rms, float clipRatio, bool settled)
+{
+    return adjustGain(rms, clipRatio, settled, std::chrono::milliseconds(0));
+}
+
+void Receiver::onNbAudio(const int16_t* pcm, int frames)
+{
+    listener_.onNbAudio(pcm, frames);
+}
+
+void Receiver::onNbReport(const NbReport& report)
+{
+    listener_.onNbReport(report, gainDb());
 }
 
 // --- decoder thread ---

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/popup_text_field.dart';
 import '../../core/providers.dart';
 import '../../data/services/place_search_service.dart';
 
@@ -8,9 +9,9 @@ import '../../data/services/place_search_service.dart';
 /// place by name (OpenStreetMap / Nominatim) and pick it from the results -
 /// its coordinates are taken over automatically.
 ///
-/// Its own sub-page rather than inline in the settings list: arrow keys in a
-/// focused TextField move the text cursor, not traversal focus, which would
-/// trap the D-Pad there. After a search, focus jumps to the first result.
+/// The place name is typed in a dialog ([PopupTextField]) - an inline
+/// TextField trapped the remote's arrow keys. After a search, focus jumps
+/// to the first result.
 class LocationSettingsScreen extends ConsumerStatefulWidget {
   const LocationSettingsScreen({super.key});
 
@@ -83,11 +84,11 @@ class _LocationSettingsScreenState extends ConsumerState<LocationSettingsScreen>
           Row(
             children: [
               Expanded(
-                child: TextField(
+                child: PopupTextField(
                   controller: _queryController,
                   autofocus: true,
-                  textInputAction: TextInputAction.search,
-                  decoration: const InputDecoration(labelText: 'Ort suchen, z. B. Graz oder Gleisdorf'),
+                  label: 'Ort suchen, z. B. Graz oder Gleisdorf',
+                  icon: Icons.place_outlined,
                   onSubmitted: (_) => _search(),
                 ),
               ),

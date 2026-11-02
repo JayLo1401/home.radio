@@ -25,7 +25,8 @@ JavaVM* g_jvm = nullptr;
 
 struct Methods {
     jmethodID onSync, onEnsembleLabel, onServiceDetected, onDynamicLabel, onSnr, onRsErrors, onAacErrors,
-        onAudioFormat, onAudioConfig, onAccessUnit, onSlide, onStatus;
+        onAudioFormat, onAudioConfig, onAccessUnit, onSlide, onStatus, onFmPcm, onFmStatus, onFmRds, onNbPcm,
+        onNbReport;
 };
 
 // ART aborts when a thread exits while still attached, so every thread we
@@ -92,11 +93,29 @@ public:
         m_.onAccessUnit = e->GetMethodID(c, "onNativeAccessUnit", "([BZ)V");
         m_.onSlide = e->GetMethodID(c, "onNativeSlide", "([BI)V");
         m_.onStatus = e->GetMethodID(c, "onNativeStatus", "(ZLjava/lang/String;)V");
-        e->DeleteLocalRef(c);
+        m_.onFmPcm = e->GetMethodID(c, "onNativeFmPcm", "([S)V");
+        m_.onFmStatus = e->GetMethodID(c, "onNativeFmStatus", "(FFZFF)V");
+        m_.onFmRds = e->GetMethodID(c, "onNativeFmRds", "(ILjava/lang/String;Ljava/lang/String;)V");
         if (e->ExceptionCheck()) {
             e->ExceptionDescribe();
             e->ExceptionClear();
         }
+        // Looked up one by one with the exception cleared after each: a
+        // missing callback (Kotlin/native out of step) then only disables
+        // that callback instead of leaving an exception pending, which ART
+        // turns into an abort on the next JNI call.
+        auto optional = [&](const char* name, const char* sig) {
+            jmethodID id = e->GetMethodID(c, name, sig);
+            if (e->ExceptionCheck()) {
+                e->ExceptionClear();
+                HR_LOGW("JNI callback %s%s missing", name, sig);
+                return static_cast<jmethodID>(nullptr);
+            }
+            return id;
+        };
+        m_.onNbPcm = optional("onNativeNbPcm", "([S)V");
+        m_.onNbReport = optional("onNativeNbReport", "(IFFFZLjava/lang/String;II[I[FF[FIZZLjava/lang/String;)V");
+        e->DeleteLocalRef(c);
     }
 
     void release(JNIEnv* e) { e->DeleteGlobalRef(target_); }
@@ -146,6 +165,90 @@ public:
         jstring s = utf8(e, message);
         e->CallVoidMethod(target_, m_.onStatus, static_cast<jboolean>(isError), s);
         e->DeleteLocalRef(s);
+        clear(e);
+    }
+    void onFmAudio(const int16_t* pcm, int frames) override
+    {
+        JNIEnv* e = env();
+        if (!e || !m_.onFmPcm) return;
+        jshortArray a = e->NewShortArray(2 * frames);
+        if (!a) {
+            clear(e);
+            return;
+        }
+        e->SetShortArrayRegion(a, 0, 2 * frames, reinterpret_cast<const jshort*>(pcm));
+        e->CallVoidMethod(target_, m_.onFmPcm, a);
+        e->DeleteLocalRef(a);
+        clear(e);
+    }
+    void onFmStatus(const FmStatus& st, float gainDb) override
+    {
+        // Level referred to the tuner input, so it does not jump with the AGC.
+        call(m_.onFmStatus, static_cast<jfloat>(st.levelDbfs - gainDb), static_cast<jfloat>(st.snrDb),
+             static_cast<jboolean>(st.stereo), static_cast<jfloat>(st.offsetHz), static_cast<jfloat>(st.pilot));
+    }
+    void onFmRds(int pi, const std::string& ps, const std::string& rt) override
+    {
+        JNIEnv* e = env();
+        if (!e || !m_.onFmRds) return;
+        jstring jps = ps.empty() ? nullptr : utf8(e, ps);
+        jstring jrt = rt.empty() ? nullptr : utf8(e, rt);
+        e->CallVoidMethod(target_, m_.onFmRds, static_cast<jint>(pi), jps, jrt);
+        if (jps) e->DeleteLocalRef(jps);
+        if (jrt) e->DeleteLocalRef(jrt);
+        clear(e);
+    }
+    void onNbAudio(const int16_t* pcm, int frames) override
+    {
+        JNIEnv* e = env();
+        if (!e || !m_.onNbPcm) return;
+        jshortArray a = e->NewShortArray(frames);
+        if (!a) {
+            clear(e);
+            return;
+        }
+        e->SetShortArrayRegion(a, 0, frames, reinterpret_cast<const jshort*>(pcm));
+        e->CallVoidMethod(target_, m_.onNbPcm, a);
+        e->DeleteLocalRef(a);
+        clear(e);
+    }
+    void onNbReport(const NbReport& r, float gainDb) override
+    {
+        // All levels referred to the tuner input (AGC-independent); NaN in
+        // the channel levels = outside the window. Empty spectrum = no
+        // activity data this time.
+        JNIEnv* e = env();
+        if (!e || !m_.onNbReport) return;
+        const jsize nc = static_cast<jsize>(r.channelDbfs.size());
+        std::vector<jint> ch(static_cast<size_t>(nc));
+        std::vector<jfloat> lv(static_cast<size_t>(nc));
+        for (jsize i = 0; i < nc; i++) {
+            ch[static_cast<size_t>(i)] = static_cast<jint>(r.channelsHz[static_cast<size_t>(i)]);
+            lv[static_cast<size_t>(i)] = r.channelDbfs[static_cast<size_t>(i)] - gainDb;
+        }
+        const jsize ns = static_cast<jsize>(r.spectrumDbfs.size());
+        std::vector<jfloat> sp(static_cast<size_t>(ns));
+        for (jsize i = 0; i < ns; i++) sp[static_cast<size_t>(i)] = r.spectrumDbfs[static_cast<size_t>(i)] - gainDb;
+        jintArray jch = e->NewIntArray(nc);
+        jfloatArray jlv = e->NewFloatArray(nc);
+        jfloatArray jsp = e->NewFloatArray(ns);
+        jstring mode = e->NewStringUTF(nbModeName(r.mode));
+        jstring agc = e->NewStringUTF(nbAgcName(r.agc));
+        if (jch && jlv && jsp && mode && agc) {
+            if (nc) e->SetIntArrayRegion(jch, 0, nc, ch.data());
+            if (nc) e->SetFloatArrayRegion(jlv, 0, nc, lv.data());
+            if (ns) e->SetFloatArrayRegion(jsp, 0, ns, sp.data());
+            e->CallVoidMethod(target_, m_.onNbReport, static_cast<jint>(r.freqHz), r.levelDbfs - gainDb,
+                              r.noiseDbfs - gainDb, r.snrDb, static_cast<jboolean>(r.squelchOpen), mode,
+                              static_cast<jint>(r.centerHz), static_cast<jint>(r.spanHz), jch, jlv,
+                              r.channelNoiseDbfs - gainDb, jsp, static_cast<jint>(r.bandwidthHz),
+                              static_cast<jboolean>(r.noiseBlanker), static_cast<jboolean>(r.voiceFilter), agc);
+        }
+        if (agc) e->DeleteLocalRef(agc);
+        if (jch) e->DeleteLocalRef(jch);
+        if (jlv) e->DeleteLocalRef(jlv);
+        if (jsp) e->DeleteLocalRef(jsp);
+        if (mode) e->DeleteLocalRef(mode);
         clear(e);
     }
 
@@ -282,4 +385,116 @@ Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeStopService(JNIEnv*, j
 {
     std::lock_guard<std::mutex> lock(g_mutex);
     if (g_session) g_session->receiver->stopService();
+}
+
+// --- FM ---
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeFmTune(JNIEnv*, jobject, jint hz)
+{
+    std::lock_guard<std::mutex> lock(g_mutex);
+    if (!g_session) return JNI_FALSE;
+    return g_session->receiver->fmTune(static_cast<uint32_t>(hz)) ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeFmSurvey(JNIEnv* e, jobject, jint centerHz, jint lowHz,
+                                                                    jint highHz)
+{
+    std::lock_guard<std::mutex> lock(g_mutex);
+    if (!g_session) return nullptr;
+    std::vector<FmCarrier> carriers;
+    if (!g_session->receiver->fmSurvey(static_cast<uint32_t>(centerHz), static_cast<uint32_t>(lowHz),
+                                       static_cast<uint32_t>(highHz), carriers)) {
+        return nullptr;
+    }
+    return utf8(e, g_session->receiver->fmCarriersJson(carriers));
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeFmInfoJson(JNIEnv* e, jobject)
+{
+    std::lock_guard<std::mutex> lock(g_mutex);
+    return utf8(e, g_session ? g_session->receiver->fmInfoJson() : std::string("{\"valid\":false}"));
+}
+
+// --- narrowband ---
+
+namespace {
+
+bool toNbMode(jint mode, NbMode& out)
+{
+    if (mode < 0 || mode > static_cast<jint>(NbMode::Lsb)) return false;
+    out = static_cast<NbMode>(mode);
+    return true;
+}
+
+std::vector<uint32_t> toFreqs(JNIEnv* e, jintArray a)
+{
+    std::vector<uint32_t> out;
+    if (!a) return out;
+    const jsize n = e->GetArrayLength(a);
+    std::vector<jint> v(static_cast<size_t>(n));
+    if (n) e->GetIntArrayRegion(a, 0, n, v.data());
+    for (jint f : v) {
+        if (f > 0) out.push_back(static_cast<uint32_t>(f));
+    }
+    return out;
+}
+
+} // namespace
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeNbStart(JNIEnv* e, jobject, jint sampleRate, jint centerHz,
+                                                                   jintArray channels, jint freqHz, jint mode,
+                                                                   jfloat squelchDb)
+{
+    std::lock_guard<std::mutex> lock(g_mutex);
+    NbMode m;
+    if (!g_session || !toNbMode(mode, m) || sampleRate <= 0 || centerHz <= 0 || freqHz <= 0) return JNI_FALSE;
+    return g_session->receiver->nbStart(static_cast<uint32_t>(sampleRate), static_cast<uint32_t>(centerHz),
+                                        toFreqs(e, channels), static_cast<uint32_t>(freqHz), m, squelchDb)
+               ? JNI_TRUE
+               : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeNbTune(JNIEnv*, jobject, jint freqHz, jint mode)
+{
+    std::lock_guard<std::mutex> lock(g_mutex);
+    NbMode m;
+    if (!g_session || !toNbMode(mode, m) || freqHz <= 0) return JNI_FALSE;
+    return g_session->receiver->nbTune(static_cast<uint32_t>(freqHz), m) ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeNbSetSquelch(JNIEnv*, jobject, jfloat squelchDb)
+{
+    std::lock_guard<std::mutex> lock(g_mutex);
+    if (g_session) g_session->receiver->nbSetSquelch(squelchDb);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeNbSetFilters(JNIEnv*, jobject, jint bandwidthHz,
+                                                                        jboolean noiseBlanker, jboolean voiceFilter,
+                                                                        jint agc)
+{
+    std::lock_guard<std::mutex> lock(g_mutex);
+    if (!g_session) return;
+    NbFilters f;
+    f.bandwidthHz = bandwidthHz;
+    f.noiseBlanker = noiseBlanker == JNI_TRUE;
+    f.voiceFilter = voiceFilter == JNI_TRUE;
+    f.agc = agc == 1 ? NbAgc::Fast : agc == 2 ? NbAgc::Slow : NbAgc::Auto;
+    g_session->receiver->nbSetFilters(f);
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeNbSetChannels(JNIEnv* e, jobject, jint centerHz,
+                                                                         jintArray channels)
+{
+    std::lock_guard<std::mutex> lock(g_mutex);
+    if (!g_session || centerHz <= 0) return JNI_FALSE;
+    return g_session->receiver->nbSetChannels(static_cast<uint32_t>(centerHz), toFreqs(e, channels)) ? JNI_TRUE
+                                                                                                    : JNI_FALSE;
 }

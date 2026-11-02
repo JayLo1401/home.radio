@@ -1,9 +1,9 @@
 import 'dart:convert';
 
-enum FavoriteSourceType { dab, internet }
+enum FavoriteSourceType { dab, internet, fm }
 
-/// UI-facing representation of a merged favorite (DAB+ or internet radio),
-/// decoded from the drift [Favorite] row's JSON `sourceRef`.
+/// UI-facing representation of a merged favorite (DAB+, FM or internet
+/// radio), decoded from the drift [Favorite] row's JSON `sourceRef`.
 class FavoriteChannel {
   final int programNumber;
   final FavoriteSourceType sourceType;
@@ -36,11 +36,19 @@ class FavoriteChannel {
   int? get dabServiceId =>
       sourceType == FavoriteSourceType.dab ? sourceRef['serviceId'] as int? : null;
 
-  String get sourceTypeKey => sourceType == FavoriteSourceType.dab ? 'dab' : 'internet';
+  /// FM (UKW) frequency in kHz.
+  int? get fmFreqKhz => sourceType == FavoriteSourceType.fm ? sourceRef['freqKhz'] as int? : null;
 
-  static FavoriteSourceType parseSourceType(String value) {
-    return value == 'dab' ? FavoriteSourceType.dab : FavoriteSourceType.internet;
-  }
+  /// Whether this needs the RTL-SDR receiver (DAB+ or FM), not just internet.
+  bool get needsReceiver => sourceType != FavoriteSourceType.internet;
+
+  String get sourceTypeKey => sourceType.name;
+
+  static FavoriteSourceType parseSourceType(String value) => switch (value) {
+        'dab' => FavoriteSourceType.dab,
+        'fm' => FavoriteSourceType.fm,
+        _ => FavoriteSourceType.internet,
+      };
 
   static Map<String, dynamic> decodeSourceRef(String json) =>
       jsonDecode(json) as Map<String, dynamic>;

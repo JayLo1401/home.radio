@@ -28,6 +28,8 @@ public:
     int gainCount() const override { return R82xx::kGainSteps; }
     bool setGainIndex(int index) override;
     int gainTenthsDb(int index) const override { return R82xx::gainTenthsDb(index); }
+    // Any rate in 900001..3200000 S/s through the RTL2832U's resampler.
+    bool setSampleRate(uint32_t hz) override;
 
 private:
     enum Block { kDemod = 0, kUsb = 1, kSys = 2, kTuner = 3, kRom = 4, kIr = 5, kI2c = 6 };
@@ -38,7 +40,7 @@ private:
     bool readDemodDummy();
     bool i2cRepeater(bool on);
     bool initBaseband();
-    bool setSampleRate(uint32_t rate);
+    bool programSampleRate(uint32_t rate);
     bool setIfFrequency(uint32_t hz);
     uint8_t probe(uint8_t addr);
 

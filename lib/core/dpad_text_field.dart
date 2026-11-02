@@ -10,12 +10,18 @@ class DpadTextField extends StatefulWidget {
   final TextEditingController controller;
   final InputDecoration decoration;
   final ValueChanged<String>? onSubmitted;
+  final bool obscureText;
+  final TextInputType? keyboardType;
+  final bool autofocus;
 
   const DpadTextField({
     super.key,
     required this.controller,
     required this.decoration,
     this.onSubmitted,
+    this.obscureText = false,
+    this.keyboardType,
+    this.autofocus = false,
   });
 
   @override
@@ -52,6 +58,10 @@ class _DpadTextFieldState extends State<DpadTextField> {
       controller: widget.controller,
       decoration: widget.decoration,
       onSubmitted: widget.onSubmitted,
+      obscureText: widget.obscureText,
+      keyboardType: widget.keyboardType,
+      autofocus: widget.autofocus,
+      autocorrect: !widget.obscureText && widget.keyboardType != TextInputType.url,
     );
   }
 }

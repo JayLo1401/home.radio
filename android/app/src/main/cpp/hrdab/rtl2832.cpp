@@ -171,8 +171,10 @@ bool Rtl2832Source::setIfFrequency(uint32_t hz)
            demodWrite(1, 0x1b, static_cast<uint16_t>(v & 0xff), 1);
 }
 
-bool Rtl2832Source::setSampleRate(uint32_t rate)
+bool Rtl2832Source::programSampleRate(uint32_t rate)
 {
+    // Resampler ratio xtal / rate in 6.22 fixed point (lowest two bits must
+    // be zero). For 0.96, 1.44 and 2.048 MS/s it is exact (30, 20, 14.0625).
     const uint32_t ratio = static_cast<uint32_t>((static_cast<uint64_t>(kRtlXtal) << 22) / rate) & 0x0ffffffc;
     return demodWrite(1, 0x9f, static_cast<uint16_t>(ratio >> 16), 2) &&
            demodWrite(1, 0xa1, static_cast<uint16_t>(ratio & 0xffff), 2) &&
@@ -215,9 +217,18 @@ bool Rtl2832Source::open()
         HR_LOGE("RTL2832: tuner init failed");
         return false;
     }
-    if (!setSampleRate(kSampleRate)) return false;
+    if (!programSampleRate(sampleRate())) return false;
     HR_LOGI("RTL2832 ready, tuner %s", tunerName());
     return true;
+}
+
+bool Rtl2832Source::setSampleRate(uint32_t hz)
+{
+    if (hz <= 900000 || hz > 3200000) return false;
+    std::lock_guard<std::mutex> lock(ctrlMutex_);
+    if (!programSampleRate(hz)) return false;
+    HR_LOGI("RTL2832: sample rate %u S/s", hz);
+    return SampleSource::setSampleRate(hz);
 }
 
 const char* Rtl2832Source::tunerName() const

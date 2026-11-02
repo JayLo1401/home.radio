@@ -12,9 +12,11 @@ import 'icy_metadata_service.dart';
 class AudioPlayerService {
   AudioPlayerService() {
     _player.icyMetadataStream.listen((meta) {
+      // ExoPlayer reports this in bit/s (icy-br * 1000), not kbit/s - it
+      // used to show up as "128000 kbps" (Cadena 100).
       final bitrate = meta?.headers?.bitrate;
       if (bitrate != null && bitrate > 0 && _quality == null) {
-        _setQuality(AudioQuality(kbps: bitrate, codec: null));
+        _setQuality(AudioQuality(kbps: AudioQuality.normalizeKbps(bitrate), codec: null));
       }
       final title = IcyMetadataService.cleanTitle(meta?.info?.title);
       if (title == null) return;

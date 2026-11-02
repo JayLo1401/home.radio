@@ -72,13 +72,37 @@ class DabStations extends Table {
   Set<Column> get primaryKey => {freqKhz, serviceId};
 }
 
-@DriftDatabase(tables: [Favorites, Settings, DabStations])
+/// Every FM (UKW) station a scan has found or the user saved while tuning
+/// manually, keyed by frequency - the FM counterpart of [DabStations].
+class FmStations extends Table {
+  IntColumn get freqKhz => integer()();
+  // RDS programme identification: recognises the same station after a
+  // re-scan. Null without RDS.
+  IntColumn get pi => integer().nullable()();
+  // RDS programme service name (8 characters), null without RDS.
+  TextColumn get psName => text().nullable()();
+  // User-provided name, wins over [psName] (see FmStationDisplay).
+  TextColumn get customLabel => text().nullable()();
+  TextColumn get logoUrl => text().nullable()();
+  TextColumn get logoLocalPath => text().nullable()();
+  BoolColumn get stereo => boolean().withDefault(const Constant(false))();
+  // Signal level at the last scan (relative dB, see the receiver's fmStatus)
+  // - shows which of several frequencies of one station (same [pi]) is the
+  // strongest here.
+  RealColumn get levelDb => real().nullable()();
+  DateTimeColumn get lastSeenAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  Set<Column> get primaryKey => {freqKhz};
+}
+
+@DriftDatabase(tables: [Favorites, Settings, DabStations, FmStations])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -88,8 +112,54 @@ class AppDatabase extends _$AppDatabase {
           if (from < 3) await m.addColumn(dabStations, dabStations.customLabel);
           if (from < 4) await m.addColumn(dabStations, dabStations.logoLocalPath);
           if (from < 5) await m.addColumn(dabStations, dabStations.logoUrl);
+          if (from < 6) await m.createTable(fmStations);
+          if (from >= 6 && from < 7) await m.addColumn(fmStations, fmStations.levelDb);
         },
       );
+
+  Stream<List<FmStation>> watchFmStations() =>
+      (select(fmStations)..orderBy([(s) => OrderingTerm.asc(s.freqKhz)])).watch();
+
+  /// Saves a found station; keeps what the user set (name, logo) and only
+  /// updates what the receiver reported, so a re-scan never loses them.
+  Future<void> upsertFmStation({
+    required int freqKhz,
+    int? pi,
+    String? psName,
+    bool stereo = false,
+    double? levelDb,
+  }) async {
+    final existing = await (select(fmStations)..where((s) => s.freqKhz.equals(freqKhz))).getSingleOrNull();
+    if (existing == null) {
+      await into(fmStations).insert(FmStationsCompanion.insert(
+        freqKhz: Value(freqKhz),
+        pi: Value(pi),
+        psName: Value(psName),
+        stereo: Value(stereo),
+        levelDb: Value(levelDb),
+      ));
+      return;
+    }
+    await (update(fmStations)..where((s) => s.freqKhz.equals(freqKhz))).write(FmStationsCompanion(
+      pi: pi == null ? const Value.absent() : Value(pi),
+      psName: psName == null ? const Value.absent() : Value(psName),
+      stereo: Value(stereo),
+      levelDb: levelDb == null ? const Value.absent() : Value(levelDb),
+      lastSeenAt: Value(DateTime.now()),
+    ));
+  }
+
+  Future<void> setFmStationCustomLabel(int freqKhz, String? customLabel) =>
+      (update(fmStations)..where((s) => s.freqKhz.equals(freqKhz)))
+          .write(FmStationsCompanion(customLabel: Value(customLabel)));
+
+  Future<void> setFmStationLogo(int freqKhz, {String? logoUrl, String? logoLocalPath}) =>
+      (update(fmStations)..where((s) => s.freqKhz.equals(freqKhz)))
+          .write(FmStationsCompanion(logoUrl: Value(logoUrl), logoLocalPath: Value(logoLocalPath)));
+
+  Future<void> deleteFmStation(int freqKhz) => (delete(fmStations)..where((s) => s.freqKhz.equals(freqKhz))).go();
+
+  Future<void> clearFmStations() => delete(fmStations).go();
 
   Future<int?> nextFreeProgramNumber() async {
     final rows = await select(favorites).get();
@@ -173,6 +243,20 @@ class AppDatabase extends _$AppDatabase {
   Future<void> updateFavoriteLogoLocalPath(int programNumber, String logoLocalPath) {
     return (update(favorites)..where((f) => f.programNumber.equals(programNumber)))
         .write(FavoritesCompanion(logoLocalPath: Value(logoLocalPath)));
+  }
+
+  /// Sets both logo sources at once - a chosen logo clears the other one,
+  /// since a broadcast image (logoLocalPath) is always shown first.
+  Future<void> setFavoriteLogo(int programNumber, {String? logoUrl, String? logoLocalPath}) {
+    return (update(favorites)..where((f) => f.programNumber.equals(programNumber)))
+        .write(FavoritesCompanion(logoUrl: Value(logoUrl), logoLocalPath: Value(logoLocalPath)));
+  }
+
+  /// See [setFavoriteLogo].
+  Future<void> setDabStationLogo(int freqKhz, int serviceId, {String? logoUrl, String? logoLocalPath}) {
+    return (update(dabStations)
+          ..where((s) => s.freqKhz.equals(freqKhz) & s.serviceId.equals(serviceId)))
+        .write(DabStationsCompanion(logoUrl: Value(logoUrl), logoLocalPath: Value(logoLocalPath)));
   }
 
   Future<void> updateFavoriteDisplayName(int programNumber, String displayName) {

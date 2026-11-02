@@ -26,6 +26,10 @@ class NowPlayingBanner extends StatelessWidget {
   /// discreetly next to the station name - null while unknown/not playing.
   final AudioQuality? quality;
 
+  /// FM: stereo (true) or mono (false), shown as the classic stereo symbol
+  /// in place of [quality]; null for anything that isn't FM.
+  final bool? fmStereo;
+
   const NowPlayingBanner({
     super.key,
     required this.programNumber,
@@ -38,6 +42,7 @@ class NowPlayingBanner extends StatelessWidget {
     this.errorMessage,
     this.snrDb,
     this.quality,
+    this.fmStereo,
   });
 
   @override
@@ -90,6 +95,10 @@ class NowPlayingBanner extends StatelessWidget {
                           if (quality != null) ...[
                             const SizedBox(width: 12),
                             _QualityLabel(quality: quality!),
+                          ],
+                          if (fmStereo != null) ...[
+                            const SizedBox(width: 12),
+                            _StereoLabel(stereo: fmStereo!),
                           ],
                         ],
                       ),
@@ -152,6 +161,60 @@ class _QualityLabel extends StatelessWidget {
       ),
     );
   }
+}
+
+/// FM stereo indicator in the same understated outline style as
+/// [_QualityLabel]: the classic two overlapping rings in green for stereo,
+/// a single ring in yellow for mono.
+class _StereoLabel extends StatelessWidget {
+  const _StereoLabel({required this.stereo});
+
+  final bool stereo;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = stereo ? Colors.greenAccent : Colors.amberAccent;
+    return Tooltip(
+      message: stereo ? 'Stereo' : 'Mono',
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: color.withValues(alpha: 0.45)),
+        ),
+        child: CustomPaint(
+          size: const Size(30, 16),
+          painter: _RingsPainter(color: color.withValues(alpha: 0.85), twoRings: stereo),
+        ),
+      ),
+    );
+  }
+}
+
+class _RingsPainter extends CustomPainter {
+  _RingsPainter({required this.color, required this.twoRings});
+
+  final Color color;
+  final bool twoRings;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2;
+    final r = size.height / 2 - 1;
+    final cy = size.height / 2;
+    if (twoRings) {
+      canvas.drawCircle(Offset(size.width / 2 - r * 0.55, cy), r, paint);
+      canvas.drawCircle(Offset(size.width / 2 + r * 0.55, cy), r, paint);
+    } else {
+      canvas.drawCircle(Offset(size.width / 2, cy), r, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _RingsPainter old) => old.color != color || old.twoRings != twoRings;
 }
 
 /// Small looping equalizer-bar animation, shown only while audio is

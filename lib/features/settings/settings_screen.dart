@@ -5,11 +5,10 @@ import '../../core/providers.dart';
 import '../../core/theme.dart';
 import '../../data/models/favorite_channel.dart';
 import '../../data/repositories/settings_repository.dart';
-import '../dab_stations/dab_stations_screen.dart';
 import '../rtlsdr/rtl_sdr_test_screen.dart';
-import '../shared/rename_dialog.dart';
 import 'backup_settings_screen.dart';
 import 'location_settings_screen.dart';
+import 'radar_source_settings_screen.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -21,7 +20,6 @@ class SettingsScreen extends ConsumerStatefulWidget {
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   AutostartMode _mode = AutostartMode.lastStation;
   int? _fixedProgramNumber;
-  DabSortMode _dabSortMode = DabSortMode.byEnsembleThenAlphabet;
   bool _showClockDate = false;
   bool _weatherEnabled = true;
   bool _radarEnabled = true;
@@ -46,7 +44,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final repo = ref.read(settingsRepositoryProvider);
     final mode = await repo.getAutostartMode();
     final fixed = await repo.getFixedProgramNumber();
-    final dabSortMode = await repo.getDabSortMode();
     final showClockDate = await repo.getShowClockDate();
     final weather = await repo.getWeatherEnabled();
     final radar = await repo.getRadarEnabled();
@@ -63,7 +60,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     setState(() {
       _mode = mode;
       _fixedProgramNumber = fixed;
-      _dabSortMode = dabSortMode;
       _showClockDate = showClockDate;
       _weatherEnabled = weather;
       _radarEnabled = radar;
@@ -124,22 +120,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     await ref.read(weatherDisplaySettingsProvider.notifier).setSunScale(next);
   }
 
-  Future<void> _renameFavorite(FavoriteChannel channel) async {
-    final newName = await showDialog<String>(
-      context: context,
-      builder: (context) => RenameDialog(
-        title: 'Favorit umbenennen',
-        initialValue: channel.displayName,
-      ),
-    );
-    if (newName == null || newName.isEmpty) return;
-    await ref.read(favoritesRepositoryProvider).rename(channel.programNumber, newName);
-  }
-
   @override
   Widget build(BuildContext context) {
     final favorites = ref.watch(favoritesStreamProvider).value ?? const <FavoriteChannel>[];
     final locationName = ref.watch(weatherDisplaySettingsProvider).locationName;
+    final receiverMode = ref.watch(receiverModeProvider);
+    final listeningBands = ref.watch(listeningBandsProvider);
+    // Only the kind of source, not its address - the settings list
+    // shouldn't advertise whichever third-party radar is set up.
+    final radarSettings = ref.watch(weatherDisplaySettingsProvider);
+    final radarSourceLabel = radarSettings.radarUrl.trim().isEmpty
+        ? 'nicht eingerichtet'
+        : (radarSettings.radarIsWebPage ? 'Webseite' : 'Bild');
     final repo = ref.read(settingsRepositoryProvider);
 
     if (!_loaded) {
@@ -251,6 +243,41 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            // First, since it decides whether DAB+ shows up anywhere at all.
+            Text('Empfang', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 8),
+            FocusTraversalOrder(
+              order: NumericFocusOrder(nextOrder()),
+              // "Kein Empfänger" is a valid choice too, not a missing setup.
+              child: _TvNavTile(
+                label: 'Radio-Empfänger (DAB+ & UKW)',
+                value: switch (receiverMode) {
+                  ReceiverMode.none => 'Kein Empfänger',
+                  ReceiverMode.usb => 'RTL-SDR per USB',
+                  ReceiverMode.tcp => 'RTL-SDR über Netzwerk',
+                },
+                configured: true,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const RtlSdrTestScreen()),
+                ),
+              ),
+            ),
+            // Extra listening bands, each a button in the top bar.
+            if (receiverMode != ReceiverMode.none) ...[
+              tileToggle('CB-Funk anzeigen', listeningBands.cb, (v) {
+                ref.read(listeningBandsProvider.notifier).setCb(v);
+              }),
+              tileToggle('Amateurfunk anzeigen', listeningBands.ham, (v) {
+                ref.read(listeningBandsProvider.notifier).setHam(v);
+              }),
+              tileToggle('Flugfunk anzeigen', listeningBands.airband, (v) {
+                ref.read(listeningBandsProvider.notifier).setAirband(v);
+              }),
+              tileToggle('Militärfunk anzeigen', listeningBands.mil, (v) {
+                ref.read(listeningBandsProvider.notifier).setMil(v);
+              }),
+            ],
+            const Divider(height: 32),
             Text('Autostart', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 8),
             FocusTraversalOrder(
@@ -318,9 +345,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             // groups below).
             FocusTraversalOrder(
               order: NumericFocusOrder(nextOrder()),
-              child: _TvChoiceTile(
-                label: 'Standort einrichten ($locationName)',
-                selected: false,
+              child: _TvNavTile(
+                label: 'Standort',
+                value: locationName,
+                configured: true,
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const LocationSettingsScreen()),
                 ),
@@ -354,13 +382,24 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ],
             ),
             tileGroup(
-              title: 'Regenradar',
+              title: 'Wetterradar',
               enabled: _radarEnabled,
               onToggleEnabled: (v) async {
                 setState(() => _radarEnabled = v);
                 await ref.read(weatherDisplaySettingsProvider.notifier).setRadarEnabled(v);
               },
               children: [
+                FocusTraversalOrder(
+                  order: NumericFocusOrder(nextOrder()),
+                  child: _TvNavTile(
+                    label: 'Quelle',
+                    value: radarSourceLabel,
+                    configured: radarSettings.radarUrl.trim().isNotEmpty,
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const RadarSourceSettingsScreen()),
+                    ),
+                  ),
+                ),
                 scaleRow(
                   label: 'Größe der Kachel',
                   valueLabel: '${(_radarScale * 100).round()} %',
@@ -369,7 +408,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 scaleRow(
                   // Not the tile size above - how much of the map around the
                   // location is shown (distance to the top/bottom edge).
-                  label: 'Umkreis um den Standort',
+                  // Only takes effect if the source URL uses {r}.
+                  label: 'Umkreis um den Standort ({r} in der Adresse)',
                   valueLabel: '$_radarRadiusKm km',
                   onChange: (d) => _changeRadarRadius(d),
                 ),
@@ -395,107 +435,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
               ],
             ),
+            // Favorites are renamed/reordered/removed right in the home
+            // screen's sidebar ("Bearbeiten"), the DAB+ station order is set
+            // on the DAB+ stations screen - neither lives here anymore.
             const Divider(height: 32),
-            Text('Favoriten verwalten', style: Theme.of(context).textTheme.titleLarge),
-            const Padding(
-              padding: EdgeInsets.only(top: 4, bottom: 4),
-              child: Text(
-                'Mit den Pfeilen die Reihenfolge (Sendernummer) ändern.',
-                style: TextStyle(color: Colors.white54, fontSize: 13),
-              ),
-            ),
-            for (final (index, c) in favorites.indexed)
-              FocusTraversalOrder(
-                order: NumericFocusOrder(nextOrder()),
-                child: ListTile(
-                  leading: CircleAvatar(child: Text('${c.programNumber}')),
-                  title: Text(c.displayName),
-                  subtitle:
-                      Text(c.sourceType == FavoriteSourceType.dab ? 'DAB+' : 'Internetradio'),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _TvIconButton(
-                        icon: Icons.keyboard_arrow_up,
-                        onTap: index == 0
-                            ? null
-                            : () => ref
-                                .read(favoritesRepositoryProvider)
-                                .swapProgramNumbers(c.programNumber, favorites[index - 1].programNumber),
-                      ),
-                      _TvIconButton(
-                        icon: Icons.keyboard_arrow_down,
-                        onTap: index == favorites.length - 1
-                            ? null
-                            : () => ref
-                                .read(favoritesRepositoryProvider)
-                                .swapProgramNumbers(c.programNumber, favorites[index + 1].programNumber),
-                      ),
-                      _TvIconButton(
-                        icon: Icons.edit_outlined,
-                        onTap: () => _renameFavorite(c),
-                      ),
-                      _TvIconButton(
-                        icon: Icons.delete_outline,
-                        onTap: () => ref.read(favoritesRepositoryProvider).remove(c.programNumber),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            const Divider(height: 32),
-            Text('DAB+ Sender sortieren', style: Theme.of(context).textTheme.titleLarge),
+            Text('Weiteres', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 8),
             FocusTraversalOrder(
               order: NumericFocusOrder(nextOrder()),
-              child: _TvChoiceTile(
-                label: 'Nach Sendern und Alphabet',
-                selected: _dabSortMode == DabSortMode.byEnsembleThenAlphabet,
-                onTap: () async {
-                  setState(() => _dabSortMode = DabSortMode.byEnsembleThenAlphabet);
-                  await ref.read(dabSortModeProvider.notifier).set(DabSortMode.byEnsembleThenAlphabet);
-                },
-              ),
-            ),
-            FocusTraversalOrder(
-              order: NumericFocusOrder(nextOrder()),
-              child: _TvChoiceTile(
-                label: 'Nach Alphabet',
-                selected: _dabSortMode == DabSortMode.byAlphabet,
-                onTap: () async {
-                  setState(() => _dabSortMode = DabSortMode.byAlphabet);
-                  await ref.read(dabSortModeProvider.notifier).set(DabSortMode.byAlphabet);
-                },
-              ),
-            ),
-            const Divider(height: 32),
-            Text('Technik', style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 8),
-            FocusTraversalOrder(
-              order: NumericFocusOrder(nextOrder()),
-              child: _TvChoiceTile(
-                label: 'DAB+ RTL-SDR Einrichtung',
-                selected: false,
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const RtlSdrTestScreen()),
-                ),
-              ),
-            ),
-            FocusTraversalOrder(
-              order: NumericFocusOrder(nextOrder()),
-              child: _TvChoiceTile(
-                label: 'DAB+ Sender verwalten',
-                selected: false,
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const DabStationsScreen()),
-                ),
-              ),
-            ),
-            FocusTraversalOrder(
-              order: NumericFocusOrder(nextOrder()),
-              child: _TvChoiceTile(
+              child: _TvNavTile(
                 label: 'Backup & Wiederherstellung',
-                selected: false,
+                icon: Icons.backup_outlined,
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const BackupSettingsScreen()),
                 ),
@@ -578,13 +528,8 @@ class _AboutBlockState extends State<_AboutBlock> {
             ),
             line(
               'Wetterradar',
-              'Niederschlag, Niederschlagsart und Böen: © GeoSphere Austria, Nowcast (INCA), '
-                  'lizenziert unter CC BY 4.0. '
-                  'Wolken und Blitze: © EUMETSAT (MSG Cloud Mask, MTG FCI IR 10.5, MTG Lightning Imager; EUMETView). '
-                  'Grenzen, Seen, Flüsse, Orte: Natural Earth (gemeinfrei). '
-                  'Relief: produced using Copernicus WorldDEM-90 © DLR e.V. 2010-2014 and © Airbus Defence '
-                  'and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; '
-                  'all rights reserved.',
+              'Das Radarbild kommt von der selbst eingetragenen Quelle; Rechte und Quellenangaben '
+                  'liegen beim jeweiligen Anbieter.',
             ),
           ],
         ),
@@ -656,6 +601,66 @@ class _TvChoiceTileState extends State<_TvChoiceTile> {
                   fontWeight: widget.bold ? FontWeight.bold : FontWeight.normal,
                 ),
               ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A row that opens a sub-page - unlike [_TvChoiceTile] not a choice, so no
+/// radio circle that would read as "not selected/not set up". Shows whether
+/// it's set up ([configured]: green tick / amber hint; null = neither, with
+/// [icon] instead), the current [value] and a chevron.
+class _TvNavTile extends StatefulWidget {
+  final String label;
+  final String? value;
+  final bool? configured;
+  final IconData? icon;
+  final VoidCallback onTap;
+
+  const _TvNavTile({required this.label, this.value, this.configured, this.icon, required this.onTap});
+
+  @override
+  State<_TvNavTile> createState() => _TvNavTileState();
+}
+
+class _TvNavTileState extends State<_TvNavTile> {
+  bool _focused = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final (icon, color) = switch (widget.configured) {
+      true => (Icons.check_circle, Theme.of(context).colorScheme.primary),
+      false => (Icons.error_outline, Colors.amber),
+      null => (widget.icon ?? Icons.settings_outlined, Colors.white70),
+    };
+    return TvFocusHighlight(
+      focused: _focused,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        focusColor: Colors.transparent,
+        hoverColor: Colors.white.withValues(alpha: 0.04),
+        onFocusChange: (v) => setState(() => _focused = v),
+        onTap: widget.onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: color),
+              const SizedBox(width: 10),
+              Text(widget.label, style: const TextStyle(fontSize: 16, color: Colors.white)),
+              if (widget.value != null) ...[
+                const SizedBox(width: 12),
+                Text(
+                  widget.value!,
+                  style: TextStyle(fontSize: 16, color: widget.configured == false ? Colors.amber : Colors.white60),
+                ),
+              ],
+              const SizedBox(width: 6),
+              const Icon(Icons.chevron_right, color: Colors.white38),
             ],
           ),
         ),

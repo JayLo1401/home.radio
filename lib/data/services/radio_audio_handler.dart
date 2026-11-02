@@ -1,9 +1,10 @@
 import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart' as just_audio;
 
-import '../db/database.dart' show DabStation;
+import '../db/database.dart' show DabStation, FmStation;
 import '../models/favorite_channel.dart';
 import '../repositories/dab_stations_repository.dart' show DabStationDisplay;
+import '../repositories/fm_stations_repository.dart' show FmStationDisplay;
 import 'audio_player_service.dart';
 
 /// Mirrors the app's current channel/playback state into an Android
@@ -79,7 +80,11 @@ class RadioAudioHandler extends BaseAudioHandler {
       MediaItem(
         id: channel.programNumber.toString(),
         title: channel.displayName,
-        album: channel.sourceType == FavoriteSourceType.dab ? 'DAB+' : 'Internetradio',
+        album: switch (channel.sourceType) {
+          FavoriteSourceType.dab => 'DAB+',
+          FavoriteSourceType.fm => 'UKW',
+          FavoriteSourceType.internet => 'Internetradio',
+        },
         artUri: channel.logoUrl != null ? Uri.tryParse(channel.logoUrl!) : null,
       ),
     );
@@ -103,6 +108,25 @@ class RadioAudioHandler extends BaseAudioHandler {
         id: 'dab_${station.freqKhz}_${station.serviceId}',
         title: station.displayLabel,
         album: 'DAB+',
+      ),
+    );
+    playbackState.add(
+      playbackState.value.copyWith(
+        controls: _controlsFor(playing),
+        systemActions: _systemActions,
+        playing: playing,
+        processingState: AudioProcessingState.ready,
+      ),
+    );
+  }
+
+  /// Same as [setDabStation], for an FM station played from the FM tab.
+  void setFmStation(FmStation station, {required bool playing}) {
+    mediaItem.add(
+      MediaItem(
+        id: 'fm_${station.freqKhz}',
+        title: station.displayLabel,
+        album: 'UKW · ${station.frequencyLabel}',
       ),
     );
     playbackState.add(

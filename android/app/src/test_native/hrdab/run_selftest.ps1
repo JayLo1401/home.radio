@@ -1,5 +1,5 @@
 # Builds the hrdab self test with the NDK and runs it on an adb device.
-#   .\run_selftest.ps1 [-Abi arm64-v8a|armeabi-v7a] [-Serial <adb serial>] [-Mode quick|full]
+#   .\run_selftest.ps1 [-Abi arm64-v8a|armeabi-v7a] [-Serial <adb serial>] [-Mode quick|full|fm|fmsep|demod|nb]
 param(
     [string]$Abi = "arm64-v8a",
     [string]$Serial = "",
@@ -16,7 +16,7 @@ $extra = if ($Abi -eq "armeabi-v7a") { @("-mfpu=neon", "-mfloat-abi=softfp") } e
 $here = $PSScriptRoot
 $src = Resolve-Path "$here\..\..\main\cpp\hrdab"
 $sources = Get-ChildItem $src -Filter *.cpp | Where-Object { $_.Name -ne "hrdab_jni.cpp" } | ForEach-Object { $_.FullName }
-$sources += "$here\tx_sim.cpp", "$here\selftest.cpp"
+$sources += "$here\tx_sim.cpp", "$here\fm_tx_sim.cpp", "$here\nb_tx_sim.cpp", "$here\selftest.cpp"
 $out = "$env:TEMP\hrdab_selftest_$Abi"
 
 & "$bin\clang++.exe" --target=$target -std=c++17 -O2 -DHRDAB_STDERR_LOG -Wall -Wno-unused-variable @extra -I $src -I $here @sources -static-libstdc++ -llog -o $out

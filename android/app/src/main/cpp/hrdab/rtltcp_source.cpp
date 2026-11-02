@@ -67,6 +67,14 @@ bool RtlTcpSource::setGainIndex(int index)
     return sendCommand(kCmdGain, static_cast<uint32_t>(R82xx::gainTenthsDb(index))) || !running_;
 }
 
+bool RtlTcpSource::setSampleRate(uint32_t hz)
+{
+    SampleSource::setSampleRate(hz);
+    // Connected (should not happen, see header): switch right away too.
+    sendCommand(kCmdSampleRate, hz);
+    return true;
+}
+
 void RtlTcpSource::closeSocket()
 {
     std::lock_guard<std::mutex> lock(sockMutex_);
@@ -121,7 +129,7 @@ bool RtlTcpSource::connectOnce()
         std::lock_guard<std::mutex> lock(sockMutex_);
         sock_ = s;
     }
-    sendCommand(kCmdSampleRate, kSampleRate);
+    sendCommand(kCmdSampleRate, sampleRate());
     sendCommand(kCmdAgcMode, 0);
     sendCommand(kCmdGainMode, 1); // manual - the receiver runs its own AGC
     if (gainIndex_ >= 0) sendCommand(kCmdGain, static_cast<uint32_t>(R82xx::gainTenthsDb(gainIndex_)));

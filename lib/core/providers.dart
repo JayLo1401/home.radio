@@ -7,7 +7,8 @@ import '../data/db/database.dart';
 import '../data/models/favorite_channel.dart';
 import '../data/repositories/dab_stations_repository.dart';
 import '../data/repositories/favorites_repository.dart';
-import '../data/repositories/settings_repository.dart' show DabSortMode, SettingsRepository;
+import '../data/repositories/fm_stations_repository.dart';
+import '../data/repositories/settings_repository.dart' show DabSortMode, ReceiverMode, SettingsRepository;
 import '../data/services/audio_player_service.dart';
 import '../data/services/backup_service.dart';
 import '../data/services/dab_rtlsdr_service.dart';
@@ -33,6 +34,82 @@ final dabStationsRepositoryProvider = Provider<DabStationsRepository>((ref) {
 final dabStationsStreamProvider = StreamProvider<List<DabStation>>((ref) {
   return ref.watch(dabStationsRepositoryProvider).watchAll();
 });
+
+final fmStationsRepositoryProvider = Provider<FmStationsRepository>((ref) {
+  return FmStationsRepository(ref.watch(databaseProvider));
+});
+
+/// All saved FM stations, by frequency.
+final fmStationsStreamProvider = StreamProvider<List<FmStation>>((ref) {
+  return ref.watch(fmStationsRepositoryProvider).watchAll();
+});
+
+/// The FM station (kHz) currently played straight from the sidebar's FM tab
+/// - the FM counterpart of [currentDabStationProvider]; mutually exclusive
+/// with it and with [currentProgramNumberProvider].
+class CurrentFmStation extends Notifier<int?> {
+  @override
+  int? build() => null;
+
+  void set(int? freqKhz) => state = freqKhz;
+}
+
+final currentFmStationProvider = NotifierProvider<CurrentFmStation, int?>(CurrentFmStation.new);
+
+/// What another screen wants played - playback itself lives in HomeScreen,
+/// which stays mounted underneath pushed screens and acts on this (e.g. the
+/// "Anhören" buttons of the DAB+/FM station lists). Exactly one is set.
+typedef PlayRequest = ({FavoriteChannel? favorite, DabStation? dab, FmStation? fm});
+
+class PlayRequestNotifier extends Notifier<PlayRequest?> {
+  @override
+  PlayRequest? build() => null;
+
+  void favorite(FavoriteChannel channel) => state = (favorite: channel, dab: null, fm: null);
+  void dab(DabStation station) => state = (favorite: null, dab: station, fm: null);
+  void fm(FmStation station) => state = (favorite: null, dab: null, fm: station);
+  void clear() => state = null;
+}
+
+final playRequestProvider = NotifierProvider<PlayRequestNotifier, PlayRequest?>(PlayRequestNotifier.new);
+
+/// Set while a screen has taken the receiver over on its own (scan, manual
+/// FM tuning, logo capture) - HomeScreen then tunes its station in again
+/// once back. Not set by plain playback via [playRequestProvider].
+class ReceiverInterrupted extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  void set(bool value) => state = value;
+}
+
+final receiverInterruptedProvider = NotifierProvider<ReceiverInterrupted, bool>(ReceiverInterrupted.new);
+
+/// The current DAB+ station's live slideshow image (a local file), null if
+/// none - offered as "Aktuelles Senderbild übernehmen" when editing that
+/// station from the home screen.
+class LiveStationImage extends Notifier<String?> {
+  @override
+  String? build() => null;
+
+  void set(String? path) => state = path;
+}
+
+final liveStationImageProvider = NotifierProvider<LiveStationImage, String?>(LiveStationImage.new);
+
+/// While set, the remote's next/previous and channel keys step through
+/// this instead of the radio stations - a listening band's channels while
+/// its ScannerScreen is open. Those keys reach the app through Android's
+/// media session, which HomeScreen owns regardless of the open screen.
+class RemoteStepOverride extends Notifier<void Function(int direction)?> {
+  @override
+  void Function(int direction)? build() => null;
+
+  void set(void Function(int direction)? step) => state = step;
+}
+
+final remoteStepOverrideProvider =
+    NotifierProvider<RemoteStepOverride, void Function(int direction)?>(RemoteStepOverride.new);
 
 class DabSortModeNotifier extends Notifier<DabSortMode> {
   @override
@@ -67,6 +144,50 @@ class ShowClockDateNotifier extends Notifier<bool> {
 }
 
 final showClockDateProvider = NotifierProvider<ShowClockDateNotifier, bool>(ShowClockDateNotifier.new);
+
+/// Which extra listening bands are switched on in the settings (CB radio,
+/// airband) - each gets a button in the top bar.
+typedef ListeningBands = ({bool cb, bool ham, bool airband, bool mil});
+
+class ListeningBandsNotifier extends Notifier<ListeningBands> {
+  @override
+  ListeningBands build() {
+    final repo = ref.watch(settingsRepositoryProvider);
+    () async {
+      state = (
+        cb: await repo.getCbEnabled(),
+        ham: await repo.getHamEnabled(),
+        airband: await repo.getAirbandEnabled(),
+        mil: await repo.getMilEnabled(),
+      );
+    }();
+    return (cb: false, ham: false, airband: false, mil: false);
+  }
+
+  SettingsRepository get _repo => ref.read(settingsRepositoryProvider);
+
+  Future<void> setCb(bool value) async {
+    state = (cb: value, ham: state.ham, airband: state.airband, mil: state.mil);
+    await _repo.setCbEnabled(value);
+  }
+
+  Future<void> setHam(bool value) async {
+    state = (cb: state.cb, ham: value, airband: state.airband, mil: state.mil);
+    await _repo.setHamEnabled(value);
+  }
+
+  Future<void> setAirband(bool value) async {
+    state = (cb: state.cb, ham: state.ham, airband: value, mil: state.mil);
+    await _repo.setAirbandEnabled(value);
+  }
+
+  Future<void> setMil(bool value) async {
+    state = (cb: state.cb, ham: state.ham, airband: state.airband, mil: value);
+    await _repo.setMilEnabled(value);
+  }
+}
+
+final listeningBandsProvider = NotifierProvider<ListeningBandsNotifier, ListeningBands>(ListeningBandsNotifier.new);
 
 /// [dabStationsStreamProvider], sorted per [dabSortModeProvider] - what
 /// FavoritesSidebar's DAB-Sender tab and DabStationsScreen actually display,
@@ -144,7 +265,26 @@ class CurrentProgramNumber extends Notifier<int?> {
 
 final currentProgramNumberProvider = NotifierProvider<CurrentProgramNumber, int?>(CurrentProgramNumber.new);
 
-enum SidebarCategory { favorites, dabStations }
+/// How DAB+ reaches its receiver (see [ReceiverMode]), reactive so choosing
+/// "Kein Empfänger" hides the DAB+ parts of the home screen right away.
+/// Starts as [ReceiverMode.tcp] (the stored default) until loaded.
+class ReceiverModeNotifier extends Notifier<ReceiverMode> {
+  @override
+  ReceiverMode build() {
+    final repo = ref.watch(settingsRepositoryProvider);
+    repo.getReceiverMode().then((mode) => state = mode);
+    return ReceiverMode.tcp;
+  }
+
+  Future<void> set(ReceiverMode mode) async {
+    state = mode;
+    await ref.read(settingsRepositoryProvider).setReceiverMode(mode);
+  }
+}
+
+final receiverModeProvider = NotifierProvider<ReceiverModeNotifier, ReceiverMode>(ReceiverModeNotifier.new);
+
+enum SidebarCategory { favorites, dabStations, fmStations }
 
 /// The user's explicit tab choice in FavoritesSidebar, if they've made one -
 /// null means "follow whatever's currently playing" (see
@@ -170,9 +310,13 @@ final sidebarCategoryProvider = NotifierProvider<SidebarCategoryNotifier, Sideba
 /// currentProgramNumberProvider instead), including by autostart restoring
 /// last session's pick before the user has touched either tab.
 final effectiveSidebarCategoryProvider = Provider<SidebarCategory>((ref) {
+  // Without a receiver there are no DAB+/FM tabs at all.
+  if (ref.watch(receiverModeProvider) == ReceiverMode.none) return SidebarCategory.favorites;
   final manual = ref.watch(sidebarCategoryProvider);
   if (manual != null) return manual;
-  return ref.watch(currentDabStationProvider) != null ? SidebarCategory.dabStations : SidebarCategory.favorites;
+  if (ref.watch(currentDabStationProvider) != null) return SidebarCategory.dabStations;
+  if (ref.watch(currentFmStationProvider) != null) return SidebarCategory.fmStations;
+  return SidebarCategory.favorites;
 });
 
 /// The DAB+ station currently tuned via the sidebar's "DAB-Sender" category
@@ -224,6 +368,11 @@ class WeatherDisplaySettings {
     required this.radarScale,
     required this.radarRadiusKm,
     required this.radarDimming,
+    required this.radarUrl,
+    required this.radarIsWebPage,
+    required this.radarWebCss,
+    required this.radarAuthEnabled,
+    required this.radarToken,
     required this.sunEnabled,
     required this.sunScale,
   });
@@ -247,6 +396,12 @@ class WeatherDisplaySettings {
   // How much of the map the radar shows - see SettingsRepository.getRadarRadiusKm.
   final int radarRadiusKm;
   final double radarDimming;
+  // The radar image's source - see SettingsRepository.getRadarUrl.
+  final String radarUrl;
+  final bool radarIsWebPage;
+  final String radarWebCss;
+  final bool radarAuthEnabled;
+  final String radarToken;
   final bool sunEnabled;
   final double sunScale;
 
@@ -262,6 +417,11 @@ class WeatherDisplaySettings {
     double? radarScale,
     int? radarRadiusKm,
     double? radarDimming,
+    String? radarUrl,
+    bool? radarIsWebPage,
+    String? radarWebCss,
+    bool? radarAuthEnabled,
+    String? radarToken,
     bool? sunEnabled,
     double? sunScale,
   }) {
@@ -277,6 +437,11 @@ class WeatherDisplaySettings {
       radarScale: radarScale ?? this.radarScale,
       radarRadiusKm: radarRadiusKm ?? this.radarRadiusKm,
       radarDimming: radarDimming ?? this.radarDimming,
+      radarUrl: radarUrl ?? this.radarUrl,
+      radarIsWebPage: radarIsWebPage ?? this.radarIsWebPage,
+      radarWebCss: radarWebCss ?? this.radarWebCss,
+      radarAuthEnabled: radarAuthEnabled ?? this.radarAuthEnabled,
+      radarToken: radarToken ?? this.radarToken,
       sunEnabled: sunEnabled ?? this.sunEnabled,
       sunScale: sunScale ?? this.sunScale,
     );
@@ -307,6 +472,11 @@ class WeatherDisplaySettingsNotifier extends Notifier<WeatherDisplaySettings> {
       radarScale: SettingsRepository.defaultTileScale,
       radarRadiusKm: SettingsRepository.defaultRadarRadiusKm,
       radarDimming: SettingsRepository.defaultRadarDimming,
+      radarUrl: '',
+      radarIsWebPage: false,
+      radarWebCss: '',
+      radarAuthEnabled: false,
+      radarToken: '',
       sunEnabled: true,
       sunScale: SettingsRepository.defaultTileScale,
     );
@@ -327,6 +497,11 @@ class WeatherDisplaySettingsNotifier extends Notifier<WeatherDisplaySettings> {
       sunEnabled: await repo.getSunEnabled(),
       sunScale: await repo.getSunTileScale(),
       radarDimming: await repo.getRadarDimming(),
+      radarUrl: await repo.getRadarUrl(),
+      radarIsWebPage: await repo.getRadarIsWebPage(),
+      radarWebCss: await repo.getRadarWebCss(),
+      radarAuthEnabled: await repo.getRadarAuthEnabled(),
+      radarToken: await repo.getRadarToken(),
     );
   }
 
@@ -374,6 +549,25 @@ class WeatherDisplaySettingsNotifier extends Notifier<WeatherDisplaySettings> {
   Future<void> setRadarDimming(double dimming) async {
     state = state.copyWith(radarDimming: dimming);
     await ref.read(settingsRepositoryProvider).setRadarDimming(dimming);
+  }
+
+  Future<void> setRadarSource({
+    required String url,
+    required bool isWebPage,
+    required String webCss,
+    required bool authEnabled,
+    required String token,
+  }) async {
+    state = state.copyWith(
+      radarUrl: url,
+      radarIsWebPage: isWebPage,
+      radarWebCss: webCss,
+      radarAuthEnabled: authEnabled,
+      radarToken: token,
+    );
+    await ref
+        .read(settingsRepositoryProvider)
+        .setRadarSource(url: url, isWebPage: isWebPage, webCss: webCss, authEnabled: authEnabled, token: token);
   }
 
   Future<void> setSunEnabled(bool enabled) async {
