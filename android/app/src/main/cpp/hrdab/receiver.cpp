@@ -223,7 +223,7 @@ bool Receiver::nbStart(uint32_t sampleRate, uint32_t centerHz, const std::vector
     nbMode_ = mode;
     nb_.setSquelch(squelchDb);
     uint32_t center = centerHz;
-    if (!NbDemod::canListen(sampleRate, NbDemod::placeLo(sampleRate, center, {freqHz}), freqHz)) center = freqHz;
+    if (!NbDemod::canListen(sampleRate, NbDemod::placeLo(sampleRate, center, {freqHz}), freqHz, mode)) center = freqHz;
     return nbRetuneLocked(center);
 }
 
@@ -233,7 +233,7 @@ bool Receiver::nbTune(uint32_t freqHz, NbMode mode)
     if (!running_ || mode_ != Mode::Nb) return false;
     nbFreqHz_ = freqHz;
     nbMode_ = mode;
-    if (NbDemod::canListen(nbRate_, nbLoHz_, freqHz)) {
+    if (NbDemod::canListen(nbRate_, nbLoHz_, freqHz, mode)) {
         // Same window: only the channel chain restarts, no retune.
         nbConfigureLocked();
         return true;

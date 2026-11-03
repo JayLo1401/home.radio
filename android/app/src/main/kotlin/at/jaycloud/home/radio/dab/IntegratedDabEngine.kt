@@ -46,7 +46,7 @@ class IntegratedDabEngine(private val events: Events) {
 
         /**
          * NB: every ~200 ms. All levels in dB referred to the tuner input.
-         * [mode] is "am"/"fm"/"usb"/"lsb", or "auto" while auto mode has not
+         * [mode] is "am"/"fm"/"usb"/"lsb"/"wfm", or "auto" while auto mode has not
          * detected anything yet. [levelsDb] has NaN for channels outside the
          * window; [spectrumDb] is empty when there is no activity data this
          * time (then [channelsHz]/[levelsDb] are empty too). The last four are
@@ -85,6 +85,7 @@ class IntegratedDabEngine(private val events: Events) {
             "fm" -> 2
             "usb" -> 3
             "lsb" -> 4
+            "wfm" -> 5
             else -> null
         }
 

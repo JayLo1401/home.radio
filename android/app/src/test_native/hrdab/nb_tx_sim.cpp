@@ -48,7 +48,8 @@ struct StationState {
         double unit;  // power for amp = 1
         switch (s.mode) {
             case NbTxMode::Am: unit = 1 + s.depth * s.depth * e2 * tones / 2; break;
-            case NbTxMode::Fm: unit = 1; break;
+            case NbTxMode::Fm:
+            case NbTxMode::Wfm: unit = 1; break;
             default: unit = e2 * tones; break;
         }
         const double want = noiseIn8k * std::pow(10.0, s.snrDb / 10);
@@ -70,8 +71,9 @@ struct StationState {
                 base = cd(1 + st.depth * m, 0);
                 break;
             }
-            case NbTxMode::Fm: {
-                const double m = env * (kA1 * a.imag() + kA2 * b.imag());
+            case NbTxMode::Fm:
+            case NbTxMode::Wfm: {
+                const double m = st.mode == NbTxMode::Wfm ? a.imag() : env * (kA1 * a.imag() + kA2 * b.imag());
                 fmPhase += 2 * M_PI * st.deviationHz * m / rate;
                 if (fmPhase > M_PI) fmPhase -= 2 * M_PI;
                 if (fmPhase < -M_PI) fmPhase += 2 * M_PI;

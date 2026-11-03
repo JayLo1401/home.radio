@@ -1160,8 +1160,128 @@ void testNbFilters()
     }
 }
 
+// Wideband FM: a +-75 kHz, 1 kHz tone on 51.4 MHz (as an SDR++ "WFM"
+// signal), a strong NFM neighbour 180 kHz up. Tone, its SNR and level,
+// channel SNR in the WFM bandwidth, squelch, reported mode/width; auto
+// never picks WFM.
+void testNbWfm(uint32_t rate, int bandwidthHz, double deviationHz, std::vector<double>& realtimes)
+{
+    const uint32_t freq = 51400000;
+    std::printf("[nb wfm %u S/s, bandwidth %d, deviation %.0f Hz]\n", rate, bandwidthHz, deviationHz);
+    const std::vector<uint32_t> channels;
+    const uint32_t lo = NbDemod::placeLo(rate, freq, {freq});
+    const double offS = 2.6, seconds = 3.8;
+    NbTxConfig cfg;
+    cfg.sampleRate = rate;
+    cfg.seed = rate / 1000 + 7;
+    NbStation w;
+    w.offsetHz = static_cast<double>(freq) - lo;
+    w.mode = NbTxMode::Wfm;
+    w.snrDb = 40;  // in 8 kHz: ~29 dB in 100 kHz
+    w.tone1Hz = 1000;
+    w.deviationHz = deviationHz;
+    w.offS = offS;
+    cfg.stations.push_back(w);
+    NbStation nfm;
+    nfm.offsetHz = w.offsetHz + 180000;
+    nfm.mode = NbTxMode::Fm;
+    nfm.snrDb = 40;
+    nfm.tone1Hz = 800;
+    nfm.tone2Hz = 1900;
+    cfg.stations.push_back(nfm);
+    const auto iq = generateNb(cfg, seconds);
+
+    NbFilters f;
+    f.bandwidthHz = bandwidthHz;
+    f.noiseBlanker = true;  // must be ignored for WFM
+    const NbRun r = runNb(iq, rate, freq, channels, freq, NbMode::Wfm, 10.f, f);
+    realtimes.push_back(r.realtime);
+
+    // Tone vs everything else in 100 Hz-15 kHz; the neighbour's tones.
+    constexpr int kN = 32768;
+    const size_t from = pcmIndex(1.0);
+    double toneSnr = -99, rmsDbfs = -99, peakHz = 0, leakDb = 0;
+    if (r.pcm.size() >= from + kN) {
+        Fft fft(kN);
+        std::vector<cf32> x(kN);
+        double sumSq = 0;
+        for (int i = 0; i < kN; i++) {
+            const float v = r.pcm[from + static_cast<size_t>(i)] / 32768.f;
+            sumSq += static_cast<double>(v) * v;
+            const float win = static_cast<float>(0.5 - 0.5 * std::cos(2 * M_PI * (i + 0.5) / kN));
+            x[static_cast<size_t>(i)] = cf32(v * win, 0);
+        }
+        rmsDbfs = 10 * std::log10(sumSq / kN + 1e-20);
+        fft.forward(x.data());
+        const double binHz = 48000.0 / kN;
+        auto band = [&](double lo, double hi) {
+            double s = 0;
+            for (int k = static_cast<int>(std::ceil(lo / binHz)); k <= static_cast<int>(hi / binHz); k++) s += std::norm(x[static_cast<size_t>(k)]);
+            return s;
+        };
+        int best = 1;
+        for (int k = 1; k < kN / 2; k++) {
+            if (std::norm(x[static_cast<size_t>(k)]) > std::norm(x[static_cast<size_t>(best)])) best = k;
+        }
+        peakHz = best * binHz;
+        const double tone = band(988, 1012);
+        toneSnr = 10 * std::log10(tone / std::max(band(100, 15000) - tone, 1e-20));
+        leakDb = 10 * std::log10((band(788, 812) + band(1888, 1912)) / std::max(tone, 1e-20));
+    }
+    bool openOk = true, closedOk = true, modeOk = true;
+    float snr = 0;
+    for (size_t k = 0; k < r.reports.size(); k++) {
+        const double t = reportTime(k);
+        const NbReport& rep = r.reports[k];
+        if (t >= 0.6 && t <= 2.5) {
+            openOk &= rep.squelchOpen;
+            snr = rep.snrDb;
+        }
+        if (t >= 3.15) closedOk &= !rep.squelchOpen;
+        modeOk &= rep.mode == NbMode::Wfm;
+    }
+    int tail = 0;
+    for (size_t i = pcmIndex(3.1); i < r.pcm.size(); i++) tail = std::max(tail, std::abs(static_cast<int>(r.pcm[i])));
+    const NbReport last = r.reports.empty() ? NbReport() : r.reports.back();
+    const int wantBw = NbDemod::effectiveBandwidth(NbMode::Wfm, bandwidthHz);
+    std::printf("  tone %.1f Hz, tone SNR %.1f dB, audio %.1f dBFS rms, neighbour %.1f dB, channel SNR %.1f dB "
+                "(noise %.1f dBFS), squelch %s/%s, tail max %d, reported %s %d Hz, %.1fx realtime\n",
+                peakHz, toneSnr, rmsDbfs, leakDb, snr, last.noiseDbfs, openOk ? "open" : "NOT OPEN",
+                closedOk ? "closed" : "NOT CLOSED", tail, nbModeName(last.mode), last.bandwidthHz, r.realtime);
+    CHECK(std::fabs(peakHz - 1000) < 5, "wfm: tone at %.1f Hz", peakHz);
+    CHECK(toneSnr > 30, "wfm: tone SNR %.1f dB", toneSnr);
+    // 75 kHz -> 0.5 peak (-9 dBFS rms), de-emphasis -0.4 dB at 1 kHz.
+    const double wantRms = 20 * std::log10(0.5 * deviationHz / 75000 / std::sqrt(2.0)) - 0.4;
+    CHECK(std::fabs(rmsDbfs - wantRms) < 1.5, "wfm: audio level %.1f dBFS, want %.1f", rmsDbfs, wantRms);
+    CHECK(leakDb < -40, "wfm: neighbour only %.1f dB down", leakDb);
+    // 40 dB in 8 kHz -> 40 - 10 log(enbw / 8 kHz).
+    const double wantSnr = 40 - 10 * std::log10(wantBw / 8000.0);
+    CHECK(std::fabs(snr - wantSnr) < 3, "wfm: channel SNR %.1f dB, want ~%.1f", snr, wantSnr);
+    CHECK(openOk, "wfm: squelch not open while keyed");
+    CHECK(closedOk && tail == 0, "wfm: squelch not closed after the transmission (tail %d)", tail);
+    CHECK(modeOk && last.bandwidthHz == wantBw, "wfm: reported %s %d Hz", nbModeName(last.mode), last.bandwidthHz);
+
+    // Auto on the same signal: never WFM.
+    const NbRun ra = runNb(iq, rate, freq, channels, freq, NbMode::Auto, 10.f, f);
+    int wfm = 0;
+    for (const auto& rep : ra.reports) wfm += rep.mode == NbMode::Wfm;
+    CHECK(wfm == 0, "auto picked wfm in %d reports", wfm);
+}
+
 void testNb()
 {
+    {
+        std::vector<double> rt;
+        // A steady +-75 kHz tone needs ~152 kHz (Carson): the default and the
+        // narrowest width get signals that fit them.
+        testNbWfm(2048000, 0, 40000, rt);
+        testNbWfm(960000, 200000, 75000, rt);
+        testNbWfm(2400000, 50000, 15000, rt);
+        testNbWfm(1440000, 150000, 75000, rt);
+        const double worst = *std::min_element(rt.begin(), rt.end());
+        std::printf("[nb wfm] realtime factor %.1fx (slowest run)\n", worst);
+        CHECK(worst > 1.5, "WFM only %.1fx realtime", worst);
+    }
     testNbFilters();
     std::vector<double> rt;
     for (uint32_t rate : {960000u, 1440000u, 2048000u}) {

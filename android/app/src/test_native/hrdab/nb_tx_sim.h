@@ -1,7 +1,8 @@
 // Test-only narrowband transmitters (CB/airband style): AM, NFM, USB and
 // LSB stations carrying two "voice-like" tones with a slow syllabic
 // envelope, keyed on and off, at given offsets from the tuner, plus white
-// noise, as 8-bit I/Q at any sample rate.
+// noise, as 8-bit I/Q at any sample rate. Wfm: one steady tone (tone1Hz)
+// at deviationHz (e.g. 75000), no pre-emphasis.
 #pragma once
 
 #include <cstdint>
@@ -9,7 +10,7 @@
 
 namespace hrdab::test {
 
-enum class NbTxMode { Am, Fm, Usb, Lsb };
+enum class NbTxMode { Am, Fm, Usb, Lsb, Wfm };
 
 struct NbStation {
     double offsetHz = 0;          // carrier / suppressed carrier relative to the tuner

@@ -27,17 +27,22 @@ constexpr float kSquelchHystDb = 3.f;
 constexpr int kPcmBlock = 1536;                 // frames per onNbAudio (32 ms)
 constexpr float kAgcTarget = 0.5f;              // audio peak level (full scale 1)
 constexpr float kPhaseScale = 4294967296.f;
+constexpr double kWfmDeviationHz = 75000.0;     // full modulation, gives kAgcTarget peaks
+constexpr int kWfmGuardHz = 120000;             // WFM stages keep 0..120 kHz alias-free
+constexpr int kWfmPassHz = 100000;              // ...and flat to 100 kHz
 
 struct RatePlan {
     uint32_t rate;
     int factors[3];  // product = rate / 16000
+    int wfm[2];      // product = rate / 240000 or rate / 256000
 };
 
 // Decimation to 16 kS/s in three stages; the first is the one that costs,
-// so it gets the largest factor its wide transition band allows.
+// so it gets the largest factor its wide transition band allows. WFM: two
+// stages, the last always by 2 (a half-band, see buildRate).
 const RatePlan kPlans[] = {
-    {960000, {5, 4, 3}},  {1024000, {8, 4, 2}}, {1440000, {6, 5, 3}},
-    {1920000, {8, 5, 3}}, {2048000, {8, 4, 4}}, {2400000, {10, 5, 3}},
+    {960000, {5, 4, 3}, {2, 2}},  {1024000, {8, 4, 2}, {2, 2}}, {1440000, {6, 5, 3}, {3, 2}},
+    {1920000, {8, 5, 3}, {4, 2}}, {2048000, {8, 4, 4}, {4, 2}}, {2400000, {10, 5, 3}, {5, 2}},
 };
 
 const RatePlan* planFor(uint32_t rate)
@@ -89,6 +94,7 @@ const char* nbModeName(NbMode mode)
         case NbMode::Fm: return "fm";
         case NbMode::Usb: return "usb";
         case NbMode::Lsb: return "lsb";
+        case NbMode::Wfm: return "wfm";
         default: return "auto";
     }
 }
@@ -106,6 +112,9 @@ int NbDemod::effectiveBandwidth(NbMode mode, int requestedHz)
 {
     if (mode == NbMode::Usb || mode == NbMode::Lsb) {
         return requestedHz <= 0 ? 2700 : std::max(1000, std::min(3500, requestedHz));
+    }
+    if (mode == NbMode::Wfm) {
+        return requestedHz <= 0 ? 100000 : std::max(50000, std::min(kWfmMaxBwHz, requestedHz));
     }
     // +-6.25 kHz at most: the 16 kS/s channel is only alias-free to ~7 kHz.
     if (requestedHz <= 0) return mode == NbMode::Am ? 9500 : 10500;
@@ -126,6 +135,17 @@ void NbDemod::rebuildDemod(NbMode mode)
     const int bw = effectiveBandwidth(mode, filters_.bandwidthHz);
     bandwidthHz_ = bw;
     const bool ssb = mode == NbMode::Usb || mode == NbMode::Lsb;
+    if (mode == NbMode::Wfm) {
+        // At 240/256 kS/s; transition 20 % of the width, at least 15 kHz
+        // (taps), so 200 kHz stops right at 120 kHz, the stages' guard.
+        const double half = bw / 2.0, tr = std::max(15000.0, std::min(40000.0, 0.2 * bw));
+        const auto h = lowpass(half - tr / 2, half + tr / 2, wfmRate_);
+        wfmFilt_.init(h, 1);
+        enbwWfm_ = enbw(h, wfmRate_);
+        // No audio filters or AGC (they are not used); reported as fast.
+        agcInUse_ = filters_.agc == NbAgc::Auto ? NbAgc::Fast : filters_.agc;
+        return;
+    }
     if (ssb) {
         // Audio passband 300 Hz .. 300 + bw, shifted to 0 Hz for the low-pass.
         const double half = bw / 2.0, tr = std::min(350.0, 0.2 * bw);
@@ -250,10 +270,13 @@ bool NbDemod::supportedRate(uint32_t rate)
     return planFor(rate) != nullptr;
 }
 
-bool NbDemod::canListen(uint32_t rate, uint32_t loHz, uint32_t freqHz)
+bool NbDemod::canListen(uint32_t rate, uint32_t loHz, uint32_t freqHz, NbMode mode)
 {
     const long off = std::labs(static_cast<long>(freqHz) - static_cast<long>(loHz));
-    return off >= kDcGuardHz && off <= usableHalfSpan(rate) - 6000;
+    // WFM: the DC spike may sit inside the channel (it is far narrower than
+    // the window shift could avoid); convert() removes the stick's offset.
+    const long margin = mode == NbMode::Wfm ? kWfmMaxBwHz / 2 : 6000;
+    return off >= kDcGuardHz && off <= usableHalfSpan(rate) - margin;
 }
 
 bool NbDemod::canMonitor(uint32_t rate, uint32_t loHz, uint32_t freqHz)
@@ -311,6 +334,7 @@ NbDemod::NbDemod(IqReader& reader, NbSink& sink)
     wideFilt_.init(wide, 1);
     enbwWide_ = enbw(wide, kChannelRate);
     enbwAm_ = enbwFm_ = enbwSsb_ = enbwWide_;
+    sqBlockLen_ = kSquelchBlock;
     // x3 to 48 kHz; passes up to 7 kHz (voice filter off), images from 9 kHz.
     interp_.init(lowpass(7000, 9000, kAudioRate), 3, 1);
 
@@ -351,6 +375,38 @@ void NbDemod::buildRate(uint32_t rate)
     b1_.resize(2 * static_cast<size_t>(chunk_ / factors_[0] + 8));
     b2_.resize(2 * static_cast<size_t>(chunk_ / factors_[0] / factors_[1] + 8));
     c16_.resize(2 * static_cast<size_t>(kChannelPerChunk + 8));
+
+    // WFM: the first stage only has to keep 0..120 kHz free of aliases (the
+    // channel filter's widest stop edge); the last, always by 2, is flat to
+    // 100 kHz and lets 120..140 kHz fold onto 100..120 kHz, where the channel
+    // filter's own transition takes it down further. Both come out as
+    // half-bands wherever the first factor is 2.
+    in = rate;
+    for (int s = 0; s < 2; s++) {
+        wfmFactors_[s] = plan->wfm[s];
+        const double out = in / wfmFactors_[s];
+        const double pass = s == 1 ? kWfmPassHz : kWfmGuardHz;
+        wfmStage_[s].init(lowpass(pass, out - pass, in), wfmFactors_[s]);
+        in = out;
+    }
+    wfmRate_ = static_cast<int>(in);
+    const int wfmChunk = chunk_ / wfmFactors_[0] / wfmFactors_[1];
+    w1_.resize(2 * static_cast<size_t>(chunk_ / wfmFactors_[0] + 8));
+    w2_.resize(2 * static_cast<size_t>(wfmChunk + 8));
+    wfmCh_.resize(2 * static_cast<size_t>(wfmChunk + 8));
+    // Discriminator output to 48 kHz (240 kHz: 1/5, 256 kHz: 3/16) with the
+    // 15 kHz audio low-pass, which also takes out a 19 kHz stereo pilot.
+    int g = kAudioRate, r = wfmRate_;
+    while (r) {
+        const int t = g % r;
+        g = r;
+        r = t;
+    }
+    const int up = kAudioRate / g, down = wfmRate_ / g;
+    wfmAudio_.init(lowpass(15000, 19000, static_cast<double>(up) * wfmRate_), up, down);
+    wfmAud_.resize(static_cast<size_t>(wfmChunk * up / down + 16));
+    // Noise reference until the first rebuildDemod (default width).
+    enbwWfm_ = enbw(lowpass(40000, 60000, wfmRate_), wfmRate_);
 }
 
 void NbDemod::applyConfig()
@@ -399,7 +455,7 @@ void NbDemod::resetWindow()
 
 void NbDemod::resetListen()
 {
-    listening_ = canListen(cfg_.sampleRate, cfg_.loHz, cfg_.freqHz);
+    listening_ = canListen(cfg_.sampleRate, cfg_.loHz, cfg_.freqHz, cfg_.mode);
     const double offset = static_cast<double>(cfg_.freqHz) - static_cast<double>(cfg_.loHz);
     inc_ = static_cast<uint32_t>(static_cast<int64_t>(std::llround(-offset / cfg_.sampleRate * 4294967296.0)));
     phase_ = 0;
@@ -408,6 +464,11 @@ void NbDemod::resetListen()
     amFilt_.reset();
     fmFilt_.reset();
     ssbFilt_.reset();
+    for (auto& s : wfmStage_) s.reset();
+    wfmFilt_.reset();
+    wfmAudio_.reset();
+    wfmDeemph_ = wfmDc_ = 0;
+    sqBlockLen_ = cfg_.mode == NbMode::Wfm ? wfmRate_ / 50 : kSquelchBlock;
     ssbPhase_ = 0;
     prevI_ = prevQ_ = 0;
     amMean_ = 0;
@@ -434,8 +495,9 @@ void NbDemod::resetListen()
     candidate_ = NbMode::Auto;
     candidateVotes_ = 0;
     confirmed_ = NbMode::Auto;
-    // An explicit choice counts as "confirmed" for a later switch to auto.
-    if (cfg_.mode != NbMode::Auto) fallback_ = cfg_.mode;
+    // An explicit choice counts as "confirmed" for a later switch to auto -
+    // except WFM, which auto never uses.
+    if (cfg_.mode != NbMode::Auto && cfg_.mode != NbMode::Wfm) fallback_ = cfg_.mode;
 }
 
 NbMode NbDemod::activeMode() const
@@ -448,7 +510,10 @@ NbMode NbDemod::activeMode() const
 
 float NbDemod::channelNoise(NbMode mode) const
 {
-    const float bw = mode == NbMode::Am ? enbwAm_ : (mode == NbMode::Usb || mode == NbMode::Lsb) ? enbwSsb_ : enbwFm_;
+    const float bw = mode == NbMode::Am                                ? enbwAm_
+                     : (mode == NbMode::Usb || mode == NbMode::Lsb) ? enbwSsb_
+                     : mode == NbMode::Wfm                          ? enbwWfm_
+                                                                    : enbwFm_;
     return static_cast<float>(n0_ * bw);
 }
 
@@ -486,7 +551,8 @@ void NbDemod::processChunk()
                 filters_.noiseBlanker, filters_.voiceFilter, nbAgcName(filters_.agc));
     }
     convert();
-    if (filters_.noiseBlanker) blankImpulses();
+    // Not for WFM: its wide channel would lose too much to every gap.
+    if (filters_.noiseBlanker && cfg_.mode != NbMode::Wfm) blankImpulses();
     const bool hold = gainHold_ > 0;
     if (hold) gainHold_ -= chunk_;
     if (!hold) monitorFft();
@@ -591,6 +657,10 @@ void NbDemod::channelChain(bool hold)
         ph += inc;
     }
     phase_ = ph;
+    if (cfg_.mode == NbMode::Wfm) {
+        wfmChain(hold);
+        return;
+    }
     const int n1 = stage_[0].process(iq_.data(), chunk_, b1_.data());
     const int n2 = stage_[1].process(b1_.data(), n1, b2_.data());
     const int n3 = stage_[2].process(b2_.data(), n2, c16_.data());
@@ -638,25 +708,7 @@ void NbDemod::demod16(int n, bool hold)
         }
         ssbFilt_.process(tmp_.data(), n, m_.data());
     }
-
-    double pow = 0;
-    for (int i = 0; i < n; i++) {
-        const float re = m[2 * i], im = m[2 * i + 1];
-        const float p = re * re + im * im;
-        pow += p;
-        sqBlockPow_ += p;
-        if (++sqBlockN_ == kSquelchBlock) {
-            // Also during a gain change: one step (~1.6 dB) stays within the
-            // hysteresis, and freezing would stretch the hang time.
-            squelchBlock();
-            sqBlockPow_ = 0;
-            sqBlockN_ = 0;
-        }
-    }
-    if (!hold) {
-        statPow_ += pow;
-        statN_ += n;
-    }
+    levelAndSquelch(m, n, hold);
 
     float* aud = aud16_.data();
     switch (mode) {
@@ -705,6 +757,73 @@ void NbDemod::demod16(int n, bool hold)
     audioOut(n);
 }
 
+void NbDemod::wfmChain(bool hold)
+{
+    if (lastMode_ != NbMode::Wfm) {
+        rebuildDemod(NbMode::Wfm);
+        prevI_ = prevQ_ = 0;
+        lastMode_ = NbMode::Wfm;
+    }
+    const int n1 = wfmStage_[0].process(iq_.data(), chunk_, w1_.data());
+    const int n2 = wfmStage_[1].process(w1_.data(), n1, w2_.data());
+    wfmFilt_.process(w2_.data(), n2, wfmCh_.data());
+    const float* m = wfmCh_.data();
+    levelAndSquelch(m, n2, hold);
+
+    // Discriminator; full deviation gives the other modes' AGC peak level,
+    // so switching modes does not jump in loudness. No AGC: the deviation
+    // is the level.
+    const float toNorm = static_cast<float>(kAgcTarget * wfmRate_ / (2.0 * M_PI) / kWfmDeviationHz);
+    float* disc = w2_.data();  // free again
+    float pi = prevI_, pq = prevQ_;
+    for (int i = 0; i < n2; i++) {
+        const float zi = m[2 * i], zq = m[2 * i + 1];
+        disc[i] = fastAtan2(zq * pi - zi * pq, zi * pi + zq * pq) * toNorm;
+        pi = zi;
+        pq = zq;
+    }
+    prevI_ = pi;
+    prevQ_ = pq;
+
+    // 15 kHz low-pass and 48 kHz in one; then, as the UKW receiver, a DC
+    // block (carrier offset) and the 50 us de-emphasis.
+    const int n48 = wfmAudio_.process(disc, n2, wfmAud_.data());
+    static const float kDeemph = static_cast<float>(1.0 - std::exp(-1.0 / (kAudioRate * 50e-6)));
+    static const float kDcBlock = onePole(5.0, kAudioRate);
+    float dc = wfmDc_, de = wfmDeemph_;
+    float* a = wfmAud_.data();
+    for (int i = 0; i < n48; i++) {
+        dc += kDcBlock * (a[i] - dc);
+        de += kDeemph * (a[i] - dc - de);
+        a[i] = std::max(-0.98f, std::min(0.98f, de));
+    }
+    wfmDc_ = dc;
+    wfmDeemph_ = de;
+    gateOut(a, n48);
+}
+
+void NbDemod::levelAndSquelch(const float* m, int n, bool hold)
+{
+    double pow = 0;
+    for (int i = 0; i < n; i++) {
+        const float re = m[2 * i], im = m[2 * i + 1];
+        const float p = re * re + im * im;
+        pow += p;
+        sqBlockPow_ += p;
+        if (++sqBlockN_ == sqBlockLen_) {
+            // Also during a gain change: one step (~1.6 dB) stays within the
+            // hysteresis, and freezing would stretch the hang time.
+            squelchBlock();
+            sqBlockPow_ = 0;
+            sqBlockN_ = 0;
+        }
+    }
+    if (!hold) {
+        statPow_ += pow;
+        statN_ += n;
+    }
+}
+
 void NbDemod::squelchBlock()
 {
     const float sq = squelchDb_.load();
@@ -717,7 +836,7 @@ void NbDemod::squelchBlock()
         sqOpen_ = false;  // floor not measured yet
         return;
     }
-    const double level = sqBlockPow_ / kSquelchBlock;
+    const double level = sqBlockPow_ / sqBlockLen_;
     if (!sqLevelInit_) {
         sqLevel_ = level;
         sqLevelInit_ = true;
@@ -780,13 +899,18 @@ void NbDemod::audioOut(int n)
     agcHold_ = holdLeft;
 
     const int n48 = interp_.process(audLp_.data(), nl, aud48_.data());
+    gateOut(aud48_.data(), n48);
+}
+
+void NbDemod::gateOut(const float* a48, int n48)
+{
     // Squelch gate: 5 ms fade in, 10 ms fade out - no clicks.
     const float target = sqOpen_ ? 1.f : 0.f;
     float g = gate_;
     for (int i = 0; i < n48; i++) {
         if (g < target) g = std::min(target, g + 1.f / 240);
         else if (g > target) g = std::max(target, g - 1.f / 480);
-        const float v = aud48_[static_cast<size_t>(i)] * g * 32767.f;
+        const float v = a48[i] * g * 32767.f;
         pcm_.push_back(static_cast<int16_t>(std::lrintf(std::max(-32767.f, std::min(32767.f, v)))));
     }
     gate_ = g;

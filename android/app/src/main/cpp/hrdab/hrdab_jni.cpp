@@ -424,7 +424,7 @@ namespace {
 
 bool toNbMode(jint mode, NbMode& out)
 {
-    if (mode < 0 || mode > static_cast<jint>(NbMode::Lsb)) return false;
+    if (mode < 0 || mode > static_cast<jint>(NbMode::Wfm)) return false;
     out = static_cast<NbMode>(mode);
     return true;
 }

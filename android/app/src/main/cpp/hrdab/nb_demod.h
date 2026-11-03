@@ -10,8 +10,13 @@
 //    NFM (discriminator, CTCSS high-pass), USB or LSB (product detector),
 //    then levelled by an audio AGC, gated by a level squelch and
 //    interpolated to 48 kHz mono PCM;
+//  - wideband FM ("wfm", e.g. broadcast-style links) takes its own path:
+//    the channel is decimated in two stages to 240/256 kS/s only, filtered
+//    to 50-200 kHz, discriminated, low-passed at 15 kHz, resampled to 48 kHz
+//    and de-emphasised (50 us); no blanker, voice filter or AGC;
 //  - in "auto" mode the listened channel's signal is classified from its
-//    spectrum (carrier, sideband symmetry) and envelope (constant or not).
+//    spectrum (carrier, sideband symmetry) and envelope (constant or not);
+//    it never picks wfm.
 #pragma once
 
 #include <atomic>
@@ -27,9 +32,9 @@
 
 namespace hrdab {
 
-enum class NbMode { Auto = 0, Am = 1, Fm = 2, Usb = 3, Lsb = 4 };
+enum class NbMode { Auto = 0, Am = 1, Fm = 2, Usb = 3, Lsb = 4, Wfm = 5 };
 
-// "auto", "am", "fm", "usb", "lsb"
+// "auto", "am", "fm", "usb", "lsb", "wfm"
 const char* nbModeName(NbMode mode);
 
 enum class NbAgc { Auto = 0, Fast = 1, Slow = 2 };
@@ -40,15 +45,17 @@ const char* nbAgcName(NbAgc agc);
 // User-selectable signal filters; they persist across channel/mode changes.
 struct NbFilters {
     // Channel filter width: two-sided for AM/NFM (3000-12500), the audio
-    // passband width from 300 Hz up for USB/LSB (1000-3500). 0 = mode default
-    // (AM 9500, NFM 10500, SSB 2700).
+    // passband width from 300 Hz up for USB/LSB (1000-3500), two-sided for
+    // WFM (50000-200000). 0 = mode default (AM 9500, NFM 10500, SSB 2700,
+    // WFM 100000).
     int bandwidthHz = 0;
-    // Impulse blanker on the wideband I/Q (ignition, electric fences).
+    // Impulse blanker on the wideband I/Q (ignition, electric fences); not
+    // for WFM.
     bool noiseBlanker = false;
     // Audio 300-3000 Hz (NFM: CTCSS high-pass at 350 Hz); off: NFM 100 Hz
-    // high-pass, AM/SSB only a DC block, low-pass at ~6.5 kHz.
+    // high-pass, AM/SSB only a DC block, low-pass at ~6.5 kHz. Not for WFM.
     bool voiceFilter = true;
-    // Auto: fast for AM/NFM, slow for SSB.
+    // Auto: fast for AM/NFM, slow for SSB. WFM has none.
     NbAgc agc = NbAgc::Auto;
 };
 
@@ -110,9 +117,14 @@ public:
     static bool supportedRate(uint32_t rate);
     // Half of the usable span: the stick's own filters roll off beyond.
     static int usableHalfSpan(uint32_t rate) { return static_cast<int>(rate * 0.85 / 2); }
+    // Widest WFM channel; a WFM channel is placed as if it were this wide,
+    // so the window does not depend on the filter setting.
+    static constexpr int kWfmMaxBwHz = 200000;
+
     // Whether a channel at freqHz can be demodulated with the tuner at loHz
-    // (inside the usable span, not on the DC spike).
-    static bool canListen(uint32_t rate, uint32_t loHz, uint32_t freqHz);
+    // in `mode` (inside the usable span, not on the DC spike; for WFM the
+    // whole kWfmMaxBwHz must be inside).
+    static bool canListen(uint32_t rate, uint32_t loHz, uint32_t freqHz, NbMode mode = NbMode::Auto);
     // Whether a monitored channel's power can be measured.
     static bool canMonitor(uint32_t rate, uint32_t loHz, uint32_t freqHz);
     // Tuner frequency for a window around centerHz: shifted by up to
@@ -164,8 +176,11 @@ private:
     void monitorFft();
     void channelChain(bool hold);
     void demod16(int n, bool hold);
+    void wfmChain(bool hold);
+    void levelAndSquelch(const float* m, int n, bool hold);
     void squelchBlock();
     void audioOut(int n);
+    void gateOut(const float* a48, int n48);
     void classifyAccumulate(const float* a, int n);
     void classify();
     void report();
@@ -202,6 +217,12 @@ private:
     FirDecimator<2> stage_[3];
     std::vector<uint8_t> raw_;
     std::vector<float> iq_, b1_, b2_, c16_;
+    // WFM: two stages to wfmRate_ (240/256 kS/s), resampler to 48 kHz
+    int wfmRate_ = 0;
+    int wfmFactors_[2] = {1, 1};
+    FirDecimator<2> wfmStage_[2];
+    RationalResampler<1> wfmAudio_;
+    std::vector<float> w1_, w2_, wfmCh_, wfmAud_;
 
     // window state
     long skip_ = 0;
@@ -221,8 +242,9 @@ private:
     // listened channel
     bool listening_ = false;
     uint32_t phase_ = 0, inc_ = 0;
-    FirDecimator<2> wideFilt_, amFilt_, fmFilt_, ssbFilt_;
-    float enbwWide_ = 0, enbwAm_ = 0, enbwFm_ = 0, enbwSsb_ = 0;
+    FirDecimator<2> wideFilt_, amFilt_, fmFilt_, ssbFilt_, wfmFilt_;
+    float enbwWide_ = 0, enbwAm_ = 0, enbwFm_ = 0, enbwSsb_ = 0, enbwWfm_ = 0;
+    float wfmDeemph_ = 0, wfmDc_ = 0;
     double ssbCentreHz_ = 1650;
     int bandwidthHz_ = 0;        // in effect for lastMode_
     NbAgc agcInUse_ = NbAgc::Fast;
@@ -245,6 +267,7 @@ private:
     // squelch
     double sqBlockPow_ = 0;
     int sqBlockN_ = 0;
+    int sqBlockLen_ = 0;         // 20 ms at the rate the level is measured at
     double sqLevel_ = 0;
     bool sqLevelInit_ = false;
     bool sqOpen_ = false;

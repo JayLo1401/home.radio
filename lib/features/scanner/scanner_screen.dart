@@ -87,6 +87,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     _settings = ref.read(settingsRepositoryProvider);
     _stepOverride = ref.read(remoteStepOverrideProvider.notifier);
     _sub = _rx.events.listen(_onEvent);
+    FocusManager.instance.addListener(_recoverFocus);
     // Not during build: providers can't change while the tree builds.
     Future.microtask(() => _stepOverride.set(_stepActive));
     _start();
@@ -96,6 +97,9 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
 
   @override
   void dispose() {
+    FocusManager.instance.removeListener(_recoverFocus);
+    _screenFocus.dispose();
+    _waterfallFocus.dispose();
     Future.microtask(() => _stepOverride.set(null));
     _rx.nbStop();
     _sub?.cancel();
@@ -120,6 +124,23 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
 
   /// The remote's channel and next/previous keys - also when they arrive as
   /// plain keys rather than through the media session (see [_stepActive]).
+  final _screenFocus = FocusNode(debugLabel: 'scanner');
+  final _waterfallFocus = FocusNode(debugLabel: 'waterfall');
+
+  /// The focused control can vanish under the remote - a range button greys
+  /// out at the band edge, a channel button leaves when the window moves.
+  /// Focus then falls back to the page itself and the arrow keys find
+  /// nothing; put it on the waterfall instead.
+  void _recoverFocus() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final primary = FocusManager.instance.primaryFocus;
+      if (primary == null || primary == _screenFocus || primary == _screenFocus.enclosingScope) {
+        if (ModalRoute.of(context)?.isCurrent ?? false) _waterfallFocus.requestFocus();
+      }
+    });
+  }
+
   KeyEventResult _onKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
     final key = event.logicalKey;
@@ -210,10 +231,20 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     if (ok) await _applyFilters();
   }
 
-  bool get _isSsb => (_mode == 'usb' || _mode == 'lsb');
+  /// Modulations whose filter widths are of the same order: SSB, wideband
+  /// FM, the rest.
+  String get _widthFamily => switch (_mode) {
+    'usb' || 'lsb' => 'ssb',
+    'wfm' => 'wfm',
+    _ => 'narrow',
+  };
 
   /// Filter widths offered for the current modulation (0 = automatic).
-  List<int> get _bandwidthChoices => _isSsb ? const [0, 1800, 2400, 2700, 3000] : const [0, 6000, 8330, 10000, 12500];
+  List<int> get _bandwidthChoices => switch (_widthFamily) {
+    'ssb' => const [0, 1800, 2400, 2700, 3000],
+    'wfm' => const [0, 50000, 100000, 150000, 200000],
+    _ => const [0, 6000, 8330, 10000, 12500],
+  };
 
   Future<void> _applyFilters() =>
       _rx.nbSetFilters(bandwidthHz: _bandwidthHz, noiseBlanker: _noiseBlanker, voiceFilter: _voiceFilter, agc: _agc);
@@ -360,14 +391,15 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
   }
 
   Future<void> _setMode(String mode) async {
-    final wasSsb = _isSsb;
+    final family = _widthFamily;
     setState(() {
       _mode = mode;
       _detectedMode = null;
     });
     await _rx.nbTune(freqHz: _channel.freqHz, mode: mode);
-    // SSB and AM/FM widths differ by an order of magnitude - back to auto.
-    if (wasSsb != _isSsb && _bandwidthHz != 0) {
+    // SSB, AM/FM and wideband FM widths differ by orders of magnitude - back
+    // to auto.
+    if (family != _widthFamily && _bandwidthHz != 0) {
       await _setFilters(bandwidthHz: 0);
     } else {
       await _applyFilters();
@@ -402,6 +434,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
         : (_snrDb! >= 20 ? Colors.greenAccent : (_snrDb! >= 10 ? Colors.amberAccent : Colors.redAccent));
     final pagesWindow = _window.length < _plan.channels.length;
     return Focus(
+      focusNode: _screenFocus,
       onKeyEvent: _onKey,
       child: Scaffold(
         appBar: AppBar(title: Text(_plan.title)),
@@ -541,6 +574,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
                   // Spectrum + waterfall of the window; a tap
                   // tunes the nearest channel.
                   _StepFocus(
+                    focusNode: _waterfallFocus,
                     onStep: (direction) => _select(_index + direction),
                     child: WaterfallView(
                       bins: _spectrum,
@@ -616,8 +650,9 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
 class _StepFocus extends StatefulWidget {
   final Widget child;
   final void Function(int direction) onStep;
+  final FocusNode focusNode;
 
-  const _StepFocus({required this.child, required this.onStep});
+  const _StepFocus({required this.child, required this.onStep, required this.focusNode});
 
   @override
   State<_StepFocus> createState() => _StepFocusState();
@@ -629,6 +664,7 @@ class _StepFocusState extends State<_StepFocus> {
   @override
   Widget build(BuildContext context) {
     return Focus(
+      focusNode: widget.focusNode,
       onFocusChange: (v) => setState(() => _focused = v),
       onKeyEvent: (node, event) {
         if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
