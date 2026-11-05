@@ -321,14 +321,25 @@ Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeCreateUsb(JNIEnv* e, j
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
-Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeCreateTcp(JNIEnv* e, jobject thiz, jstring jHost, jint port)
+Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeCreateTcp(JNIEnv* e, jobject thiz, jstring jHost, jint port,
+                                                                    jboolean v2, jboolean auth, jstring jUser,
+                                                                    jstring jPassword)
 {
     std::lock_guard<std::mutex> lock(g_mutex);
     if (g_session) return JNI_TRUE;
-    const char* host = e->GetStringUTFChars(jHost, nullptr);
-    std::string h = host ? host : "127.0.0.1";
-    if (host) e->ReleaseStringUTFChars(jHost, host);
-    return create(e, thiz, std::make_unique<RtlTcpSource>(h, static_cast<int>(port)));
+    auto str = [e](jstring js, const char* def) {
+        if (!js) return std::string(def);
+        const char* c = e->GetStringUTFChars(js, nullptr);
+        std::string s = c ? c : def;
+        if (c) e->ReleaseStringUTFChars(js, c);
+        return s;
+    };
+    RtlTcpOptions options;
+    options.v2 = v2 == JNI_TRUE;
+    options.auth = auth == JNI_TRUE;
+    options.user = str(jUser, "");
+    options.password = str(jPassword, "");
+    return create(e, thiz, std::make_unique<RtlTcpSource>(str(jHost, "127.0.0.1"), static_cast<int>(port), options));
 }
 
 extern "C" JNIEXPORT void JNICALL

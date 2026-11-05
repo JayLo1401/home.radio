@@ -434,11 +434,12 @@ void RadioController::onNbReport(const NbReport& r, float gainDb)
 
 // --- engine ---
 
-bool RadioController::engineCreateTcp(const std::string& host, int port)
+bool RadioController::engineCreateTcp(const std::string& host, int port, const RtlTcpOptions& options)
 {
     std::lock_guard<std::mutex> lock(engineMutex_);
     if (rx_) return true;
-    rx_ = std::make_unique<Receiver>(std::make_unique<RtlTcpSource>(host, port), static_cast<ReceiverListener&>(*this));
+    rx_ = std::make_unique<Receiver>(std::make_unique<RtlTcpSource>(host, port, options),
+                                     static_cast<ReceiverListener&>(*this));
     return true;
 }
 
@@ -595,9 +596,17 @@ bool RadioController::ensureCreated()
 {
     std::lock_guard<std::mutex> lock(sessionMutex_);
     if (created_) return true;
-    created_ = engineCreateTcp(lastHost_, lastPort_);
-    sessionEndpoint_ = created_ ? lastHost_ + ":" + std::to_string(lastPort_) : std::string();
+    created_ = engineCreateTcp(lastHost_, lastPort_, lastOptions_);
+    sessionEndpoint_ = created_ ? endpointKey() : std::string();
     return created_;
+}
+
+// Host, port and protocol/login settings: a change needs a new session.
+std::string RadioController::endpointKey() const
+{
+    return lastHost_ + ":" + std::to_string(lastPort_) + "|v2=" + (lastOptions_.v2 ? "1" : "0") +
+           "|auth=" + (lastOptions_.auth ? "1" : "0") + "|" + lastOptions_.user + "|" +
+           std::to_string(std::hash<std::string>{}(lastOptions_.password));
 }
 
 void RadioController::destroySession()
@@ -1404,9 +1413,13 @@ void RadioController::onMethodCall(int64_t id, const std::string& method, const 
             std::lock_guard<std::mutex> lock(sessionMutex_);
             lastHost_ = host;
             lastPort_ = port;
+            lastOptions_.v2 = args.boolOr("v2", false);
+            lastOptions_.auth = args.boolOr("auth", false);
+            lastOptions_.user = args.stringOr("user", "");
+            lastOptions_.password = args.stringOr("password", "");
             // The rtl_tcp endpoint (or the USB stick) is bound when the
             // session is created, so a different source needs a new one.
-            replace = created_ && sessionEndpoint_ != host + ":" + std::to_string(port);
+            replace = created_ && sessionEndpoint_ != endpointKey();
         }
         if (replace) {
             stopPlayback();

@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/popup_text_field.dart';
 import '../../core/providers.dart';
-import '../../data/repositories/settings_repository.dart' show ReceiverMode;
+import '../../data/repositories/settings_repository.dart' show ReceiverMode, RtlTcpAuth;
 import '../../data/services/rtl_sdr_service.dart';
 import '../../data/services/rtl_sdr_usb_service.dart';
 
@@ -24,6 +24,9 @@ class _RtlSdrTestScreenState extends ConsumerState<RtlSdrTestScreen> {
   final _hostController = TextEditingController(text: '127.0.0.1');
   final _portController = TextEditingController(text: '1234');
   final _freqController = TextEditingController(text: '100000000');
+  final _userController = TextEditingController();
+  final _passwordController = TextEditingController();
+  RtlTcpAuth _auth = const RtlTcpAuth();
 
   bool _connecting = false;
   RtlConnectResult? _lastResult;
@@ -46,12 +49,23 @@ class _RtlSdrTestScreenState extends ConsumerState<RtlSdrTestScreen> {
     final host = await settings.getRtlSdrHost();
     final port = await settings.getRtlSdrPort();
     final mode = await settings.getReceiverMode();
+    final auth = await settings.getRtlTcpAuth();
     if (!mounted) return;
     setState(() {
       _hostController.text = host;
       _portController.text = '$port';
       _mode = mode;
+      _auth = auth;
+      _userController.text = auth.user;
+      _passwordController.text = auth.password;
     });
+  }
+
+  /// Protocol/login are saved right away; the receiver picks them up the
+  /// next time it connects (a changed setting starts a new session).
+  Future<void> _saveAuth(RtlTcpAuth auth) async {
+    setState(() => _auth = auth);
+    await ref.read(settingsRepositoryProvider).setRtlTcpAuth(auth);
   }
 
   @override
@@ -67,6 +81,8 @@ class _RtlSdrTestScreenState extends ConsumerState<RtlSdrTestScreen> {
     _hostController.dispose();
     _portController.dispose();
     _freqController.dispose();
+    _userController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
@@ -138,7 +154,7 @@ class _RtlSdrTestScreenState extends ConsumerState<RtlSdrTestScreen> {
     final connected = _lastResult?.connected ?? false;
     return Scaffold(
       appBar: AppBar(title: const Text('Radio-Empfänger (DAB+ & UKW)')),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -242,6 +258,63 @@ class _RtlSdrTestScreenState extends ConsumerState<RtlSdrTestScreen> {
                   ),
                 ],
               ),
+              const SizedBox(height: 12),
+              // Chosen by hand, no auto-detection (rtltcp.server's
+              // docs/client-integration.md).
+              Row(
+                children: [
+                  const Text('Protokoll:'),
+                  const SizedBox(width: 12),
+                  DropdownButton<bool>(
+                    value: _auth.v2,
+                    items: const [
+                      DropdownMenuItem(value: false, child: Text('rtl_tcp (v1)')),
+                      DropdownMenuItem(value: true, child: Text('rtltcp_v2')),
+                    ],
+                    onChanged: (v) => v == null ? null : _saveAuth(_auth.copyWith(v2: v)),
+                  ),
+                ],
+              ),
+              if (_auth.v2) ...[
+                const Text(
+                  'rtltcp_v2 (z.B. rtltcp.server) meldet, wenn der Stick am Server fehlt oder der Server '
+                  'belegt ist, und kann eine Anmeldung verlangen. Ein klassischer rtl_tcp-Server funktioniert '
+                  'trotzdem weiter.',
+                  style: TextStyle(color: Colors.white70),
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Anmeldung'),
+                  subtitle: const Text('Nur nötig, wenn der Server es verlangt'),
+                  value: _auth.login,
+                  onChanged: (v) => _saveAuth(_auth.copyWith(login: v)),
+                ),
+                if (_auth.login)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: PopupTextField(
+                          controller: _userController,
+                          label: 'Benutzer',
+                          onSubmitted: (v) => _saveAuth(_auth.copyWith(user: v.trim())),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: PopupTextField(
+                          controller: _passwordController,
+                          label: 'Passwort',
+                          obscureText: true,
+                          onSubmitted: (v) => _saveAuth(_auth.copyWith(password: v)),
+                        ),
+                      ),
+                    ],
+                  ),
+                const Text(
+                  'Der Verbindungstest hier unten nutzt immer das klassische Protokoll (v1).',
+                  style: TextStyle(color: Colors.white54, fontSize: 13),
+                ),
+              ],
               const SizedBox(height: 12),
               Row(
                 children: [

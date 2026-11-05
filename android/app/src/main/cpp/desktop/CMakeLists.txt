@@ -118,6 +118,7 @@ add_library(hrdab SHARED
   "${HRDAB_SRC}/fic.cpp"
   "${HRDAB_SRC}/fm_demod.cpp"
   "${HRDAB_SRC}/fm_dsp.cpp"
+  "${HRDAB_SRC}/json.cpp"
   "${HRDAB_SRC}/msc.cpp"
   "${HRDAB_SRC}/nb_demod.cpp"
   "${HRDAB_SRC}/ofdm.cpp"
@@ -129,11 +130,11 @@ add_library(hrdab SHARED
   "${HRDAB_SRC}/reed_solomon.cpp"
   "${HRDAB_SRC}/rtl2832.cpp"
   "${HRDAB_SRC}/rtltcp_source.cpp"
+  "${HRDAB_SRC}/scram.cpp"
   "${HRDAB_SRC}/superframe.cpp"
   "${HRDAB_SRC}/viterbi.cpp"
   audio_player.cpp
   hrdab_desktop.cpp
-  json.cpp
   libusb_transport.cpp
   miniaudio_impl.c
   radio_controller.cpp

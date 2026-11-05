@@ -27,6 +27,7 @@ add_library(hrdab SHARED
     hrdab/fm_demod.cpp
     hrdab/fm_dsp.cpp
     hrdab/hrdab_jni.cpp
+    hrdab/json.cpp
     hrdab/msc.cpp
     hrdab/nb_demod.cpp
     hrdab/ofdm.cpp
@@ -38,6 +39,7 @@ add_library(hrdab SHARED
     hrdab/reed_solomon.cpp
     hrdab/rtl2832.cpp
     hrdab/rtltcp_source.cpp
+    hrdab/scram.cpp
     hrdab/superframe.cpp
     hrdab/usbfs_transport.cpp
     hrdab/viterbi.cpp

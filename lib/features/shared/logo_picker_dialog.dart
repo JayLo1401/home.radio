@@ -18,7 +18,11 @@ Future<bool> connectDecoder(WidgetRef ref) async {
   final dab = ref.read(dabRtlSdrServiceProvider);
   return await settings.getRtlSdrAutoStartOwnService()
       ? await dab.useDirectUsb()
-      : await dab.setServer(host: await settings.getRtlSdrHost(), port: await settings.getRtlSdrPort());
+      : await dab.setServer(
+          host: await settings.getRtlSdrHost(),
+          port: await settings.getRtlSdrPort(),
+          auth: await settings.getRtlTcpAuth(),
+        );
 }
 
 /// What the user picked in [_LogoPickerDialog]: an image URL, or a received

@@ -15,6 +15,7 @@
 #include "audio_player.h"
 #include "json.h"
 #include "receiver.h"
+#include "rtltcp_source.h"
 
 namespace hrdab {
 
@@ -128,7 +129,7 @@ private:
                    const std::optional<std::string>& rt);
 
     // --- engine (IntegratedDabEngine's role; engineMutex_) ---
-    bool engineCreateTcp(const std::string& host, int port);
+    bool engineCreateTcp(const std::string& host, int port, const RtlTcpOptions& options);
     bool engineCreateUsb(std::string& error);
     void engineDestroy();
     void engineTune(uint32_t hz);
@@ -195,6 +196,8 @@ private:
     std::atomic<bool> created_{false};
     std::string lastHost_ = "127.0.0.1";
     int lastPort_ = 1234;
+    RtlTcpOptions lastOptions_; // protocol / login of the rtl_tcp server
+    std::string endpointKey() const;
     std::string sessionEndpoint_; // "host:port" of a live TCP session, empty = none
     bool usbSession_ = false;
 

@@ -1,4 +1,23 @@
 import '../db/database.dart';
+import '../services/secret_store.dart';
+
+/// Protocol and login settings of the rtl_tcp server (see
+/// SettingsRepository.getRtlTcpAuth).
+class RtlTcpAuth {
+  final bool v2;
+  final bool login; // only meaningful with v2
+  final String user;
+  final String password;
+
+  const RtlTcpAuth({this.v2 = false, this.login = false, this.user = '', this.password = ''});
+
+  RtlTcpAuth copyWith({bool? v2, bool? login, String? user, String? password}) => RtlTcpAuth(
+        v2: v2 ?? this.v2,
+        login: login ?? this.login,
+        user: user ?? this.user,
+        password: password ?? this.password,
+      );
+}
 
 enum AutostartMode { lastStation, fixedStation }
 
@@ -84,6 +103,10 @@ class SettingsRepository {
   static const _keyRtlSdrHost = 'rtl_sdr_host';
   static const _keyRtlSdrPort = 'rtl_sdr_port';
   static const _keyRtlSdrMode = 'rtl_sdr_mode'; // 'own' | 'external'
+  static const _keyRtlTcpProtocol = 'rtl_tcp_protocol'; // 'v1' | 'v2'
+  static const _keyRtlTcpLogin = 'rtl_tcp_login';
+  static const _keyRtlTcpUser = 'rtl_tcp_user';
+  static const _secretRtlTcpPassword = 'rtl_tcp_password'; // SecretStore, not the settings table
   static const _keyDabSortMode = 'dab_sort_mode'; // 'grouped' | 'ensemble' | 'alphabet'
   static const _keyShowClockDate = 'show_clock_date';
   static const _keyCbEnabled = 'cb_enabled';
@@ -98,7 +121,8 @@ class SettingsRepository {
   static const _keyNbPrefix = 'nb_last_'; // + band id: "freqHz|mode|squelchDb"
 
   final AppDatabase _db;
-  SettingsRepository(this._db);
+  final SecretStore _secrets;
+  SettingsRepository(this._db) : _secrets = SecretStore(_db);
 
   Future<AutostartMode> getAutostartMode() async {
     final v = await _db.getSetting(_keyAutostartMode);
@@ -327,6 +351,23 @@ class SettingsRepository {
   Future<void> setRtlSdrServer(String host, int port) async {
     await _db.setSetting(_keyRtlSdrHost, host);
     await _db.setSetting(_keyRtlSdrPort, '$port');
+  }
+
+  /// Protocol and login of the rtl_tcp server - set by hand, no
+  /// auto-detection: v1 = classic rtl_tcp (the old behaviour), v2 =
+  /// rtltcp_v2 (rtltcp.server: status messages, optional login).
+  Future<RtlTcpAuth> getRtlTcpAuth() async => RtlTcpAuth(
+        v2: (await _db.getSetting(_keyRtlTcpProtocol)) == 'v2',
+        login: (await _db.getSetting(_keyRtlTcpLogin)) == 'true',
+        user: (await _db.getSetting(_keyRtlTcpUser)) ?? '',
+        password: await _secrets.read(_secretRtlTcpPassword) ?? '',
+      );
+
+  Future<void> setRtlTcpAuth(RtlTcpAuth auth) async {
+    await _db.setSetting(_keyRtlTcpProtocol, auth.v2 ? 'v2' : 'v1');
+    await _db.setSetting(_keyRtlTcpLogin, '${auth.login}');
+    await _db.setSetting(_keyRtlTcpUser, auth.user);
+    await _secrets.write(_secretRtlTcpPassword, auth.password);
   }
 
   /// How DAB+ reaches its receiver (see [ReceiverMode]). Unset counts as

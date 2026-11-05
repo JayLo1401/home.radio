@@ -47,6 +47,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
   double _squelchDb = 10;
   bool _started = false;
   bool _failed = false;
+  String? _sourceWarning; // 'connectionMessage' of the receiver's source
   bool _scanning = false;
 
   // The window: its centre and the channels inside it.
@@ -299,6 +300,10 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
           _spectrumCenterHz = event['centerHz'] as int;
           _spectrumSpanHz = event['spanHz'] as int;
         });
+      case 'connectionMessage':
+        final isError = event['isError'] as bool? ?? false;
+        final message = (event['message'] as String?)?.trim() ?? '';
+        setState(() => _sourceWarning = isError && message.isNotEmpty ? message : null);
     }
   }
 
@@ -455,6 +460,21 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
                               selected: v.id == _plan.id,
                               onSelected: (_) => _switchVariant(v),
                             ),
+                        ],
+                      ),
+                    ),
+                  // The receiver's source has a problem (rtl_tcp gone, with
+                  // rtltcp_v2 e.g. the server's stick not ready, server busy).
+                  if (_sourceWarning case final warning?)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.warning_amber, color: Colors.orangeAccent),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(warning, style: const TextStyle(color: Colors.orangeAccent, fontSize: 16)),
+                          ),
                         ],
                       ),
                     ),

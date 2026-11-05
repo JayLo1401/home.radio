@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/services.dart';
 
+import '../repositories/settings_repository.dart' show RtlTcpAuth;
 import 'desktop/hrdab_desktop.dart';
 
 /// Dart bridge to [DabRtlSdrPlugin] (Kotlin) - DAB+ reception with the
@@ -44,9 +45,22 @@ class DabRtlSdrService {
 
   /// Points the receiver at the rtl_tcp server [host]:[port]. Must be called
   /// (at least once) before [scanBand3]/[tuneFrequency]/[playService].
-  /// Returns whether something actually listens there.
-  Future<bool> setServer({String host = '127.0.0.1', int port = 1234}) async {
-    final result = await _invokeMethod<bool>('setServer', {'host': host, 'port': port});
+  /// Returns whether something actually listens there. [auth]: protocol
+  /// (v1 / rtltcp_v2) and login, see SettingsRepository.getRtlTcpAuth.
+  Future<bool> setServer({
+    String host = '127.0.0.1',
+    int port = 1234,
+    RtlTcpAuth auth = const RtlTcpAuth(),
+  }) async {
+    final login = auth.v2 && auth.login;
+    final result = await _invokeMethod<bool>('setServer', {
+      'host': host,
+      'port': port,
+      'v2': auth.v2,
+      'auth': login,
+      'user': login ? auth.user : null,
+      'password': login ? auth.password : null,
+    });
     return result ?? false;
   }
 

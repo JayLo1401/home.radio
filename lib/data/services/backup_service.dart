@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../db/database.dart';
 import 'desktop/hrdab_desktop.dart';
+import 'secret_store.dart';
 
 /// One backup file found in Download/HomeRadio (see BackupPlugin.kt).
 class BackupFile {
@@ -57,6 +58,9 @@ class BackupService {
       'dabStations': (await _db.select(_db.dabStations).get()).map((r) => r.toJson()).toList(),
       'fmStations': (await _db.select(_db.fmStations).get()).map((r) => r.toJson()).toList(),
       'settings': (await _db.select(_db.settings).get()).map((r) => r.toJson()).toList(),
+      // Passwords from secure storage (rtl_tcp login) - backups carry all
+      // credentials, see the backup screen.
+      'secrets': await SecretStore(_db).exportAll(),
     };
     final content = const JsonEncoder.withIndent('  ').convert(data);
     final name = 'home_radio_backup_${_timestamp(now)}.json';
@@ -184,6 +188,9 @@ class BackupService {
         b.insertAll(_db.settings, settings);
       });
     });
+    // Missing in backups from before secure storage - the passwords stay.
+    final secrets = decoded['secrets'];
+    if (secrets is Map<String, dynamic>) await SecretStore(_db).importAll(secrets);
   }
 
   static bool _fileExists(String? path) => path != null && File(path).existsSync();

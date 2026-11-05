@@ -3,6 +3,9 @@
 #include <charconv>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
+#include <locale>
+#include <sstream>
 
 namespace hrdab {
 
@@ -63,12 +66,18 @@ private:
 
     bool parseNumber(Json& out)
     {
-        const char* begin = s_.data() + pos_;
-        const char* end = s_.data() + s_.size();
+        // Not std::from_chars: Android's libc++ has no floating-point
+        // overload. A stream with the classic locale is just as
+        // locale-independent (see the header).
+        size_t end = pos_;
+        while (end < s_.size() && std::strchr("+-0123456789.eE", s_[end]) && s_[end] != '\0') end++;
+        if (end == pos_) return false;
+        std::istringstream in(s_.substr(pos_, end - pos_));
+        in.imbue(std::locale::classic());
         double v = 0;
-        const auto r = std::from_chars(begin, end, v);
-        if (r.ec != std::errc() || r.ptr == begin) return false;
-        pos_ += static_cast<size_t>(r.ptr - begin);
+        in >> v;
+        if (in.fail()) return false;
+        pos_ = end;
         out.type_ = Json::Type::Number;
         out.number_ = v;
         return true;
