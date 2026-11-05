@@ -8,15 +8,16 @@
 
 #include "r82xx.h"
 #include "sample_source.h"
+#include "usb_transport.h"
 
 namespace hrdab {
 
-// RTL2832U USB demodulator in SDR mode with an R820T/R828D tuner, driven
-// directly through Linux usbfs ioctls on the file descriptor Android's
-// UsbManager hands out. The caller must already have claimed interface 0.
+// RTL2832U USB demodulator in SDR mode with an R820T/R828D tuner. The USB
+// access itself goes through a UsbTransport: usbfs ioctls on the fd Android's
+// UsbManager hands out (UsbfsTransport), or libusb on the desktop builds.
 class Rtl2832Source : public SampleSource, private I2cBus {
 public:
-    explicit Rtl2832Source(int fd);
+    explicit Rtl2832Source(std::unique_ptr<UsbTransport> usb);
     ~Rtl2832Source() override;
 
     bool open();
@@ -49,7 +50,7 @@ private:
 
     void streamLoop();
 
-    int fd_;
+    std::unique_ptr<UsbTransport> usb_;
     std::mutex ctrlMutex_; // tuner/register access vs. AGC from another thread
     std::unique_ptr<R82xx> tuner_;
     bool r828d_ = false;

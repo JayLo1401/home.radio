@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../core/display_mode.dart';
+import '../../core/providers.dart';
 
 import '../home/home_screen.dart';
 
@@ -16,31 +20,33 @@ import '../home/home_screen.dart';
 /// than after a longer, purely decorative wait, so its own startup work
 /// (DAB+ auto-permission, autostart, favorites lookups, ...) begins as
 /// early as possible instead of being gated behind this screen.
-class SplashScreen extends StatefulWidget {
+class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
 
   @override
-  State<SplashScreen> createState() => _SplashScreenState();
+  ConsumerState<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
+class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerProviderStateMixin {
   static const _popDuration = Duration(milliseconds: 500);
 
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: _popDuration,
-  );
+  late final AnimationController _controller = AnimationController(vsync: this, duration: _popDuration);
   late final Animation<double> _scale = CurvedAnimation(parent: _controller, curve: Curves.easeOutBack);
 
   @override
   void initState() {
     super.initState();
     _controller.forward();
+    final settings = ref.read(settingsRepositoryProvider);
+    () async {
+      await applyDisplayMode(
+        fullscreen: await settings.getFullscreen(),
+        monitor: await settings.getFullscreenMonitor(),
+      );
+    }();
     Future.delayed(_popDuration, () {
       if (mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
-        );
+        Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const HomeScreen()));
       }
     });
   }

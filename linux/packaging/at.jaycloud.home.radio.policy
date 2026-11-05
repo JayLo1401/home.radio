@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+  "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<!-- Lets the logged-in user install Home Radio updates via the app
+     (apply-update.sh, which only installs /tmp/home-radio-update.deb). -->
+<policyconfig>
+  <vendor>jaycloud</vendor>
+  <action id="at.jaycloud.home.radio.update">
+    <description>Home Radio aktualisieren</description>
+    <message>Home Radio möchte ein Update installieren.</message>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>yes</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/opt/home-radio/apply-update.sh</annotate>
+  </action>
+</policyconfig>

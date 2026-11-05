@@ -92,6 +92,9 @@ class SettingsRepository {
   static const _keyMilEnabled = 'mil_enabled';
   static const _keyNbSampleRate = 'nb_sample_rate';
   static const _keyCbAll80 = 'cb_all_80';
+  static const _keyAutoUpdate = 'auto_update';
+  static const _keyFullscreen = 'fullscreen';
+  static const _keyFullscreenMonitor = 'fullscreen_monitor';
   static const _keyNbPrefix = 'nb_last_'; // + band id: "freqHz|mode|squelchDb"
 
   final AppDatabase _db;
@@ -398,6 +401,18 @@ class SettingsRepository {
   /// CB channels 1-40 only (Austria, default) or 1-80 (Germany).
   Future<bool> getCbAll80() async => (await _db.getSetting(_keyCbAll80)) == 'true';
   Future<void> setCbAll80(bool value) => _db.setSetting(_keyCbAll80, '$value');
+
+  /// Install new versions from the update server on start (default on).
+  Future<bool> getAutoUpdate() async => (await _db.getSetting(_keyAutoUpdate)) != 'false';
+  Future<void> setAutoUpdate(bool value) => _db.setSetting(_keyAutoUpdate, '$value');
+
+  /// Full screen (see applyDisplayMode); off by default.
+  Future<bool> getFullscreen() async => (await _db.getSetting(_keyFullscreen)) == 'true';
+  Future<void> setFullscreen(bool value) => _db.setSetting(_keyFullscreen, '$value');
+
+  /// Monitor for full screen on Windows, 1-based.
+  Future<int> getFullscreenMonitor() async => int.tryParse(await _db.getSetting(_keyFullscreenMonitor) ?? '') ?? 1;
+  Future<void> setFullscreenMonitor(int value) => _db.setSetting(_keyFullscreenMonitor, '$value');
 
   /// Signal filters per listening band: bandwidth (0 = automatic), noise
   /// blanker, voice filter, AGC - defaults: automatic, on, on, automatic.

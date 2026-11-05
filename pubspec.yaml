@@ -50,6 +50,14 @@ dependencies:
   audio_session: ^0.2.4
   audio_service: ^0.18.19
   webview_flutter: ^4.14.1
+  ffi: ^2.2.0
+  just_audio_media_kit: ^2.1.0
+  media_kit_libs_windows_audio: ^1.0.9
+  media_kit_libs_linux: ^1.2.1
+  package_info_plus: ^10.2.2
+  crypto: ^3.0.8
+  window_manager: ^0.5.2
+  screen_retriever: ^0.2.2
 
 dev_dependencies:
   flutter_test:
@@ -71,6 +79,10 @@ flutter_launcher_icons:
   min_sdk_android: 21
   adaptive_icon_background: "#2F9E5C"
   adaptive_icon_foreground: "assets/icon/applogo1.png"
+  windows:
+    generate: true
+    image_path: "assets/icon/applogo1.png"
+    icon_size: 256
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

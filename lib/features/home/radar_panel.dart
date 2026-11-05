@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
@@ -218,6 +219,19 @@ class _RadarPanelState extends State<RadarPanel> {
           height: (size.height * dpr).round(),
           scale: dpr,
         );
+        // webview_flutter only exists on Android here.
+        if (widget.isWebPage && !Platform.isAndroid) {
+          return const ColoredBox(
+            color: Colors.black54,
+            child: Center(
+              child: Text(
+                'Webseiten als Radarquelle gibt es nur in der Android-Version.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white70),
+              ),
+            ),
+          );
+        }
         if (widget.isWebPage) {
           return Stack(
             fit: StackFit.expand,

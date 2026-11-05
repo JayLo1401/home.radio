@@ -16,6 +16,9 @@ find_library(log-lib log)
 # (fm_demod, rds), sharing the same stick and sample stream, and the
 # narrowband receiver for CB/airband (nb_demod: AM/NFM/SSB, squelch, auto
 # mode, activity monitor).
+#
+# The Windows/Linux desktop builds compile the same sources (minus the JNI
+# glue and usbfs) into hrdab.dll / libhrdab.so - see desktop/CMakeLists.txt.
 add_library(hrdab SHARED
     hrdab/charset.cpp
     hrdab/dab_tables.cpp
@@ -28,6 +31,7 @@ add_library(hrdab SHARED
     hrdab/nb_demod.cpp
     hrdab/ofdm.cpp
     hrdab/pad.cpp
+    hrdab/platform.cpp
     hrdab/r82xx.cpp
     hrdab/rds.cpp
     hrdab/receiver.cpp
@@ -35,6 +39,7 @@ add_library(hrdab SHARED
     hrdab/rtl2832.cpp
     hrdab/rtltcp_source.cpp
     hrdab/superframe.cpp
+    hrdab/usbfs_transport.cpp
     hrdab/viterbi.cpp
 )
 target_compile_features(hrdab PRIVATE cxx_std_17)

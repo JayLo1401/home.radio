@@ -5,7 +5,6 @@
 #include <cstdio>
 #include <cstring>
 #include <sstream>
-#include <sys/resource.h>
 
 #include "common.h"
 
@@ -79,21 +78,21 @@ bool Receiver::startLocked(Mode mode)
     mode_ = mode;
     if (mode == Mode::Nb) {
         nbThread_ = std::thread([this] {
-            setpriority(PRIO_PROCESS, 0, -16);
+            raiseThreadPriority(-16);
             nb_.run(stop_);
         });
     } else if (mode == Mode::Dab) {
         ofdmThread_ = std::thread([this] {
-            setpriority(PRIO_PROCESS, 0, -16);
+            raiseThreadPriority(-16);
             ofdm_.run(stop_);
         });
         decoderThread_ = std::thread([this] {
-            setpriority(PRIO_PROCESS, 0, -10);
+            raiseThreadPriority(-10);
             decoderLoop();
         });
     } else {
         fmThread_ = std::thread([this] {
-            setpriority(PRIO_PROCESS, 0, -16);
+            raiseThreadPriority(-16);
             fm_.run(stop_);
         });
     }

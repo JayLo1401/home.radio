@@ -3,8 +3,11 @@ import 'dart:io';
 
 import 'package:drift/drift.dart';
 import 'package:flutter/services.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 
 import '../db/database.dart';
+import 'desktop/hrdab_desktop.dart';
 
 /// One backup file found in Download/HomeRadio (see BackupPlugin.kt).
 class BackupFile {
@@ -30,6 +33,9 @@ class BackupFormatException implements Exception {
 ///
 /// Restoring replaces the current data completely and then restarts the
 /// app, since lots of settings are only read once at startup.
+///
+/// On Windows/Linux the files live in Documents/HomeRadio instead (no
+/// BackupPlugin there).
 class BackupService {
   BackupService(this._db);
 
@@ -53,14 +59,27 @@ class BackupService {
       'settings': (await _db.select(_db.settings).get()).map((r) => r.toJson()).toList(),
     };
     final content = const JsonEncoder.withIndent('  ').convert(data);
+    final name = 'home_radio_backup_${_timestamp(now)}.json';
+    if (!Platform.isAndroid) {
+      final dir = await _desktopDir();
+      await File(p.join(dir.path, name)).writeAsString(content, flush: true);
+      return dir.path;
+    }
     final location = await _channel.invokeMethod<String>('save', {
-      'name': 'home_radio_backup_${_timestamp(now)}.json',
+      'name': name,
       'content': content,
     });
     return location!;
   }
 
   Future<List<BackupFile>> listBackups() async {
+    if (!Platform.isAndroid) {
+      final files = (await _desktopDir()).listSync().whereType<File>().where((f) => f.path.endsWith('.json')).toList();
+      final list = [
+        for (final f in files) BackupFile(id: f.path, name: p.basename(f.path), modified: f.lastModifiedSync()),
+      ]..sort((a, b) => b.modified.compareTo(a.modified));
+      return list;
+    }
     final raw = await _channel.invokeListMethod<Map<Object?, Object?>>('list') ?? const [];
     return raw
         .map((m) => BackupFile(
@@ -72,6 +91,7 @@ class BackupService {
   }
 
   Future<void> restore(BackupFile file) async {
+    if (!Platform.isAndroid) return _restoreJson(await File(file.id).readAsString());
     final content = await _channel.invokeMethod<String>('read', {'id': file.id});
     await _restoreJson(content!);
   }
@@ -81,6 +101,7 @@ class BackupService {
   /// [PlatformException] with code NO_PICKER if the device has no picker -
   /// common on Android TV.
   Future<bool> restoreFromPicker() async {
+    if (!Platform.isAndroid) throw PlatformException(code: 'NO_PICKER');
     final content = await _channel.invokeMethod<String>('pick');
     if (content == null) return false;
     await _restoreJson(content);
@@ -90,14 +111,26 @@ class BackupService {
   /// Whether reading backups from a previous installation needs "All files
   /// access" first (Android 11+ without it granted).
   Future<bool> canRequestAllFilesAccess() async =>
-      await _channel.invokeMethod<bool>('canRequestAllFilesAccess') ?? false;
+      Platform.isAndroid && (await _channel.invokeMethod<bool>('canRequestAllFilesAccess') ?? false);
 
   /// Opens the system settings page for "All files access". Returns false if
   /// the device doesn't have one.
   Future<bool> requestAllFilesAccess() async =>
-      await _channel.invokeMethod<bool>('requestAllFilesAccess') ?? false;
+      Platform.isAndroid && (await _channel.invokeMethod<bool>('requestAllFilesAccess') ?? false);
 
-  Future<void> restartApp() => _channel.invokeMethod('restartApp');
+  Future<void> restartApp() async {
+    if (Platform.isAndroid) return _channel.invokeMethod('restartApp');
+    // rtl_tcp takes one client - free it before the new instance connects.
+    HrdabDesktop.shutdownIfStarted();
+    await Process.start(Platform.resolvedExecutable, const [], mode: ProcessStartMode.detached);
+    exit(0);
+  }
+
+  static Future<Directory> _desktopDir() async {
+    final dir = Directory(p.join((await getApplicationDocumentsDirectory()).path, 'HomeRadio'));
+    await dir.create(recursive: true);
+    return dir;
+  }
 
   Future<void> _restoreJson(String content) async {
     final Object? decoded;

@@ -288,7 +288,7 @@ void RdsDecoder::block(int pos, uint32_t raw)
     }
 
     errHist_ = ((errHist_ << 1) | (ok ? 0u : 1u)) & ((1ull << 50) - 1);
-    if (__builtin_popcountll(errHist_) > 30) {
+    if (popcount64(errHist_) > 30) {
         // Lost: too many bad blocks among the last 50.
         synced_ = false;
         seen_.clear();

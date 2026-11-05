@@ -29,6 +29,35 @@ namespace hrdab {
 
 using cf32 = std::complex<float>;
 
+// Bit counting; GCC/Clang builtins, a plain loop elsewhere (MSVC on the
+// Windows desktop build).
+inline int popcount64(uint64_t v)
+{
+#if defined(__GNUC__) || defined(__clang__)
+    return __builtin_popcountll(v);
+#else
+    int n = 0;
+    for (; v; v &= v - 1) n++;
+    return n;
+#endif
+}
+
+inline int parity(unsigned v)
+{
+#if defined(__GNUC__) || defined(__clang__)
+    return __builtin_parity(v);
+#else
+    return popcount64(v) & 1;
+#endif
+}
+
+// Raises the calling thread's scheduling priority. `nice` is the Linux nice
+// value the thread asks for (-19 = USB/network reader, -16 = DSP, -10 =
+// decoder); on Linux/Android it is applied as is (an unprivileged desktop
+// process may be refused, which is harmless), on Windows it maps to a thread
+// priority class. See platform.cpp.
+void raiseThreadPriority(int nice);
+
 // Mode I timing, in samples at 2.048 MS/s.
 constexpr int kSampleRate = 2048000;
 constexpr int kFftLen = 2048;          // useful symbol part Tu

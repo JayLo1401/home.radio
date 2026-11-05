@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,6 +17,7 @@ import '../data/services/radio_audio_handler.dart';
 import '../data/services/radio_browser_api_service.dart';
 import '../data/services/rtl_sdr_service.dart';
 import '../data/services/rtl_sdr_usb_service.dart';
+import '../data/services/update_service.dart';
 
 final databaseProvider = Provider<AppDatabase>((ref) {
   final db = AppDatabase();
@@ -206,6 +208,8 @@ final backupServiceProvider = Provider<BackupService>((ref) {
   return BackupService(ref.watch(databaseProvider));
 });
 
+final updateServiceProvider = Provider<UpdateService>((ref) => UpdateService());
+
 final radioBrowserApiServiceProvider = Provider<RadioBrowserApiService>((ref) {
   return RadioBrowserApiService();
 });
@@ -221,8 +225,11 @@ final audioPlayerServiceProvider = Provider<AudioPlayerService>((ref) {
 /// notification involves starting a foreground service, which is slow
 /// enough on this TV to noticeably delay the very first Flutter frame (and
 /// therefore how long the native launch screen stays up) if awaited first.
+/// Windows/Linux have no media session for audio_service - the handler then
+/// works on its own.
 final radioAudioHandlerProvider = FutureProvider<RadioAudioHandler>((ref) async {
   final player = ref.watch(audioPlayerServiceProvider);
+  if (!Platform.isAndroid) return RadioAudioHandler(player);
   return AudioService.init(
     builder: () => RadioAudioHandler(player),
     config: AudioServiceConfig(

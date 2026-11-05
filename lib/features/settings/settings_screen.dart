@@ -1,12 +1,16 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/display_mode.dart';
 import '../../core/providers.dart';
 import '../../core/theme.dart';
 import '../../data/models/favorite_channel.dart';
 import '../../data/repositories/settings_repository.dart';
 import '../rtlsdr/rtl_sdr_test_screen.dart';
 import 'backup_settings_screen.dart';
+import 'update_settings_screen.dart';
 import 'location_settings_screen.dart';
 import 'radar_source_settings_screen.dart';
 
@@ -32,6 +36,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   double _radarDimming = 0.0;
   bool _sunEnabled = true;
   double _sunScale = 1.0;
+  bool _fullscreen = false;
+  int _monitor = 1;
+  int _monitors = 1;
   bool _loaded = false;
 
   @override
@@ -55,6 +62,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final radarDimming = await repo.getRadarDimming();
     final sunEnabled = await repo.getSunEnabled();
     final sunScale = await repo.getSunTileScale();
+    final fullscreen = await repo.getFullscreen();
+    final monitor = await repo.getFullscreenMonitor();
+    final monitors = await monitorCount();
     final scale = ref.read(uiScaleProvider);
     if (!mounted) return;
     setState(() {
@@ -72,8 +82,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       _radarDimming = radarDimming;
       _sunEnabled = sunEnabled;
       _sunScale = sunScale;
+      _fullscreen = fullscreen;
+      _monitor = monitor;
+      _monitors = monitors;
       _loaded = true;
     });
+  }
+
+  Future<void> _setFullscreen({bool? fullscreen, int? monitor}) async {
+    final repo = ref.read(settingsRepositoryProvider);
+    setState(() {
+      _fullscreen = fullscreen ?? _fullscreen;
+      _monitor = monitor ?? _monitor;
+    });
+    await repo.setFullscreen(_fullscreen);
+    await repo.setFullscreenMonitor(_monitor);
+    await applyDisplayMode(fullscreen: _fullscreen, monitor: _monitor);
   }
 
   Future<void> _changeUiScale(double delta) async {
@@ -331,6 +355,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               setState(() => _showClockDate = v);
               await ref.read(showClockDateProvider.notifier).set(v);
             }),
+            tileToggle('Vollbild', _fullscreen, (v) => _setFullscreen(fullscreen: v)),
+            if (Platform.isWindows && _fullscreen)
+              scaleRow(
+                label: 'Monitor für Vollbild',
+                valueLabel: '$_monitor von $_monitors',
+                onChange: (d) => _setFullscreen(monitor: (_monitor + d).clamp(1, _monitors < 1 ? 1 : _monitors)),
+              ),
             scaleRow(
               label: 'Größe der Oberfläche',
               valueLabel: '${(_uiScale * 100).round()} %',
@@ -448,6 +479,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 icon: Icons.backup_outlined,
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const BackupSettingsScreen()),
+                ),
+              ),
+            ),
+            FocusTraversalOrder(
+              order: NumericFocusOrder(nextOrder()),
+              child: _TvNavTile(
+                label: 'Updates',
+                icon: Icons.system_update_outlined,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const UpdateSettingsScreen()),
                 ),
               ),
             ),

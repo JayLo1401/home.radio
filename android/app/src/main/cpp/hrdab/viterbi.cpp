@@ -2,17 +2,14 @@
 
 #include <climits>
 
+#include "common.h"
+
 namespace hrdab {
 
 namespace {
 
 // Encoder word w: bit 6 = newest input bit, bit 0 = input 6 bits ago.
 const uint8_t kPolys[4] = {0x5B, 0x79, 0x65, 0x5B}; // 133, 171, 145, 133 octal
-
-inline int parity(unsigned v)
-{
-    return __builtin_parity(v);
-}
 
 } // namespace
 

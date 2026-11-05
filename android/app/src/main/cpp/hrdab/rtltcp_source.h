@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <cstdint>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -27,6 +28,10 @@ public:
     // it while stopped, i.e. before the next connect.
     bool setSampleRate(uint32_t hz) override;
 
+    // Whether something accepts a TCP connection at host:port within
+    // timeoutMs (desktop "setServer"; Android probes from Kotlin).
+    static bool probe(const std::string& host, int port, int timeoutMs);
+
 private:
     void loop();
     bool connectOnce();
@@ -38,7 +43,7 @@ private:
     std::thread thread_;
     std::atomic<bool> running_{false};
     std::mutex sockMutex_;
-    int sock_ = -1;
+    intptr_t sock_ = -1; // fd, or SOCKET on Windows
     ByteRing* ring_ = nullptr;
     std::atomic<uint32_t> freqHz_{0};
     std::atomic<int> gainIndex_{-1};

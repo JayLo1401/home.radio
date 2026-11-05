@@ -16,6 +16,7 @@
 #include "receiver.h"
 #include "rtl2832.h"
 #include "rtltcp_source.h"
+#include "usbfs_transport.h"
 
 using namespace hrdab;
 
@@ -314,7 +315,7 @@ Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeCreateUsb(JNIEnv* e, j
 {
     std::lock_guard<std::mutex> lock(g_mutex);
     if (g_session) return JNI_TRUE;
-    auto rtl = std::make_unique<Rtl2832Source>(static_cast<int>(fd));
+    auto rtl = std::make_unique<Rtl2832Source>(std::make_unique<UsbfsTransport>(static_cast<int>(fd)));
     if (!rtl->open()) return JNI_FALSE;
     return create(e, thiz, std::move(rtl));
 }

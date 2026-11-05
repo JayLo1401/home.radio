@@ -1,11 +1,6 @@
 #include "rtl2832.h"
 
-#include <cerrno>
 #include <cstring>
-#include <linux/usbdevice_fs.h>
-#include <sys/ioctl.h>
-#include <sys/resource.h>
-#include <unistd.h>
 
 #include "common.h"
 
@@ -16,8 +11,6 @@ namespace {
 constexpr uint32_t kRtlXtal = 28800000;
 constexpr uint32_t kR828dXtal = 16000000;
 constexpr uint8_t kEndpointIn = 0x81;
-constexpr int kUrbCount = 32;
-constexpr int kUrbBytes = 16384; // safe on every usbfs, even without scatter-gather
 
 // USB block registers
 constexpr uint16_t kUsbSysctl = 0x2000;
@@ -30,14 +23,9 @@ constexpr uint16_t kDemodCtl1 = 0x300b;
 // Default decimation low-pass of the RTL2832U DDC: 8 x int8 then 8 x int12.
 const int kFirCoeffs[16] = {-54, -36, -41, -40, -32, -14, 14, 53, 101, 156, 215, 273, 327, 372, 404, 421};
 
-struct Urb {
-    std::vector<uint8_t> buffer;
-    usbdevfs_urb urb; // last: ends in a (here unused) flexible array
-};
-
 } // namespace
 
-Rtl2832Source::Rtl2832Source(int fd) : fd_(fd) {}
+Rtl2832Source::Rtl2832Source(std::unique_ptr<UsbTransport> usb) : usb_(std::move(usb)) {}
 
 Rtl2832Source::~Rtl2832Source()
 {
@@ -46,21 +34,7 @@ Rtl2832Source::~Rtl2832Source()
 
 bool Rtl2832Source::control(uint8_t requestType, uint16_t value, uint16_t index, uint8_t* data, uint16_t len)
 {
-    usbdevfs_ctrltransfer ct{};
-    ct.bRequestType = requestType;
-    ct.bRequest = 0;
-    ct.wValue = value;
-    ct.wIndex = index;
-    ct.wLength = len;
-    ct.timeout = 300;
-    ct.data = data;
-    const int r = ioctl(fd_, USBDEVFS_CONTROL, &ct);
-    if (r < 0) {
-        HR_LOGW("RTL2832 control 0x%02x val=0x%04x idx=0x%04x failed: %s", requestType, value, index,
-                strerror(errno));
-        return false;
-    }
-    return true;
+    return usb_->control(requestType, value, index, data, len);
 }
 
 bool Rtl2832Source::writeReg(int block, uint16_t addr, uint16_t value, int len)
@@ -277,59 +251,12 @@ void Rtl2832Source::stop()
 
 void Rtl2832Source::streamLoop()
 {
-    setpriority(PRIO_PROCESS, 0, -19);
-
-    std::vector<Urb> urbs(kUrbCount);
-    int inFlight = 0;
-    for (auto& u : urbs) {
-        u.buffer.resize(kUrbBytes);
-        std::memset(&u.urb, 0, sizeof(u.urb));
-        u.urb.type = USBDEVFS_URB_TYPE_BULK;
-        u.urb.endpoint = kEndpointIn;
-        u.urb.buffer = u.buffer.data();
-        u.urb.buffer_length = kUrbBytes;
-        u.urb.usercontext = &u;
-        if (ioctl(fd_, USBDEVFS_SUBMITURB, &u.urb) == 0) inFlight++;
-    }
-    if (inFlight == 0) {
-        HR_LOGE("RTL2832: could not submit any USB transfer: %s", strerror(errno));
-        if (onStatus) onStatus(true, "USB-Übertragung konnte nicht gestartet werden");
-        return;
-    }
-
-    bool discarded = false;
-    while (inFlight > 0) {
-        if (!streaming_ && !discarded) {
-            for (auto& u : urbs) ioctl(fd_, USBDEVFS_DISCARDURB, &u.urb);
-            discarded = true;
-        }
-        void* reaped = nullptr;
-        // Non-blocking reap + short sleep while stopping, blocking otherwise:
-        // a blocking reap only returns once some transfer completes.
-        const int r = discarded ? ioctl(fd_, USBDEVFS_REAPURBNDELAY, &reaped)
-                                : ioctl(fd_, USBDEVFS_REAPURB, &reaped);
-        if (r < 0) {
-            if (errno == EINTR) continue;
-            if (errno == EAGAIN) {
-                usleep(1000);
-                continue;
-            }
-            HR_LOGE("RTL2832: reap failed: %s", strerror(errno));
-            if (errno == ENODEV && onStatus) onStatus(true, "USB-Stick getrennt");
-            break; // device gone - nothing more will complete
-        }
-        auto* u = static_cast<Urb*>(static_cast<usbdevfs_urb*>(reaped)->usercontext);
-        inFlight--;
-        if (u->urb.status == 0 && u->urb.actual_length > 0 && streaming_) {
-            ring_->write(u->buffer.data(), static_cast<size_t>(u->urb.actual_length));
-        }
-        if (streaming_) {
-            u->urb.actual_length = 0;
-            u->urb.status = 0;
-            if (ioctl(fd_, USBDEVFS_SUBMITURB, &u->urb) == 0) inFlight++;
-            else HR_LOGW("RTL2832: resubmit failed: %s", strerror(errno));
-        }
-    }
+    raiseThreadPriority(-19);
+    usb_->streamBulk(
+        kEndpointIn, streaming_, [this](const uint8_t* data, size_t len) { ring_->write(data, len); },
+        [this](const std::string& message) {
+            if (onStatus) onStatus(true, message);
+        });
 }
 
 } // namespace hrdab

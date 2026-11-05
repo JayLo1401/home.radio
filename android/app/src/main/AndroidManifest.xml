@@ -16,6 +16,8 @@
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
         tools:ignore="ScopedStorage" />
+    <!-- In-place updates from the update server (UpdatePlugin). -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!-- usesCleartextTraffic: many internet radio streams (e.g. Kronehit,
          http://onair.krone.at/kronehit.mp3) are only offered over plain
@@ -83,6 +85,16 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MEDIA_BUTTON" />
+            </intent-filter>
+        </receiver>
+
+        <!-- In-place updates (UpdatePlugin): PackageInstaller results, and
+             starting the app again after it was replaced. -->
+        <receiver
+            android:name=".UpdateInstallReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
     </application>

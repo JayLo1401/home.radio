@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -163,10 +165,10 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> wit
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            const Text(
+            Text(
               'Backups enthalten Favoriten, DAB+ Senderliste und alle Einstellungen (inkl. Zugangsdaten). '
-              'Sie werden im Ordner „Download/HomeRadio“ gespeichert und bleiben auch erhalten, '
-              'wenn die App deinstalliert wird.',
+              'Sie werden im Ordner „${Platform.isAndroid ? 'Download' : 'Dokumente'}/HomeRadio“ gespeichert '
+              'und bleiben auch erhalten, wenn die App deinstalliert wird.',
               style: hintStyle,
             ),
             const SizedBox(height: 12),

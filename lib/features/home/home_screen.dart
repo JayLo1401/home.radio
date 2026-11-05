@@ -19,7 +19,9 @@ import '../dab_stations/dab_stations_screen.dart';
 import '../fm_stations/fm_stations_screen.dart';
 import '../scanner/scanner_screen.dart';
 import '../search_internet/internet_radio_search_screen.dart';
+import '../../data/services/update_service.dart';
 import '../settings/settings_screen.dart';
+import '../settings/update_settings_screen.dart';
 import 'background_layer.dart';
 import 'favorites_sidebar.dart';
 import 'now_playing_banner.dart';
@@ -92,6 +94,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     ref.read(liveStationImageProvider.notifier).set(null);
   }
 
+  /// A newer version on the update server is installed right after start
+  /// (Settings → Updates can turn this off) - a little later, so the radio
+  /// gets going first.
+  Future<void> _autoUpdate() async {
+    if (!UpdateService.supported) return;
+    await Future<void>.delayed(const Duration(seconds: 5));
+    if (!mounted || !await ref.read(settingsRepositoryProvider).getAutoUpdate()) return;
+    final update = await ref.read(updateServiceProvider).check();
+    if (update == null || !mounted) return;
+    await installUpdate(context, ref, update);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -108,6 +122,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     audio.qualityStream.listen((q) {
       if (mounted) setState(() => _netQuality = q);
     });
+    _autoUpdate();
     ref.read(dabRtlSdrServiceProvider).events.listen(_onDabEvent);
     ref.read(rtlSdrUsbServiceProvider).events.listen(_onUsbDeviceEvent);
     // Lets Android's own MediaSession (hardware media buttons, Bluetooth

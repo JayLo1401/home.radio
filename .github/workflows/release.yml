@@ -1,0 +1,278 @@
+name: Release
+
+# Every push to main builds a release:
+#   1. prepare: next version from the commits since the last release (tag
+#      v* with a GitHub Release; see .github/scripts/prepare_release.py) -
+#      nothing is committed back, the version goes into the builds as
+#      --build-name, the build number is 100 + run number (above the
+#      hand-made 1.2.1 builds).
+#   2. Android (signed APKs: one per ABI + universal), Windows (Inno Setup
+#      installer) and Linux (.deb) in parallel; each uploads to the Nexus raw
+#      repository on its own as soon as it's done:
+#        <NEXUS_URL>/repository/<NEXUS_REPO>/<platform>/release/<version>/...
+#        <NEXUS_URL>/repository/<NEXUS_REPO>/<platform>/release/latest/...
+#      with version.json - the manifest the in-app updater reads
+#      (lib/data/services/update_service.dart).
+#   3. release: only when all three succeeded - tag v<version> and a GitHub
+#      Release with the notes and links to the files on Nexus. No files are
+#      stored on GitHub (no release assets, no workflow artifacts). If a build
+#      fails there's no tag, so the next push builds the same version again
+#      (and overwrites it in Nexus).
+#
+# Secrets: ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD,
+# ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD (the same key as the installed
+# apps - Android only updates in place with the same signature),
+# NEXUS_USER, NEXUS_PASS.
+# Variables: NEXUS_URL (e.g. https://repository.jaycloud.at), NEXUS_REPO
+# (e.g. home.radio); the repository must be readable anonymously for the
+# updater.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
+env:
+  FLUTTER_VERSION: "3.44.9"
+  UPDATE_BASE_URL: ${{ vars.NEXUS_URL }}/repository/${{ vars.NEXUS_REPO }}
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      build_number: ${{ steps.version.outputs.build_number }}
+      notes: ${{ steps.version.outputs.notes }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Check configuration
+        run: |
+          [ -n "${{ vars.NEXUS_URL }}" ] && [ -n "${{ vars.NEXUS_REPO }}" ] \
+            || { echo "::error::Variables NEXUS_URL and NEXUS_REPO are missing"; exit 1; }
+      - name: Next version
+        id: version
+        run: |
+          git fetch origin --tags --force
+          BASE_REF=""
+          for TAG in $(git tag -l 'v*' --sort=-v:refname); do
+            if gh release view "$TAG" >/dev/null 2>&1; then BASE_REF="$TAG"; break; fi
+          done
+          BASE_VERSION="${BASE_REF#v}"
+          export BASE_REF BASE_VERSION NOTES_PATH="$RUNNER_TEMP/release_notes.md"
+          VERSION="$(python3 .github/scripts/prepare_release.py)"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "build_number=$((100 + ${{ github.run_number }}))" >> "$GITHUB_OUTPUT"
+          DELIM="NOTES_$(openssl rand -hex 8)"
+          { echo "notes<<$DELIM"; cat "$NOTES_PATH"; echo; echo "$DELIM"; } >> "$GITHUB_OUTPUT"
+          echo "Version $VERSION (base ${BASE_REF:-none})"
+
+  android:
+    needs: prepare
+    runs-on: ubuntu-latest
+    outputs:
+      sha_arm64: ${{ steps.upload.outputs.sha_arm64_v8a }}
+      sha_armv7: ${{ steps.upload.outputs.sha_armeabi_v7a }}
+      sha_x86_64: ${{ steps.upload.outputs.sha_x86_64 }}
+      sha_universal: ${{ steps.upload.outputs.sha_universal }}
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+      BUILD_NUMBER: ${{ needs.prepare.outputs.build_number }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - name: Keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          [ -n "$KEYSTORE_BASE64" ] || { echo "::error::Secret ANDROID_KEYSTORE_BASE64 is missing"; exit 1; }
+          echo "$KEYSTORE_BASE64" | grep -v -- '-----' | base64 -d > android/app/release.jks
+          cat > android/key.properties <<EOF
+          storePassword=$KEYSTORE_PASSWORD
+          keyPassword=$KEY_PASSWORD
+          keyAlias=$KEY_ALIAS
+          storeFile=release.jks
+          EOF
+      - name: Build
+        run: |
+          ARGS=(--release --build-name="$VERSION" --build-number="$BUILD_NUMBER" --dart-define=UPDATE_BASE_URL="$UPDATE_BASE_URL")
+          mkdir -p dist
+          flutter build apk "${ARGS[@]}"
+          cp build/app/outputs/flutter-apk/app-release.apk "dist/home_radio-$VERSION-universal.apk"
+          flutter build apk "${ARGS[@]}" --split-per-abi
+          for ABI in arm64-v8a armeabi-v7a x86_64; do
+            cp "build/app/outputs/flutter-apk/app-$ABI-release.apk" "dist/home_radio-$VERSION-$ABI.apk"
+          done
+      - name: Verify signature
+        run: |
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -maxdepth 2 -name apksigner | sort -V | tail -n1)
+          for APK in dist/*.apk; do "$APKSIGNER" verify --print-certs "$APK" | head -3; done
+      - name: Upload to Nexus
+        id: upload
+        env:
+          NEXUS_USER: ${{ secrets.NEXUS_USER }}
+          NEXUS_PASS: ${{ secrets.NEXUS_PASS }}
+        run: |
+          source .github/scripts/nexus_upload.sh
+          BASE="$UPDATE_BASE_URL/android/release"
+          {
+            echo "{"
+            echo "  \"version\": \"$VERSION\","
+            echo "  \"apks\": {"
+            SEP=""
+            for ABI in arm64-v8a armeabi-v7a x86_64 universal; do
+              FILE="home_radio-$VERSION-$ABI.apk"
+              SHA=$(sha256sum "dist/$FILE" | cut -d' ' -f1)
+              echo "sha_${ABI//-/_}=$SHA" >> "$GITHUB_OUTPUT"
+              printf '%s    "%s": {"url": "%s", "sha256": "%s"}' "$SEP" "$ABI" "$BASE/$VERSION/$FILE" "$SHA"
+              SEP=$',\n'
+            done
+            printf '\n  }\n}\n'
+          } > dist/version.json
+          cat dist/version.json
+          for ABI in arm64-v8a armeabi-v7a x86_64 universal; do
+            upload "dist/home_radio-$VERSION-$ABI.apk" "$BASE/$VERSION/home_radio-$VERSION-$ABI.apk"
+            upload "dist/home_radio-$VERSION-$ABI.apk" "$BASE/latest/home_radio-$ABI.apk"
+          done
+          upload dist/version.json "$BASE/$VERSION/version.json"
+          upload dist/version.json "$BASE/latest/version.json"
+
+  windows:
+    needs: prepare
+    runs-on: windows-latest
+    outputs:
+      sha: ${{ steps.upload.outputs.sha }}
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+      BUILD_NUMBER: ${{ needs.prepare.outputs.build_number }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - name: Inno Setup
+        run: choco install innosetup --no-progress -y
+      - name: Build
+        shell: pwsh
+        run: ./windows/scripts/build-installer.ps1 -Version $env:VERSION -BuildNumber $env:BUILD_NUMBER -UpdateBaseUrl $env:UPDATE_BASE_URL
+      - name: Upload to Nexus
+        id: upload
+        shell: bash
+        env:
+          NEXUS_USER: ${{ secrets.NEXUS_USER }}
+          NEXUS_PASS: ${{ secrets.NEXUS_PASS }}
+        run: |
+          source .github/scripts/nexus_upload.sh
+          BASE="$UPDATE_BASE_URL/windows/release"
+          OUT=windows/installer/output
+          echo "sha=$(sha256sum "$OUT/setup.exe" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          cat "$OUT/version.json"
+          upload "$OUT/setup.exe" "$BASE/$VERSION/home_radio-setup-$VERSION.exe"
+          upload "$OUT/setup.exe" "$BASE/latest/home_radio-setup.exe"
+          upload "$OUT/version.json" "$BASE/$VERSION/version.json"
+          upload "$OUT/version.json" "$BASE/latest/version.json"
+
+  linux:
+    needs: prepare
+    runs-on: ubuntu-24.04
+    outputs:
+      sha: ${{ steps.upload.outputs.sha }}
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+      BUILD_NUMBER: ${{ needs.prepare.outputs.build_number }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libstdc++-12-dev \
+            libmpv-dev libusb-1.0-0-dev dpkg-dev
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - name: Build
+        run: bash linux/scripts/build-deb.sh "$VERSION" "$BUILD_NUMBER" "$UPDATE_BASE_URL"
+      - name: Upload to Nexus
+        id: upload
+        env:
+          NEXUS_USER: ${{ secrets.NEXUS_USER }}
+          NEXUS_PASS: ${{ secrets.NEXUS_PASS }}
+        run: |
+          source .github/scripts/nexus_upload.sh
+          BASE="$UPDATE_BASE_URL/linux/release"
+          OUT=build/linux-deb-output
+          DEB="home-radio_${VERSION}_amd64.deb"
+          echo "sha=$(sha256sum "$OUT/$DEB" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          sed "s#__UPDATE_BASE_URL__#$UPDATE_BASE_URL#" linux/scripts/install-latest.sh > "$OUT/install.sh"
+          cat "$OUT/version.json"
+          upload "$OUT/$DEB" "$BASE/$VERSION/$DEB"
+          upload "$OUT/$DEB" "$BASE/latest/home-radio-latest.deb"
+          upload "$OUT/version.json" "$BASE/$VERSION/version.json"
+          upload "$OUT/version.json" "$BASE/latest/version.json"
+          upload "$OUT/install.sh" "$BASE/latest/install.sh"
+
+  release:
+    needs: [prepare, android, windows, linux]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION: ${{ needs.prepare.outputs.version }}
+      NOTES: ${{ needs.prepare.outputs.notes }}
+      SHA_ARM64: ${{ needs.android.outputs.sha_arm64 }}
+      SHA_ARMV7: ${{ needs.android.outputs.sha_armv7 }}
+      SHA_UNIVERSAL: ${{ needs.android.outputs.sha_universal }}
+      SHA_WINDOWS: ${{ needs.windows.outputs.sha }}
+      SHA_LINUX: ${{ needs.linux.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Tag and GitHub Release
+        run: |
+          TAG="v$VERSION"
+          A="$UPDATE_BASE_URL/android/release/$VERSION"
+          W="$UPDATE_BASE_URL/windows/release/$VERSION"
+          L="$UPDATE_BASE_URL/linux/release/$VERSION"
+          {
+            printf '%s\n' "$NOTES"
+            echo
+            echo "## Downloads"
+            echo
+            echo "| Datei | Für | SHA-256 |"
+            echo "|---|---|---|"
+            echo "| [home_radio-$VERSION-arm64-v8a.apk]($A/home_radio-$VERSION-arm64-v8a.apk) | die meisten Android-TV-Boxen (64-bit ARM) | \`$SHA_ARM64\` |"
+            echo "| [home_radio-$VERSION-armeabi-v7a.apk]($A/home_radio-$VERSION-armeabi-v7a.apk) | ältere bzw. 32-bit-Geräte, z. B. manche Fernseher | \`$SHA_ARMV7\` |"
+            echo "| [home_radio-$VERSION-universal.apk]($A/home_radio-$VERSION-universal.apk) | alle Android-Geräte, falls unklar (größer) | \`$SHA_UNIVERSAL\` |"
+            echo "| [home_radio-setup-$VERSION.exe]($W/home_radio-setup-$VERSION.exe) | Windows 10/11 (64-bit) | \`$SHA_WINDOWS\` |"
+            echo "| [home-radio_${VERSION}_amd64.deb]($L/home-radio_${VERSION}_amd64.deb) | Debian/Ubuntu (64-bit) | \`$SHA_LINUX\` |"
+            echo
+            echo "Linux in einem Schritt: \`curl -fsSL $UPDATE_BASE_URL/linux/release/latest/install.sh | bash\`"
+            echo
+            echo "Die App aktualisiert sich danach selbst (Einstellungen → Weiteres → Updates)."
+          } > "$RUNNER_TEMP/notes.md"
+          git tag "$TAG" "$GITHUB_SHA"
+          git push origin "$TAG"
+          gh release create "$TAG" --title "Home Radio $VERSION" --notes-file "$RUNNER_TEMP/notes.md" --latest

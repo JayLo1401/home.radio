@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -170,6 +172,24 @@ class _RtlSdrTestScreenState extends ConsumerState<RtlSdrTestScreen> {
                 'gestartet wird, öffnet der Decoder den Stick selbst.',
                 style: TextStyle(color: Colors.white70),
               ),
+              if (Platform.isWindows)
+                const Padding(
+                  padding: EdgeInsets.only(top: 8),
+                  child: Text(
+                    'Windows: Der Stick braucht einmalig den WinUSB-Treiber - mit Zadig (zadig.akeo.ie) '
+                    'für "Bulk-In, Interface (Interface 0)" installieren. Ohne ihn ist kein Zugriff möglich.',
+                    style: TextStyle(color: Colors.white70),
+                  ),
+                )
+              else if (Platform.isLinux)
+                const Padding(
+                  padding: EdgeInsets.only(top: 8),
+                  child: Text(
+                    'Linux: Für den Zugriff braucht es eine udev-Regel für den Stick (z.B. aus dem Paket rtl-sdr); '
+                    'der DVB-T-Treiber des Kernels wird automatisch abgekoppelt.',
+                    style: TextStyle(color: Colors.white70),
+                  ),
+                ),
               const SizedBox(height: 12),
               if (_usbDevices.isEmpty)
                 const Text('Kein RTL-SDR-Stick erkannt.', style: TextStyle(color: Colors.orangeAccent))
