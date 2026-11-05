@@ -215,11 +215,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         // events that explain why that retry is failing - _playDab() below
         // prefers this message over its own generic "Kein Empfang"/
         // "Quelle nicht erreichbar" text once it's set.
+        // The message says what's wrong - with rtltcp_v2 e.g. "USB-Stick am
+        // rtl_tcp-Server nicht bereit", "… wird bereits von 192.168.1.20
+        // verwendet", "Anmeldung … fehlgeschlagen".
         final isError = event['isError'] as bool? ?? false;
+        final message = (event['message'] as String?)?.trim() ?? '';
         setState(() {
-          _dabConnectionWarning = isError
-              ? 'Verbindung zur RTL-SDR-Quelle verloren - versuche erneut zu verbinden…'
-              : null;
+          _dabConnectionWarning = !isError
+              ? null
+              : (message.isEmpty || message.startsWith('Verbindung zur rtl_tcp-Quelle verloren'))
+                  ? 'Verbindung zur RTL-SDR-Quelle verloren - versuche erneut zu verbinden…'
+                  : message;
         });
     }
   }
@@ -319,6 +325,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         : await dab.setServer(
             host: await settings.getRtlSdrHost(),
             port: await settings.getRtlSdrPort(),
+            auth: await settings.getRtlTcpAuth(),
           );
     if (mounted) setState(() => _dabServerReady = ok);
   }
@@ -422,6 +429,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     final url = channel.internetStreamUrl;
     if (url != null) {
+      // Supersedes a DAB+/FM tune still in progress (see _receiverWanted).
+      _dabPlayGeneration++;
+      _receiverWanted = false;
       await _stopReceiver();
       await ref.read(audioPlayerServiceProvider).stop();
       _setNowPlayingFavorite(channel, playing: true);
@@ -523,6 +533,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   /// newer request supersedes an older retry of either kind.
   Future<void> _playFm(int freqKhz, {required VoidCallback onPlaying}) async {
     final myGeneration = ++_dabPlayGeneration;
+    _receiverWanted = true;
     if (ref.read(receiverModeProvider) == ReceiverMode.none) {
       if (mounted) setState(() => _dabStatusText = 'Kein Radio-Empfänger eingerichtet (Einstellungen)');
       return;
@@ -534,7 +545,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       });
     }
     final ok = await ref.read(dabRtlSdrServiceProvider).fmPlay(freqKhz);
-    if (!mounted || myGeneration != _dabPlayGeneration) return;
+    if (!mounted) return;
+    if (myGeneration != _dabPlayGeneration) return _dropSupersededTune();
     setState(() {
       _dabTuned = ok;
       _dabStatusText = ok
@@ -563,6 +575,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   /// bail out instead of fighting over the tuner with whatever's current.
   int _dabPlayGeneration = 0;
 
+  /// Whether the newest selection uses the receiver (DAB+/FM). False after
+  /// switching to internet radio or pausing - then a tune that was still
+  /// running when the user switched must not leave its audio playing
+  /// (issue #1: the previous DAB+ station came through over internet radio).
+  bool _receiverWanted = false;
+
+  /// A DAB+/FM tune finished after the user had already picked something
+  /// else. Another receiver station takes the tuner over on its own; for
+  /// internet radio / pause the receiver is stopped here, because the native
+  /// side started the superseded station's audio.
+  Future<void> _dropSupersededTune() async {
+    if (!_receiverWanted) await _stopReceiver();
+  }
+
   /// Shared DAB+ playback path for both [_play] (favorites) and
   /// [_playDabStation]: tunes+decodes via the DAB+ receiver
   /// (DabRtlSdrService) and waits for the result in a single await.
@@ -572,6 +598,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     required VoidCallback onPlaying,
   }) async {
     final myGeneration = ++_dabPlayGeneration;
+    _receiverWanted = true;
     // E.g. a DAB+ favorite left over from before "Kein Empfänger" was chosen.
     if (ref.read(receiverModeProvider) == ReceiverMode.none) {
       if (mounted) setState(() => _dabStatusText = 'Kein Radio-Empfänger eingerichtet (Einstellungen)');
@@ -581,7 +608,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final ok = await ref
         .read(dabRtlSdrServiceProvider)
         .playService(freqKhz: freqKhz, serviceId: serviceId);
-    if (!mounted || myGeneration != _dabPlayGeneration) return;
+    if (!mounted) return;
+    if (myGeneration != _dabPlayGeneration) return _dropSupersededTune();
     // Weak/absent reception ("Kein Signal!", server up but no usable
     // signal on this frequency) is often transient - a brief fade, or the
     // tuner needing another cycle - so keep retrying every second,
@@ -654,6 +682,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   /// exactly that for whatever's currently selected).
   Future<void> _pauseCurrentPlayback() async {
     if (_isDabSelected) {
+      // Also cancels a tune still in progress.
+      _dabPlayGeneration++;
+      _receiverWanted = false;
       await _stopReceiver();
       if (mounted) setState(() => _dabTuned = false);
     } else {
