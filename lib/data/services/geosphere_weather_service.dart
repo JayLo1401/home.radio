@@ -6,21 +6,26 @@ import 'package:http/http.dart' as http;
 import '../models/hourly_forecast.dart';
 
 /// Hourly forecast via GeoSphere Austria's (formerly ZAMG) public Data Hub -
-/// the AROME-based `nwp-v1-1h-2500m` point forecast, free/CC0, no API key
-/// (endpoint verified directly, 2026-09-17: `dataset.api.hub.geosphere.at`,
-/// same one Home Assistant's ZAMG/GeoSphere integrations use). Chosen over
-/// Open-Meteo/Bergfex specifically for Austria-sourced data.
+/// the `nwp-v2-1h-1km` point forecast, free/CC0, no API key
+/// (`dataset.api.hub.geosphere.at`, same one Home Assistant's ZAMG/GeoSphere
+/// integrations use). Chosen over Open-Meteo/Bergfex specifically for
+/// Austria-sourced data.
+///
+/// Until 2026-11 this used `nwp-v1-1h-2500m`; GeoSphere stopped updating it
+/// (last run 2026-11-04 03 UTC, since then HTTP 200 with an empty time
+/// series - the panel showed "Keine Daten"). v2 names the parameters
+/// differently (2t/10u/10v), gives precipitation per hour (tp) instead of
+/// accumulated (rr_acc), and cloud cover in % instead of 0..1.
 ///
 /// `sy` (GeoSphere's own weather-symbol code) is deliberately not
 /// requested - it's an undocumented, proprietary code table (confirmed
 /// against the most complete open-source GeoSphere integration, which
 /// derives its own condition from physical parameters instead of decoding
 /// it). [WeatherCondition] here is derived the same way, simplified
-/// (no CAPE/CIN thunderstorm detection, which AROME's basic parameter set
-/// doesn't include).
+/// (no CAPE/CIN thunderstorm detection).
 class GeoSphereWeatherService {
-  static const _baseUrl = 'https://dataset.api.hub.geosphere.at/v1/timeseries/forecast/nwp-v1-1h-2500m';
-  static const _parameters = 't2m,rr_acc,u10m,v10m,tcc';
+  static const _baseUrl = 'https://dataset.api.hub.geosphere.at/v1/timeseries/forecast/nwp-v2-1h-1km';
+  static const _parameters = '2t,tp,10u,10v,tcc';
 
   /// Only hours up to the next 02:00 are returned - "today's" forecast, with
   /// a late-night cutoff rather than stopping dead at midnight.
@@ -48,11 +53,11 @@ class GeoSphereWeatherService {
         ((parameters[name] as Map<String, dynamic>?)?['data'] as List?)?.map((v) => (v as num?)?.toDouble()).toList() ??
         List.filled(timestamps.length, null);
 
-    final t2m = series('t2m');
-    final rrAcc = series('rr_acc');
-    final u10m = series('u10m');
-    final v10m = series('v10m');
-    final tcc = series('tcc');
+    final t2m = series('2t');
+    final tp = series('tp'); // kg/m² = mm in the hour before the timestamp
+    final u10m = series('10u');
+    final v10m = series('10v');
+    final tcc = series('tcc'); // %
     final now = DateTime.now();
     final cutoff = _cutoff(now);
     // The API returns the whole day starting near midnight, not "from now" -
@@ -77,13 +82,9 @@ class GeoSphereWeatherService {
         missingHours++;
         continue;
       }
-      // rr_acc is accumulated since forecast start - the hourly amount is
-      // the delta from the previous step (matches the reference GeoSphere
-      // integration's approach; the very first step has no predecessor).
-      final rr = rrAcc[i], rrPrev = i == 0 ? 0.0 : rrAcc[i - 1];
-      final rainHour = rr == null || rrPrev == null ? 0.0 : math.max(rr - rrPrev, 0.0);
+      final rainHour = math.max(tp[i] ?? 0.0, 0.0);
       final windSpeed = math.sqrt(u * u + v * v);
-      final cloudPct = (tcc[i] ?? 0) * 100;
+      final cloudPct = (tcc[i] ?? 0).clamp(0.0, 100.0).toDouble();
       result.add(
         HourlyForecast(
           time: time,
