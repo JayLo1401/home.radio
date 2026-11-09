@@ -53,6 +53,7 @@ constexpr uint32_t kMaxJsonFrame = 1u << 20;
 // No data for this long on a v2 session: ping; twice as long: reconnect.
 constexpr int kV2PingAfterMs = 5000;
 constexpr int kV2DeadAfterMs = 20000;
+constexpr int kHandshakeTimeoutS = 12;
 
 // The few socket calls that differ between POSIX and Winsock.
 #ifdef _WIN32
@@ -396,7 +397,10 @@ RtlTcpSource::Connect RtlTcpSource::connectOnce()
     for (addrinfo* ai = res; ai; ai = ai->ai_next) {
         s = openSock(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
         if (s < 0) continue;
-        setTimeouts(s, 2);
+        // A server whose stick idles opens it on connect and only then sends
+        // the greeting - typically 1-2 s, up to 10 s (rtltcp.server's "v1
+        // client waits for stick"). 2 s here made the first connect fail.
+        setTimeouts(s, kHandshakeTimeoutS);
         setOpt(s, IPPROTO_TCP, TCP_NODELAY, 1);
         setOpt(s, SOL_SOCKET, SO_RCVBUF, 1 << 20);
         if (connect(static_cast<SockT>(s), ai->ai_addr, static_cast<SockLen>(ai->ai_addrlen)) ==

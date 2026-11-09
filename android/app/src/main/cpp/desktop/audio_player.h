@@ -84,6 +84,14 @@ private:
     int fadeStep_ = 0;
     int deviceChannels_ = 0;
     std::atomic<int64_t> writes_{0};
+
+    // Statistics, logged every 10 s by the output thread.
+    std::atomic<int> underruns_{0};
+    std::atomic<int> ausDecoded_{0};
+    std::atomic<int> ausDamaged_{0};   // CRC failed upstream: silence
+    std::atomic<int> decodeErrors_{0}; // FDK rejected the AU: silence
+    std::atomic<int> ausDropped_{0};   // queue full
+    std::atomic<int> minFillMs_{-1};
 };
 
 } // namespace hrdab

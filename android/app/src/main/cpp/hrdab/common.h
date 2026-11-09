@@ -19,10 +19,30 @@
 #define HR_LOGW(...) __android_log_print(ANDROID_LOG_WARN, "hrdab", __VA_ARGS__)
 #define HR_LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "hrdab", __VA_ARGS__)
 #else
+#include <chrono>
 #include <cstdio>
-#define HR_LOGI(...) (std::fprintf(stderr, __VA_ARGS__), std::fputc('\n', stderr))
-#define HR_LOGW(...) (std::fprintf(stderr, __VA_ARGS__), std::fputc('\n', stderr))
-#define HR_LOGE(...) (std::fprintf(stderr, __VA_ARGS__), std::fputc('\n', stderr))
+#include <ctime>
+namespace hrdab {
+// "HH:MM:SS.mmm " in local time, so a log line can be matched against what
+// was heard.
+inline void logStamp()
+{
+    const auto now = std::chrono::system_clock::now();
+    const std::time_t t = std::chrono::system_clock::to_time_t(now);
+    const int ms = static_cast<int>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count() % 1000);
+    std::tm tm{};
+#ifdef _WIN32
+    localtime_s(&tm, &t);
+#else
+    localtime_r(&t, &tm);
+#endif
+    std::fprintf(stderr, "%02d:%02d:%02d.%03d ", tm.tm_hour, tm.tm_min, tm.tm_sec, ms);
+}
+} // namespace hrdab
+#define HR_LOGI(...) (::hrdab::logStamp(), std::fprintf(stderr, __VA_ARGS__), std::fputc('\n', stderr))
+#define HR_LOGW(...) (::hrdab::logStamp(), std::fprintf(stderr, "W: "), std::fprintf(stderr, __VA_ARGS__), std::fputc('\n', stderr))
+#define HR_LOGE(...) (::hrdab::logStamp(), std::fprintf(stderr, "E: "), std::fprintf(stderr, __VA_ARGS__), std::fputc('\n', stderr))
 #endif
 
 namespace hrdab {

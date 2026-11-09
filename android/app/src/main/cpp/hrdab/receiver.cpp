@@ -374,7 +374,7 @@ void Receiver::onReset()
     ofdmGeneration_ = generation_.load();
 }
 
-void Receiver::pushItem(const int8_t* soft, bool lost)
+void Receiver::pushItem(const int8_t* soft, bool lost, bool erased)
 {
     std::lock_guard<std::mutex> lock(queueMutex_);
     if (queue_.size() >= kMaxQueuedFrames) {
@@ -387,10 +387,12 @@ void Receiver::pushItem(const int8_t* soft, bool lost)
         gap.lost = true;
         gap.generation = ofdmGeneration_;
         queue_.push_back(std::move(gap));
+        stats_.queueDrops++;
         HR_LOGW("decoder too slow - dropped queued frames");
     }
     FrameItem item;
     item.lost = lost;
+    item.erased = erased;
     item.generation = ofdmGeneration_;
     if (!lost) {
         if (!pool_.empty()) {
@@ -398,7 +400,8 @@ void Receiver::pushItem(const int8_t* soft, bool lost)
             pool_.pop_back();
         }
         item.soft.resize(kFrameSoftBits);
-        std::memcpy(item.soft.data(), soft, kFrameSoftBits);
+        if (erased) std::memset(item.soft.data(), 0, kFrameSoftBits);
+        else std::memcpy(item.soft.data(), soft, kFrameSoftBits);
     }
     queue_.push_back(std::move(item));
     queueCv_.notify_one();
@@ -406,23 +409,67 @@ void Receiver::pushItem(const int8_t* soft, bool lost)
 
 void Receiver::onFrame(const int8_t* soft)
 {
-    pushItem(soft, false);
+    stats_.framesOk++;
+    pushItem(soft, false, false);
 }
 
-void Receiver::onFrameLost()
+void Receiver::onFrameLost(bool inTimeline)
 {
-    pushItem(nullptr, true);
+    // In the timeline: an erasure keeps the time de-interleaver and the
+    // super frame alignment; the Viterbi decoder and RS usually bridge one
+    // frame, since time interleaving spreads it over 16 logical frames.
+    // Resetting instead cost ~1 s of audio for every single lost frame.
+    if (inTimeline) stats_.framesErased++;
+    else stats_.gaps++;
+    pushItem(nullptr, !inTimeline, inTimeline);
 }
 
 void Receiver::onSync(bool synced)
 {
+    if (!synced && synced_) {
+        stats_.syncLosses++;
+        HR_LOGW("DAB: sync lost (offset %.0f Hz, clock %.1f ppm)", ofdm_.frequencyOffsetHz(), ofdm_.sampleClockPpm());
+    }
     synced_ = synced;
     listener_.onSync(synced);
 }
 
 void Receiver::onSnr(float snrDb)
 {
+    stats_.snrDb = snrDb;
     listener_.onSnr(snrDb);
+}
+
+// One line of reception statistics per period - what tells a weak or
+// drifting signal (SNR, offsets, erasures, sync losses, FIC/RS/AU errors)
+// from a starved pipeline (ring/queue drops). Decoder thread.
+void Receiver::logStats(bool force)
+{
+    constexpr auto kStatsPeriod = std::chrono::seconds(10);
+    const auto now = std::chrono::steady_clock::now();
+    if (stats_.since == std::chrono::steady_clock::time_point{}) stats_.since = now;
+    if (!force && now - stats_.since < kStatsPeriod) return;
+    const double secs = std::chrono::duration<double>(now - stats_.since).count();
+    const int ficOk = fic_.fibsOk() - stats_.ficOkBase;
+    const int ficBad = fic_.fibsBad() - stats_.ficBadBase;
+    const int auErr = superframe_.auCrcErrors() - stats_.auErrorsBase;
+    const size_t ringDropped = ring_.takeDropped();
+    HR_LOGI("DAB stats %.0fs: SNR %.1f dB, carrier %.0f Hz, clock %.1f ppm, phase %.1f deg, timing %+.0f, gain %.1f dB (%d changes) | "
+            "frames ok %d erased %d gaps %d, sync lost %d | FIC CRC bad %d/%d | superframes %d, RS fixed %d, "
+            "RS uncorrectable %d | AU CRC bad %d/%d | dropped: I/Q %zu bytes, decoder queue %d",
+            secs, stats_.snrDb.load(), ofdm_.frequencyOffsetHz(), ofdm_.sampleClockPpm(), ofdm_.commonPhaseDeg(),
+            ofdm_.lastTimingStep(), gainDb(), stats_.gainChanges.exchange(0), stats_.framesOk.exchange(0), stats_.framesErased.exchange(0),
+            stats_.gaps.exchange(0), stats_.syncLosses.exchange(0), ficBad, ficOk + ficBad, stats_.superframes,
+            stats_.rsCorrected, stats_.rsUncorrectable, auErr, stats_.auTotal, ringDropped,
+            stats_.queueDrops.exchange(0));
+    stats_.ficOkBase = fic_.fibsOk();
+    stats_.ficBadBase = fic_.fibsBad();
+    stats_.auErrorsBase = superframe_.auCrcErrors();
+    stats_.superframes = 0;
+    stats_.rsCorrected = 0;
+    stats_.rsUncorrectable = 0;
+    stats_.auTotal = 0;
+    stats_.since = now;
 }
 
 void Receiver::onLevel(float rms, float clipRatio)
@@ -462,6 +509,7 @@ bool Receiver::adjustGain(float rms, float clipRatio, bool synced, std::chrono::
     if (g == gainIndex_) return false;
     gainIndex_ = g;
     lastGainChange_ = now;
+    stats_.gainChanges++;
     source_->setGainIndex(g);
     HR_LOGI("AGC: rms %.3f clip %.4f -> gain %.1f dB", rms, clipRatio, source_->gainTenthsDb(g) / 10.0);
     return true;
@@ -544,6 +592,8 @@ void Receiver::decoderLoop()
             // that was mid-decode at that moment may have refilled it.
             ensemble_.clear();
             fic_.resetStats();
+            stats_.ficOkBase = 0;
+            stats_.ficBadBase = 0;
             superframe_.reset();
             pad_.reset();
             sub_.reset();
@@ -557,7 +607,9 @@ void Receiver::decoderLoop()
                 sub_.reset();
                 superframe_.reset();
             } else {
-                fic_.processFrame(item.soft.data());
+                // An erased frame has no FIC worth decoding; its MSC part
+                // (all zero = "don't know") still goes through, see onFrameLost.
+                if (!item.erased) fic_.processFrame(item.soft.data());
                 if (serviceActive_) {
                     const int8_t* msc = item.soft.data() + kFicSymbols * kBitsPerSymbol;
                     for (int c = 0; c < kCifsPerFrame; c++) {
@@ -580,6 +632,7 @@ void Receiver::decoderLoop()
             std::lock_guard<std::mutex> lock(queueMutex_);
             pool_.push_back(std::move(item.soft));
         }
+        logStats(false);
     }
 }
 
@@ -602,6 +655,7 @@ void Receiver::onAudioParams(const AudioParams& params)
 
 void Receiver::onAccessUnit(const uint8_t* data, int len, bool ok)
 {
+    stats_.auTotal++;
     if (!playing_) return;
     if (ok) pad_.processAccessUnit(data, len);
     listener_.onAccessUnit(data, len, ok);
@@ -609,6 +663,9 @@ void Receiver::onAccessUnit(const uint8_t* data, int len, bool ok)
 
 void Receiver::onSuperframeStats(bool rsUncorrectable, int rsCorrected)
 {
+    stats_.superframes++;
+    stats_.rsCorrected += rsCorrected;
+    if (rsUncorrectable) stats_.rsUncorrectable++;
     const auto now = std::chrono::steady_clock::now();
     if (!rsUncorrectable && rsCorrected == 0 && now - lastRsReport_ < std::chrono::seconds(2)) return;
     lastRsReport_ = now;

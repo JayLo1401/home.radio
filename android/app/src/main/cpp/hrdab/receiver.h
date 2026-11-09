@@ -116,7 +116,27 @@ private:
     struct FrameItem {
         std::vector<int8_t> soft;
         uint32_t generation = 0;
-        bool lost = false;
+        bool lost = false;   // gap in the frame timeline
+        bool erased = false; // in the timeline, but no data (soft bits all 0)
+    };
+    // Reception statistics, logged every kStatsPeriod while DAB runs.
+    struct Stats {
+        std::atomic<int> framesOk{0};
+        std::atomic<int> framesErased{0};
+        std::atomic<int> gaps{0};
+        std::atomic<int> syncLosses{0};
+        std::atomic<int> queueDrops{0};
+        std::atomic<int> gainChanges{0};
+        std::atomic<float> snrDb{0};
+        // decoder thread only
+        int rsCorrected = 0;
+        int rsUncorrectable = 0;
+        int superframes = 0;
+        int ficOkBase = 0;
+        int ficBadBase = 0;
+        int auErrorsBase = 0;
+        int auTotal = 0;
+        std::chrono::steady_clock::time_point since{};
     };
     struct ServiceRequest {
         int version = 0;
@@ -126,7 +146,7 @@ private:
 
     // OfdmSink
     void onFrame(const int8_t* soft) override;
-    void onFrameLost() override;
+    void onFrameLost(bool inTimeline) override;
     void onSync(bool synced) override;
     void onSnr(float snrDb) override;
     void onLevel(float rms, float clipRatio) override;
@@ -161,8 +181,9 @@ private:
     void stopLocked();
     bool adjustGain(float rms, float clipRatio, bool settled, std::chrono::milliseconds searchInterval);
     void decoderLoop();
-    void pushItem(const int8_t* soft, bool lost);
+    void pushItem(const int8_t* soft, bool lost, bool erased);
     void applyServiceRequest();
+    void logStats(bool force);
 
     std::unique_ptr<SampleSource> source_;
     ReceiverListener& listener_;
@@ -219,6 +240,8 @@ private:
     std::chrono::steady_clock::time_point lastRsReport_{};
     std::chrono::steady_clock::time_point lastAacReport_{};
     int auErrorsReported_ = 0;
+
+    Stats stats_;
 };
 
 } // namespace hrdab

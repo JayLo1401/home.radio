@@ -22,8 +22,10 @@ public:
     virtual ~OfdmSink() = default;
     // 75 data symbols worth of soft bits (FIC first), see kFrameSoftBits.
     virtual void onFrame(const int8_t* soft) = 0;
-    // A frame could not be demodulated (timeline gap for the decoders).
-    virtual void onFrameLost() = 0;
+    // A frame could not be demodulated. `inTimeline`: the lock is kept and
+    // the next frame follows this one seamlessly, so the decoders can treat
+    // it as an erasure (all soft bits 0) instead of a gap in the timeline.
+    virtual void onFrameLost(bool inTimeline) = 0;
     virtual void onSync(bool synced) = 0;
     virtual void onSnr(float snrDb) = 0;
     // Input level once per ~100 ms: RMS of the raw samples (0..1 full scale)
@@ -50,6 +52,11 @@ public:
     void requestReset(uint32_t tunedHz);
 
     float frequencyOffsetHz() const { return static_cast<float>(freqOffsetHz_); }
+    // Of the last demodulated frame (diagnostics): sample clock offset from
+    // the carrier phase slope, and the common phase error per symbol.
+    float sampleClockPpm() const { return slopePpm_; }
+    float commonPhaseDeg() const { return commonDeg_; }
+    float lastTimingStep() const { return lastTimingStep_; }
 
 private:
     bool ensure(size_t count);
@@ -89,7 +96,10 @@ private:
     std::vector<cf32> work_;
     std::vector<int8_t> soft_;
     std::vector<cf32> refDiff_;
-
+    std::vector<cf32> diff_;      // differential products of a frame, natural carrier order
+    std::vector<cf32> phaseFix_;  // per-carrier phase correction of the current frame
+    std::vector<cf32> carrierSum_;
+    cf32 slopeState_{1, 0};       // smoothed exp(j 4 slope lag); kept across retunes (same crystal)
     // statistics
     double levelSumSq_ = 0;
     long levelClipped_ = 0;
@@ -99,6 +109,9 @@ private:
     int dbgFrames_ = 0;
     int skipSamples_ = 0;
     long absPos_ = 0; // samples consumed since start (diagnostics)
+    std::atomic<float> slopePpm_{0};
+    std::atomic<float> commonDeg_{0};
+    std::atomic<float> lastTimingStep_{0};
 };
 
 } // namespace hrdab

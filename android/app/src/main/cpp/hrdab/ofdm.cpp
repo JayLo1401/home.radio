@@ -19,6 +19,9 @@ constexpr int kMaxCoarseShift = 45;   // carriers = kHz, ~ +-200 ppm in Band III
 constexpr double kMaxOffsetHz = kMaxCoarseShift * 1000.0 + 1000.0;
 constexpr int kNullBlock = 64;
 constexpr int kNullWindowBlocks = 40; // 2560 of the 2656 null samples
+// Carrier distance for the phase slope estimate: 4 x slope x lag stays
+// below pi up to ~390 ppm of sample clock offset.
+constexpr int kSlopeLag = 256;
 
 inline int wrapTiming(int m)
 {
@@ -31,6 +34,28 @@ inline int wrapTiming(int m)
 inline cf32 mulConj(cf32 a, cf32 b)
 {
     return cf32(a.real() * b.real() + a.imag() * b.imag(), a.imag() * b.real() - a.real() * b.imag());
+}
+
+// Natural carrier order: index j = 0..1535 <-> carrier k = -768..-1, 1..768.
+inline int naturalCarrier(int j)
+{
+    return j < kCarriers / 2 ? j - kCarriers / 2 : j - kCarriers / 2 + 1;
+}
+
+inline int naturalIndex(int k)
+{
+    return k < 0 ? k + kCarriers / 2 : k + kCarriers / 2 - 1;
+}
+
+// d^4 scaled back to |d|: the QPSK data drops out (4 x 90 degrees), the
+// phase error is multiplied by 4, and strong carriers don't dominate the way
+// they would with |d|^4.
+inline cf32 quartic(cf32 d)
+{
+    const float m = std::norm(d);
+    if (m <= 0.f) return cf32(0, 0);
+    const cf32 d2 = d * d;
+    return d2 * d2 / (m * std::sqrt(m));
 }
 
 inline int8_t clampSoft(float v)
@@ -52,7 +77,10 @@ OfdmDemod::OfdmDemod(IqReader& reader, OfdmSink& sink)
       cur_(kFftLen),
       prev_(kFftLen),
       work_(kFftLen),
-      soft_(kFrameSoftBits)
+      soft_(kFrameSoftBits),
+      diff_(static_cast<size_t>(kDataSymbols) * kCarriers),
+      phaseFix_(kCarriers, cf32(1, 0)),
+      carrierSum_(kCarriers)
 {
     for (int i = 0; i < 256; i++) lut_[static_cast<size_t>(i)] = (static_cast<float>(i) - 127.5f) / 127.5f;
     stash_.reserve(4 * kFrameLen);
@@ -383,8 +411,12 @@ bool OfdmDemod::demodulateFrame()
     quiet /= (kNullLen - 256) / 4;
     loud /= kSymbolLen / 4;
     if (quality < 8.f || std::abs(e) > 200 || quiet > 0.5 * loud) {
-        sink_.onFrameLost();
-        if (++misses_ >= 3) {
+        ++misses_;
+        // Still locked, the frame timeline goes on (one frame consumed): the
+        // decoders can take it as an erasure. Once the lock is given up, the
+        // re-acquisition skips an unknown number of frames - a real gap.
+        sink_.onFrameLost(misses_ < 3);
+        if (misses_ >= 3) {
             locked_ = false;
             HR_LOGW("OFDM sync lost (impulse quality %.1f, timing step %d)", quality, e);
             if (reportedSync_) {
@@ -396,6 +428,7 @@ bool OfdmDemod::demodulateFrame()
         return true;
     }
     misses_ = 0;
+    lastTimingStep_ = static_cast<float>(e);
 
     const int offset = kWindowOffset + e;
     if (e != 0) spectrumAt(base + kNullLen + static_cast<size_t>(offset), cur_.data());
@@ -405,28 +438,91 @@ bool OfdmDemod::demodulateFrame()
     const float residual = cyclicPrefixOffsetHz(base, e);
     freqOffsetHz_ += std::max(-200.f, std::min(200.f, 0.3f * residual));
 
-    const auto& map = frequencyMap();
-    std::vector<cf32>& d = work_;
+    // Pass 1: differential products of all data symbols, in natural carrier
+    // order (k = -768..-1, 1..768).
     double signalPower = 0;
     for (int l = 1; l < kSymbolsPerFrame; l++) {
         const size_t pos = base + kNullLen + static_cast<size_t>(l) * kSymbolLen + static_cast<size_t>(offset);
         for (int i = 0; i < kFftLen; i += 8) signalPower += std::norm(stash_[pos + static_cast<size_t>(i)]);
         spectrumAt(pos, cur_.data());
-        float sum = 0;
-        for (int n = 0; n < kCarriers; n++) {
-            const int b = carrierToBin(map[static_cast<size_t>(n)]);
-            d[static_cast<size_t>(n)] = mulConj(cur_[static_cast<size_t>(b)], prev_[static_cast<size_t>(b)]);
-            sum += std::fabs(d[static_cast<size_t>(n)].real()) + std::fabs(d[static_cast<size_t>(n)].imag());
-        }
-        const float mean = sum / (2 * kCarriers);
-        const float scale = mean > 0 ? 48.f / mean : 0.f;
-        int8_t* out = soft_.data() + (l - 1) * kBitsPerSymbol;
-        for (int n = 0; n < kCarriers; n++) {
-            // QPSK: bit 0 -> +1. Soft convention here: > 0 means bit 1.
-            out[n] = clampSoft(-d[static_cast<size_t>(n)].real() * scale);
-            out[n + kCarriers] = clampSoft(-d[static_cast<size_t>(n)].imag() * scale);
+        cf32* d = &diff_[static_cast<size_t>(l - 1) * kCarriers];
+        for (int j = 0; j < kCarriers; j++) {
+            const size_t b = static_cast<size_t>(carrierToBin(naturalCarrier(j)));
+            d[j] = mulConj(cur_[b], prev_[b]);
         }
         std::swap(cur_, prev_);
+    }
+
+    // Pass 2: phase slope of the differential products across the carriers.
+    // The sample clock is off by the crystal's ppm (the same crystal as the
+    // LO on these sticks), so each symbol's FFT window drifts against the
+    // signal by ppm * 2552 samples - a phase step between symbols that grows
+    // linearly with the carrier index, ~17 degrees at the band edges for
+    // 50 ppm: most of the QPSK margin. It is the same for every symbol pair,
+    // so the 4th power (removes the pi/4-DQPSK data) is summed per carrier
+    // over the whole frame first, then compared between carriers kSlopeLag
+    // apart. Smoothed over frames; the clock drifts only slowly.
+    {
+        for (int j = 0; j < kCarriers; j++) carrierSum_[static_cast<size_t>(j)] = cf32(0, 0);
+        for (int l = 0; l < kDataSymbols; l++) {
+            const cf32* d = &diff_[static_cast<size_t>(l) * kCarriers];
+            for (int j = 0; j < kCarriers; j++) carrierSum_[static_cast<size_t>(j)] += quartic(d[j]);
+        }
+        cf32 acc(0, 0), common(0, 0);
+        for (int j = 0; j + kSlopeLag < kCarriers; j++) {
+            // only pairs on the same side of the DC carrier: exactly kSlopeLag apart
+            if (j < kCarriers / 2 && j + kSlopeLag >= kCarriers / 2) continue;
+            acc += mulConj(carrierSum_[static_cast<size_t>(j + kSlopeLag)], carrierSum_[static_cast<size_t>(j)]);
+        }
+        const float accMag = std::abs(acc);
+        if (accMag > 0) {
+            // weighted by reliability: a frame of noise adds little
+            double total = 0;
+            for (int j = 0; j < kCarriers; j++) total += std::norm(carrierSum_[static_cast<size_t>(j)]);
+            const float weight = total > 0 ? std::min(1.f, static_cast<float>(accMag / total)) : 0.f;
+            slopeState_ = slopeState_ * (1.f - 0.3f * weight) + (acc / accMag) * (0.3f * weight);
+        }
+        const double slope = std::atan2(slopeState_.imag(), slopeState_.real()) / (4.0 * kSlopeLag); // rad per carrier
+        for (int j = 0; j < kCarriers; j++) {
+            const double ph = -slope * naturalCarrier(j);
+            phaseFix_[static_cast<size_t>(j)] = cf32(static_cast<float>(std::cos(ph)), static_cast<float>(std::sin(ph)));
+            const double c = 4.0 * ph;
+            common += carrierSum_[static_cast<size_t>(j)] * cf32(static_cast<float>(std::cos(c)), static_cast<float>(std::sin(c)));
+        }
+        // Diagnostics only: sample clock offset, and the common phase error
+        // per symbol that is left (pi/4-DQPSK: d^4 sits at 180 degrees).
+        // The common phase is not corrected: the cyclic prefix loop keeps the
+        // carrier within ~1 Hz (< 1 degree per symbol), and a 4th-power
+        // estimate would risk a 90 degree slip on weak frames.
+        // A fast stick clock (+ppm) makes the windows lag: negative slope.
+        slopePpm_ = static_cast<float>(-slope * kFftLen / (2.0 * M_PI) / kSymbolLen * 1e6);
+        commonDeg_ = static_cast<float>(std::atan2(-common.imag(), -common.real()) / 4.0 * 180.0 / M_PI);
+    }
+
+    // Pass 3: corrected decisions, frequency de-interleaved. The soft value
+    // comes from the phase alone: each differential product is normalised
+    // to |re| + |im| = 1, so 48 at the ideal +-45 degrees, 96 at most.
+    // Weighting by amplitude (|d|, as before, or a full channel-state LLR)
+    // let carriers with a large amplitude but an unreliable phase outvote
+    // the rest - on a real capture of 8D in Graz (multipath notch of 10-16
+    // dB, 14 dB SNR) that lost 21 of 279 AUs of the 112 kbit/s service with
+    // 1526 RS byte corrections; phase only: 0 AUs, 18 corrections.
+    const auto& map = frequencyMap();
+    constexpr float kSoftScale = 96.f;
+    for (int l = 0; l < kDataSymbols; l++) {
+        const cf32* d = &diff_[static_cast<size_t>(l) * kCarriers];
+        for (int j = 0; j < kCarriers; j++) {
+            const cf32 v = d[j] * phaseFix_[static_cast<size_t>(j)];
+            const float a = std::fabs(v.real()) + std::fabs(v.imag());
+            work_[static_cast<size_t>(j)] = a > 0 ? v * (kSoftScale / a) : cf32(0, 0);
+        }
+        int8_t* out = soft_.data() + l * kBitsPerSymbol;
+        for (int n = 0; n < kCarriers; n++) {
+            const cf32 v = work_[static_cast<size_t>(naturalIndex(map[static_cast<size_t>(n)]))];
+            // QPSK: bit 0 -> +1. Soft convention here: > 0 means bit 1.
+            out[n] = clampSoft(-v.real());
+            out[n + kCarriers] = clampSoft(-v.imag());
+        }
     }
 
     double nullPower = 0;

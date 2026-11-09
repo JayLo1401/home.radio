@@ -135,7 +135,7 @@ void AudioPlayer::onAccessUnit(const uint8_t* data, int len, bool ok)
     if (ok && len > 0) item.data.assign(data, data + len);
     std::lock_guard<std::mutex> lock(queueMutex_);
     if (queue_.size() >= kMaxQueued) {
-        HR_LOGW("AU queue full, dropping");
+        ausDropped_++;
         return;
     }
     queue_.push_back(std::move(item));
@@ -178,15 +178,18 @@ void AudioPlayer::decodeLoop()
         } else if (item.ok && !item.data.empty()) {
             int rate = 0, channels = 0;
             if (decoder.decode(item.data.data(), static_cast<int>(item.data.size()), pcm, rate, channels)) {
+                ausDecoded_++;
                 configureRing(rate, channels);
                 pushPcm(pcm.data(), pcm.size(), false);
             } else {
+                decodeErrors_++;
                 pcm.assign(static_cast<size_t>(frameSamples) * std::max(outChannels_.load(), 1), 0);
                 pushPcm(pcm.data(), pcm.size(), true);
             }
         } else {
             // Damaged AU: keep the timeline with silence rather than feeding
             // garbage to the decoder.
+            ausDamaged_++;
             pcm.assign(static_cast<size_t>(frameSamples) * std::max(outChannels_.load(), 1), 0);
             pushPcm(pcm.data(), pcm.size(), true);
         }
@@ -247,7 +250,12 @@ void AudioPlayer::render(int16_t* out, uint32_t frames)
         if (prebuffering_ && ringFill_ >= prebufferSamples) prebuffering_ = false;
         if (!prebuffering_ && ringFill_ < want) {
             prebuffering_ = true; // underrun: rebuild the cushion
-            HR_LOGW("underrun, re-buffering");
+            underruns_++;         // logged by the output thread, not here in the device callback
+        }
+        if (!prebuffering_ && rate > 0) {
+            const int fillMs = static_cast<int>(ringFill_ * 1000 / (static_cast<size_t>(rate) * channels));
+            const int prev = minFillMs_.load();
+            if (prev < 0 || fillMs < prev) minFillMs_ = fillMs;
         }
         if (prebuffering_) {
             std::memset(out, 0, want * sizeof(int16_t));
@@ -286,6 +294,7 @@ void AudioPlayer::outputLoop()
     std::unique_ptr<Device> dev;
     int devRate = 0;
     int devChannels = 0;
+    auto lastStats = std::chrono::steady_clock::now();
     auto close = [&] {
         if (dev) ma_device_uninit(&dev->device);
         dev.reset();
@@ -327,6 +336,22 @@ void AudioPlayer::outputLoop()
             HR_LOGI("audio: %d Hz x%d, prebuffer %d ms", rate, channels, prebufferMs_);
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        const auto now = std::chrono::steady_clock::now();
+        if (now - lastStats >= std::chrono::seconds(10)) {
+            lastStats = now;
+            const int underruns = underruns_.exchange(0);
+            const int decoded = ausDecoded_.exchange(0);
+            const int damaged = ausDamaged_.exchange(0);
+            const int errors = decodeErrors_.exchange(0);
+            const int dropped = ausDropped_.exchange(0);
+            const int minFill = minFillMs_.exchange(-1);
+            // Silent for PCM-only players (FM/NB) unless something went wrong.
+            if (decoded || damaged || errors || dropped || underruns) {
+                HR_LOGI("audio stats 10s: AUs decoded %d, damaged %d, decoder errors %d, dropped %d | underruns %d, "
+                        "lowest buffer %d ms",
+                        decoded, damaged, errors, dropped, underruns, minFill);
+            }
+        }
     }
     close();
 }

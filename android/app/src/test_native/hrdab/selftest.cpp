@@ -240,7 +240,14 @@ public:
     void onServiceDetected(uint32_t sid) override { std::lock_guard<std::mutex> l(m); services.push_back(sid); }
     void onDynamicLabel(const std::string& t) override { std::lock_guard<std::mutex> l(m); dls = t; }
     void onSnr(float s) override { snr = s; }
-    void onRsErrors(bool, int) override {}
+    void onRsErrors(bool uncorrectable, int corrected) override
+    {
+        std::lock_guard<std::mutex> l(m);
+        rsUncorrectable += uncorrectable;
+        rsCorrected += corrected;
+    }
+    int rsUncorrectable = 0;
+    int rsCorrected = 0;
     void onAacErrors(int) override {}
     void onAudioFormat(const std::string& f) override { std::lock_guard<std::mutex> l(m); format = f; }
     void onAudioConfig(const std::vector<uint8_t>& a, int r, int c) override
@@ -264,17 +271,21 @@ public:
 
 class MemReader : public IqReader {
 public:
-    explicit MemReader(const std::vector<uint8_t>& d) : d_(d) {}
+    // `stop` is raised once the data is used up: OfdmDemod::run() only
+    // returns on stop, a short read alone is not an exit.
+    MemReader(const std::vector<uint8_t>& d, std::atomic<bool>& stop) : d_(d), stop_(stop) {}
     int readIq(uint8_t* dst, int bytes) override
     {
         const size_t n = std::min(static_cast<size_t>(bytes), d_.size() - pos_);
         std::memcpy(dst, d_.data() + pos_, n);
         pos_ += n;
+        if (n < static_cast<size_t>(bytes)) stop_ = true;
         return static_cast<int>(n);
     }
 
 private:
     const std::vector<uint8_t>& d_;
+    std::atomic<bool>& stop_;
     size_t pos_ = 0;
 };
 
@@ -311,8 +322,11 @@ public:
                         static_cast<double>(total) / kFrameSoftBits, perSym.c_str());
         frames_++;
         lastBer = static_cast<double>(total) / kFrameSoftBits;
+        berSum += lastBer;
     }
-    void onFrameLost() override { lost++; }
+    double meanBer() const { return frames_ ? berSum / frames_ : 1.0; }
+    double berSum = 0;
+    void onFrameLost(bool) override { lost++; }
     void onSync(bool s) override { std::printf("  sync %d\n", s); }
     void onSnr(float s) override { snr = s; }
     void onLevel(float, float) override {}
@@ -353,13 +367,13 @@ void testDemod(const char* name, TxConfig cfg)
             std::printf("  tx frame %d null power %.5f\n", f, np / 2000);
         }
     }
-    MemReader reader(iq);
+    std::atomic<bool> stop{false};
+    MemReader reader(iq, stop);
     BerSink sink(tx.frameBits);
     OfdmDemod demod(reader, sink);
-    std::atomic<bool> stop{false};
     demod.run(stop);
-    std::printf("  %d frames, %d lost, final BER %.4f, SNR %.1f dB, offset %.0f Hz\n", sink.frames_, sink.lost,
-                sink.lastBer, sink.snr, demod.frequencyOffsetHz());
+    std::printf("  %d frames, %d lost, final BER %.4f, mean BER %.4f, SNR %.1f dB, offset %.0f Hz\n", sink.frames_,
+                sink.lost, sink.lastBer, sink.meanBer(), sink.snr, demod.frequencyOffsetHz());
 }
 
 struct E2eResult {
@@ -1296,8 +1310,45 @@ void testNb()
 
 } // namespace
 
+// Plays a raw rtl_tcp capture (u8 I/Q, 2.048 MS/s) through the whole
+// receiver at full speed and counts the errors of one service:
+//   selftest file <capture.u8> <serviceId>
+int runFile(const char* path, uint32_t sid)
+{
+    std::FILE* f = std::fopen(path, "rb");
+    if (!f) {
+        std::printf("cannot open %s\n", path);
+        return 2;
+    }
+    std::vector<uint8_t> iq;
+    uint8_t buf[1 << 16];
+    size_t n;
+    while ((n = std::fread(buf, 1, sizeof(buf), f)) > 0) iq.insert(iq.end(), buf, buf + n);
+    std::fclose(f);
+    Collector col;
+    auto src = std::make_unique<MemorySource>(iq, false);
+    MemorySource* srcPtr = src.get();
+    Receiver rx(std::move(src), col);
+    rx.tune(201072000);
+    bool playing = false;
+    while (!srcPtr->finished_) {
+        if (!playing && rx.playService(sid)) playing = true;
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(800));
+    rx.halt();
+    std::lock_guard<std::mutex> l(col.m);
+    std::printf("RESULT %s sid 0x%04x: ensemble '%s', format '%s', SNR %.1f | AUs ok %zu bad %d | RS fixed %d, "
+                "uncorrectable %d\n",
+                path, sid, col.ensemble.c_str(), col.format.c_str(), col.snr, col.aus.size(), col.badAus,
+                col.rsCorrected, col.rsUncorrectable);
+    return 0;
+}
+
 int main(int argc, char** argv)
 {
+    if (argc > 3 && std::strcmp(argv[1], "file") == 0)
+        return runFile(argv[2], static_cast<uint32_t>(std::strtoul(argv[3], nullptr, 0)));
     const bool quick = argc > 1 && std::strcmp(argv[1], "quick") == 0;
     if (argc > 1 && std::strcmp(argv[1], "nb") == 0) {
         testFft();
@@ -1326,6 +1377,16 @@ int main(int argc, char** argv)
         testDemod("echo", echo);
         noisy.echoGain = 0.3;
         testDemod("noise+echo", noisy);
+        // A cheap stick without TCXO (LO and sample clock share the crystal).
+        TxConfig stick = clean;
+        stick.freqOffsetHz = 10000;
+        stick.clockPpm = 50;
+        stick.snrDb = 10;
+        stick.echoGain = 0.3;
+        testDemod("stick 50ppm", stick);
+        stick.clockPpm = 85;
+        stick.freqOffsetHz = 17000;
+        testDemod("stick 85ppm", stick);
         return 0;
     }
     if (argc > 1 && std::strcmp(argv[1], "fmsep") == 0) {
