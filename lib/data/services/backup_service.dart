@@ -58,8 +58,8 @@ class BackupService {
       'dabStations': (await _db.select(_db.dabStations).get()).map((r) => r.toJson()).toList(),
       'fmStations': (await _db.select(_db.fmStations).get()).map((r) => r.toJson()).toList(),
       'settings': (await _db.select(_db.settings).get()).map((r) => r.toJson()).toList(),
-      // Passwords from secure storage (rtl_tcp login) - backups carry all
-      // credentials, see the backup screen.
+      // Passwords from secure storage (SecretStore.keys, currently none) -
+      // backups carry all credentials, see the backup screen.
       'secrets': await SecretStore(_db).exportAll(),
     };
     final content = const JsonEncoder.withIndent('  ').convert(data);

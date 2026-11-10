@@ -39,7 +39,6 @@ add_library(hrdab SHARED
     hrdab/reed_solomon.cpp
     hrdab/rtl2832.cpp
     hrdab/rtltcp_source.cpp
-    hrdab/scram.cpp
     hrdab/superframe.cpp
     hrdab/usbfs_transport.cpp
     hrdab/viterbi.cpp

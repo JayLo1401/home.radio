@@ -1,177 +1,339 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:flutter/services.dart';
-
-/// Dart-side bridge to [RtlSdrPlugin] (Kotlin) - connects to an `rtl_tcp`
-/// server (see RtlTcpClient.kt's doc comment for the protocol/rationale)
-/// running either locally (an Android RTL-SDR driver app on this device)
-/// or remotely (e.g. a Raspberry Pi with the dongle attached), configurable
-/// via [connect]'s host/port.
+/// Test connection to an rtl_tcp server (Settings → Radio-Empfänger): connects
+/// to [connect]'s host/port - a driver app on this device, a Raspberry Pi,
+/// rtltcp.server - tunes it and counts the I/Q bytes, enough to verify the
+/// whole chain (stick -> server -> network -> this app) independently of the
+/// DAB+/FM receiver.
 ///
-/// This only covers the raw connection/tuning/byte-rate layer - enough to
-/// verify the whole chain (dongle -> driver app -> network -> this app)
-/// works before any DAB+/FM/AM demodulation is built on top of it.
+/// Pure dart:io, the same on every platform. Like the receiver
+/// (cpp/hrdab/rtltcp_source.cpp) it sends HELLO_V2 first and takes whatever
+/// the server answers (rtltcp.server docs/protocol-v2.md §2): "RTL2" = rtl_tcp
+/// Jay extended (framed, with status messages), "RTL0" = classic rtl_tcp.
 class RtlSdrService {
-  static const _methodChannel = MethodChannel('home_radio/rtlsdr');
-  static const _eventChannel = EventChannel('home_radio/rtlsdr/events');
-
   final _statsController = StreamController<RtlSdrStats>.broadcast();
-  StreamSubscription<dynamic>? _eventSub;
+  final _messageController = StreamController<RtlServerMessage>.broadcast();
+  _RtlTcpTestClient? _client;
 
   /// Live byte-rate stats while connected, roughly once per second.
   Stream<RtlSdrStats> get stats => _statsController.stream;
 
-  static final bool _desktop = Platform.isWindows || Platform.isLinux;
+  /// Status and error messages of an rtl_tcp Jay extended server while
+  /// connected (stick lost / back, kicked, ...).
+  Stream<RtlServerMessage> get messages => _messageController.stream;
 
-  // Desktop: the same test client in Dart (dart:io), see [_DesktopRtlTcp].
-  _DesktopRtlTcp? _tcp;
-
-  RtlSdrService() {
-    if (_desktop) return;
-    _eventSub = _eventChannel.receiveBroadcastStream().listen((event) {
-      final map = (event as Map).cast<String, dynamic>();
-      if (map['type'] == 'stats') {
-        _statsController.add(
-          RtlSdrStats(
-            totalBytes: map['totalBytes'] as int? ?? 0,
-            bytesPerSec: map['bytesPerSec'] as int? ?? 0,
-          ),
-        );
-      }
-    });
-  }
-
-  /// Connects to an `rtl_tcp` server. Defaults to localhost:1234 (a driver
-  /// app running on this same device); pass a different [host] to reach a
-  /// remote one (e.g. a Raspberry Pi acting as the server).
+  /// Connects to an rtl_tcp server. Defaults to localhost:1234 (a driver app
+  /// running on this same device).
   Future<RtlConnectResult> connect({String host = '127.0.0.1', int port = 1234}) async {
-    if (_desktop) {
-      await _tcp?.close();
-      final tcp = _DesktopRtlTcp(_statsController);
-      final result = await tcp.connect(host, port);
-      if (result.connected) _tcp = tcp;
-      return result;
-    }
-    final result = await _methodChannel.invokeMapMethod<String, dynamic>(
-      'rtlConnect',
-      {'host': host, 'port': port},
-    );
-    return RtlConnectResult(
-      connected: result?['connected'] as bool? ?? false,
-      tunerType: result?['tunerType'] as int?,
-      tunerGainCount: result?['tunerGainCount'] as int?,
-      error: result?['error'] as String?,
-    );
+    await _client?.close();
+    _client = null;
+    final client = _RtlTcpTestClient(_statsController, _messageController);
+    final result = await client.connect(host, port);
+    if (result.connected) _client = client;
+    return result;
   }
 
   Future<void> disconnect() async {
-    if (_desktop) {
-      await _tcp?.close();
-      _tcp = null;
-      return;
-    }
-    await _methodChannel.invokeMethod('rtlDisconnect');
+    await _client?.close();
+    _client = null;
   }
 
-  Future<void> setFrequencyHz(int hz) async =>
-      _desktop ? _tcp?.command(0x01, hz) : await _methodChannel.invokeMethod('rtlSetFrequency', {'hz': hz});
+  Future<void> setFrequencyHz(int hz) async => _client?.command(0x01, hz);
 
-  Future<void> setSampleRateHz(int hz) async =>
-      _desktop ? _tcp?.command(0x02, hz) : await _methodChannel.invokeMethod('rtlSetSampleRate', {'hz': hz});
+  Future<void> setSampleRateHz(int hz) async => _client?.command(0x02, hz);
 
-  Future<void> setGainMode({required bool auto}) async => _desktop
-      ? _tcp?.command(0x03, auto ? 0 : 1)
-      : await _methodChannel.invokeMethod('rtlSetGainMode', {'auto': auto});
+  Future<void> setGainMode({required bool auto}) async => _client?.command(0x03, auto ? 0 : 1);
 
-  Future<void> setGainTenthDb(int tenthDb) async => _desktop
-      ? _tcp?.command(0x04, tenthDb)
-      : await _methodChannel.invokeMethod('rtlSetGain', {'tenthDb': tenthDb});
+  Future<void> setGainTenthDb(int tenthDb) async => _client?.command(0x04, tenthDb);
 
-  Future<bool> isConnected() async {
-    if (_desktop) return _tcp?.connected ?? false;
-    final result = await _methodChannel.invokeMethod<bool>('rtlIsConnected');
-    return result ?? false;
-  }
+  Future<bool> isConnected() async => _client?.connected ?? false;
 
   Future<void> dispose() async {
-    await _tcp?.close();
-    await _eventSub?.cancel();
+    await _client?.close();
     await _statsController.close();
+    await _messageController.close();
   }
 }
 
-/// Desktop stand-in for RtlTcpClient.kt + RtlSdrPlugin.kt: connects, reads
-/// the 12-byte "RTL0" header, counts the I/Q bytes (stats once per second)
-/// and sends 5-byte big-endian commands.
-class _DesktopRtlTcp {
-  _DesktopRtlTcp(this._stats);
+/// The two protocols an rtl_tcp server can speak; [label] is what the UI
+/// shows (the wire names RTL0/RTL2 stay internal).
+enum RtlTcpProtocol {
+  classic('rtl_tcp'),
+  jayExtended('rtl_tcp Jay extended');
+
+  const RtlTcpProtocol(this.label);
+  final String label;
+}
+
+/// One connection: HELLO_V2, header, then either the raw v1 stream or the
+/// framed v2 stream (u8 type | u32 length | payload), parsed byte by byte as
+/// it arrives - I/Q payloads are only counted.
+class _RtlTcpTestClient {
+  _RtlTcpTestClient(this._stats, this._messages);
+
+  static const _helloV2 = [0xF2, 0x52, 0x54, 0x4C, 0x32]; // F2 "RTL2"
+  static const _frameIq = 0x01;
+  static const _frameJson = 0x02;
+  static const _frameCommand = 0x03;
+  static const _maxFrame = 16 << 20;
+  static const _maxJsonFrame = 1 << 20;
+  // A server whose stick idles opens it on connect and only then answers -
+  // up to 10 s (rtltcp.server's "v1 client waits for stick").
+  static const _handshakeTimeout = Duration(seconds: 12);
 
   final StreamController<RtlSdrStats> _stats;
+  final StreamController<RtlServerMessage> _messages;
   Socket? _socket;
   Timer? _timer;
   var _total = 0;
   var _lastTotal = 0;
 
+  RtlTcpProtocol? _protocol;
+  final _header = BytesBuilder(copy: false);
+  // v2 frame parser state.
+  final _frameHead = BytesBuilder(copy: false);
+  var _frameType = 0;
+  var _frameRemaining = 0;
+  final _json = BytesBuilder(copy: false);
+
+  // v2 handshake: server_info first, then the first status (or I/Q).
+  Map<String, dynamic>? _serverInfo;
+  Map<String, dynamic>? _tuner;
+  Completer<RtlConnectResult>? _handshake;
+
   bool get connected => _socket != null;
 
   Future<RtlConnectResult> connect(String host, int port) async {
+    final Socket socket;
     try {
-      final socket = await Socket.connect(host, port, timeout: const Duration(seconds: 5));
-      socket.setOption(SocketOption.tcpNoDelay, true);
-      final header = BytesBuilder();
-      final headerDone = Completer<List<int>>();
-      socket.listen(
-        (data) {
-          if (!headerDone.isCompleted) {
-            header.add(data);
-            if (header.length >= 12) {
-              final bytes = header.takeBytes();
-              headerDone.complete(bytes);
-              _total += bytes.length - 12;
-            }
-          } else {
-            _total += data.length;
-          }
-        },
-        onError: (Object e) {
-          if (!headerDone.isCompleted) headerDone.completeError(e);
-          close();
-        },
-        onDone: () {
-          if (!headerDone.isCompleted) headerDone.completeError('rtl_tcp connection closed while reading header');
-          close();
-        },
-        cancelOnError: true,
-      );
-      final bytes = await headerDone.future.timeout(const Duration(seconds: 5));
-      if (String.fromCharCodes(bytes.sublist(0, 4)) != 'RTL0') {
-        socket.destroy();
-        return RtlConnectResult(connected: false, error: 'Unexpected rtl_tcp header magic');
-      }
-      final info = ByteData.sublistView(Uint8List.fromList(bytes), 4, 12);
-      _socket = socket;
-      _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-        if (_stats.isClosed) return;
-        _stats.add(RtlSdrStats(totalBytes: _total, bytesPerSec: _total - _lastTotal));
-        _lastTotal = _total;
-      });
-      return RtlConnectResult(
-        connected: true,
-        tunerType: info.getUint32(0),
-        tunerGainCount: info.getUint32(4),
-      );
+      socket = await Socket.connect(host, port, timeout: const Duration(seconds: 5));
     } catch (e) {
-      return RtlConnectResult(connected: false, error: '$e');
+      return RtlConnectResult(connected: false, error: 'rtl_tcp-Server $host:$port nicht erreichbar ($e)');
+    }
+    socket.setOption(SocketOption.tcpNoDelay, true);
+    final handshake = _handshake = Completer<RtlConnectResult>();
+    // HELLO before reading anything; a classic server ignores it as an
+    // unknown command.
+    socket.add(_helloV2);
+    socket.listen(
+      _onData,
+      onError: (Object e) => _end('Verbindung zum rtl_tcp-Server unterbrochen ($e)'),
+      onDone: () => _end(_protocol == null
+          ? 'rtl_tcp-Server hat die Verbindung abgelehnt (belegt oder kein Stick bereit)'
+          : 'Verbindung zum rtl_tcp-Server beendet'),
+      cancelOnError: true,
+    );
+    _socket = socket;
+    final result = await handshake.future.timeout(
+      _handshakeTimeout,
+      onTimeout: () => const RtlConnectResult(connected: false, error: 'rtl_tcp-Server antwortet nicht'),
+    );
+    if (!result.connected) {
+      await close();
+      return result;
+    }
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (_stats.isClosed) return;
+      _stats.add(RtlSdrStats(totalBytes: _total, bytesPerSec: _total - _lastTotal));
+      _lastTotal = _total;
+    });
+    return result;
+  }
+
+  void _finishHandshake(RtlConnectResult result) {
+    final h = _handshake;
+    _handshake = null;
+    if (h != null && !h.isCompleted) h.complete(result);
+  }
+
+  // Connection gone: fails a pending handshake, otherwise tells the screen.
+  void _end(String message) {
+    if (_handshake != null) {
+      _finishHandshake(RtlConnectResult(connected: false, error: message));
+    } else if (_socket != null && !_messages.isClosed) {
+      _messages.add(RtlServerMessage(isError: true, text: message));
+    }
+    close();
+  }
+
+  void _onData(Uint8List data) {
+    var offset = 0;
+    if (_protocol == null) {
+      final need = 12 - _header.length;
+      _header.add(data.sublist(0, need.clamp(0, data.length)));
+      offset = need.clamp(0, data.length);
+      if (_header.length < 12) return;
+      final header = _header.takeBytes();
+      final magic = String.fromCharCodes(header.sublist(0, 4));
+      if (magic == 'RTL0') {
+        _protocol = RtlTcpProtocol.classic;
+        final info = ByteData.sublistView(header, 4, 12);
+        _finishHandshake(RtlConnectResult(
+          connected: true,
+          protocol: RtlTcpProtocol.classic,
+          tunerType: info.getUint32(0),
+          tunerGainCount: info.getUint32(4),
+        ));
+      } else if (magic == 'RTL2') {
+        _protocol = RtlTcpProtocol.jayExtended;
+      } else {
+        _finishHandshake(const RtlConnectResult(connected: false, error: 'Kein rtl_tcp-Server (unbekannte Begrüßung)'));
+        close();
+        return;
+      }
+    }
+    if (_protocol == RtlTcpProtocol.classic) {
+      _total += data.length - offset;
+      return;
+    }
+    while (offset < data.length && _socket != null) {
+      if (_frameHead.length < 5) {
+        final take = (5 - _frameHead.length).clamp(0, data.length - offset);
+        _frameHead.add(data.sublist(offset, offset + take));
+        offset += take;
+        if (_frameHead.length < 5) return;
+        final head = ByteData.sublistView(_frameHead.toBytes());
+        _frameType = head.getUint8(0);
+        _frameRemaining = head.getUint32(1);
+        if (_frameRemaining > _maxFrame) {
+          _end('rtl_tcp-Server: Datenstrom fehlerhaft');
+          return;
+        }
+        if (_frameRemaining == 0) _frameDone();
+        continue;
+      }
+      final take = (data.length - offset).clamp(0, _frameRemaining);
+      if (_frameType == _frameIq) {
+        _total += take;
+        // I/Q before any status: the stick is ours.
+        if (_serverInfo != null) _completeV2();
+      } else if (_frameType == _frameJson && _json.length + take <= _maxJsonFrame) {
+        _json.add(data.sublist(offset, offset + take));
+      }
+      offset += take;
+      _frameRemaining -= take;
+      if (_frameRemaining == 0) _frameDone();
     }
   }
 
+  void _frameDone() {
+    _frameHead.clear();
+    if (_frameType != _frameJson) return;
+    final Object? decoded;
+    try {
+      decoded = jsonDecode(utf8.decode(_json.takeBytes(), allowMalformed: true));
+    } catch (_) {
+      return;
+    }
+    if (decoded is Map<String, dynamic>) _onMessage(decoded);
+  }
+
+  // A non-empty string field of server_info.device (or a map inside it).
+  String? _deviceField(String key, [String? inside]) {
+    Object? map = _serverInfo?['device'];
+    if (inside != null) map = map is Map ? map[inside] : null;
+    final value = map is Map ? map[key] : null;
+    return value is String && value.trim().isNotEmpty ? value.trim() : null;
+  }
+
+  String? get _deviceName => _deviceField('name');
+
+  String get _stick => _deviceName == null ? 'USB-Stick am rtl_tcp-Server' : '„$_deviceName“';
+
+  void _onMessage(Map<String, dynamic> msg) {
+    switch (msg['type']) {
+      case 'server_info':
+        if (msg['auth'] == 'required') {
+          _end('rtl_tcp-Server verlangt eine Anmeldung, das wird nicht mehr unterstützt. '
+              'Bitte den rtltcp.server im lokalen Netz verwenden.');
+          return;
+        }
+        _serverInfo = msg;
+      case 'status':
+        final tuner = msg['tuner'];
+        if (tuner is Map<String, dynamic>) _tuner = tuner;
+        final state = msg['state'];
+        final ready = state == 'ready' || state == 'device_restored';
+        final text = switch (state) {
+          'ready' || 'device_restored' => '$_stick bereit',
+          'starting' => '$_stick startet …',
+          'device_not_ready' => '$_stick nicht bereit',
+          'device_lost' => '$_stick getrennt – der Server verbindet neu …',
+          _ => null,
+        };
+        if (_serverInfo != null) _completeV2();
+        if (text != null && !_messages.isClosed) {
+          _messages.add(RtlServerMessage(isError: !ready, text: text));
+        }
+      case 'error':
+        final text = _errorText(msg);
+        if (msg['fatal'] != false) {
+          _end(text);
+        } else if (!_messages.isClosed) {
+          _messages.add(RtlServerMessage(isError: true, text: text));
+        }
+      case 'ping':
+        _send(_frameJson, utf8.encode(jsonEncode({'type': 'pong', 'id': msg['id'] ?? 0})));
+    }
+  }
+
+  String _errorText(Map<String, dynamic> msg) {
+    final code = msg['code'];
+    final message = msg['message'] is String ? msg['message'] as String : '';
+    final client = msg['client'] is String ? msg['client'] as String : '';
+    final who = _deviceName == null ? 'rtl_tcp-Server' : '„$_deviceName“';
+    return switch (code) {
+      'BUSY' => client.isEmpty
+          ? '$who wird bereits von einem anderen Gerät verwendet'
+          : '$who wird bereits von $client verwendet',
+      'AUTH_REQUIRED' || 'AUTH_FAILED' => 'rtl_tcp-Server verlangt eine Anmeldung, das wird nicht mehr unterstützt. '
+          'Bitte den rtltcp.server im lokalen Netz verwenden.',
+      'KICKED' => 'Vom rtl_tcp-Server getrennt',
+      'PROTOCOL_ERROR' => 'rtl_tcp-Server meldet einen Protokollfehler${message.isEmpty ? '' : ': $message'}',
+      _ => 'rtl_tcp-Server: ${message.isEmpty ? '$code' : message}',
+    };
+  }
+
+  void _completeV2() {
+    if (_handshake == null) return;
+    final gains = _tuner?['gains'];
+    final tunerType = _tuner?['type'];
+    _finishHandshake(RtlConnectResult(
+      connected: true,
+      protocol: RtlTcpProtocol.jayExtended,
+      tunerType: tunerType is int ? tunerType : null,
+      tunerGainCount: gains is List ? gains.length : null,
+      deviceName: _deviceName,
+      // Draft format, see rtltcp.server docs/protocol-v2.md; a remote
+      // stick's site stands in for a missing location.
+      location: _deviceField('location') ?? _deviceField('site', 'remote'),
+      antenna: _deviceField('antenna'),
+      server: [_serverInfo?['server'], _serverInfo?['version']].whereType<String>().join(' '),
+    ));
+  }
+
+  void _send(int type, List<int> payload) {
+    final frame = ByteData(5 + payload.length)
+      ..setUint8(0, type)
+      ..setUint32(1, payload.length);
+    final bytes = frame.buffer.asUint8List()..setRange(5, 5 + payload.length, payload);
+    _socket?.add(bytes);
+  }
+
   void command(int cmd, int param) {
-    final buf = ByteData(5)
-      ..setUint8(0, cmd)
-      ..setUint32(1, param & 0xFFFFFFFF);
-    _socket?.add(buf.buffer.asUint8List());
+    final buf = (ByteData(5)
+          ..setUint8(0, cmd)
+          ..setUint32(1, param & 0xFFFFFFFF))
+        .buffer
+        .asUint8List();
+    if (_protocol == RtlTcpProtocol.jayExtended) {
+      _send(_frameCommand, buf);
+    } else {
+      _socket?.add(buf);
+    }
   }
 
   Future<void> close() async {
@@ -186,15 +348,41 @@ class _DesktopRtlTcp {
 class RtlConnectResult {
   const RtlConnectResult({
     required this.connected,
+    this.protocol,
     this.tunerType,
     this.tunerGainCount,
+    this.deviceName,
+    this.location,
+    this.antenna,
+    this.server,
     this.error,
   });
 
   final bool connected;
+
+  /// What the server answered to HELLO_V2.
+  final RtlTcpProtocol? protocol;
   final int? tunerType;
   final int? tunerGainCount;
+
+  /// rtl_tcp Jay extended only: the stick's display name (server_info).
+  final String? deviceName;
+
+  /// rtl_tcp Jay extended only, when the server has them: the stick's
+  /// location name and antenna type.
+  final String? location;
+  final String? antenna;
+
+  /// rtl_tcp Jay extended only: e.g. "rtltcp.server 1.5.0".
+  final String? server;
   final String? error;
+}
+
+class RtlServerMessage {
+  const RtlServerMessage({required this.isError, required this.text});
+
+  final bool isError;
+  final String text;
 }
 
 class RtlSdrStats {

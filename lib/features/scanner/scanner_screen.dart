@@ -464,7 +464,8 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
                       ),
                     ),
                   // The receiver's source has a problem (rtl_tcp gone, with
-                  // rtltcp_v2 e.g. the server's stick not ready, server busy).
+                  // rtl_tcp Jay extended e.g. the server's stick not ready,
+                  // server busy).
                   if (_sourceWarning case final warning?)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 12),

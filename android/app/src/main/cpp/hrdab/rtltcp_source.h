@@ -12,30 +12,22 @@ namespace hrdab {
 
 class Json;
 
-// Protocol settings of one rtl_tcp server (chosen by hand in the app, no
-// auto-detection). v1 = classic rtl_tcp, exactly the old behaviour.
-struct RtlTcpOptions {
-    bool v2 = false;   // rtltcp_v2: HELLO, framed stream, status/error messages
-    bool auth = false; // log in (SCRAM-SHA-256) when the server requires it
-    std::string user;
-    std::string password;
-};
-
 // Client for the rtl_tcp network protocol (12-byte "RTL0" greeting, then
 // raw 8-bit I/Q; 5-byte big-endian commands upstream). Reconnects on its own
 // and re-applies frequency and gain after every reconnect.
 //
-// With RtlTcpOptions::v2 it speaks rtltcp_v2 (rtltcp.server,
-// docs/protocol-v2.md): everything after the "RTL2" header is framed
-// (u8 type | u32 length | payload) - I/Q payloads go to the ring as before,
-// JSON frames become onStatus messages. While the server reports the stick
-// as not ready / lost the connection is kept (the server says when it's
-// back); after a fatal error (busy, login, kicked) it does not reconnect
-// until the next start(). A plain rtl_tcp server answers HELLO with "RTL0"
-// and the session continues as v1.
+// Every connection starts with HELLO_V2; the server's answer decides the
+// protocol (rtltcp.server docs/protocol-v2.md §2):
+// - "RTL2": rtl_tcp Jay extended (wire name rtltcp_v2) - everything after
+//   the header is framed (u8 type | u32 length | payload), I/Q payloads go
+//   to the ring as before, JSON frames become onStatus messages. While the
+//   server reports the stick as not ready / lost the connection is kept (the
+//   server says when it's back); after a fatal error (busy, kicked) it does
+//   not reconnect until the next start().
+// - "RTL0": classic rtl_tcp, which ignores HELLO as an unknown command.
 class RtlTcpSource : public SampleSource {
 public:
-    RtlTcpSource(std::string host, int port, RtlTcpOptions options = {});
+    RtlTcpSource(std::string host, int port);
     ~RtlTcpSource() override;
 
     bool start(ByteRing& ring) override;
@@ -68,10 +60,12 @@ private:
     // Shows a fatal error and remembers it (no reconnect).
     void fail(const std::string& message);
     void status(bool isError, const std::string& message);
+    // "„Standort1 Stick 1“" from server_info, else the generic stick wording.
+    std::string stickLabel() const;
 
     std::string host_;
     int port_;
-    RtlTcpOptions options_;
+    std::string deviceName_; // server_info.device.name of the current v2 session
     std::thread thread_;
     std::atomic<bool> running_{false};
     std::atomic<bool> fatal_{false};

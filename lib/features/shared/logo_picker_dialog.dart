@@ -21,7 +21,6 @@ Future<bool> connectDecoder(WidgetRef ref) async {
       : await dab.setServer(
           host: await settings.getRtlSdrHost(),
           port: await settings.getRtlSdrPort(),
-          auth: await settings.getRtlTcpAuth(),
         );
 }
 

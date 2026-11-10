@@ -130,7 +130,6 @@ add_library(hrdab SHARED
   "${HRDAB_SRC}/reed_solomon.cpp"
   "${HRDAB_SRC}/rtl2832.cpp"
   "${HRDAB_SRC}/rtltcp_source.cpp"
-  "${HRDAB_SRC}/scram.cpp"
   "${HRDAB_SRC}/superframe.cpp"
   "${HRDAB_SRC}/viterbi.cpp"
   audio_player.cpp

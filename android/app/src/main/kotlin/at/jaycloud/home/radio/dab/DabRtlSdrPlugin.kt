@@ -96,10 +96,6 @@ class DabRtlSdrPlugin :
     private var created = false
     private var lastHost = "127.0.0.1"
     private var lastPort = 1234
-    private var lastV2 = false
-    private var lastAuth = false
-    private var lastUser: String? = null
-    private var lastPassword: String? = null
     private var sessionEndpoint: String? = null // "host:port" of a live TCP session
 
     private val engineEvents = object : IntegratedDabEngine.Events {
@@ -395,14 +391,13 @@ class DabRtlSdrPlugin :
 
     private fun ensureCreated(): Boolean {
         if (created) return true
-        created = engine.createTcp(lastHost, lastPort, lastV2, lastAuth, lastUser, lastPassword)
+        created = engine.createTcp(lastHost, lastPort)
         sessionEndpoint = if (created) endpointKey() else null
         return created
     }
 
-    // Host, port and protocol/login settings: a change needs a new session.
-    private fun endpointKey() =
-        "$lastHost:$lastPort|v2=$lastV2|auth=$lastAuth|${lastUser.orEmpty()}|${lastPassword.hashCode()}"
+    // Host and port: a change needs a new session.
+    private fun endpointKey() = "$lastHost:$lastPort"
 
     /**
      * USB counterpart to "setServer": asks for the USB permission if needed,
@@ -1181,10 +1176,6 @@ class DabRtlSdrPlugin :
                 val port = call.argument<Int>("port") ?: 1234
                 lastHost = host
                 lastPort = port
-                lastV2 = call.argument<Boolean>("v2") ?: false
-                lastAuth = call.argument<Boolean>("auth") ?: false
-                lastUser = call.argument<String>("user")
-                lastPassword = call.argument<String>("password")
                 // The rtl_tcp endpoint (or the USB stick) is bound when the
                 // session is created, so a different source needs a new one.
                 if (created && sessionEndpoint != endpointKey()) {

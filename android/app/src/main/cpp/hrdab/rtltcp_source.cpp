@@ -31,7 +31,6 @@
 #include "common.h"
 #include "json.h"
 #include "r82xx.h"
-#include "scram.h"
 
 namespace hrdab {
 
@@ -43,7 +42,7 @@ constexpr uint8_t kCmdGainMode = 0x03;
 constexpr uint8_t kCmdGain = 0x04;
 constexpr uint8_t kCmdAgcMode = 0x08;
 
-// rtltcp_v2 (rtltcp.server docs/protocol-v2.md).
+// rtl_tcp Jay extended, wire name rtltcp_v2 (rtltcp.server docs/protocol-v2.md).
 constexpr uint8_t kHelloV2[5] = {0xF2, 'R', 'T', 'L', '2'};
 constexpr uint8_t kFrameIq = 0x01;
 constexpr uint8_t kFrameJson = 0x02;
@@ -162,8 +161,7 @@ long recvSock(intptr_t s, uint8_t* data, size_t len)
 
 } // namespace
 
-RtlTcpSource::RtlTcpSource(std::string host, int port, RtlTcpOptions options)
-    : host_(std::move(host)), port_(port), options_(std::move(options))
+RtlTcpSource::RtlTcpSource(std::string host, int port) : host_(std::move(host)), port_(port)
 {
     netInit();
 }
@@ -256,6 +254,11 @@ void RtlTcpSource::fail(const std::string& message)
     status(true, message);
 }
 
+std::string RtlTcpSource::stickLabel() const
+{
+    return deviceName_.empty() ? "USB-Stick am rtl_tcp-Server" : "\xE2\x80\x9E" + deviceName_ + "\xE2\x80\x9C";
+}
+
 namespace {
 
 // Reads exactly len bytes during the handshake (2 s socket timeout).
@@ -291,18 +294,25 @@ uint32_t be32(const uint8_t* p)
     return (uint32_t(p[0]) << 24) | (uint32_t(p[1]) << 16) | (uint32_t(p[2]) << 8) | uint32_t(p[3]);
 }
 
-// The user-facing text of a v2 error message.
-std::string errorText(const Json& msg)
+// Login is gone from the protocol (rtltcp.server and rtl.over.internet do
+// that now); an old server that still asks gets this answer.
+const char* const kAuthUnsupported =
+    "rtl_tcp-Server verlangt eine Anmeldung, das wird nicht mehr unterstützt. "
+    "Bitte den rtltcp.server im lokalen Netz verwenden.";
+
+// The user-facing text of a v2 error message; [deviceName] from server_info
+// (may be empty).
+std::string errorText(const Json& msg, const std::string& deviceName)
 {
     const std::string code = msg.stringOr("code", "");
     const std::string message = msg.stringOr("message", "");
     if (code == "BUSY") {
+        const std::string who = deviceName.empty() ? "rtl_tcp-Server" : "\xE2\x80\x9E" + deviceName + "\xE2\x80\x9C";
         const std::string client = msg.stringOr("client", "");
-        return client.empty() ? "rtl_tcp-Server wird bereits von einem anderen Gerät verwendet"
-                              : "rtl_tcp-Server wird bereits von " + client + " verwendet";
+        return client.empty() ? who + " wird bereits von einem anderen Gerät verwendet"
+                              : who + " wird bereits von " + client + " verwendet";
     }
-    if (code == "AUTH_REQUIRED") return "rtl_tcp-Server verlangt eine Anmeldung (Einstellungen → Empfänger)";
-    if (code == "AUTH_FAILED") return "Anmeldung am rtl_tcp-Server fehlgeschlagen";
+    if (code == "AUTH_REQUIRED" || code == "AUTH_FAILED") return kAuthUnsupported;
     if (code == "KICKED") return "Vom rtl_tcp-Server getrennt";
     if (code == "PROTOCOL_ERROR") return "rtl_tcp-Server meldet einen Protokollfehler" + (message.empty() ? "" : ": " + message);
     return "rtl_tcp-Server: " + (message.empty() ? code : message);
@@ -323,63 +333,39 @@ bool RtlTcpSource::readFrame(intptr_t s, uint8_t& type, std::string& payload)
     return len == 0 || readExact(s, reinterpret_cast<uint8_t*>(&payload[0]), len);
 }
 
-// After "RTL2": server_info, then the login if the server wants one, then
-// the first status (or I/Q) - only then is the stick ours. A busy server
-// sends BUSY right after the login and closes; commands sent before that
-// would make the connection reset and lose the message.
+// After "RTL2": server_info, then the first status (or I/Q) - only then is
+// the stick ours. A busy server sends BUSY right after server_info and
+// closes; commands sent before that would make the connection reset and
+// lose the message.
 RtlTcpSource::Connect RtlTcpSource::handshakeV2(intptr_t s)
 {
-    std::unique_ptr<scram::Client> login;
-    bool authorized = false;
+    bool gotInfo = false;
     for (;;) {
         uint8_t type;
         std::string payload;
         if (!readFrame(s, type, payload)) return Connect::Failed;
-        if (type == kFrameIq && authorized) return Connect::Ok;
+        if (type == kFrameIq && gotInfo) return Connect::Ok;
         if (type != kFrameJson) continue;
         const Json msg = Json::parse(payload);
         const std::string kind = msg.stringOr("type", "");
         if (kind == "error") {
             if (msg.boolOr("fatal", true)) {
-                fail(errorText(msg));
+                fail(errorText(msg, deviceName_));
                 return Connect::Fatal;
             }
-            HR_LOGW("rtl_tcp: %s", errorText(msg).c_str());
+            HR_LOGW("rtl_tcp: %s", errorText(msg, deviceName_).c_str());
         } else if (kind == "server_info") {
-            if (msg.stringOr("auth", "none") != "required") {
-                authorized = true;
-                continue;
-            }
-            if (!options_.auth || options_.user.empty()) {
-                fail("rtl_tcp-Server verlangt eine Anmeldung (Einstellungen → Empfänger)");
+            if (msg.stringOr("auth", "none") == "required") {
+                fail(kAuthUnsupported);
                 return Connect::Fatal;
             }
-            login = std::make_unique<scram::Client>(options_.user, options_.password);
-            JsonWriter w;
-            w.beginObject().str("type", "auth_start").str("user", login->user()).str("cnonce", login->cnonce()).endObject();
-            if (!sendJson(w.text())) return Connect::Failed;
-        } else if (kind == "auth_challenge" && login) {
-            // PBKDF2 (100 000 rounds) runs here on the source thread, not
-            // the UI thread.
-            const std::string proof = login->proof(msg.stringOr("nonce", ""), msg.stringOr("salt", ""),
-                                                   msg.intOr("iterations", 0));
-            if (proof.empty()) {
-                fail("Anmeldung am rtl_tcp-Server fehlgeschlagen (ungültige Antwort des Servers)");
-                return Connect::Fatal;
-            }
-            JsonWriter w;
-            w.beginObject().str("type", "auth_proof").str("proof", proof).endObject();
-            if (!sendJson(w.text())) return Connect::Failed;
-        } else if (kind == "auth_ok" && login) {
-            if (!login->verifyServer(msg.stringOr("signature", ""))) {
-                fail("Anmeldung am rtl_tcp-Server fehlgeschlagen (Server konnte sich nicht ausweisen)");
-                return Connect::Fatal;
-            }
-            HR_LOGI("rtl_tcp: logged in as %s", options_.user.c_str());
-            authorized = true;
+            deviceName_ = msg["device"].stringOr("name", "");
+            HR_LOGI("rtl_tcp: rtl_tcp Jay extended, %s %s, stick \"%s\"", msg.stringOr("server", "?").c_str(),
+                    msg.stringOr("version", "?").c_str(), deviceName_.c_str());
+            gotInfo = true;
         } else if (kind == "status") {
             handleMessage(msg);
-            if (authorized) return Connect::Ok;
+            if (gotInfo) return Connect::Ok;
         }
     }
 }
@@ -387,6 +373,7 @@ RtlTcpSource::Connect RtlTcpSource::handshakeV2(intptr_t s)
 RtlTcpSource::Connect RtlTcpSource::connectOnce()
 {
     framed_ = false;
+    deviceName_.clear();
     addrinfo hints{};
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
@@ -417,20 +404,19 @@ RtlTcpSource::Connect RtlTcpSource::connectOnce()
         sock_ = s;
     }
 
-    // v2: HELLO before reading anything; a classic server takes it as an
+    // HELLO before reading anything; a classic server takes it as an
     // unknown command and ignores it.
-    if (options_.v2 && sendSock(s, kHelloV2, sizeof(kHelloV2)) != static_cast<long>(sizeof(kHelloV2))) {
+    if (sendSock(s, kHelloV2, sizeof(kHelloV2)) != static_cast<long>(sizeof(kHelloV2))) {
         closeSocket();
         return Connect::Failed;
     }
     uint8_t greeting[12];
     if (!readExact(s, greeting, sizeof(greeting))) {
         closeSocket();
-        // v2: closed without a word = the server refused (busy, login
-        // required for v1, no stick); v1 just retries as always.
-        return options_.v2 ? Connect::Refused : Connect::Failed;
+        // Closed without a word = the server refused (busy, no stick).
+        return Connect::Refused;
     }
-    if (std::memcmp(greeting, "RTL2", 4) == 0 && options_.v2) {
+    if (std::memcmp(greeting, "RTL2", 4) == 0) {
         framed_ = true;
         const Connect c = handshakeV2(s);
         if (c != Connect::Ok) {
@@ -439,7 +425,7 @@ RtlTcpSource::Connect RtlTcpSource::connectOnce()
             return c;
         }
     } else if (std::memcmp(greeting, "RTL0", 4) == 0) {
-        if (options_.v2) HR_LOGW("rtl_tcp: server does not speak rtltcp_v2 - continuing as v1");
+        HR_LOGI("rtl_tcp: classic rtl_tcp server");
     } else {
         closeSocket();
         return Connect::Failed;
@@ -463,26 +449,26 @@ bool RtlTcpSource::handleMessage(const Json& msg)
         if (state == "ready" || state == "device_restored") {
             // Only worth saying when something was wrong before.
             if (lastStatus_.empty()) return true;
-            text = "USB-Stick am rtl_tcp-Server bereit";
+            text = stickLabel() + " bereit";
         } else if (state == "starting") {
-            text = "Empfänger am rtl_tcp-Server startet …";
+            text = deviceName_.empty() ? "Empfänger am rtl_tcp-Server startet …" : stickLabel() + " startet …";
             isError = true;
         } else if (state == "device_not_ready") {
-            text = "USB-Stick am rtl_tcp-Server nicht bereit";
+            text = stickLabel() + " nicht bereit";
             isError = true;
         } else if (state == "device_lost") {
-            text = "USB-Stick am rtl_tcp-Server getrennt – verbinde neu …";
+            text = stickLabel() + " getrennt – verbinde neu …";
             isError = true;
         } else {
             return true;
         }
     } else if (kind == "error") {
         if (msg.boolOr("fatal", false)) {
-            fail(errorText(msg));
+            fail(errorText(msg, deviceName_));
             return false;
         }
         // INVALID_COMMAND etc.: the session goes on.
-        HR_LOGW("rtl_tcp: %s", errorText(msg).c_str());
+        HR_LOGW("rtl_tcp: %s", errorText(msg, deviceName_).c_str());
         return true;
     } else if (kind == "ping") {
         JsonWriter w;

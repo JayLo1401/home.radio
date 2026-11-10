@@ -32,8 +32,14 @@ Sender).
 - Empfang über einen **RTL-SDR-USB-Stick** (RTL2832U-basiert, getestet mit einem
   Nooelec-Stick), wahlweise:
   - **direkt per USB** am TV-Gerät angeschlossen, oder
-  - über **rtl_tcp** von einer entfernten Quelle (z. B. einem Raspberry Pi mit
-    angeschlossenem Stick im selben Netzwerk) - Host/Port einstellbar.
+  - über **rtl_tcp** von einer Quelle im lokalen Netz (z. B. einem Raspberry Pi
+    mit angeschlossenem Stick oder einem
+    [rtltcp.server](https://github.com/JayLo1401/rtltcp.server)) - Host/Port
+    einstellbar. Das Protokoll wird automatisch erkannt: klassisches
+    **rtl_tcp** oder **rtl_tcp Jay extended** (rtltcp.server), das zusätzlich
+    den Namen des Sticks und Meldungen wie „Stick nicht bereit“ oder „belegt
+    durch …“ liefert. Sticks an anderen Standorten stellt der rtltcp.server über
+    rtl.over.internet lokal bereit; home.radio selbst braucht keine Anmeldung.
 - Vollständiger nativer OFDM-Demodulator/DAB+-Decoder (Tuning, FIC/MSC-Decoding,
   Reed-Solomon-Fehlerkorrektur, AAC-Decodierung) - kein Rückgriff auf eine externe
   DAB-App.
@@ -141,8 +147,9 @@ Sender).
 ### Einstellungen
 - DAB+-Empfänger: kein Empfänger (nur Internetradio - DAB+-Suche und der Reiter
   „DAB-Sender“ werden ausgeblendet), RTL-SDR-Stick per USB oder über das Netzwerk
-  (rtl_tcp-Server, Host/Port, Geräteliste/Berechtigungen, Verbindungstest,
-  Auto-Gain).
+  (mehrere rtl_tcp-Server, einer davon als Standard; „Testen“ zeigt bei rtl_tcp
+  Jay extended Stick-Name, Standort und Antenne; Geräteliste/Berechtigungen für
+  USB).
 - Kacheleinstellungen (siehe oben), Standort, UI-Skalierung, Uhrzeit-Datum-Anzeige.
 - Backup & Wiederherstellung.
 

@@ -1,22 +1,41 @@
+import 'dart:convert';
+
 import '../db/database.dart';
 import '../services/secret_store.dart';
 
-/// Protocol and login settings of the rtl_tcp server (see
-/// SettingsRepository.getRtlTcpAuth).
-class RtlTcpAuth {
-  final bool v2;
-  final bool login; // only meaningful with v2
-  final String user;
-  final String password;
+/// One configured rtl_tcp server (Settings → Radio-Empfänger).
+class RtlTcpServer {
+  const RtlTcpServer({required this.host, required this.port});
 
-  const RtlTcpAuth({this.v2 = false, this.login = false, this.user = '', this.password = ''});
+  final String host;
+  final int port;
 
-  RtlTcpAuth copyWith({bool? v2, bool? login, String? user, String? password}) => RtlTcpAuth(
-        v2: v2 ?? this.v2,
-        login: login ?? this.login,
-        user: user ?? this.user,
-        password: password ?? this.password,
-      );
+  Map<String, dynamic> toJson() => {'host': host, 'port': port};
+
+  static RtlTcpServer? fromJson(Object? json) {
+    if (json is! Map) return null;
+    final host = json['host'];
+    final port = json['port'];
+    if (host is! String || host.trim().isEmpty || port is! int) return null;
+    return RtlTcpServer(host: host.trim(), port: port);
+  }
+
+  @override
+  bool operator ==(Object other) => other is RtlTcpServer && other.host == host && other.port == port;
+
+  @override
+  int get hashCode => Object.hash(host, port);
+}
+
+/// All configured rtl_tcp servers; the receiver (DAB+/FM) uses
+/// [defaultServer].
+class RtlTcpServers {
+  const RtlTcpServers(this.servers, this.defaultIndex);
+
+  final List<RtlTcpServer> servers;
+  final int defaultIndex;
+
+  RtlTcpServer get defaultServer => servers[defaultIndex];
 }
 
 enum AutostartMode { lastStation, fixedStation }
@@ -102,11 +121,8 @@ class SettingsRepository {
   static const _keyFtpDir = 'ftp_dir';
   static const _keyRtlSdrHost = 'rtl_sdr_host';
   static const _keyRtlSdrPort = 'rtl_sdr_port';
+  static const _keyRtlTcpServers = 'rtl_tcp_servers'; // JSON [{host, port}], see getRtlTcpServers
   static const _keyRtlSdrMode = 'rtl_sdr_mode'; // 'own' | 'external'
-  static const _keyRtlTcpProtocol = 'rtl_tcp_protocol'; // 'v1' | 'v2'
-  static const _keyRtlTcpLogin = 'rtl_tcp_login';
-  static const _keyRtlTcpUser = 'rtl_tcp_user';
-  static const _secretRtlTcpPassword = 'rtl_tcp_password'; // SecretStore, not the settings table
   static const _keyDabSortMode = 'dab_sort_mode'; // 'grouped' | 'ensemble' | 'alphabet'
   static const _keyShowClockDate = 'show_clock_date';
   static const _keyCbEnabled = 'cb_enabled';
@@ -348,26 +364,43 @@ class SettingsRepository {
   Future<int> getRtlSdrPort() async =>
       int.tryParse(await _db.getSetting(_keyRtlSdrPort) ?? '') ?? defaultRtlSdrPort;
 
-  Future<void> setRtlSdrServer(String host, int port) async {
-    await _db.setSetting(_keyRtlSdrHost, host);
-    await _db.setSetting(_keyRtlSdrPort, '$port');
+  /// Every configured rtl_tcp server. rtl_sdr_host/rtl_sdr_port keep holding
+  /// the default one (what the receiver connects to); the list adds the
+  /// others. Before the list existed there was only that one server.
+  Future<RtlTcpServers> getRtlTcpServers() async {
+    final current = RtlTcpServer(host: await getRtlSdrHost(), port: await getRtlSdrPort());
+    var servers = <RtlTcpServer>[];
+    try {
+      final decoded = jsonDecode(await _db.getSetting(_keyRtlTcpServers) ?? '[]');
+      if (decoded is List) servers = decoded.map(RtlTcpServer.fromJson).whereType<RtlTcpServer>().toList();
+    } catch (_) {}
+    var index = servers.indexOf(current);
+    if (index < 0) {
+      servers.insert(0, current);
+      index = 0;
+    }
+    return RtlTcpServers(servers, index);
   }
 
-  /// Protocol and login of the rtl_tcp server - set by hand, no
-  /// auto-detection: v1 = classic rtl_tcp (the old behaviour), v2 =
-  /// rtltcp_v2 (rtltcp.server: status messages, optional login).
-  Future<RtlTcpAuth> getRtlTcpAuth() async => RtlTcpAuth(
-        v2: (await _db.getSetting(_keyRtlTcpProtocol)) == 'v2',
-        login: (await _db.getSetting(_keyRtlTcpLogin)) == 'true',
-        user: (await _db.getSetting(_keyRtlTcpUser)) ?? '',
-        password: await _secrets.read(_secretRtlTcpPassword) ?? '',
-      );
+  Future<void> setRtlTcpServers(RtlTcpServers value) async {
+    await _db.setSetting(_keyRtlTcpServers, jsonEncode([for (final s in value.servers) s.toJson()]));
+    await _db.setSetting(_keyRtlSdrHost, value.defaultServer.host);
+    await _db.setSetting(_keyRtlSdrPort, '${value.defaultServer.port}');
+  }
 
-  Future<void> setRtlTcpAuth(RtlTcpAuth auth) async {
-    await _db.setSetting(_keyRtlTcpProtocol, auth.v2 ? 'v2' : 'v1');
-    await _db.setSetting(_keyRtlTcpLogin, '${auth.login}');
-    await _db.setSetting(_keyRtlTcpUser, auth.user);
-    await _secrets.write(_secretRtlTcpPassword, auth.password);
+  /// Removes what earlier versions stored for the rtl_tcp server: the
+  /// protocol choice (now negotiated on every connect) and the login
+  /// (rtltcp.server and rtl.over.internet do that now, home.radio only
+  /// connects inside the local network). Runs on every start - it only
+  /// costs a delete when nothing is left, and also cleans up settings that
+  /// come back with an old backup.
+  Future<void> removeRtlTcpLogin() async {
+    await _db.deleteSettings(const [
+      'rtl_tcp_protocol',
+      'rtl_tcp_login',
+      'rtl_tcp_user',
+    ]);
+    await _secrets.delete('rtl_tcp_password');
   }
 
   /// How DAB+ reaches its receiver (see [ReceiverMode]). Unset counts as

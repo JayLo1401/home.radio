@@ -18,8 +18,9 @@ class SecretStore {
   static const _storage = FlutterSecureStorage();
   static const _fallbackPrefix = 'secret_fallback.';
 
-  /// Every secret the app keeps (for backups).
-  static const keys = ['rtl_tcp_password'];
+  /// Every secret the app keeps (for backups). Empty since the rtl_tcp login
+  /// is gone; older backups may still carry 'rtl_tcp_password' - ignored.
+  static const keys = <String>[];
 
   Future<String?> read(String key) async {
     try {
@@ -46,6 +47,16 @@ class SecretStore {
       debugPrint('SecretStore: secure storage unavailable, using the settings table ($e)');
       await _db.setSetting('$_fallbackPrefix$key', value);
     }
+  }
+
+  /// Removes [key] from secure storage and the settings-table fallback.
+  Future<void> delete(String key) async {
+    try {
+      await _storage.delete(key: key);
+    } catch (e) {
+      debugPrint('SecretStore: secure storage unavailable ($e)');
+    }
+    await _db.deleteSettings(['$_fallbackPrefix$key']);
   }
 
   Future<Map<String, String>> exportAll() async => {

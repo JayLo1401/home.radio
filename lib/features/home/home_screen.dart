@@ -215,9 +215,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         // events that explain why that retry is failing - _playDab() below
         // prefers this message over its own generic "Kein Empfang"/
         // "Quelle nicht erreichbar" text once it's set.
-        // The message says what's wrong - with rtltcp_v2 e.g. "USB-Stick am
-        // rtl_tcp-Server nicht bereit", "… wird bereits von 192.168.1.20
-        // verwendet", "Anmeldung … fehlgeschlagen".
+        // The message says what's wrong - with rtl_tcp Jay extended e.g.
+        // "„Standort1 Stick 1“ nicht bereit", "… wird bereits von
+        // 192.168.1.20 verwendet".
         final isError = event['isError'] as bool? ?? false;
         final message = (event['message'] as String?)?.trim() ?? '';
         setState(() {
@@ -325,7 +325,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         : await dab.setServer(
             host: await settings.getRtlSdrHost(),
             port: await settings.getRtlSdrPort(),
-            auth: await settings.getRtlTcpAuth(),
           );
     if (mounted) setState(() => _dabServerReady = ok);
   }

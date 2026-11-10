@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:audio_service/audio_service.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/db/database.dart';
@@ -201,7 +202,10 @@ final sortedDabStationsProvider = Provider<AsyncValue<List<DabStation>>>((ref) {
 });
 
 final settingsRepositoryProvider = Provider<SettingsRepository>((ref) {
-  return SettingsRepository(ref.watch(databaseProvider));
+  final repo = SettingsRepository(ref.watch(databaseProvider));
+  // Leftovers of the rtl_tcp login from earlier versions.
+  repo.removeRtlTcpLogin().catchError((Object e) => debugPrint('removeRtlTcpLogin: $e'));
+  return repo;
 });
 
 final backupServiceProvider = Provider<BackupService>((ref) {

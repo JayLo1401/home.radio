@@ -5,14 +5,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/popup_text_field.dart';
 import '../../core/providers.dart';
-import '../../data/repositories/settings_repository.dart' show ReceiverMode, RtlTcpAuth;
+import '../../data/repositories/settings_repository.dart' show ReceiverMode, RtlTcpServer, RtlTcpServers;
 import '../../data/services/rtl_sdr_service.dart';
 import '../../data/services/rtl_sdr_usb_service.dart';
 
-/// "Radio-Empfänger": whether and how DAB+ and FM reach the RTL-SDR receiver (see
-/// [ReceiverMode]) - "Kein Empfänger" for internet radio only - and a test
-/// connection that verifies the rtl_tcp chain independently of DAB+
-/// decoding itself.
+/// "Radio-Empfänger": whether and how DAB+ and FM reach the RTL-SDR receiver
+/// (see [ReceiverMode]) - "Kein Empfänger" for internet radio only.
+///
+/// rtl_tcp: any number of servers, one row each (host, port, "Testen", and
+/// what the test found: location and antenna of the stick with rtl_tcp Jay
+/// extended). The radio button marks the default server - the one the
+/// receiver uses.
 class RtlSdrTestScreen extends ConsumerStatefulWidget {
   const RtlSdrTestScreen({super.key});
 
@@ -20,18 +23,33 @@ class RtlSdrTestScreen extends ConsumerStatefulWidget {
   ConsumerState<RtlSdrTestScreen> createState() => _RtlSdrTestScreenState();
 }
 
-class _RtlSdrTestScreenState extends ConsumerState<RtlSdrTestScreen> {
-  final _hostController = TextEditingController(text: '127.0.0.1');
-  final _portController = TextEditingController(text: '1234');
-  final _freqController = TextEditingController(text: '100000000');
-  final _userController = TextEditingController();
-  final _passwordController = TextEditingController();
-  RtlTcpAuth _auth = const RtlTcpAuth();
+/// One server row: its text fields and the last test result.
+class _ServerRow {
+  _ServerRow(RtlTcpServer server)
+      : host = TextEditingController(text: server.host),
+        port = TextEditingController(text: '${server.port}');
 
-  bool _connecting = false;
-  RtlConnectResult? _lastResult;
-  RtlSdrStats? _lastStats;
-  bool _autoGain = true;
+  final TextEditingController host;
+  final TextEditingController port;
+  RtlConnectResult? result;
+
+  RtlTcpServer get server => RtlTcpServer(
+        host: host.text.trim().isEmpty ? '127.0.0.1' : host.text.trim(),
+        port: int.tryParse(port.text.trim()) ?? 1234,
+      );
+
+  void dispose() {
+    host.dispose();
+    port.dispose();
+  }
+}
+
+class _RtlSdrTestScreenState extends ConsumerState<RtlSdrTestScreen> {
+  static const _hint = TextStyle(color: Colors.white70, fontSize: 13);
+
+  final _rows = <_ServerRow>[];
+  int _defaultIndex = 0;
+  _ServerRow? _testing;
 
   late ReceiverMode _mode = ref.read(receiverModeProvider);
   List<RtlSdrUsbDevice> _usbDevices = [];
@@ -46,43 +64,29 @@ class _RtlSdrTestScreenState extends ConsumerState<RtlSdrTestScreen> {
 
   Future<void> _loadPersisted() async {
     final settings = ref.read(settingsRepositoryProvider);
-    final host = await settings.getRtlSdrHost();
-    final port = await settings.getRtlSdrPort();
+    final servers = await settings.getRtlTcpServers();
     final mode = await settings.getReceiverMode();
-    final auth = await settings.getRtlTcpAuth();
     if (!mounted) return;
     setState(() {
-      _hostController.text = host;
-      _portController.text = '$port';
+      for (final row in _rows) {
+        row.dispose();
+      }
+      _rows
+        ..clear()
+        ..addAll(servers.servers.map(_ServerRow.new));
+      _defaultIndex = servers.defaultIndex;
       _mode = mode;
-      _auth = auth;
-      _userController.text = auth.user;
-      _passwordController.text = auth.password;
     });
-  }
-
-  /// Protocol/login are saved right away; the receiver picks them up the
-  /// next time it connects (a changed setting starts a new session).
-  Future<void> _saveAuth(RtlTcpAuth auth) async {
-    setState(() => _auth = auth);
-    await ref.read(settingsRepositoryProvider).setRtlTcpAuth(auth);
   }
 
   @override
   void dispose() {
-    // rtl_tcp (both our own server and most external ones) only serves one
-    // client at a time - leaving this screen connected would permanently
-    // block the DAB+ decoder (or anything else) from ever getting a real
-    // connection, with no obvious error (the TCP handshake still succeeds,
-    // it just never receives any data).
-    if (_lastResult?.connected == true) {
-      _service.disconnect();
+    // rtl_tcp serves one client at a time - a test still running when the
+    // screen closes must not keep the server from the receiver.
+    if (_testing != null) _service.disconnect();
+    for (final row in _rows) {
+      row.dispose();
     }
-    _hostController.dispose();
-    _portController.dispose();
-    _freqController.dispose();
-    _userController.dispose();
-    _passwordController.dispose();
     super.dispose();
   }
 
@@ -108,50 +112,57 @@ class _RtlSdrTestScreenState extends ConsumerState<RtlSdrTestScreen> {
     if (mode == ReceiverMode.usb) _refreshUsbDevices();
   }
 
-  /// Saved right away, not only on "Verbinden" - DAB+ uses this server too.
-  Future<void> _saveServer() => ref
+  /// Saved on every change - the receiver connects to the default server
+  /// the next time it starts.
+  Future<void> _save() => ref
       .read(settingsRepositoryProvider)
-      .setRtlSdrServer(_hostController.text.trim(), int.tryParse(_portController.text) ?? 1234);
+      .setRtlTcpServers(RtlTcpServers([for (final r in _rows) r.server], _defaultIndex));
 
-  Future<void> _connect() async {
-    setState(() => _connecting = true);
-    final host = _hostController.text.trim();
-    final port = int.tryParse(_portController.text) ?? 1234;
-    await ref.read(settingsRepositoryProvider).setRtlSdrServer(host, port);
-    final result = await _service.connect(host: host, port: port);
-    if (!mounted) return;
-    setState(() {
-      _connecting = false;
-      _lastResult = result;
-    });
-    if (result.connected) {
-      ref.read(rtlSdrServiceProvider).stats.listen((stats) {
-        if (mounted) setState(() => _lastStats = stats);
-      });
-      await _service.setSampleRateHz(2048000);
-      await _service.setGainMode(auto: _autoGain);
-      final hz = int.tryParse(_freqController.text);
-      if (hz != null) await _service.setFrequencyHz(hz);
-    }
+  void _setDefault(int index) {
+    setState(() => _defaultIndex = index);
+    _save();
   }
 
-  Future<void> _disconnect() async {
+  void _add() {
+    setState(() => _rows.add(_ServerRow(const RtlTcpServer(host: '', port: 1234))));
+  }
+
+  void _remove(int index) {
+    setState(() {
+      _rows.removeAt(index).dispose();
+      if (_defaultIndex == index) {
+        _defaultIndex = 0;
+      } else if (_defaultIndex > index) {
+        _defaultIndex--;
+      }
+    });
+    _save();
+  }
+
+  void _edited(_ServerRow row) {
+    setState(() => row.result = null);
+    _save();
+  }
+
+  /// Connects, reads what the server says about itself, disconnects.
+  Future<void> _test(_ServerRow row) async {
+    setState(() {
+      _testing = row;
+      row.result = null;
+    });
+    await _save();
+    final server = row.server;
+    final result = await _service.connect(host: server.host, port: server.port);
     await _service.disconnect();
     if (!mounted) return;
     setState(() {
-      _lastResult = null;
-      _lastStats = null;
+      _testing = null;
+      row.result = result;
     });
-  }
-
-  Future<void> _tune() async {
-    final hz = int.tryParse(_freqController.text);
-    if (hz != null) await _service.setFrequencyHz(hz);
   }
 
   @override
   Widget build(BuildContext context) {
-    final connected = _lastResult?.connected ?? false;
     return Scaffold(
       appBar: AppBar(title: const Text('Radio-Empfänger (DAB+ & UKW)')),
       body: SingleChildScrollView(
@@ -159,226 +170,184 @@ class _RtlSdrTestScreenState extends ConsumerState<RtlSdrTestScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Für DAB+ und UKW braucht es einen RTL-SDR-Stick - direkt am Gerät oder über das Netzwerk. '
-              'Internetradio funktioniert auch ohne.',
-              style: TextStyle(color: Colors.white70),
+            Row(
+              children: [
+                const Text('Empfänger:'),
+                const SizedBox(width: 12),
+                DropdownButton<ReceiverMode>(
+                  value: _mode,
+                  items: const [
+                    DropdownMenuItem(value: ReceiverMode.none, child: Text('Kein Empfänger (nur Internetradio)')),
+                    DropdownMenuItem(value: ReceiverMode.usb, child: Text('RTL-SDR-Stick per USB')),
+                    DropdownMenuItem(value: ReceiverMode.tcp, child: Text('RTL-SDR über Netzwerk (rtl_tcp)')),
+                  ],
+                  onChanged: _testing != null ? null : (m) => m == null ? null : _selectMode(m),
+                ),
+              ],
             ),
             const SizedBox(height: 8),
-            DropdownButton<ReceiverMode>(
-              value: _mode,
-              items: const [
-                DropdownMenuItem(value: ReceiverMode.none, child: Text('Kein Empfänger (nur Internetradio)')),
-                DropdownMenuItem(value: ReceiverMode.usb, child: Text('RTL-SDR-Stick per USB')),
-                DropdownMenuItem(value: ReceiverMode.tcp, child: Text('RTL-SDR über Netzwerk (rtl_tcp)')),
-              ],
-              onChanged: connected ? null : (m) => m == null ? null : _selectMode(m),
-            ),
-            const SizedBox(height: 16),
-            if (_mode == ReceiverMode.none)
-              const Text(
-                'DAB+- und UKW-Sendersuche sowie die Reiter „DAB+“ und „FM“ sind ausgeblendet. '
-                'Vorhandene DAB+- und UKW-Favoriten bleiben erhalten, spielen aber erst wieder mit einem Empfänger.',
-                style: TextStyle(color: Colors.white70),
-              )
-            else if (_mode == ReceiverMode.usb) ...[
-              const Text(
-                'DAB+ öffnet den Stick direkt über USB, ohne rtl_tcp-Umweg. '
-                'Kein separater "Dienst starten"-Schritt nötig - sobald ein Sender '
-                'gestartet wird, öffnet der Decoder den Stick selbst.',
-                style: TextStyle(color: Colors.white70),
-              ),
-              if (Platform.isWindows)
-                const Padding(
-                  padding: EdgeInsets.only(top: 8),
-                  child: Text(
-                    'Windows: Der Stick braucht einmalig den WinUSB-Treiber - mit Zadig (zadig.akeo.ie) '
-                    'für "Bulk-In, Interface (Interface 0)" installieren. Ohne ihn ist kein Zugriff möglich.',
-                    style: TextStyle(color: Colors.white70),
-                  ),
-                )
-              else if (Platform.isLinux)
-                const Padding(
-                  padding: EdgeInsets.only(top: 8),
-                  child: Text(
-                    'Linux: Für den Zugriff braucht es eine udev-Regel für den Stick (z.B. aus dem Paket rtl-sdr); '
-                    'der DVB-T-Treiber des Kernels wird automatisch abgekoppelt.',
-                    style: TextStyle(color: Colors.white70),
-                  ),
-                ),
-              const SizedBox(height: 12),
-              if (_usbDevices.isEmpty)
-                const Text('Kein RTL-SDR-Stick erkannt.', style: TextStyle(color: Colors.orangeAccent))
-              else
-                for (final device in _usbDevices)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Row(
-                      children: [
-                        Expanded(child: Text(device.label)),
-                        if (!device.hasPermission)
-                          ElevatedButton(
-                            onPressed: _usbBusy ? null : () => _requestUsbPermission(device),
-                            child: const Text('Zugriff erlauben'),
-                          )
-                        else
-                          const Text('Zugriff erteilt', style: TextStyle(color: Colors.greenAccent)),
-                      ],
-                    ),
-                  ),
-              IconButton(onPressed: _refreshUsbDevices, icon: const Icon(Icons.refresh)),
-            ] else ...[
-              const Text(
-                'Verbindet sich als rtl_tcp-Client - egal ob eine externe Treiber-App '
-                'auf diesem Gerät (Host 127.0.0.1), ein Netzwerkdienst (z.B. Raspberry '
-                'Pi) oder später einmal ein eigener lokaler Dienst dahintersteckt.',
-                style: TextStyle(color: Colors.white70),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: PopupTextField(
-                      controller: _hostController,
-                      enabled: !connected,
-                      label: 'Host (IP)',
-                      onSubmitted: (_) => _saveServer(),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: PopupTextField(
-                      controller: _portController,
-                      enabled: !connected,
-                      keyboardType: TextInputType.number,
-                      label: 'Port',
-                      onSubmitted: (_) => _saveServer(),
-                    ),
+            ...switch (_mode) {
+              ReceiverMode.none => [
+                  const Text(
+                    'DAB+- und UKW-Suche sowie die Reiter „DAB+“ und „FM“ sind ausgeblendet. '
+                    'Vorhandene Favoriten bleiben erhalten und spielen wieder, sobald ein Empfänger eingerichtet ist.',
+                    style: _hint,
                   ),
                 ],
-              ),
-              const SizedBox(height: 12),
-              // Chosen by hand, no auto-detection (rtltcp.server's
-              // docs/client-integration.md).
-              Row(
-                children: [
-                  const Text('Protokoll:'),
-                  const SizedBox(width: 12),
-                  DropdownButton<bool>(
-                    value: _auth.v2,
-                    items: const [
-                      DropdownMenuItem(value: false, child: Text('rtl_tcp (v1)')),
-                      DropdownMenuItem(value: true, child: Text('rtltcp_v2')),
-                    ],
-                    onChanged: (v) => v == null ? null : _saveAuth(_auth.copyWith(v2: v)),
-                  ),
-                ],
-              ),
-              if (_auth.v2) ...[
-                const Text(
-                  'rtltcp_v2 (z.B. rtltcp.server) meldet, wenn der Stick am Server fehlt oder der Server '
-                  'belegt ist, und kann eine Anmeldung verlangen. Ein klassischer rtl_tcp-Server funktioniert '
-                  'trotzdem weiter.',
-                  style: TextStyle(color: Colors.white70),
-                ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Anmeldung'),
-                  subtitle: const Text('Nur nötig, wenn der Server es verlangt'),
-                  value: _auth.login,
-                  onChanged: (v) => _saveAuth(_auth.copyWith(login: v)),
-                ),
-                if (_auth.login)
-                  Row(
-                    children: [
-                      Expanded(
-                        child: PopupTextField(
-                          controller: _userController,
-                          label: 'Benutzer',
-                          onSubmitted: (v) => _saveAuth(_auth.copyWith(user: v.trim())),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: PopupTextField(
-                          controller: _passwordController,
-                          label: 'Passwort',
-                          obscureText: true,
-                          onSubmitted: (v) => _saveAuth(_auth.copyWith(password: v)),
-                        ),
-                      ),
-                    ],
-                  ),
-                const Text(
-                  'Der Verbindungstest hier unten nutzt immer das klassische Protokoll (v1).',
-                  style: TextStyle(color: Colors.white54, fontSize: 13),
-                ),
-              ],
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  ElevatedButton(
-                    onPressed: _connecting ? null : (connected ? _disconnect : _connect),
-                    child: Text(_connecting ? 'Verbinde…' : (connected ? 'Trennen' : 'Verbinden')),
-                  ),
-                  const SizedBox(width: 16),
-                  Switch(
-                    value: _autoGain,
-                    onChanged: connected
-                        ? (v) {
-                            setState(() => _autoGain = v);
-                            _service.setGainMode(auto: v);
-                          }
-                        : null,
-                  ),
-                  const Text('Auto-Gain'),
-                ],
-              ),
-              const Divider(height: 32),
-              Row(
-                children: [
-                  Expanded(
-                    child: PopupTextField(
-                      controller: _freqController,
-                      keyboardType: TextInputType.number,
-                      label: 'Frequenz (Hz)',
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  ElevatedButton(onPressed: connected ? _tune : null, child: const Text('Antunen')),
-                ],
-              ),
-              const SizedBox(height: 24),
-              Text(
-                connected ? 'Status: Verbunden' : 'Status: Nicht verbunden',
-                style: TextStyle(color: connected ? Colors.greenAccent : Colors.redAccent, fontSize: 16),
-              ),
-              if (_lastResult?.error != null)
-                Text('Fehler: ${_lastResult!.error}', style: const TextStyle(color: Colors.redAccent)),
-              if (connected) ...[
-                Text('Tuner-Typ: ${_lastResult?.tunerType}'),
-                Text('Gain-Stufen: ${_lastResult?.tunerGainCount}'),
-                const SizedBox(height: 12),
-                Text(
-                  _lastStats == null
-                      ? 'Warte auf Daten…'
-                      : 'Empfangen: ${_lastStats!.bytesPerSec} Byte/s '
-                          '(gesamt: ${(_lastStats!.totalBytes / 1024).toStringAsFixed(0)} KB)',
-                  style: const TextStyle(fontSize: 18),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  (_lastStats?.bytesPerSec ?? 0) > 0
-                      ? '✓ Es kommen Daten an - die Kette Stick → Treiber-App → Netzwerk → diese App funktioniert.'
-                      : 'Noch keine Daten - prüfe ob die Treiber-App läuft und den Stick erkannt hat.',
-                  style: const TextStyle(color: Colors.white70),
-                ),
-              ],
-            ],
+              ReceiverMode.usb => _usbSection(),
+              ReceiverMode.tcp => _tcpSection(),
+            },
           ],
         ),
       ),
     );
+  }
+
+  List<Widget> _usbSection() => [
+        Text(
+          [
+            'Der Empfänger öffnet den Stick direkt über USB, sobald ein Sender startet.',
+            if (Platform.isWindows)
+              'Windows: einmalig den WinUSB-Treiber mit Zadig (zadig.akeo.ie) für '
+                  '„Bulk-In, Interface (Interface 0)“ installieren.',
+            if (Platform.isLinux)
+              'Linux: braucht eine udev-Regel für den Stick (z. B. aus dem Paket rtl-sdr); '
+                  'der DVB-T-Treiber des Kernels wird automatisch abgekoppelt.',
+          ].join(' '),
+          style: _hint,
+        ),
+        const SizedBox(height: 8),
+        if (_usbDevices.isEmpty)
+          const Text('Kein RTL-SDR-Stick erkannt.', style: TextStyle(color: Colors.orangeAccent)),
+        for (final device in _usbDevices)
+          Row(
+            children: [
+              Expanded(child: Text(device.label)),
+              if (!device.hasPermission)
+                ElevatedButton(
+                  onPressed: _usbBusy ? null : () => _requestUsbPermission(device),
+                  child: const Text('Zugriff erlauben'),
+                )
+              else
+                const Text('Zugriff erteilt', style: TextStyle(color: Colors.greenAccent)),
+            ],
+          ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: _refreshUsbDevices,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Neu suchen'),
+          ),
+        ),
+      ];
+
+  List<Widget> _tcpSection() => [
+        const Text(
+          'rtl_tcp-Server im lokalen Netz: Treiber-App auf diesem Gerät (127.0.0.1), Raspberry Pi oder '
+          'rtltcp.server. Der markierte Server ist der Standard für DAB+ und UKW. Sticks an anderen '
+          'Standorten stellt der rtltcp.server über rtl.over.internet lokal bereit.',
+          style: _hint,
+        ),
+        const SizedBox(height: 8),
+        RadioGroup<int>(
+          groupValue: _defaultIndex,
+          onChanged: (i) => i == null ? null : _setDefault(i),
+          child: Column(
+            children: [
+              for (var i = 0; i < _rows.length; i++) _serverRow(i, _rows[i]),
+            ],
+          ),
+        ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: _testing != null ? null : _add,
+            icon: const Icon(Icons.add),
+            label: const Text('Server hinzufügen'),
+          ),
+        ),
+        const Text(
+          'Spielt gerade DAB+ oder UKW über einen Server, meldet „Testen“ ihn als belegt.',
+          style: TextStyle(color: Colors.white54, fontSize: 12),
+        ),
+      ];
+
+  Widget _serverRow(int index, _ServerRow row) {
+    final testing = _testing == row;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Tooltip(
+            message: 'Standard',
+            child: Radio<int>(value: index),
+          ),
+          SizedBox(
+            width: 200,
+            child: PopupTextField(
+              controller: row.host,
+              enabled: _testing == null,
+              label: 'Host (IP)',
+              onSubmitted: (_) => _edited(row),
+            ),
+          ),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 90,
+            child: PopupTextField(
+              controller: row.port,
+              enabled: _testing == null,
+              keyboardType: TextInputType.number,
+              label: 'Port',
+              onSubmitted: (_) => _edited(row),
+            ),
+          ),
+          const SizedBox(width: 8),
+          OutlinedButton(
+            onPressed: _testing != null ? null : () => _test(row),
+            child: testing
+                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Text('Testen'),
+          ),
+          const SizedBox(width: 12),
+          Expanded(child: _resultText(row.result)),
+          IconButton(
+            tooltip: 'Entfernen',
+            onPressed: _rows.length > 1 && _testing == null ? () => _remove(index) : null,
+            icon: const Icon(Icons.delete_outline),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Location and antenna (rtl_tcp Jay extended), "not supported" for a
+  /// classic server, or the error. Details in the tooltip.
+  Widget _resultText(RtlConnectResult? r) {
+    if (r == null) return const SizedBox.shrink();
+    final String text;
+    final Color color;
+    if (!r.connected) {
+      text = r.error ?? 'Keine Verbindung';
+      color = Colors.redAccent;
+    } else if (r.protocol != RtlTcpProtocol.jayExtended) {
+      text = 'rtl_tcp – Server unterstützt Standort und Antenne nicht';
+      color = Colors.white70;
+    } else {
+      text = [
+        if (r.deviceName != null) '„${r.deviceName}“',
+        'Standort: ${r.location ?? 'nicht angegeben'}',
+        'Antenne: ${r.antenna ?? 'nicht angegeben'}',
+      ].join(' · ');
+      color = Colors.greenAccent;
+    }
+    final details = [
+      if (r.protocol != null) 'Protokoll: ${r.protocol!.label}',
+      if (r.server?.isNotEmpty ?? false) 'Server: ${r.server}',
+      if (r.tunerType != null) 'Tuner-Typ: ${r.tunerType}, ${r.tunerGainCount ?? '?'} Gain-Stufen',
+    ];
+    final label = Text(text, style: TextStyle(color: color), maxLines: 2, overflow: TextOverflow.ellipsis);
+    return details.isEmpty ? label : Tooltip(message: details.join('\n'), child: label);
   }
 }

@@ -210,6 +210,9 @@ class AppDatabase extends _$AppDatabase {
     );
   }
 
+  Future<void> deleteSettings(List<String> keys) =>
+      (delete(settings)..where((s) => s.key.isIn(keys))).go();
+
   // Unsorted at the SQL level on purpose - the user-configurable sort order
   // (see DabSortMode) needs a "strip leading */!/space" comparison that
   // isn't expressible as a plain ORDER BY, so sorting happens client-side

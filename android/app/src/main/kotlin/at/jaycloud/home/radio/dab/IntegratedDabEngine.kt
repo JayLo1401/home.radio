@@ -99,14 +99,7 @@ class IntegratedDabEngine(private val events: Events) {
     }
 
     private external fun nativeCreateUsb(fd: Int): Boolean
-    private external fun nativeCreateTcp(
-        host: String,
-        port: Int,
-        v2: Boolean,
-        auth: Boolean,
-        user: String?,
-        password: String?,
-    ): Boolean
+    private external fun nativeCreateTcp(host: String, port: Int): Boolean
     private external fun nativeDestroy()
     private external fun nativeTune(hz: Int): Boolean
     private external fun nativeHalt()
@@ -131,17 +124,10 @@ class IntegratedDabEngine(private val events: Events) {
     private external fun nativeNbSetFilters(bandwidthHz: Int, noiseBlanker: Boolean, voiceFilter: Boolean, agc: Int)
 
     /**
-     * rtl_tcp client session to [host]:[port]; [v2] = rtltcp_v2 (status
-     * messages, optional login with [user]/[password] when [auth] is on).
+     * rtl_tcp client session to [host]:[port]; the protocol (rtl_tcp or
+     * rtl_tcp Jay extended) is negotiated on every connect.
      */
-    fun createTcp(
-        host: String,
-        port: Int,
-        v2: Boolean = false,
-        auth: Boolean = false,
-        user: String? = null,
-        password: String? = null,
-    ) = nativeCreateTcp(host, port, v2, auth, user, password)
+    fun createTcp(host: String, port: Int) = nativeCreateTcp(host, port)
 
     /** Direct USB session on an opened, interface-claimed RTL-SDR fd. */
     fun createUsb(fd: Int) = nativeCreateUsb(fd)
