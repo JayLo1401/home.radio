@@ -223,12 +223,12 @@ void main() {
     await server.close();
   });
 
-  test('busy server: message names the stick and the owner', () async {
+  test('busy server: message names location/antenna (not the serial-based name) and the owner', () async {
     final server = await _server((s) {
       s.add(Uint8List(12)..setRange(0, 4, 'RTL2'.codeUnits));
       s.add(_json({
         'type': 'server_info',
-        'device': {'name': 'Dach'},
+        'device': {'name': 'RTL-SDR 77771111153705700 @ HA', 'location': 'Graz', 'antenna': 'Stabantenne'},
         'auth': 'none',
       }));
       s.add(_json({'type': 'error', 'code': 'BUSY', 'fatal': true, 'client': '192.168.1.20'}));
@@ -237,7 +237,25 @@ void main() {
     final service = RtlSdrService();
     final r = await service.connect(host: '127.0.0.1', port: server.port);
     expect(r.connected, isFalse);
-    expect(r.error, '„Dach“ wird bereits von 192.168.1.20 verwendet');
+    expect(r.error, '„Graz · Stabantenne“ wird bereits von 192.168.1.20 verwendet');
+    await service.dispose();
+    await server.close();
+  });
+
+  test('busy server without location/antenna: generic wording', () async {
+    final server = await _server((s) {
+      s.add(Uint8List(12)..setRange(0, 4, 'RTL2'.codeUnits));
+      s.add(_json({
+        'type': 'server_info',
+        'device': {'name': 'RTL-SDR 77771111153705700'},
+        'auth': 'none',
+      }));
+      s.add(_json({'type': 'error', 'code': 'BUSY', 'fatal': true}));
+      s.close();
+    });
+    final service = RtlSdrService();
+    final r = await service.connect(host: '127.0.0.1', port: server.port);
+    expect(r.error, 'rtl_tcp-Server wird bereits von einem anderen Gerät verwendet');
     await service.dispose();
     await server.close();
   });

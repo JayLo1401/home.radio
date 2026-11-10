@@ -255,9 +255,9 @@ class _RtlTcpTestClient {
 
   RtlStick? get _device => RtlStick.fromJson(_serverInfo?['device']);
 
-  String? get _deviceName => _device?.name;
+  String? get _stickLabel => _device?.label;
 
-  String get _stick => _deviceName == null ? 'USB-Stick am rtl_tcp-Server' : '„$_deviceName“';
+  String get _stick => _stickLabel == null ? 'USB-Stick am rtl_tcp-Server' : '„$_stickLabel“';
 
   void _onMessage(Map<String, dynamic> msg) {
     switch (msg['type']) {
@@ -304,7 +304,7 @@ class _RtlTcpTestClient {
     final code = msg['code'];
     final message = msg['message'] is String ? msg['message'] as String : '';
     final client = msg['client'] is String ? msg['client'] as String : '';
-    final who = _deviceName == null ? 'rtl_tcp-Server' : '„$_deviceName“';
+    final who = _stickLabel == null ? 'rtl_tcp-Server' : '„$_stickLabel“';
     return switch (code) {
       'BUSY' => client.isEmpty
           ? '$who wird bereits von einem anderen Gerät verwendet'
@@ -435,6 +435,14 @@ class RtlStick {
   final String? tuner;
 
   bool get isRemote => source == 'remote';
+
+  /// What status and error texts call the stick: location and antenna
+  /// ("Graz · Stabantenne"), null when neither is set. Not [name] - that is
+  /// often generated from the serial number and tells a listener nothing.
+  String? get label {
+    final parts = [location, antenna].whereType<String>();
+    return parts.isEmpty ? null : parts.join(' · ');
+  }
 
   static String? _str(Object? map, String key) {
     final value = map is Map ? map[key] : null;

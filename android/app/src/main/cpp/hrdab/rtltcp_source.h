@@ -60,12 +60,14 @@ private:
     // Shows a fatal error and remembers it (no reconnect).
     void fail(const std::string& message);
     void status(bool isError, const std::string& message);
-    // "„Standort1 Stick 1“" from server_info, else the generic stick wording.
+    // "„Graz · Stabantenne“" (location / antenna from server_info), else the
+    // generic stick wording.
     std::string stickLabel() const;
 
     std::string host_;
     int port_;
-    std::string deviceName_; // server_info.device.name of the current v2 session
+    std::string deviceName_; // server_info.device.name of the current v2 session (log only)
+    std::string stickName_;  // its location / antenna, for status texts (stickNameOf)
     std::thread thread_;
     std::atomic<bool> running_{false};
     std::atomic<bool> fatal_{false};

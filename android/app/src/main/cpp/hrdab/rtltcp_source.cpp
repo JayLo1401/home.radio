@@ -256,7 +256,7 @@ void RtlTcpSource::fail(const std::string& message)
 
 std::string RtlTcpSource::stickLabel() const
 {
-    return deviceName_.empty() ? "USB-Stick am rtl_tcp-Server" : "\xE2\x80\x9E" + deviceName_ + "\xE2\x80\x9C";
+    return stickName_.empty() ? "USB-Stick am rtl_tcp-Server" : "\xE2\x80\x9E" + stickName_ + "\xE2\x80\x9C";
 }
 
 namespace {
@@ -300,14 +300,27 @@ const char* const kAuthUnsupported =
     "rtl_tcp-Server verlangt eine Anmeldung, das wird nicht mehr unterstützt. "
     "Bitte den rtltcp.server im lokalen Netz verwenden.";
 
-// The user-facing text of a v2 error message; [deviceName] from server_info
+// "Graz · Stabantenne" from server_info.device (location - or a remote
+// stick's site - and antenna); empty if neither is set. Not device.name:
+// that is often generated from the serial number and tells a listener
+// nothing.
+std::string stickNameOf(const Json& device)
+{
+    std::string location = device.stringOr("location", "");
+    if (location.empty()) location = device["remote"].stringOr("site", "");
+    const std::string antenna = device.stringOr("antenna", "");
+    if (location.empty()) return antenna;
+    return antenna.empty() ? location : location + " \xC2\xB7 " + antenna;
+}
+
+// The user-facing text of a v2 error message; [stickName] see stickNameOf
 // (may be empty).
-std::string errorText(const Json& msg, const std::string& deviceName)
+std::string errorText(const Json& msg, const std::string& stickName)
 {
     const std::string code = msg.stringOr("code", "");
     const std::string message = msg.stringOr("message", "");
     if (code == "BUSY") {
-        const std::string who = deviceName.empty() ? "rtl_tcp-Server" : "\xE2\x80\x9E" + deviceName + "\xE2\x80\x9C";
+        const std::string who = stickName.empty() ? "rtl_tcp-Server" : "\xE2\x80\x9E" + stickName + "\xE2\x80\x9C";
         const std::string client = msg.stringOr("client", "");
         return client.empty() ? who + " wird bereits von einem anderen Gerät verwendet"
                               : who + " wird bereits von " + client + " verwendet";
@@ -350,16 +363,17 @@ RtlTcpSource::Connect RtlTcpSource::handshakeV2(intptr_t s)
         const std::string kind = msg.stringOr("type", "");
         if (kind == "error") {
             if (msg.boolOr("fatal", true)) {
-                fail(errorText(msg, deviceName_));
+                fail(errorText(msg, stickName_));
                 return Connect::Fatal;
             }
-            HR_LOGW("rtl_tcp: %s", errorText(msg, deviceName_).c_str());
+            HR_LOGW("rtl_tcp: %s", errorText(msg, stickName_).c_str());
         } else if (kind == "server_info") {
             if (msg.stringOr("auth", "none") == "required") {
                 fail(kAuthUnsupported);
                 return Connect::Fatal;
             }
             deviceName_ = msg["device"].stringOr("name", "");
+            stickName_ = stickNameOf(msg["device"]);
             HR_LOGI("rtl_tcp: rtl_tcp Jay extended, %s %s, stick \"%s\"", msg.stringOr("server", "?").c_str(),
                     msg.stringOr("version", "?").c_str(), deviceName_.c_str());
             gotInfo = true;
@@ -374,6 +388,7 @@ RtlTcpSource::Connect RtlTcpSource::connectOnce()
 {
     framed_ = false;
     deviceName_.clear();
+    stickName_.clear();
     addrinfo hints{};
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
@@ -451,7 +466,7 @@ bool RtlTcpSource::handleMessage(const Json& msg)
             if (lastStatus_.empty()) return true;
             text = stickLabel() + " bereit";
         } else if (state == "starting") {
-            text = deviceName_.empty() ? "Empfänger am rtl_tcp-Server startet …" : stickLabel() + " startet …";
+            text = stickName_.empty() ? "Empfänger am rtl_tcp-Server startet …" : stickLabel() + " startet …";
             isError = true;
         } else if (state == "device_not_ready") {
             text = stickLabel() + " nicht bereit";
@@ -464,11 +479,11 @@ bool RtlTcpSource::handleMessage(const Json& msg)
         }
     } else if (kind == "error") {
         if (msg.boolOr("fatal", false)) {
-            fail(errorText(msg, deviceName_));
+            fail(errorText(msg, stickName_));
             return false;
         }
         // INVALID_COMMAND etc.: the session goes on.
-        HR_LOGW("rtl_tcp: %s", errorText(msg, deviceName_).c_str());
+        HR_LOGW("rtl_tcp: %s", errorText(msg, stickName_).c_str());
         return true;
     } else if (kind == "ping") {
         JsonWriter w;
