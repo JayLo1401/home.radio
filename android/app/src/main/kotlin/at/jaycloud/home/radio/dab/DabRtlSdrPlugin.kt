@@ -62,8 +62,9 @@ class DabRtlSdrPlugin :
         // FM (UKW) band and scan parameters, in kHz.
         private const val FM_LOW_KHZ = 87_500
         private const val FM_HIGH_KHZ = 108_000
-        // Survey windows: the inner +-800 kHz of the stick's 2.048 MHz.
-        private const val FM_WINDOW_KHZ = 1600
+        // Survey windows: the inner +-400 kHz of the stick's 1.024 MHz in FM
+        // mode (FmDemod::kSurveySpanHz).
+        private const val FM_WINDOW_KHZ = 800
         // A carrier this far off the raster point is a neighbour's sideband.
         private const val FM_MAX_OFFSET_HZ = 30_000f
         // Carrier-to-noise (dB, in the 256 kHz channel) that makes a station
@@ -960,8 +961,8 @@ class DabRtlSdrPlugin :
     }
 
     /**
-     * FM band scan, 87.5-108 MHz. Phase 1 ("survey"): power spectra of 13
-     * windows of 1.6 MHz, carriers on the 50 kHz raster that stand clearly
+     * FM band scan, 87.5-108 MHz. Phase 1 ("survey"): power spectra of 26
+     * windows of 800 kHz, carriers on the 50 kHz raster that stand clearly
      * above the noise floor (~0.3 s per window). Phase 2 ("probe"): each
      * candidate is tuned and checked ([fmProbe]); stations closer than
      * 100 kHz are one station's splatter unless their PIs differ - only the

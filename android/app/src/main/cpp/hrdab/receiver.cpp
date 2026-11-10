@@ -64,9 +64,12 @@ bool Receiver::startLocked(Mode mode)
     if (running_ && mode_ == mode) return true;
     // Switching modes: the other mode's threads must not read the ring.
     if (running_) stopLocked();
-    // DAB and FM need 2.048 MS/s; NB brings its own rate. The source is
-    // stopped here, which is when a rate change is allowed.
-    const uint32_t rate = mode == Mode::Nb ? nbRate_ : static_cast<uint32_t>(kSampleRate);
+    // DAB needs 2.048 MS/s, FM gets by with half (FmDemod::kRate); NB
+    // brings its own rate. The source is stopped here, which is when a rate
+    // change is allowed.
+    const uint32_t rate = mode == Mode::Nb   ? nbRate_
+                          : mode == Mode::Fm ? static_cast<uint32_t>(FmDemod::kRate)
+                                             : static_cast<uint32_t>(kSampleRate);
     if (source_->sampleRate() != rate && !source_->setSampleRate(rate)) {
         HR_LOGW("could not set the sample rate to %u", rate);
         return false;

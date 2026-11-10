@@ -9,14 +9,15 @@ namespace hrdab {
 
 namespace {
 
-constexpr int kChunk = 16384;                   // input samples per read (8 ms)
-constexpr int kMpxRate = kSampleRate / 8;        // 256 kHz
-constexpr int kMpxChunk = kChunk / 8;
+constexpr int kRate = FmDemod::kRate;
+constexpr int kChunk = 8192;                    // input samples per read (8 ms)
+constexpr int kMpxRate = kRate / 4;              // 256 kHz
+constexpr int kMpxChunk = kChunk / 4;
 constexpr double kDeviationHz = 75000.0;         // full modulation
 constexpr int kLevelChunks = 6;                  // ~50 ms per AGC report
 constexpr int kStatusSamples = kMpxRate / 2;     // 0.5 s
-constexpr long kRetuneSkip = kSampleRate * 15 / 100;  // old data still in flight after a retune
-constexpr long kGainSkip = kSampleRate * 13 / 100;    // same after a gain change
+constexpr long kRetuneSkip = kRate * 15 / 100;  // old data still in flight after a retune
+constexpr long kGainSkip = kRate * 13 / 100;    // same after a gain change
 constexpr int kSurveyFfts = 64;
 constexpr int kMaxAgcRounds = 4;
 constexpr double kMaxAfcHz = 25000.0;           // beyond that it is the neighbour, not drift
@@ -37,13 +38,12 @@ FmDemod::FmDemod(IqReader& reader, FmSink& sink)
 {
     for (int i = 0; i < 256; i++) lut_[i] = (static_cast<float>(i) - 127.5f) / 127.5f;
 
-    // Channel filter as three half-band decimators (2.048 -> 1.024 -> 0.512
-    // -> 0.256 MS/s). Only the last one is sharp: it passes +-100 kHz (the
-    // FM signal incl. RDS) and must stop by 156 kHz, which aliases to the
+    // Channel filter as two half-band decimators (1.024 -> 0.512 -> 0.256
+    // MS/s). Only the second one is sharp: it passes +-100 kHz (the FM
+    // signal incl. RDS) and must stop by 156 kHz, which aliases to the
     // passband edge. Half-bands skip every other tap.
-    hb1_f_.init(designLowpass(11, 0.25, kaiserBeta(60)), 2);
-    hb2_f_.init(designLowpass(19, 0.25, kaiserBeta(60)), 2);
-    hb3_f_.init(designLowpass(35, 0.25, kaiserBeta(60)), 2);
+    hb1_f_.init(designLowpass(19, 0.25, kaiserBeta(60)), 2);
+    hb2_f_.init(designLowpass(35, 0.25, kaiserBeta(60)), 2);
     // Audio, done on (L+R, L-R) pairs: 256 -> 64 kHz, then 64 -> 48 kHz with
     // the 15 kHz audio low-pass that also removes the 19 kHz pilot.
     audioDec_.init(designLowpass(33, 30000.0 / kMpxRate, kaiserBeta(60)), 4);
@@ -51,7 +51,6 @@ FmDemod::FmDemod(IqReader& reader, FmSink& sink)
 
     iq_.resize(2 * kChunk);
     hb1_.resize(2 * (kChunk / 2 + 4));
-    hb2_.resize(2 * (kChunk / 4 + 4));
     ch_.resize(2 * (kMpxChunk + 4));
     mpx_.resize(kMpxChunk + 4);
     pair_.resize(2 * (kMpxChunk + 4));
@@ -111,7 +110,6 @@ void FmDemod::doReset()
 
     hb1_f_.reset();
     hb2_f_.reset();
-    hb3_f_.reset();
     // A new station has its own offset; the stick's share of it (crystal
     // ppm) is small next to the AFC's range, so starting from 0 is fine.
     afcHz_ = 0;
@@ -194,7 +192,7 @@ void FmDemod::levelStats()
 
     // FM does not care about amplitude, so playback never pauses for a gain
     // step; it only settles down after the first second.
-    const bool settled = mode_ == Mode::Play && chunks_ > kSampleRate / kChunk;
+    const bool settled = mode_ == Mode::Play && chunks_ > kRate / kChunk;
     const bool changed = sink_.onFmLevel(rms, clip, settled);
     if (mode_ == Mode::Survey && surveyLeveling_) {
         if (changed && agcRounds_ < kMaxAgcRounds) {
@@ -247,9 +245,10 @@ std::vector<FmCarrier> findFmCarriers(const std::vector<float>& powerDb, uint32_
     std::vector<FmCarrier> out;
     const int n = static_cast<int>(powerDb.size());
     if (n < 64) return out;
-    const int binHz = kSampleRate / n;
+    const int binHz = kRate / n;
     const int mid = n / 2;
-    const int usable = 800000 / binHz;
+    const long span = FmDemod::kSurveySpanHz / 2;
+    const int usable = static_cast<int>(span / binHz);
     const int half = 60000 / binHz;
     std::vector<double> lin(static_cast<size_t>(n));
     for (int i = 0; i < n; i++) lin[static_cast<size_t>(i)] = std::pow(10.0, powerDb[static_cast<size_t>(i)] / 10.0);
@@ -270,8 +269,8 @@ std::vector<FmCarrier> findFmCarriers(const std::vector<float>& powerDb, uint32_
     };
 
     const long center = static_cast<long>(centerHz);
-    long first = (center - 800000 + 49999) / 50000 * 50000;
-    for (long f = first; f < center + 800000; f += 50000) {
+    long first = (center - span + 49999) / 50000 * 50000;
+    for (long f = first; f < center + span; f += 50000) {
         if (f < static_cast<long>(lowHz) || f > static_cast<long>(highHz)) continue;
         const double p = band(f - center);
         const double margin = 10.0 * std::log10(p / (floorBin * (2 * half + 1)));
@@ -311,19 +310,18 @@ void FmDemod::processPlay()
         o[7] = lut_[r[6]];
     }
     const int n1 = hb1_f_.process(iq_.data(), kChunk, hb1_.data());
-    const int n2 = hb2_f_.process(hb1_.data(), n1, hb2_.data());
 
     // AFC at 512 kHz, ahead of the sharp channel filter so a station that is
     // off by a few kHz still gets centred in it.
     const uint32_t afcInc = static_cast<uint32_t>(static_cast<int32_t>(std::lround(-afcHz_ / (kMpxRate * 2) * 4294967296.0)));
-    for (int i = 0; i < n2; i++) {
+    for (int i = 0; i < n1; i++) {
         const float c = cosTable(afcPhase_), s = sinTable(afcPhase_);
-        const float re = hb2_[static_cast<size_t>(2 * i)], im = hb2_[static_cast<size_t>(2 * i + 1)];
-        hb2_[static_cast<size_t>(2 * i)] = re * c - im * s;
-        hb2_[static_cast<size_t>(2 * i + 1)] = re * s + im * c;
+        const float re = hb1_[static_cast<size_t>(2 * i)], im = hb1_[static_cast<size_t>(2 * i + 1)];
+        hb1_[static_cast<size_t>(2 * i)] = re * c - im * s;
+        hb1_[static_cast<size_t>(2 * i + 1)] = re * s + im * c;
         afcPhase_ += afcInc;
     }
-    const int n = hb3_f_.process(hb2_.data(), n2, ch_.data());
+    const int n = hb2_f_.process(hb1_.data(), n1, ch_.data());
 
     // Discriminator: phase step between samples = instantaneous frequency.
     constexpr float kToHz = static_cast<float>(kMpxRate / (2.0 * M_PI));

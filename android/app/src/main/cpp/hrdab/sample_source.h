@@ -9,7 +9,7 @@
 namespace hrdab {
 
 // A tuner delivering 8-bit unsigned I/Q into a ByteRing, at 2.048 MS/s
-// unless setSampleRate() chose another rate (narrowband mode only).
+// unless setSampleRate() chose another rate (FM and narrowband modes).
 class SampleSource {
 public:
     static constexpr uint32_t kDefaultRate = 2048000;

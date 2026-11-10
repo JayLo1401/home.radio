@@ -1,8 +1,8 @@
 // Test-only FM broadcast transmitter: stereo MPX (distinct left/right tones
 // with 50 us pre-emphasis, 19 kHz pilot, 38 kHz DSB-SC), RDS groups 0A and
 // 2A on 57 kHz, frequency modulated with 75 kHz deviation at a given
-// baseband offset, several stations summed, plus white noise, as 2.048 MS/s
-// 8-bit I/Q.
+// baseband offset, several stations summed, plus white noise, as 8-bit I/Q
+// at FmDemod::kRate.
 #pragma once
 
 #include <cstdint>
@@ -27,7 +27,7 @@ struct FmStation {
 
 struct FmTxConfig {
     std::vector<FmStation> stations;
-    double cnrDb = 25;            // total carrier power to noise over the full 2.048 MHz
+    double cnrDb = 25;            // total carrier power to noise over the full band (FmDemod::kRate)
     double rms = 0.22;            // per component, of full scale before quantisation
     unsigned seed = 4321;
 };

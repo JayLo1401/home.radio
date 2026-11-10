@@ -1,5 +1,6 @@
-// FM broadcast (UKW, 87.5-108 MHz) receiver on the same 2.048 MS/s I/Q
-// stream as DAB: channel filter + decimation to 256 kS/s, discriminator,
+// FM broadcast (UKW, 87.5-108 MHz) receiver on a 1.024 MS/s I/Q stream
+// (half the DAB rate - a station is only +-100 kHz wide, and over rtl_tcp
+// the rate is the bandwidth): channel filter + decimation to 256 kS/s, discriminator,
 // AFC, 19 kHz pilot PLL, stereo decoder with automatic mono fallback, 50 us
 // de-emphasis, 48 kHz PCM out, and RDS. Also measures power spectra for the
 // band scan (survey).
@@ -51,8 +52,8 @@ struct FmCarrier {
 };
 
 // Stations on the 50 kHz raster in a survey spectrum (kSurveyBins bins of
-// 1 kHz, bin kSurveyBins/2 = `centerHz`). Only the inner +-800 kHz are used
-// (the stick's own filters roll off towards +-1 MHz), clipped to
+// 1 kHz, bin kSurveyBins/2 = `centerHz`). Only the inner +-kSurveySpanHz/2
+// are used (the stick's own filters roll off towards +-fs/2), clipped to
 // [lowHz, highHz]. Of carriers closer than 100 kHz only the strongest is
 // reported - the others are its modulation sidebands.
 std::vector<FmCarrier> findFmCarriers(const std::vector<float>& powerDb, uint32_t centerHz, uint32_t lowHz,
@@ -60,12 +61,17 @@ std::vector<FmCarrier> findFmCarriers(const std::vector<float>& powerDb, uint32_
 
 class FmDemod {
 public:
+    // I/Q rate for playback and survey alike: a switch between them would
+    // restart the source (over rtl_tcp a reconnect), and seek alternates.
+    static constexpr int kRate = 1024000;
     // While playing, the tuner sits this far below the station: fs/4 moves
     // it back to 0 Hz without multiplications, and keeps it clear of the DC
     // offset / LO leakage at the tuner's own centre.
-    static constexpr int kIfShiftHz = kSampleRate / 4;
+    static constexpr int kIfShiftHz = kRate / 4;
     static constexpr int kAudioRate = 48000;
-    static constexpr int kSurveyBins = 2048;
+    static constexpr int kSurveyBins = kRate / 1000;  // 1 kHz bins
+    // Part of a survey spectrum that is searched for carriers (centred).
+    static constexpr int kSurveySpanHz = 800000;
 
     FmDemod(IqReader& reader, FmSink& sink);
 
@@ -110,7 +116,7 @@ private:
     long chunks_ = 0;            // since the last reset
 
     std::vector<uint8_t> raw_;
-    std::vector<float> iq_, hb1_, hb2_, ch_, mpx_, pair_, pair64_, pair48_;
+    std::vector<float> iq_, hb1_, ch_, mpx_, pair_, pair64_, pair48_;
     std::vector<int16_t> pcm_;
 
     // level / AGC
@@ -120,7 +126,7 @@ private:
     int agcRounds_ = 0;
 
     // front end
-    FirDecimator<2> hb1_f_, hb2_f_, hb3_f_;
+    FirDecimator<2> hb1_f_, hb2_f_;
     uint32_t afcPhase_ = 0;
     double afcHz_ = 0;           // applied correction
     double dcHz_ = 0;            // residual discriminator DC

@@ -6,6 +6,7 @@
 #include <random>
 
 #include "common.h"
+#include "fm_demod.h"
 #include "rds.h"
 
 namespace hrdab::test {
@@ -14,11 +15,14 @@ namespace {
 
 using cd = std::complex<double>;
 
+// Generated at the rate the FM receiver runs at.
+constexpr double kRate = FmDemod::kRate;
+
 // Recursive oscillator (one complex multiply per sample).
 struct Osc {
     cd p, step;
     int n = 0;
-    Osc(double hz, double phase) : p(std::polar(1.0, phase)), step(std::polar(1.0, 2 * M_PI * hz / kSampleRate)) {}
+    Osc(double hz, double phase) : p(std::polar(1.0, phase)), step(std::polar(1.0, 2 * M_PI * hz / kRate)) {}
     cd next()
     {
         const cd v = p;
@@ -54,11 +58,11 @@ const std::vector<float>& biphasePulse()
             if (std::fabs(den) < 1e-9) return M_PI / 4; // limit at |t| = T/8
             return std::cos(4 * M_PI * u) / den;
         };
-        const int len = static_cast<int>((2 * kPulseSpanBits + 0.5) * kSampleRate / kBitRate) + 1;
+        const int len = static_cast<int>((2 * kPulseSpanBits + 0.5) * kRate / kBitRate) + 1;
         std::vector<float> p(static_cast<size_t>(len));
         double peak = 0;
         for (int i = 0; i < len; i++) {
-            const double x = static_cast<double>(i) / kSampleRate - kPulseSpanBits * t;
+            const double x = static_cast<double>(i) / kRate - kPulseSpanBits * t;
             const double v = h(x) - h(x - t / 2);
             p[static_cast<size_t>(i)] = static_cast<float>(v);
             peak = std::max(peak, std::fabs(v));
@@ -117,7 +121,7 @@ struct StationState {
                 // Sum of the shaped symbols of the neighbouring bits.
                 const auto& pulse = biphasePulse();
                 v = 0;
-                const double perBit = kSampleRate / kBitRate;
+                const double perBit = kRate / kBitRate;
                 for (int k = -kPulseSpanBits; k <= kPulseSpanBits; k++) {
                     const long bit = static_cast<long>(bitIndex) + k;
                     if (bit < 0 || bit >= static_cast<long>(rdsSymbols.size())) continue;
@@ -130,13 +134,13 @@ struct StationState {
                 v = rdsSymbols[bitIndex] * rdsClock.next().imag();
             }
             mpx += st.rdsLevel * v * s3;
-            bitPhase += kBitRate / kSampleRate;
+            bitPhase += kBitRate / kRate;
             if (bitPhase >= 1) {
                 bitPhase -= 1;
                 if (++bitIndex >= rdsSymbols.size()) bitIndex = 0;
             }
         }
-        const double d = 2 * M_PI * 75000.0 * mpx / kSampleRate;
+        const double d = 2 * M_PI * 75000.0 * mpx / kRate;
         const double d2 = d * d;
         const cd step(1 - d2 / 2 + d2 * d2 / 24 - d2 * d2 * d2 / 720, d - d * d2 / 6 + d * d2 * d2 / 120);
         mod *= step;
@@ -201,7 +205,7 @@ std::vector<uint8_t> rdsBits(const std::vector<std::vector<uint16_t>>& groups, i
 
 std::vector<uint8_t> generateFm(const FmTxConfig& cfg, double seconds)
 {
-    const size_t n = static_cast<size_t>(seconds * kSampleRate);
+    const size_t n = static_cast<size_t>(seconds * kRate);
     std::vector<StationState> stations;
     stations.reserve(cfg.stations.size());
     double carrierPower = 0;

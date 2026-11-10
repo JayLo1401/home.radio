@@ -24,7 +24,7 @@ constexpr int64_t kEmptyChannelMs = 3000;
 // FM (UKW) band and scan parameters, in kHz (see DabRtlSdrPlugin.kt).
 constexpr int kFmLowKhz = 87500;
 constexpr int kFmHighKhz = 108000;
-constexpr int kFmWindowKhz = 1600;
+constexpr int kFmWindowKhz = FmDemod::kSurveySpanHz / 1000;
 constexpr double kFmMaxOffsetHz = 30000;
 constexpr double kFmStationSnrDb = 10;
 constexpr double kFmMinSnrDb = 6;
@@ -1027,7 +1027,7 @@ std::optional<RadioController::FmStation> RadioController::fmProbe(int freqKhz, 
     return FmStation{freqKhz, last->levelDb, last->stereo, last->pi, last->ps};
 }
 
-// FM band scan: survey of 13 windows of 1.6 MHz, then each candidate probed
+// FM band scan: survey of 26 windows of 800 kHz, then each candidate probed
 // (see DabRtlSdrPlugin.scanFm).
 void RadioController::scanFm()
 {

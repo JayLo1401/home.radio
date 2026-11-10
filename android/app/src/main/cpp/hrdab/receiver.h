@@ -54,8 +54,8 @@ public:
 // thread (FIC, selected sub-channel, DAB+ super frames, PAD), or, in FM
 // mode, sample source -> FM thread (FmDemod), or, in narrowband mode,
 // sample source -> NB thread (NbDemod). There is one stick, so the modes
-// take turns: switching stops the other mode's threads. DAB and FM always
-// run at 2.048 MS/s; NB sets its own rate and the others restore theirs.
+// take turns: switching stops the other mode's threads. DAB runs at 2.048
+// MS/s, FM at FmDemod::kRate (1.024 MS/s), NB at its own rate.
 //
 // The threads are decoupled by queues that drop instead of blocking, so a
 // slow consumer (e.g. the audio output) can never stall the USB transfers

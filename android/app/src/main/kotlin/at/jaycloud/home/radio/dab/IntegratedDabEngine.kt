@@ -156,7 +156,7 @@ class IntegratedDabEngine(private val events: Events) {
     fun fmTune(hz: Int) = nativeFmTune(hz)
 
     /**
-     * FM: power spectrum survey of the ~1.6 MHz around [centerHz] (no audio
+     * FM: power spectrum survey of the 800 kHz around [centerHz] (no audio
      * meanwhile); blocks for ~0.3-1 s. JSON array of
      * `{"freqKhz":..,"levelDb":..,"marginDb":..}` for the carriers on the
      * 50 kHz raster within [lowHz]..[highHz], or null if it failed.

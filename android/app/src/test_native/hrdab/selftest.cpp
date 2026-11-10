@@ -189,7 +189,7 @@ public:
             while (running_ && pos < data_.size()) {
                 const size_t n = std::min(chunk, data_.size() - pos);
                 if (realtime_) {
-                    const auto due = t0 + std::chrono::microseconds(static_cast<long long>(pos / 4.096));
+                    const auto due = t0 + std::chrono::microseconds(static_cast<long long>(pos * 5e5 / sampleRate()));
                     std::this_thread::sleep_until(due);
                 } else {
                     while (running_ && ring.freeSpace() < n) std::this_thread::sleep_for(std::chrono::microseconds(500));
@@ -677,8 +677,8 @@ void testFmSurvey()
 {
     std::printf("[fm survey]\n");
     FmTxConfig cfg;
-    cfg.cnrDb = 35;
-    const double offsets[4] = {-600000, -150000, 250000, 700000};
+    cfg.cnrDb = 38;
+    const double offsets[4] = {-300000, -150000, 100000, 350000};
     const double amps[4] = {1.0, 0.3, 0.1, 0.5};
     for (int i = 0; i < 4; i++) {
         FmStation s;
@@ -718,7 +718,7 @@ void testFm(bool quick)
     st.offsetHz = FmDemod::kIfShiftHz + 3300;
     st.rt = "Gr\x99\x8D" "e aus \xD7sterreich - Home Radio UKW";
     cfg.stations.push_back(st);
-    cfg.cnrDb = 25;
+    cfg.cnrDb = 28;
     const double rt = runFm("stereo", cfg, 6.0, FmExpect{});
 
     FmTxConfig mono = cfg;
@@ -729,7 +729,7 @@ void testFm(bool quick)
 
     if (!quick) {
         FmTxConfig weak = cfg;
-        weak.cnrDb = 9;
+        weak.cnrDb = 12;
         weak.seed = 5;
         weak.stations[0].offsetHz = FmDemod::kIfShiftHz - 4700;
         runFm("weak", weak, 6.0, FmExpect{true, false, false});
