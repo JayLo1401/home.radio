@@ -75,6 +75,7 @@ class _RtlSdrTestScreenState extends ConsumerState<RtlSdrTestScreen> {
         ..clear()
         ..addAll(servers.servers.map(_ServerRow.new));
       _defaultIndex = servers.defaultIndex;
+      _receiverServer = servers.defaultServer;
       _mode = mode;
     });
   }
@@ -114,9 +115,20 @@ class _RtlSdrTestScreenState extends ConsumerState<RtlSdrTestScreen> {
 
   /// Saved on every change - the receiver connects to the default server
   /// the next time it starts.
-  Future<void> _save() => ref
-      .read(settingsRepositoryProvider)
-      .setRtlTcpServers(RtlTcpServers([for (final r in _rows) r.server], _defaultIndex));
+  Future<void> _save() async {
+    final servers = RtlTcpServers([for (final r in _rows) r.server], _defaultIndex);
+    await ref.read(settingsRepositoryProvider).setRtlTcpServers(servers);
+    // A new default server: the home screen points the receiver at it and
+    // tunes the current station in again once back.
+    if (_receiverServer != null && servers.defaultServer != _receiverServer) {
+      _receiverServer = servers.defaultServer;
+      ref.read(receiverInterruptedProvider.notifier).set(true);
+    }
+  }
+
+  /// The server the receiver (DAB+/FM) was pointed at when this screen
+  /// opened, or since changed to here.
+  RtlTcpServer? _receiverServer;
 
   void _setDefault(int index) {
     setState(() => _defaultIndex = index);
@@ -144,22 +156,68 @@ class _RtlSdrTestScreenState extends ConsumerState<RtlSdrTestScreen> {
     _save();
   }
 
-  /// Connects, reads what the server says about itself, disconnects.
+  /// Asks the server what is behind the port (see RtlSdrService.inspect).
+  /// The receiver's own server is freed first - a playing DAB+/FM station
+  /// would hold the stick; the home screen tunes it in again once back.
   Future<void> _test(_ServerRow row) async {
+    final server = row.server;
+    final receiverServer = _receiverServer;
     setState(() {
       _testing = row;
       row.result = null;
     });
     await _save();
-    final server = row.server;
-    final result = await _service.connect(host: server.host, port: server.port);
-    await _service.disconnect();
+    if (_mode == ReceiverMode.tcp && server == receiverServer) {
+      ref.read(receiverInterruptedProvider.notifier).set(true);
+      await ref.read(dabRtlSdrServiceProvider).resetSession();
+      // Give the server a moment to notice the closed connection.
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+    }
+    final result = await _service.inspect(host: server.host, port: server.port);
     if (!mounted) return;
     setState(() {
       _testing = null;
       row.result = result;
     });
   }
+
+  /// All sticks of the server (rtltcp.server ≥ 1.8); picking one takes over
+  /// its port.
+  Future<void> _chooseStick(_ServerRow row) async {
+    final sticks = row.result?.devices ?? const <RtlStick>[];
+    final current = row.server.port;
+    final port = await showDialog<int>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: Text('Sticks auf ${row.server.host}'),
+        children: [
+          for (final s in sticks)
+            if (s.port != null)
+              SimpleDialogOption(
+                onPressed: () => Navigator.pop(context, s.port),
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(s.port == current ? Icons.radio_button_checked : Icons.radio_button_unchecked),
+                  title: Text('${s.name ?? 'Stick'} · Port ${s.port}'),
+                  subtitle: Text(_stickDetails(s)),
+                ),
+              ),
+        ],
+      ),
+    );
+    if (port == null || port == current || !mounted) return;
+    row.port.text = '$port';
+    await _test(row);
+  }
+
+  /// "Standort: … · Antenne: … · über … · belegt von …" for one stick.
+  static String _stickDetails(RtlStick s, {bool withName = false}) => [
+        if (withName && s.name != null) '„${s.name}“',
+        'Standort: ${s.location ?? 'nicht angegeben'}',
+        'Antenne: ${s.antenna ?? 'nicht angegeben'}',
+        if (s.isRemote && s.remoteInstance != null) 'über ${s.remoteInstance}',
+        if (s.busyBy != null) 'belegt von ${s.busyBy}' else if (s.stateText != null) s.stateText!,
+      ].join(' · ');
 
   @override
   Widget build(BuildContext context) {
@@ -268,7 +326,8 @@ class _RtlSdrTestScreenState extends ConsumerState<RtlSdrTestScreen> {
           ),
         ),
         const Text(
-          'Spielt gerade DAB+ oder UKW über einen Server, meldet „Testen“ ihn als belegt.',
+          '„Testen“ unterbricht DAB+ oder UKW, wenn es über diesen Server läuft; der Sender spielt beim '
+          'Zurückkehren weiter.',
           style: TextStyle(color: Colors.white54, fontSize: 12),
         ),
       ];
@@ -294,7 +353,7 @@ class _RtlSdrTestScreenState extends ConsumerState<RtlSdrTestScreen> {
           ),
           const SizedBox(width: 8),
           SizedBox(
-            width: 90,
+            width: 130,
             child: PopupTextField(
               controller: row.port,
               enabled: _testing == null,
@@ -312,6 +371,11 @@ class _RtlSdrTestScreenState extends ConsumerState<RtlSdrTestScreen> {
           ),
           const SizedBox(width: 12),
           Expanded(child: _resultText(row.result)),
+          if ((row.result?.devices?.length ?? 0) > 1)
+            TextButton(
+              onPressed: _testing != null ? null : () => _chooseStick(row),
+              child: Text('Stick wählen (${row.result!.devices!.length})'),
+            ),
           IconButton(
             tooltip: 'Entfernen',
             onPressed: _rows.length > 1 && _testing == null ? () => _remove(index) : null,
@@ -335,12 +399,14 @@ class _RtlSdrTestScreenState extends ConsumerState<RtlSdrTestScreen> {
       text = 'rtl_tcp – Server unterstützt Standort und Antenne nicht';
       color = Colors.white70;
     } else {
-      text = [
-        if (r.deviceName != null) '„${r.deviceName}“',
-        'Standort: ${r.location ?? 'nicht angegeben'}',
-        'Antenne: ${r.antenna ?? 'nicht angegeben'}',
-      ].join(' · ');
-      color = Colors.greenAccent;
+      // The `devices` entry of this port carries state and busy_by too.
+      final port = r.device?.port;
+      final stick = r.devices?.where((s) => port != null && s.port == port).firstOrNull ??
+          r.device ??
+          const RtlStick();
+      text = _stickDetails(stick, withName: true);
+      final trouble = stick.busyBy != null || (stick.stateText != null && stick.state != 'idle');
+      color = trouble ? Colors.orangeAccent : Colors.greenAccent;
     }
     final details = [
       if (r.protocol != null) 'Protokoll: ${r.protocol!.label}',

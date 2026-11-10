@@ -41,6 +41,19 @@ class RtlSdrService {
     _client = null;
   }
 
+  /// "Testen": what is behind host:port, without taking the stick where
+  /// possible. First the info HELLO ("RTLI", rtltcp.server ≥ 1.8:
+  /// server_info and all sticks of the server, nothing is opened). A server
+  /// answering "RTL0" to that is classic rtl_tcp or an older rtltcp.server -
+  /// a normal connect tells them apart (and briefly takes the stick).
+  Future<RtlConnectResult> inspect({required String host, required int port}) async {
+    final info = await _RtlTcpTestClient(_statsController, _messageController, info: true).connect(host, port);
+    if (!info.connected || info.protocol == RtlTcpProtocol.jayExtended) return info;
+    final result = await connect(host: host, port: port);
+    await disconnect();
+    return result;
+  }
+
   Future<void> setFrequencyHz(int hz) async => _client?.command(0x01, hz);
 
   Future<void> setSampleRateHz(int hz) async => _client?.command(0x02, hz);
@@ -72,9 +85,14 @@ enum RtlTcpProtocol {
 /// framed v2 stream (u8 type | u32 length | payload), parsed byte by byte as
 /// it arrives - I/Q payloads are only counted.
 class _RtlTcpTestClient {
-  _RtlTcpTestClient(this._stats, this._messages);
+  _RtlTcpTestClient(this._stats, this._messages, {this.info = false});
 
   static const _helloV2 = [0xF2, 0x52, 0x54, 0x4C, 0x32]; // F2 "RTL2"
+  static const _helloInfo = [0xF2, 0x52, 0x54, 0x4C, 0x49]; // F2 "RTLI"
+
+  // Info HELLO: server_info + devices, then the server closes.
+  final bool info;
+  List<RtlStick>? _devices;
   static const _frameIq = 0x01;
   static const _frameJson = 0x02;
   static const _frameCommand = 0x03;
@@ -117,13 +135,17 @@ class _RtlTcpTestClient {
     final handshake = _handshake = Completer<RtlConnectResult>();
     // HELLO before reading anything; a classic server ignores it as an
     // unknown command.
-    socket.add(_helloV2);
+    socket.add(info ? _helloInfo : _helloV2);
     socket.listen(
       _onData,
       onError: (Object e) => _end('Verbindung zum rtl_tcp-Server unterbrochen ($e)'),
-      onDone: () => _end(_protocol == null
-          ? 'rtl_tcp-Server hat die Verbindung abgelehnt (belegt oder kein Stick bereit)'
-          : 'Verbindung zum rtl_tcp-Server beendet'),
+      onDone: () {
+        // The info answer ends with the server closing - normal there.
+        if (info && _serverInfo != null) _completeV2();
+        _end(_protocol == null
+            ? 'rtl_tcp-Server hat die Verbindung abgelehnt (belegt oder kein Stick bereit)'
+            : 'Verbindung zum rtl_tcp-Server beendet');
+      },
       cancelOnError: true,
     );
     _socket = socket;
@@ -131,7 +153,7 @@ class _RtlTcpTestClient {
       _handshakeTimeout,
       onTimeout: () => const RtlConnectResult(connected: false, error: 'rtl_tcp-Server antwortet nicht'),
     );
-    if (!result.connected) {
+    if (!result.connected || info) {
       await close();
       return result;
     }
@@ -153,7 +175,7 @@ class _RtlTcpTestClient {
   void _end(String message) {
     if (_handshake != null) {
       _finishHandshake(RtlConnectResult(connected: false, error: message));
-    } else if (_socket != null && !_messages.isClosed) {
+    } else if (_socket != null && !info && !_messages.isClosed) {
       _messages.add(RtlServerMessage(isError: true, text: message));
     }
     close();
@@ -170,12 +192,12 @@ class _RtlTcpTestClient {
       final magic = String.fromCharCodes(header.sublist(0, 4));
       if (magic == 'RTL0') {
         _protocol = RtlTcpProtocol.classic;
-        final info = ByteData.sublistView(header, 4, 12);
+        final dongle = ByteData.sublistView(header, 4, 12);
         _finishHandshake(RtlConnectResult(
           connected: true,
           protocol: RtlTcpProtocol.classic,
-          tunerType: info.getUint32(0),
-          tunerGainCount: info.getUint32(4),
+          tunerType: dongle.getUint32(0),
+          tunerGainCount: dongle.getUint32(4),
         ));
       } else if (magic == 'RTL2') {
         _protocol = RtlTcpProtocol.jayExtended;
@@ -231,15 +253,9 @@ class _RtlTcpTestClient {
     if (decoded is Map<String, dynamic>) _onMessage(decoded);
   }
 
-  // A non-empty string field of server_info.device (or a map inside it).
-  String? _deviceField(String key, [String? inside]) {
-    Object? map = _serverInfo?['device'];
-    if (inside != null) map = map is Map ? map[inside] : null;
-    final value = map is Map ? map[key] : null;
-    return value is String && value.trim().isNotEmpty ? value.trim() : null;
-  }
+  RtlStick? get _device => RtlStick.fromJson(_serverInfo?['device']);
 
-  String? get _deviceName => _deviceField('name');
+  String? get _deviceName => _device?.name;
 
   String get _stick => _deviceName == null ? 'USB-Stick am rtl_tcp-Server' : '„$_deviceName“';
 
@@ -252,6 +268,10 @@ class _RtlTcpTestClient {
           return;
         }
         _serverInfo = msg;
+      case 'devices':
+        final list = msg['devices'];
+        _devices = list is List ? list.map(RtlStick.fromJson).whereType<RtlStick>().toList() : const [];
+        if (info && _serverInfo != null) _completeV2();
       case 'status':
         final tuner = msg['tuner'];
         if (tuner is Map<String, dynamic>) _tuner = tuner;
@@ -306,11 +326,8 @@ class _RtlTcpTestClient {
       protocol: RtlTcpProtocol.jayExtended,
       tunerType: tunerType is int ? tunerType : null,
       tunerGainCount: gains is List ? gains.length : null,
-      deviceName: _deviceName,
-      // Draft format, see rtltcp.server docs/protocol-v2.md; a remote
-      // stick's site stands in for a missing location.
-      location: _deviceField('location') ?? _deviceField('site', 'remote'),
-      antenna: _deviceField('antenna'),
+      device: _device,
+      devices: _devices,
       server: [_serverInfo?['server'], _serverInfo?['version']].whereType<String>().join(' '),
     ));
   }
@@ -351,31 +368,106 @@ class RtlConnectResult {
     this.protocol,
     this.tunerType,
     this.tunerGainCount,
-    this.deviceName,
-    this.location,
-    this.antenna,
+    this.device,
+    this.devices,
     this.server,
     this.error,
   });
 
   final bool connected;
 
-  /// What the server answered to HELLO_V2.
+  /// What the server answered to the HELLO.
   final RtlTcpProtocol? protocol;
   final int? tunerType;
   final int? tunerGainCount;
 
-  /// rtl_tcp Jay extended only: the stick's display name (server_info).
-  final String? deviceName;
+  /// rtl_tcp Jay extended only: the stick behind this port (server_info).
+  final RtlStick? device;
 
-  /// rtl_tcp Jay extended only, when the server has them: the stick's
-  /// location name and antenna type.
-  final String? location;
-  final String? antenna;
+  /// Info HELLO on rtltcp.server ≥ 1.8 only: all sticks of the server.
+  final List<RtlStick>? devices;
+
+  String? get deviceName => device?.name;
+  String? get location => device?.location;
+  String? get antenna => device?.antenna;
 
   /// rtl_tcp Jay extended only: e.g. "rtltcp.server 1.5.0".
   final String? server;
   final String? error;
+}
+
+/// One stick as rtl_tcp Jay extended describes it - server_info.device or an
+/// entry of `devices` (rtltcp.server docs/protocol-v2.md §4.1, §4.5). Empty
+/// strings count as not set.
+class RtlStick {
+  const RtlStick({
+    this.name,
+    this.serial,
+    this.port,
+    this.source,
+    this.remoteInstance,
+    this.remoteSite,
+    this.location,
+    this.antenna,
+    this.state,
+    this.busyBy,
+    this.tuner,
+  });
+
+  final String? name;
+  final String? serial;
+  final int? port;
+
+  /// "usb" (at the server) or "remote" (shared from another site).
+  final String? source;
+  final String? remoteInstance;
+  final String? remoteSite;
+
+  /// Location name; a remote stick's site stands in when it is missing.
+  final String? location;
+  final String? antenna;
+
+  /// `devices` only: ready | starting | device_not_ready | device_lost | idle.
+  final String? state;
+
+  /// `devices` only: who holds the stick; null = free.
+  final String? busyBy;
+  final String? tuner;
+
+  bool get isRemote => source == 'remote';
+
+  static String? _str(Object? map, String key) {
+    final value = map is Map ? map[key] : null;
+    return value is String && value.trim().isNotEmpty ? value.trim() : null;
+  }
+
+  static RtlStick? fromJson(Object? json) {
+    if (json is! Map) return null;
+    final remote = json['remote'];
+    final port = json['port'];
+    return RtlStick(
+      name: _str(json, 'name'),
+      serial: _str(json, 'serial'),
+      port: port is int ? port : null,
+      source: _str(json, 'source'),
+      remoteInstance: _str(remote, 'instance'),
+      remoteSite: _str(remote, 'site'),
+      location: _str(json, 'location') ?? _str(remote, 'site'),
+      antenna: _str(json, 'antenna'),
+      state: _str(json, 'state'),
+      busyBy: _str(json, 'busy_by'),
+      tuner: _str(json, 'tuner'),
+    );
+  }
+
+  /// German text for [state], null when there is nothing to say.
+  String? get stateText => switch (state) {
+        'starting' => 'startet',
+        'device_not_ready' => 'nicht bereit',
+        'device_lost' => 'getrennt',
+        'idle' => 'ruht',
+        _ => null,
+      };
 }
 
 class RtlServerMessage {

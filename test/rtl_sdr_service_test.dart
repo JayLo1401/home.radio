@@ -7,6 +7,33 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:home_radio/data/services/rtl_sdr_service.dart';
 
 const _hello = [0xF2, 0x52, 0x54, 0x4C, 0x32];
+const _helloInfo = [0xF2, 0x52, 0x54, 0x4C, 0x49];
+
+Uint8List _rtl0() {
+  final h = ByteData(12)
+    ..setUint32(4, 5)
+    ..setUint32(8, 29);
+  h.buffer.asUint8List().setRange(0, 4, 'RTL0'.codeUnits);
+  return h.buffer.asUint8List();
+}
+
+/// A fake server for any number of connections: [script] gets each
+/// connection and the HELLO it started with.
+Future<ServerSocket> _multiServer(void Function(Socket s, List<int> hello) script) async {
+  final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+  server.listen((s) {
+    final got = <int>[];
+    var started = false;
+    s.listen((data) {
+      got.addAll(data);
+      if (!started && got.length >= 5) {
+        started = true;
+        script(s, got.sublist(0, 5));
+      }
+    }, onError: (_) {});
+  });
+  return server;
+}
 
 Uint8List _frame(int type, List<int> payload) {
   final b = ByteData(5 + payload.length)
@@ -37,6 +64,72 @@ Future<ServerSocket> _server(void Function(Socket s) script, {Completer<List<int
 }
 
 void main() {
+  test('inspect: info HELLO lists all sticks without taking one', () async {
+    final hellos = <List<int>>[];
+    final server = await _multiServer((s, hello) {
+      hellos.add(hello);
+      s.add(Uint8List(12)..setRange(0, 4, 'RTL2'.codeUnits));
+      s.add(_json({
+        'type': 'server_info',
+        'auth': 'none',
+        'device': {
+          'name': 'Standort1 Stick 1',
+          'port': 1235,
+          'source': 'remote',
+          'remote': {'instance': 'Funkfreund Max', 'site': 'Standort1'},
+          'location': 'Wien Dach',
+          'antenna': 'DAB-Rundstrahler',
+        },
+      }));
+      s.add(_json({
+        'type': 'devices',
+        'devices': [
+          {'port': 1234, 'name': 'Dach', 'source': 'usb', 'state': 'idle'},
+          {
+            'port': 1235,
+            'name': 'Standort1 Stick 1',
+            'source': 'remote',
+            'location': 'Wien Dach',
+            'antenna': 'DAB-Rundstrahler',
+            'state': 'ready',
+            'busy_by': '192.168.1.20',
+          },
+        ],
+      }));
+      s.close();
+    });
+    final service = RtlSdrService();
+    final r = await service.inspect(host: '127.0.0.1', port: server.port);
+    expect(hellos, [_helloInfo]);
+    expect(r.connected, isTrue);
+    expect(r.protocol, RtlTcpProtocol.jayExtended);
+    expect(r.device!.remoteInstance, 'Funkfreund Max');
+    expect(r.location, 'Wien Dach');
+    expect(r.devices!.map((d) => d.port), [1234, 1235]);
+    expect(r.devices![0].antenna, isNull);
+    expect(r.devices![0].stateText, 'ruht');
+    expect(r.devices![1].busyBy, '192.168.1.20');
+    await service.dispose();
+    await server.close();
+  });
+
+  test('inspect: RTL0 to the info HELLO falls back to a normal connect', () async {
+    final hellos = <List<int>>[];
+    final server = await _multiServer((s, hello) {
+      hellos.add(hello);
+      s.add(_rtl0());
+    });
+    final service = RtlSdrService();
+    final r = await service.inspect(host: '127.0.0.1', port: server.port);
+    expect(hellos, [_helloInfo, _hello]);
+    expect(r.connected, isTrue);
+    expect(r.protocol, RtlTcpProtocol.classic);
+    expect(r.devices, isNull);
+    expect(await service.isConnected(), isFalse);
+    await service.dispose();
+    await server.close();
+  });
+
   test('classic rtl_tcp: RTL0 header, raw commands', () async {
     final received = Completer<List<int>>();
     final server = await _server((s) {

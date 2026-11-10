@@ -516,6 +516,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (_isDabSelected) await _resumeCurrentPlayback();
   }
 
+  /// Back from the settings: the receiver follows the (possibly new) default
+  /// source, and a station interrupted there plays again.
+  Future<void> _afterSettings() async {
+    if (!mounted || !ref.read(receiverInterruptedProvider)) return;
+    await _initDabServer();
+    await _afterReceiverScreen();
+  }
+
   /// Plays what another screen asked for (see [playRequestProvider]).
   void _onPlayRequest(PlayRequest? request) {
     if (request == null) return;
@@ -895,9 +903,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         builder: (_) => const InternetRadioSearchScreen(),
                       ),
                     ),
-                    onOpenSettings: () => Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const SettingsScreen()),
-                    ),
+                    // The receiver settings may have changed the default
+                    // rtl_tcp server or freed it for "Testen".
+                    onOpenSettings: () => Navigator.of(context)
+                        .push(MaterialPageRoute(builder: (_) => const SettingsScreen()))
+                        .then((_) => _afterSettings()),
                   ),
                   Expanded(
                     child: Row(
