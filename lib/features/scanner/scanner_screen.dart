@@ -5,18 +5,25 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers.dart';
+import '../../data/models/aprs.dart';
 import '../../data/models/band_plan.dart';
 import '../../data/repositories/settings_repository.dart';
 import '../../data/services/dab_rtlsdr_service.dart' show DabRtlSdrService;
+import '../../core/popup_text_field.dart' show showTextInputDialog;
 import '../shared/logo_picker_dialog.dart' show connectDecoder;
 import 'waterfall_view.dart';
 
-/// Just listening in on a band (CB radio, airband) - full screen and
-/// separate from everyday radio: no stations, no favorites. Shows every
-/// channel within the receiver's window, green while something is on air,
-/// with modulation (auto-detected or fixed), squelch, a scan that stops on
-/// activity, and a selectable bandwidth (the sample rate - over rtl_tcp it
-/// decides how much the network has to carry).
+/// Just listening in on a band (CB radio, airband, amateur radio, a free
+/// range) - full screen and separate from everyday radio: no stations, no
+/// favorites. Shows every channel within the receiver's window, green while
+/// something is on air, with modulation (auto-detected or fixed), squelch,
+/// tuner gain, a scan that stops on activity, and a selectable bandwidth
+/// (the sample rate - over rtl_tcp it decides how much the network has to
+/// carry).
+///
+/// "Bandplan": tuning into another part of the band (e.g. from the SSB part
+/// of 2 m into the FM repeaters) switches modulation and filter width to
+/// what's used there, as listed in [BandPlan.segments].
 class ScannerScreen extends ConsumerStatefulWidget {
   final BandPlan plan;
 
@@ -50,6 +57,16 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
   String? _sourceWarning; // 'connectionMessage' of the receiver's source
   bool _scanning = false;
 
+  /// Follow the band plan (see [ScannerScreen]).
+  bool _bandPlanAuto = true;
+
+  /// Fine tuning off the channel (SSB/CW), in Hz.
+  int _fineHz = 0;
+
+  /// Tuner gain step, -1 = automatic; [_gainDb] is the gain in effect.
+  int _gainIndex = -1;
+  double? _gainDb;
+
   // The window: its centre and the channels inside it.
   int _centerHz = 0;
   List<BandChannel> _window = const [];
@@ -80,6 +97,12 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
   DateTime _lastTuneAt = DateTime.now();
 
   BandChannel get _channel => _plan.channels[_index];
+  BandSegment? get _segment => _plan.segmentAt(_channel.freqHz);
+  int get _tunedHz => _channel.freqHz + _fineHz;
+
+  /// CW is USB with a narrow filter for the receiver.
+  static String _nativeMode(String mode) => mode == 'cw' ? 'usb' : mode;
+  bool get _fineTunable => _mode == 'usb' || _mode == 'lsb' || _mode == 'cw';
 
   @override
   void initState() {
@@ -102,6 +125,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     _screenFocus.dispose();
     _waterfallFocus.dispose();
     Future.microtask(() => _stepOverride.set(null));
+    if (_decoderSent ?? false) _rx.nbSetPacketDecoder(DabRtlSdrService.packetOff);
     _rx.nbStop();
     _sub?.cancel();
     super.dispose();
@@ -181,8 +205,25 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
 
   bool _inWindow(int freqHz) => (freqHz - _centerHz).abs() <= _usableHz ~/ 2;
 
+  /// Auto modulation was picked (CB): the band plan keeps it wherever AM or
+  /// FM is used - the receiver tells those apart itself - and only sets SSB
+  /// parts to their sideband, back to Auto outside them.
+  bool _preferAuto = false;
+
+  /// The band plan's modulation and filter width for [segment] - only when
+  /// [_bandPlanAuto] is on and the band offers that modulation.
+  void _takeSegmentSettings(BandSegment? segment) {
+    if (!_bandPlanAuto || segment == null || !_plan.modes.contains(segment.mode)) return;
+    final autoFits = _preferAuto && _plan.modes.contains('auto') && (segment.mode == 'am' || segment.mode == 'fm');
+    _mode = autoFits ? 'auto' : segment.mode;
+    // Auto picks the width per detected modulation.
+    _bandwidthHz = autoFits ? 0 : segment.bandwidthHz;
+    _detectedMode = null;
+  }
+
   Future<void> _start() async {
     _sampleRate = await _settings.getNbSampleRate();
+    _bandPlanAuto = await _settings.getNbBandPlanAuto();
     final variants = widget.variants;
     if (variants != null && !_variantLoaded) {
       _variantLoaded = true;
@@ -196,6 +237,11 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
       _plan = cbBandPlan(all80: _cbAll80);
       _index = _plan.channels.length ~/ 2;
     }
+    // A band's usual start (e.g. 2 m on the FM calling channel).
+    if (_plan.defaultFreqHz case final hz?) {
+      final i = _plan.channels.indexWhere((c) => c.freqHz == hz);
+      if (i >= 0) _index = i;
+    }
     final filters = await _settings.getNbFilters(_plan.id);
     _bandwidthHz = filters.bandwidthHz;
     _noiseBlanker = filters.noiseBlanker;
@@ -208,6 +254,14 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
       if (_plan.modes.contains(last.mode)) _mode = last.mode;
       _squelchDb = last.squelchDb;
     }
+    _preferAuto = _mode == 'auto';
+    // Without a plan entry the remembered or first modulation stays.
+    _takeSegmentSettings(_segment);
+    if (!_plan.modes.contains(_mode)) _mode = _plan.modes.first;
+    _fineHz = 0;
+    _gainIndex = await _settings.getNbGain(_plan.id);
+    _homeLat = await _settings.getWeatherLat();
+    _homeLon = await _settings.getWeatherLon();
     _placeWindow(_channel.freqHz);
     // The home screen tunes its station in again once back.
     ref.read(receiverInterruptedProvider.notifier).set(true);
@@ -219,8 +273,8 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
       sampleRate: _sampleRate,
       centerHz: _centerHz,
       channelsHz: [for (final c in _window) c.freqHz],
-      freqHz: _channel.freqHz,
-      mode: _mode,
+      freqHz: _tunedHz,
+      mode: _nativeMode(_mode),
       squelchDb: _squelchDb,
     );
     if (mounted) {
@@ -229,12 +283,52 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
         _failed = !ok;
       });
     }
-    if (ok) await _applyFilters();
+    if (ok) {
+      await _applyFilters();
+      final db = await _rx.nbSetGain(_gainIndex);
+      if (mounted && _gainIndex >= 0) setState(() => _gainDb = db);
+      _decoderSent = null; // a new start: send the decoder state again
+      await _syncDecoder();
+    }
   }
 
-  /// Modulations whose filter widths are of the same order: SSB, wideband
-  /// FM, the rest.
+  // --- APRS packet decoder ---
+
+  /// The user's choice for the packet decoder; null = automatic (on at
+  /// the APRS frequencies, see aprsFrequenciesHz).
+  bool? _aprsChoice;
+  bool? _decoderSent;
+  final List<AprsPacket> _packets = [];
+  double _homeLat = SettingsRepository.defaultLat, _homeLon = SettingsRepository.defaultLon;
+
+  bool get _fmLike => _mode == 'fm' || _mode == 'auto';
+  bool get _decoderOn => _fmLike && (_aprsChoice ?? aprsFrequenciesHz.contains(_tunedHz));
+
+  /// Tells the receiver whether to decode packets - after every tune or
+  /// modulation change.
+  Future<void> _syncDecoder() async {
+    final on = _decoderOn;
+    if (on == _decoderSent) return;
+    _decoderSent = on;
+    await _rx.nbSetPacketDecoder(on ? DabRtlSdrService.packetAprs : DabRtlSdrService.packetOff);
+  }
+
+  void _onPacket(Map<String, dynamic> event) {
+    if ((event['kind'] as int? ?? DabRtlSdrService.packetAprs) != DabRtlSdrService.packetAprs) return;
+    final bytes = aprsFrameFromEvent(event);
+    if (bytes == null) return;
+    final packet = parseAx25(bytes);
+    if (packet == null) return;
+    setState(() {
+      _packets.insert(0, packet);
+      if (_packets.length > 200) _packets.removeLast();
+    });
+  }
+
+  /// Modulations whose filter widths are of the same order: CW, SSB,
+  /// wideband FM, the rest.
   String get _widthFamily => switch (_mode) {
+    'cw' => 'cw',
     'usb' || 'lsb' => 'ssb',
     'wfm' => 'wfm',
     _ => 'narrow',
@@ -242,13 +336,32 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
 
   /// Filter widths offered for the current modulation (0 = automatic).
   List<int> get _bandwidthChoices => switch (_widthFamily) {
+    'cw' => const [0, 1000, 1500, 1800],
     'ssb' => const [0, 1800, 2400, 2700, 3000],
     'wfm' => const [0, 50000, 100000, 150000, 200000],
-    _ => const [0, 6000, 8330, 10000, 12500],
+    _ => const [0, 6000, 8000, 8330, 10000, 12500],
   };
 
-  Future<void> _applyFilters() =>
-      _rx.nbSetFilters(bandwidthHz: _bandwidthHz, noiseBlanker: _noiseBlanker, voiceFilter: _voiceFilter, agc: _agc);
+  /// The filter width in effect (for the waterfall's shading).
+  int get _effectiveBandwidthHz {
+    if (_bandwidthHz > 0) return _bandwidthHz;
+    return switch (_mode == 'auto' ? (_detectedMode ?? 'fm') : _mode) {
+      'cw' => 1000,
+      'usb' || 'lsb' => 2700,
+      'am' => 9500,
+      'wfm' => 100000,
+      _ => 10500,
+    };
+  }
+
+  // CW: the narrowest the receiver has (passband 300-1300 Hz above the
+  // tuned frequency).
+  Future<void> _applyFilters() => _rx.nbSetFilters(
+    bandwidthHz: _mode == 'cw' && _bandwidthHz == 0 ? 1000 : _bandwidthHz,
+    noiseBlanker: _noiseBlanker,
+    voiceFilter: _voiceFilter,
+    agc: _agc,
+  );
 
   Future<void> _setFilters({int? bandwidthHz, bool? noiseBlanker, bool? voiceFilter, String? agc}) async {
     setState(() {
@@ -257,15 +370,17 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
       _voiceFilter = voiceFilter ?? _voiceFilter;
       _agc = agc ?? _agc;
     });
-    await _settings.setNbFilters(
-      _plan.id,
-      bandwidthHz: _bandwidthHz,
-      noiseBlanker: _noiseBlanker,
-      voiceFilter: _voiceFilter,
-      agc: _agc,
-    );
+    await _saveFilters();
     await _applyFilters();
   }
+
+  Future<void> _saveFilters() => _settings.setNbFilters(
+    _plan.id,
+    bandwidthHz: _bandwidthHz,
+    noiseBlanker: _noiseBlanker,
+    voiceFilter: _voiceFilter,
+    agc: _agc,
+  );
 
   void _onEvent(Map<String, dynamic> event) {
     if (!mounted) return;
@@ -296,10 +411,13 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
         });
       case 'nbSpectrum':
         setState(() {
-          _spectrum = (event['binsDb'] as List).map((v) => (v as num).toDouble()).toList();
+          _spectrum = [for (final v in event['binsDb'] as List) (v as num).toDouble()];
           _spectrumCenterHz = event['centerHz'] as int;
           _spectrumSpanHz = event['spanHz'] as int;
+          _gainDb = (event['gainDb'] as num?)?.toDouble() ?? _gainDb;
         });
+      case 'nbPacket':
+        _onPacket(event);
       case 'connectionMessage':
         final isError = event['isError'] as bool? ?? false;
         final message = (event['message'] as String?)?.trim() ?? '';
@@ -352,14 +470,21 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
       _placeWindow(_channel.freqHz);
     });
     await _rx.nbSetChannels(centerHz: _centerHz, channelsHz: [for (final c in _window) c.freqHz]);
-    await _rx.nbTune(freqHz: _channel.freqHz, mode: _mode);
+    await _rx.nbTune(freqHz: _tunedHz, mode: _nativeMode(_mode));
+    await _syncDecoder();
     _remember();
   }
 
-  Future<void> _select(int index) async {
+  /// Tunes channel [index], [fineHz] off it. Entering another part of the
+  /// band takes over its settings (see [_takeSegmentSettings]).
+  Future<void> _select(int index, {int fineHz = 0}) async {
+    final oldSegment = _segment;
+    final oldMode = _mode, oldWidth = _bandwidthHz;
     setState(() {
       _index = index.clamp(0, _plan.channels.length - 1);
+      _fineHz = fineHz;
       _detectedMode = null;
+      if (_segment != oldSegment) _takeSegmentSettings(_segment);
     });
     _lastTuneAt = DateTime.now();
     final freq = _channel.freqHz;
@@ -367,11 +492,91 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
       setState(() => _placeWindow(freq));
       await _rx.nbSetChannels(centerHz: _centerHz, channelsHz: [for (final c in _window) c.freqHz]);
     }
-    await _rx.nbTune(freqHz: freq, mode: _mode);
+    await _rx.nbTune(freqHz: _tunedHz, mode: _nativeMode(_mode));
+    await _syncDecoder();
+    if (_mode != oldMode || _bandwidthHz != oldWidth) {
+      await _saveFilters();
+      await _applyFilters();
+    }
     _remember();
   }
 
-  void _remember() => _settings.setNbLast(_plan.id, freqHz: _channel.freqHz, mode: _mode, squelchDb: _squelchDb);
+  /// Free band scan: tunes [hz] - the nearest channel, the rest as fine
+  /// offset (so e.g. 174,928 MHz is exact on a 100 kHz raster).
+  Future<void> _jumpTo(int hz) async {
+    final ch = _plan.channels;
+    var lo = 0, hi = ch.length - 1;
+    while (lo < hi) {
+      final mid = (lo + hi) ~/ 2;
+      if (ch[mid].freqHz < hz) {
+        lo = mid + 1;
+      } else {
+        hi = mid;
+      }
+    }
+    var i = lo;
+    if (i > 0 && (ch[i - 1].freqHz - hz).abs() < (ch[i].freqHz - hz).abs()) i--;
+    final fine = (hz - ch[i].freqHz).clamp(-25000, 25000);
+    await _select(i, fineHz: fine);
+  }
+
+  /// "Springen zu…": the plan's jump targets, pickable with the remote.
+  Future<void> _pickJump() async {
+    final hz = await showDialog<int>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('Springen zu…'),
+        children: [
+          for (final (i, (name, hz)) in _plan.jumpTargets.indexed)
+            ListTile(
+              autofocus: i == 0,
+              onTap: () => Navigator.of(context).pop(hz),
+              title: Text(name),
+              trailing: Text('${formatMhzAuto(hz)} MHz', style: const TextStyle(color: Colors.white54)),
+            ),
+        ],
+      ),
+    );
+    if (hz != null) await _jumpTo(hz);
+  }
+
+  /// "Frequenz…": any frequency in MHz within the stick's range.
+  Future<void> _enterFrequency() async {
+    final text = await showTextInputDialog(
+      context,
+      title: 'Frequenz (MHz)',
+      initialValue: formatMhzAuto(_tunedHz),
+      hint: 'z. B. 145,500',
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+    );
+    final mhz = double.tryParse(text?.trim().replaceAll(',', '.') ?? '');
+    if (mhz == null) return;
+    final hz = (mhz * 1e6).round();
+    if (hz < _plan.lowHz || hz > _plan.highHz) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Der Stick empfängt ${formatMhz(_plan.lowHz, decimals: 0)}–${formatMhz(_plan.highHz, decimals: 0)} MHz.')),
+        );
+      }
+      return;
+    }
+    await _jumpTo(hz);
+  }
+
+  /// SSB/CW: in 100 Hz steps around the channel.
+  Future<void> _fineTune(int deltaHz) async {
+    setState(() => _fineHz = (_fineHz + deltaHz).clamp(-25000, 25000));
+    await _rx.nbTune(freqHz: _tunedHz, mode: _nativeMode(_mode));
+    await _syncDecoder();
+  }
+
+  // The Auto preference is kept even while an SSB part uses its sideband.
+  void _remember() => _settings.setNbLast(
+    _plan.id,
+    freqHz: _channel.freqHz,
+    mode: _preferAuto ? 'auto' : _mode,
+    squelchDb: _squelchDb,
+  );
 
   /// Scan: stays while the squelch is open (and a moment after), then moves
   /// on to the next active channel - within the current window only; it
@@ -399,11 +604,14 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     final family = _widthFamily;
     setState(() {
       _mode = mode;
+      _preferAuto = mode == 'auto';
       _detectedMode = null;
+      if (!_fineTunable) _fineHz = 0;
     });
-    await _rx.nbTune(freqHz: _channel.freqHz, mode: mode);
-    // SSB, AM/FM and wideband FM widths differ by orders of magnitude - back
-    // to auto.
+    await _rx.nbTune(freqHz: _tunedHz, mode: _nativeMode(mode));
+    await _syncDecoder();
+    // CW, SSB, AM/FM and wideband FM widths differ by orders of magnitude -
+    // back to auto.
     if (family != _widthFamily && _bandwidthHz != 0) {
       await _setFilters(bandwidthHz: 0);
     } else {
@@ -412,10 +620,33 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     _remember();
   }
 
+  Future<void> _setBandPlanAuto(bool on) async {
+    setState(() => _bandPlanAuto = on);
+    await _settings.setNbBandPlanAuto(on);
+    if (!on) return;
+    final oldMode = _mode;
+    setState(() => _takeSegmentSettings(_segment));
+    if (_mode != oldMode) await _rx.nbTune(freqHz: _tunedHz, mode: _nativeMode(_mode));
+    await _syncDecoder();
+    await _saveFilters();
+    await _applyFilters();
+    _remember();
+  }
+
   Future<void> _setSquelch(double db) async {
     setState(() => _squelchDb = db.clamp(0, 40));
     await _rx.nbSetSquelch(_squelchDb);
     _remember();
+  }
+
+  /// One gain step up/down; below the lowest step is "Auto".
+  Future<void> _stepGain(int delta) async {
+    final next = (_gainIndex + delta).clamp(-1, DabRtlSdrService.nbGainSteps - 1);
+    if (next == _gainIndex) return;
+    setState(() => _gainIndex = next);
+    await _settings.setNbGain(_plan.id, next);
+    final db = await _rx.nbSetGain(next);
+    if (mounted) setState(() => _gainDb = db);
   }
 
   Future<void> _setSampleRate(int rate) async {
@@ -430,14 +661,43 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     await _start();
   }
 
+  static Color _modeColour(String mode) => switch (mode) {
+    'cw' => const Color(0xFF9B59B6),
+    'usb' || 'lsb' => const Color(0xFF2E86DE),
+    'am' => const Color(0xFFE67E22),
+    'wfm' => const Color(0xFF16A085),
+    _ => const Color(0xFF27AE60),
+  };
+
+  // The band plan for the waterfall, built once per plan.
+  BandPlan? _segmentsFor;
+  List<WaterfallSegment> _waterfallSegments = const [];
+
+  List<WaterfallSegment> get _segmentsOfPlan {
+    if (!identical(_segmentsFor, _plan)) {
+      _segmentsFor = _plan;
+      // Unnamed parts (the free scan's gaps between bands) aren't drawn.
+      _waterfallSegments = _plan.segments.length < 2
+          ? const []
+          : [
+              for (final s in _plan.segments)
+                if (s.name.isNotEmpty) (lowHz: s.lowHz, highHz: s.highHz, name: s.name, color: _modeColour(s.mode)),
+            ];
+    }
+    return _waterfallSegments;
+  }
+
   @override
   Widget build(BuildContext context) {
     final channel = _channel;
+    final segment = _segment;
     final signal = ((_snrDb ?? 0) / 40).clamp(0.0, 1.0);
     final signalColor = _snrDb == null
         ? Colors.white24
         : (_snrDb! >= 20 ? Colors.greenAccent : (_snrDb! >= 10 ? Colors.amberAccent : Colors.redAccent));
-    final pagesWindow = _window.length < _plan.channels.length;
+    // Empty until _start() placed the window.
+    final pagesWindow = _window.isNotEmpty && _window.length < _plan.channels.length;
+    const muted = TextStyle(color: Colors.white70);
     return Focus(
       focusNode: _screenFocus,
       onKeyEvent: _onKey,
@@ -494,8 +754,10 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
                         children: [
                           Text(_plan.longLabel(channel), style: Theme.of(context).textTheme.headlineMedium),
                           Text(
-                            '${formatMhz(channel.freqHz)} MHz · ${modeLabel(_mode)}'
-                            '${_mode == 'auto' && _detectedMode != null ? ' → ${modeLabel(_detectedMode!)}' : ''}',
+                            '${_fineHz == 0 ? formatMhzAuto(_tunedHz) : formatMhz(_tunedHz, decimals: 4)} MHz · '
+                            '${modeLabel(_mode)}'
+                            '${_mode == 'auto' && _detectedMode != null ? ' → ${modeLabel(_detectedMode!)}' : ''}'
+                            '${segment != null && segment.name.isNotEmpty && _plan.segments.length > 1 ? ' · ${segment.name}' : ''}',
                             style: const TextStyle(color: Colors.white70, fontSize: 18),
                           ),
                         ],
@@ -537,6 +799,28 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
                         icon: const Icon(Icons.chevron_right),
                         label: const Text('Kanal'),
                       ),
+                      if (_plan.isFree) ...[
+                        OutlinedButton.icon(
+                          onPressed: _pickJump,
+                          icon: const Icon(Icons.bookmarks_outlined),
+                          label: const Text('Springen zu…'),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: _enterFrequency,
+                          icon: const Icon(Icons.dialpad),
+                          label: const Text('Frequenz…'),
+                        ),
+                      ],
+                      if (_fineTunable) ...[
+                        const Text('Fein', style: muted),
+                        IconButton(
+                          tooltip: '−100 Hz',
+                          onPressed: () => _fineTune(-100),
+                          icon: const Icon(Icons.remove),
+                        ),
+                        Text('${_fineHz >= 0 ? '+' : ''}$_fineHz Hz'),
+                        IconButton(tooltip: '+100 Hz', onPressed: () => _fineTune(100), icon: const Icon(Icons.add)),
+                      ],
                       if (widget.plan.id == 'cb')
                         for (final all80 in const [false, true])
                           ChoiceChip(
@@ -552,11 +836,41 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
                           _lastTuneAt = DateTime.now();
                         }),
                       ),
+                      if (_fmLike)
+                        Tooltip(
+                          message: 'APRS-Pakete (1200 Baud) dekodieren - auf 144,800 und 145,825 automatisch',
+                          child: FilterChip(
+                            label: const Text('APRS'),
+                            selected: _decoderOn,
+                            onSelected: (v) async {
+                              setState(() => _aprsChoice = v);
+                              await _syncDecoder();
+                            },
+                          ),
+                        ),
+                      if (_plan.segments.length > 1)
+                        Tooltip(
+                          message: 'Modulation und Filter passend zum Bereich des Bandplans',
+                          child: FilterChip(
+                            label: const Text('Bandplan'),
+                            selected: _bandPlanAuto,
+                            onSelected: _setBandPlanAuto,
+                          ),
+                        ),
                       const SizedBox(width: 8),
-                      const Text('Rauschsperre', style: TextStyle(color: Colors.white70)),
+                      const Text('Rauschsperre', style: muted),
                       IconButton(onPressed: () => _setSquelch(_squelchDb - 2), icon: const Icon(Icons.remove)),
                       Text('${_squelchDb.round()} dB'),
                       IconButton(onPressed: () => _setSquelch(_squelchDb + 2), icon: const Icon(Icons.add)),
+                      const SizedBox(width: 8),
+                      const Text('Verstärkung', style: muted),
+                      IconButton(onPressed: () => _stepGain(-1), icon: const Icon(Icons.remove)),
+                      Text(
+                        _gainIndex < 0
+                            ? 'Auto${_gainDb == null ? '' : ' (${_gainDb!.toStringAsFixed(1).replaceAll('.', ',')} dB)'}'
+                            : '${(_gainDb ?? 0).toStringAsFixed(1).replaceAll('.', ',')} dB',
+                      ),
+                      IconButton(onPressed: () => _stepGain(1), icon: const Icon(Icons.add)),
                       if (_plan.modes.length > 1)
                         for (final m in _plan.modes)
                           ChoiceChip(label: Text(modeLabel(m)), selected: _mode == m, onSelected: (_) => _setMode(m)),
@@ -592,8 +906,8 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  // Spectrum + waterfall of the window; a tap
-                  // tunes the nearest channel.
+                  // Spectrum + waterfall of the window; a tap tunes the
+                  // nearest channel (SSB/CW: right where tapped).
                   _StepFocus(
                     focusNode: _waterfallFocus,
                     onStep: (direction) => _select(_index + direction),
@@ -601,7 +915,11 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
                       bins: _spectrum,
                       centerHz: _spectrumCenterHz,
                       spanHz: _spectrumSpanHz,
-                      markHz: channel.freqHz,
+                      markHz: _tunedHz,
+                      segments: _segmentsOfPlan,
+                      bandwidthHz: _effectiveBandwidthHz,
+                      upperSideband: _mode == 'usb' || _mode == 'cw',
+                      lowerSideband: _mode == 'lsb',
                       // A band that fits into the window (CB) is shown on
                       // its own, with a little margin.
                       view: _window.length == _plan.channels.length
@@ -612,11 +930,29 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
                         final nearest = _window.reduce(
                           (a, b) => (a.freqHz - hz).abs() <= (b.freqHz - hz).abs() ? a : b,
                         );
-                        _select(_plan.channels.indexOf(nearest));
+                        final index = _plan.channels.indexOf(nearest);
+                        if (!_fineTunable) {
+                          _select(index);
+                          return;
+                        }
+                        // The segment's settings first, then right where tapped.
+                        final fine = ((hz - nearest.freqHz) / 100).round() * 100;
+                        _select(index, fineHz: fine.clamp(-25000, 25000));
                       },
                     ),
                   ),
                   const SizedBox(height: 12),
+                  // APRS: what the packet decoder received, newest first.
+                  if (_decoderOn || _packets.isNotEmpty) ...[
+                    _AprsHeader(
+                      count: _packets.length,
+                      decoding: _decoderOn,
+                      onClear: _packets.isEmpty ? null : () => setState(_packets.clear),
+                    ),
+                    for (final p in _packets.take(50))
+                      _AprsTile(packet: p, homeLat: _homeLat, homeLon: _homeLon),
+                    const SizedBox(height: 12),
+                  ],
                   if (pagesWindow)
                     Row(
                       children: [
@@ -652,7 +988,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
                     children: [
                       for (final c in _window)
                         _ChannelButton(
-                          label: c.label,
+                          label: _plan.id == 'cb' || c.name == null ? c.label : c.name!,
                           selected: c.freqHz == channel.freqHz,
                           heat: _heat(c),
                           onPressed: () => _select(_plan.channels.indexOf(c)),
@@ -859,6 +1195,145 @@ class _FilterDialogState extends State<_FilterDialog> {
       actions: [
         TextButton(autofocus: true, onPressed: () => Navigator.of(context).pop(), child: const Text('Schließen')),
       ],
+    );
+  }
+}
+
+/// "APRS · 12 Pakete" above the packet list, with a button to clear it.
+class _AprsHeader extends StatelessWidget {
+  final int count;
+  final bool decoding;
+  final VoidCallback? onClear;
+
+  const _AprsHeader({required this.count, required this.decoding, required this.onClear});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          Icon(Icons.location_on, color: decoding ? Colors.greenAccent : Colors.white38),
+          const SizedBox(width: 8),
+          Text(
+            'APRS · $count ${count == 1 ? 'Paket' : 'Pakete'}',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              decoding
+                  ? (count == 0 ? 'Dekoder läuft - warte auf Pakete…' : 'Dekoder läuft')
+                  : 'Dekoder aus',
+              style: const TextStyle(color: Colors.white54),
+            ),
+          ),
+          if (onClear != null)
+            TextButton.icon(onPressed: onClear, icon: const Icon(Icons.delete_outline), label: const Text('Leeren')),
+        ],
+      ),
+    );
+  }
+}
+
+/// One received APRS packet: sender, what it is, where (distance and
+/// direction from the home location), and its text. OK shows the details.
+class _AprsTile extends StatelessWidget {
+  final AprsPacket packet;
+  final double homeLat;
+  final double homeLon;
+
+  const _AprsTile({required this.packet, required this.homeLat, required this.homeLon});
+
+  String get _time {
+    final t = packet.receivedAt;
+    String two(int v) => v.toString().padLeft(2, '0');
+    return '${two(t.hour)}:${two(t.minute)}:${two(t.second)}';
+  }
+
+  String? get _where {
+    final km = packet.distanceKm(homeLat, homeLon);
+    if (km == null) return null;
+    final d = km < 10 ? km.toStringAsFixed(1).replaceAll('.', ',') : km.round().toString();
+    return '$d km ${packet.bearingFrom(homeLat, homeLon)}';
+  }
+
+  String get _text {
+    final p = packet;
+    return [
+      if (p.name != null) p.kind == 'Nachricht' ? 'an ${p.name}' : p.name!,
+      if (p.weather != null) p.weather!.describe(),
+      if (p.speedKmh != null) '${p.speedKmh!.round()} km/h${p.course != null ? ' · ${p.course}°' : ''}',
+      if (p.comment != null) p.comment!,
+    ].join(' · ');
+  }
+
+  void _details(BuildContext context) {
+    final p = packet;
+    String coord(double v, String pos, String neg) =>
+        '${v.abs().toStringAsFixed(5).replaceAll('.', ',')}° ${v >= 0 ? pos : neg}';
+    showDialog<void>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text('${p.source} · ${p.kind}'),
+        content: SizedBox(
+          width: 640,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Empfangen $_time'),
+              if (p.symbolName != null) Text('Symbol: ${p.symbolName}'),
+              if (p.hasPosition) Text('Position: ${coord(p.lat!, 'N', 'S')}, ${coord(p.lon!, 'O', 'W')}'),
+              if (_where != null) Text('Entfernung: $_where'),
+              if (_text.isNotEmpty) Text(_text),
+              Text('Weg: ${p.path.isEmpty ? 'direkt' : p.path.join(', ')}'),
+              const SizedBox(height: 12),
+              const Text('Rohdaten', style: TextStyle(color: Colors.white54)),
+              SelectableText(p.tnc2, style: const TextStyle(fontFamily: 'monospace', fontSize: 13)),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(autofocus: true, onPressed: () => Navigator.of(context).pop(), child: const Text('Schließen')),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final where = _where;
+    final text = _text;
+    return Card(
+      margin: const EdgeInsets.only(bottom: 4),
+      child: InkWell(
+        onTap: () => _details(context),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(width: 70, child: Text(_time, style: const TextStyle(color: Colors.white54))),
+              SizedBox(
+                width: 130,
+                child: Text(packet.source, style: const TextStyle(fontWeight: FontWeight.bold)),
+              ),
+              SizedBox(
+                width: 150,
+                child: Text(
+                  packet.symbolName != null && packet.hasPosition ? packet.symbolName! : packet.kind,
+                  style: const TextStyle(color: Colors.white70),
+                ),
+              ),
+              SizedBox(width: 110, child: Text(where ?? '', style: const TextStyle(color: Colors.greenAccent))),
+              Expanded(
+                child: Text(text, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70)),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

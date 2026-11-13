@@ -499,6 +499,37 @@ class SettingsRepository {
   Future<void> setNbFilters(String band, {required int bandwidthHz, required bool noiseBlanker, required bool voiceFilter, required String agc}) =>
       _db.setSetting('nb_filters_$band', '$bandwidthHz|$noiseBlanker|$voiceFilter|$agc');
 
+  /// Tuner gain per listening band: a gain step, -1 = automatic (default).
+  Future<int> getNbGain(String band) async => int.tryParse(await _db.getSetting('nb_gain_$band') ?? '') ?? -1;
+  Future<void> setNbGain(String band, int gainIndex) => _db.setSetting('nb_gain_$band', '$gainIndex');
+
+  /// ISM sensors: own names and hidden devices (device key -> name, or
+  /// [ismHidden]), as "key\tname" lines.
+  static const ismHidden = '␀';
+  Future<Map<String, String>> getIsmNames() async {
+    final raw = await _db.getSetting('ism_names') ?? '';
+    return {
+      for (final line in raw.split('\n'))
+        if (line.contains('\t')) line.substring(0, line.indexOf('\t')): line.substring(line.indexOf('\t') + 1),
+    };
+  }
+
+  Future<void> setIsmNames(Map<String, String> names) =>
+      _db.setSetting('ism_names', names.entries.map((e) => '${e.key}\t${e.value}').join('\n'));
+
+  /// ISM sensors: last frequency (433920000 / 868300000).
+  Future<int> getIsmFrequency() async => int.tryParse(await _db.getSetting('ism_freq') ?? '') ?? 433920000;
+  Future<void> setIsmFrequency(int hz) => _db.setSetting('ism_freq', '$hz');
+
+  /// ADS-B: a map under the radar picture (default on).
+  Future<bool> getAdsbMap() async => (await _db.getSetting('adsb_map')) != 'false';
+  Future<void> setAdsbMap(bool value) => _db.setSetting('adsb_map', '$value');
+
+  /// Listening bands: switch modulation and filter width to the band plan's
+  /// recommendation when tuning into another part of a band (default on).
+  Future<bool> getNbBandPlanAuto() async => (await _db.getSetting('nb_bandplan_auto')) != 'false';
+  Future<void> setNbBandPlanAuto(bool value) => _db.setSetting('nb_bandplan_auto', '$value');
+
   /// Last channel, modulation and squelch per listening band.
   Future<({int freqHz, String mode, double squelchDb})?> getNbLast(String band) async {
     final parts = (await _db.getSetting('$_keyNbPrefix$band'))?.split('|');
