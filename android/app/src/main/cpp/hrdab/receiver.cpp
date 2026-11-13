@@ -302,6 +302,9 @@ bool Receiver::adsbStart()
     if (running_ && mode_ != Mode::Adsb) stopLocked();
     const bool tuned = source_->setFrequency(AdsbDemod::kFrequencyHz);
     if (!tuned) HR_LOGW("adsb: tuner did not accept %u Hz", AdsbDemod::kFrequencyHz);
+    // Automatic gain starts at its ceiling (see onAdsbLevel), not wherever
+    // the last mode left it; startLocked() hands it to the stick.
+    if (nbManualGain_.load() < 0) gainIndex_ = kAdsbAutoGain;
     ring_.clear();
     ring_.interrupt();
     if (!startLocked(Mode::Adsb)) return false;
@@ -367,10 +370,27 @@ void Receiver::onAdsbFrame(const uint8_t* bytes, int length, uint32_t icao, floa
 
 void Receiver::onAdsbLevel(float rms, float clipRatio)
 {
-    // Same gain handling as NB (manual or automatic); bursts come and go,
-    // so the AGC acts as if settled (slow, mainly against overload).
-    onNbLevel(rms, clipRatio, true);
     statusTick(rms, clipRatio, {});
+    if (nbManualGain_.load() >= 0) {
+        onNbLevel(rms, clipRatio, true);  // held fixed by the user
+        return;
+    }
+    // Automatic for ADS-B: not the usual noise-level AGC - that ran to full
+    // gain, where strong signals nearby (mobile, DVB-T) swamp the stick and
+    // the short replies get lost. Start at ~40 dB, never above, step down
+    // only on clipping, and back up slowly once it's gone.
+    const auto now = std::chrono::steady_clock::now();
+    if (now - lastGainChange_ < std::chrono::milliseconds(2000)) return;
+    int g = gainIndex_;
+    if (clipRatio > 0.002f) g--;
+    else if (g < kAdsbAutoGain && clipRatio == 0.f) g++;
+    else if (g > kAdsbAutoGain) g = kAdsbAutoGain;
+    g = std::max(0, std::min(g, source_->gainCount() - 1));
+    if (g == gainIndex_) return;
+    gainIndex_ = g;
+    lastGainChange_ = now;
+    source_->setGainIndex(g);
+    HR_LOGI("ADS-B gain %.1f dB (clip %.4f)", source_->gainTenthsDb(g) / 10.0, clipRatio);
 }
 
 void Receiver::halt()

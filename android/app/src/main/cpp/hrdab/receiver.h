@@ -239,6 +239,8 @@ private:
     enum class Mode { Dab, Fm, Nb, Adsb, Ism, Acars };
 
     void statusTick(float rms, float clipRatio, const std::vector<float>& channelLevelsDb);
+    // ADS-B automatic gain: this step (~40 dB on the R820T) and never above.
+    static constexpr int kAdsbAutoGain = 22;
     std::atomic<long long> bytesRead_{0};
     std::chrono::steady_clock::time_point statusSince_{};
     double statusRmsSum_ = 0, statusClipSum_ = 0;
