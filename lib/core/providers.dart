@@ -149,7 +149,7 @@ class ShowClockDateNotifier extends Notifier<bool> {
 final showClockDateProvider = NotifierProvider<ShowClockDateNotifier, bool>(ShowClockDateNotifier.new);
 
 /// Which extra listening bands are switched on in the settings (CB radio,
-/// airband) - each gets a button in the top bar.
+/// airband) - each gets a tile in the "Funk" window (ListeningHubScreen).
 typedef ListeningBands = ({bool cb, bool ham, bool airband, bool mil});
 
 class ListeningBandsNotifier extends Notifier<ListeningBands> {

@@ -286,16 +286,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
               ),
             ),
-            // Extra listening bands, each a button in the top bar.
+            // Extra listening bands, shown in the top bar's "Funk" window.
             if (receiverMode != ReceiverMode.none) ...[
               tileToggle('CB-Funk anzeigen', listeningBands.cb, (v) {
                 ref.read(listeningBandsProvider.notifier).setCb(v);
               }),
               tileToggle('Amateurfunk anzeigen', listeningBands.ham, (v) {
                 ref.read(listeningBandsProvider.notifier).setHam(v);
-              }),
-              tileToggle('Flugfunk anzeigen', listeningBands.airband, (v) {
-                ref.read(listeningBandsProvider.notifier).setAirband(v);
               }),
               tileToggle('Militärfunk anzeigen', listeningBands.mil, (v) {
                 ref.read(listeningBandsProvider.notifier).setMil(v);
