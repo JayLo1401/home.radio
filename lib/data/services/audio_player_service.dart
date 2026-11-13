@@ -193,6 +193,16 @@ class AudioPlayerService {
     await _player.stop();
   }
 
+  /// Stops playback and the connection to the stream like [stop], but keeps
+  /// the station, so [resume] starts it again (the Stop button, and while a
+  /// listening band uses the speaker).
+  Future<void> halt() async {
+    _retryTimer?.cancel();
+    _titlePollTimer?.cancel();
+    _setTitle(null);
+    await _player.stop();
+  }
+
   /// Pause/resume in place, unlike [stop] - keeps [_currentUrl] loaded so a
   /// remote's Play/Pause/Stop keys can resume the same station rather than
   /// needing a full re-tune (see HomeScreen's key handling).
@@ -207,6 +217,7 @@ class AudioPlayerService {
     // nothing is loaded to resume, so start the stream again instead.
     if (url != null && _player.processingState == ProcessingState.idle) {
       _failedAttempts = 0;
+      _startTitlePolling(url);
       await _start(url);
       return;
     }

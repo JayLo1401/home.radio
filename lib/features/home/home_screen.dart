@@ -9,7 +9,6 @@ import '../../core/providers.dart';
 import '../../core/theme.dart';
 import '../../data/db/database.dart' show DabStation, FmStation;
 import '../../data/models/audio_quality.dart';
-import '../../data/models/band_plan.dart';
 import '../../data/models/favorite_channel.dart';
 import '../../data/repositories/dab_stations_repository.dart'
     show DabStationDisplay;
@@ -17,7 +16,7 @@ import '../../data/repositories/fm_stations_repository.dart' show FmStationDispl
 import '../../data/repositories/settings_repository.dart' show AutostartMode, ReceiverMode;
 import '../dab_stations/dab_stations_screen.dart';
 import '../fm_stations/fm_stations_screen.dart';
-import '../scanner/scanner_screen.dart';
+import '../scanner/listening_hub_screen.dart';
 import '../search_internet/internet_radio_search_screen.dart';
 import '../../data/services/update_service.dart';
 import '../settings/settings_screen.dart';
@@ -74,10 +73,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   String? _fmPs;
   String? _fmRt;
 
+  /// Stopped with the Stop button (or the remote's Stop key): nothing plays,
+  /// the receiver's connection is closed, and coming back from another
+  /// screen doesn't start anything on its own.
+  bool _stopped = false;
+
+  /// The receiver's session (rtl_tcp connection / USB stick) was closed
+  /// ([_releaseReceiver]) - the next DAB+/FM play opens it again first.
+  bool _receiverReleased = false;
+  Future<void>? _releasing;
+
+  /// Internet radio was playing when a listening band ("Funk") or the FM
+  /// screen took over the speaker - it continues once back.
+  bool _netHaltedForReceiver = false;
+
   /// Clears everything describing the previous station, before a new one
   /// starts - so nothing stale (radiotext, slideshow, signal) lingers.
   void _resetPlaybackState() {
+    _netHaltedForReceiver = false;
     setState(() {
+      _stopped = false;
       _playbackError = null;
       _icyTitle = null;
       _dabStatusText = null;
@@ -133,7 +148,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     ref.read(radioAudioHandlerProvider.future).then(
           (handler) => handler.bindControls(
             onPlay: _resumeCurrentPlayback,
-            onPause: _pauseCurrentPlayback,
+            // A real stop, as the remote's Play/Pause key (see _togglePlayPause).
+            onPause: _stopPlayback,
             onSkipNext: () => _stepStation(1),
             onSkipPrevious: () => _stepStation(-1),
           ),
@@ -508,12 +524,91 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   /// Back from a screen that tunes the receiver on its own (scans, manual
-  /// FM tuning): whatever DAB+/FM station was playing here is silent now,
-  /// so it's tuned in again.
+  /// FM tuning, listening bands): whatever DAB+/FM station was playing here
+  /// is silent now, so it's tuned in again. Internet radio halted for the
+  /// screen continues; with nothing for the receiver to do, its connection
+  /// is closed (frees the rtl_tcp server / stick).
   Future<void> _afterReceiverScreen() async {
-    if (!mounted || !ref.read(receiverInterruptedProvider)) return;
+    if (!mounted) return;
+    if (_netHaltedForReceiver) {
+      _netHaltedForReceiver = false;
+      if (ref.read(receiverInterruptedProvider)) {
+        ref.read(receiverInterruptedProvider.notifier).set(false);
+        unawaited(_releaseReceiver());
+      }
+      await ref.read(audioPlayerServiceProvider).resume();
+      return;
+    }
+    if (!ref.read(receiverInterruptedProvider)) return;
     ref.read(receiverInterruptedProvider.notifier).set(false);
-    if (_isDabSelected) await _resumeCurrentPlayback();
+    if (_isDabSelected && !_stopped) {
+      await _resumeCurrentPlayback();
+    } else {
+      await _releaseReceiver();
+    }
+  }
+
+  /// Before a screen that uses the receiver itself (listening bands, FM
+  /// tuning, DAB+ search): whatever plays here stops cleanly first, and
+  /// continues afterwards (see [_afterReceiverScreen]).
+  /// - DAB+/FM: the tune and its retries are cancelled and the receiver
+  ///   stopped. A retry left running ("Kein Signal" retunes every second)
+  ///   pulled the stick back to DAB+ under the listening band, which then
+  ///   froze.
+  /// - Internet radio: halted, it'd play over the receiver's audio.
+  Future<void> _prepareReceiverScreen() async {
+    if (_stopped) return;
+    if (_isDabSelected) {
+      _dabPlayGeneration++;
+      _receiverWanted = false;
+      await _stopReceiver();
+      ref.read(receiverInterruptedProvider.notifier).set(true);
+      if (mounted) setState(() => _dabTuned = false);
+      return;
+    }
+    final audio = ref.read(audioPlayerServiceProvider);
+    if (audio.currentUrl == null) return;
+    _netHaltedForReceiver = _playerState?.playing ?? false;
+    await audio.halt();
+  }
+
+  /// Closes the receiver's session - the rtl_tcp connection or the USB
+  /// stick - so the server/stick is free; the next play opens it again
+  /// ([_reconnectIfReleased]).
+  Future<void> _releaseReceiver() {
+    _receiverReleased = true;
+    return _releasing = ref.read(dabRtlSdrServiceProvider).resetSession();
+  }
+
+  Future<void> _reconnectIfReleased() async {
+    await _releasing;
+    if (!_receiverReleased) return;
+    _receiverReleased = false;
+    await _initDabServer();
+  }
+
+  /// The Stop button / the remote's Stop key: playback ends and the
+  /// connection is closed - for DAB+/FM the receiver's session, for internet
+  /// radio the stream. Play starts the same station again.
+  Future<void> _stopPlayback() async {
+    _netHaltedForReceiver = false;
+    setState(() => _stopped = true);
+    if (_isDabSelected) {
+      _dabPlayGeneration++; // also cancels a tune or retry in progress
+      _receiverWanted = false;
+      await _stopReceiver();
+      await _releaseReceiver();
+      ref.read(radioAudioHandlerProvider.future).then((h) => h.setPlaying(false), onError: (_) {});
+      if (mounted) {
+        setState(() {
+          _dabTuned = false;
+          _dabSnrDb = null;
+          _dabStatusText = null;
+        });
+      }
+    } else {
+      await ref.read(audioPlayerServiceProvider).halt();
+    }
   }
 
   /// Back from the settings: the receiver follows the (possibly new) default
@@ -545,6 +640,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       if (mounted) setState(() => _dabStatusText = 'Kein Radio-Empfänger eingerichtet (Einstellungen)');
       return;
     }
+    await _reconnectIfReleased();
+    if (!mounted || myGeneration != _dabPlayGeneration) return;
     if (mounted) {
       setState(() {
         _fmFreqKhz = freqKhz;
@@ -611,6 +708,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       if (mounted) setState(() => _dabStatusText = 'Kein Radio-Empfänger eingerichtet (Einstellungen)');
       return;
     }
+    await _reconnectIfReleased();
+    if (!mounted || myGeneration != _dabPlayGeneration) return;
     if (mounted) setState(() => _dabStatusText = 'Sender wird getunt…');
     final ok = await ref
         .read(dabRtlSdrServiceProvider)
@@ -683,23 +782,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return ref.read(currentDabStationProvider) != null || ref.read(currentFmStationProvider) != null;
   }
 
-  /// DAB+ has no real "pause" (it's a live broadcast) - stopping the
-  /// tune/decode pipeline is the closest equivalent, and resuming re-tunes
-  /// (see [_resumeDabAfterReconnect], reused here since it already does
-  /// exactly that for whatever's currently selected).
-  Future<void> _pauseCurrentPlayback() async {
-    if (_isDabSelected) {
-      // Also cancels a tune still in progress.
-      _dabPlayGeneration++;
-      _receiverWanted = false;
-      await _stopReceiver();
-      if (mounted) setState(() => _dabTuned = false);
-    } else {
-      await ref.read(audioPlayerServiceProvider).pause();
-    }
-  }
-
   Future<void> _resumeCurrentPlayback() async {
+    if (_stopped) setState(() => _stopped = false);
     if (_isDabSelected) {
       await _resumeDabAfterReconnect();
     } else {
@@ -707,11 +791,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
   }
 
+  /// The remote's Play/Pause key: a real stop (connection closed, see
+  /// [_stopPlayback]) rather than a pause - and play again. Also stops a
+  /// tune still in progress.
   Future<void> _togglePlayPause() async {
-    final playing = _isDabSelected
-        ? _dabTuned
-        : (_playerState?.playing ?? false);
-    await (playing ? _pauseCurrentPlayback() : _resumeCurrentPlayback());
+    final active = !_stopped &&
+        (_isDabSelected
+            ? (_dabTuned || _receiverWanted)
+            : (_playerState?.playing ?? false) ||
+                _playerState?.processingState == ProcessingState.loading ||
+                _playerState?.processingState == ProcessingState.buffering);
+    await (active ? _stopPlayback() : _resumeCurrentPlayback());
   }
 
   /// Moves to the previous/next station in whichever list the sidebar is
@@ -802,9 +892,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       _resumeCurrentPlayback();
       return KeyEventResult.handled;
     }
-    if (key == LogicalKeyboardKey.mediaPause ||
-        key == LogicalKeyboardKey.mediaStop) {
-      _pauseCurrentPlayback();
+    if (key == LogicalKeyboardKey.mediaPause || key == LogicalKeyboardKey.mediaStop) {
+      _stopPlayback();
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
@@ -813,7 +902,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     ref.listen(playRequestProvider, (_, request) => _onPlayRequest(request));
-    final bands = ref.watch(listeningBandsProvider);
     final favorites = ref.watch(favoritesStreamProvider).value ?? const [];
     final currentProgram = ref.watch(currentProgramNumberProvider);
     final currentChannel = currentProgram == null
@@ -868,36 +956,38 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     // No DAB+/FM station search without a receiver.
                     onOpenDabStations: ref.watch(receiverModeProvider) == ReceiverMode.none
                         ? null
-                        : () => Navigator.of(context)
-                            .push(MaterialPageRoute(builder: (_) => const DabStationsScreen()))
-                            .then((_) => _afterReceiverScreen()),
+                        : () async {
+                            await _prepareReceiverScreen();
+                            if (!context.mounted) return;
+                            await Navigator.of(context)
+                                .push(MaterialPageRoute(builder: (_) => const DabStationsScreen()));
+                            await _afterReceiverScreen();
+                          },
+                    // All listening bands and the free band scan in one
+                    // window (see ListeningHubScreen).
                     listeningButtons: [
                       if (ref.watch(receiverModeProvider) != ReceiverMode.none)
-                        for (final (enabled, icon, label, screen) in [
-                          (bands.cb, Icons.forum, 'CB-Funk', () => ScannerScreen(plan: cbBandPlan())),
-                          (
-                            bands.ham,
-                            Icons.cell_tower,
-                            'Amateurfunk',
-                            () => ScannerScreen(plan: hamBandPlans.first, variants: hamBandPlans),
-                          ),
-                          (bands.airband, Icons.flight, 'Flugfunk', () => ScannerScreen(plan: airBandPlan)),
-                          (bands.mil, Icons.shield_outlined, 'Militärfunk', () => ScannerScreen(plan: milBandPlan)),
-                        ])
-                          if (enabled)
-                            (
-                              icon,
-                              label,
-                              () => Navigator.of(context)
-                                  .push(MaterialPageRoute(builder: (_) => screen()))
-                                  .then((_) => _afterReceiverScreen()),
-                            ),
+                        (
+                          Icons.settings_input_antenna,
+                          'Funk',
+                          () async {
+                            await _prepareReceiverScreen();
+                            if (!context.mounted) return;
+                            await Navigator.of(context)
+                                .push(MaterialPageRoute(builder: (_) => const ListeningHubScreen()));
+                            await _afterReceiverScreen();
+                          },
+                        ),
                     ],
                     onOpenFmStations: ref.watch(receiverModeProvider) == ReceiverMode.none
                         ? null
-                        : () => Navigator.of(context)
-                            .push(MaterialPageRoute(builder: (_) => const FmStationsScreen()))
-                            .then((_) => _afterReceiverScreen()),
+                        : () async {
+                            await _prepareReceiverScreen();
+                            if (!context.mounted) return;
+                            await Navigator.of(context)
+                                .push(MaterialPageRoute(builder: (_) => const FmStationsScreen()));
+                            await _afterReceiverScreen();
+                          },
                     onOpenInternetSearch: () => Navigator.of(context).push(
                       MaterialPageRoute(
                         builder: (_) => const InternetRadioSearchScreen(),
@@ -968,6 +1058,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     snrDb: (isDab && isPlaying) ? _dabSnrDb : null,
                     quality: isPlaying ? (isDab ? _dabQuality : _netQuality) : null,
                     fmStereo: isPlaying && _fmFreqKhz != null ? _fmStereo : null,
+                    stopped: _stopped,
+                    // Stop while playing or tuning, else play again.
+                    onStop: !_stopped && (isPlaying || isBuffering || (isDab && _receiverWanted))
+                        ? _stopPlayback
+                        : null,
+                    onPlay: _stopped || !(isPlaying || isBuffering || (isDab && _receiverWanted))
+                        ? _resumeCurrentPlayback
+                        : null,
                   ),
                 ],
               ),

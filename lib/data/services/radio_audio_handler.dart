@@ -139,6 +139,20 @@ class RadioAudioHandler extends BaseAudioHandler {
     );
   }
 
+  /// DAB+/FM stopped (or started again) from the app - otherwise Android
+  /// keeps showing it as playing, and the remote's next Play/Pause press
+  /// arrives as another "pause" instead of "play".
+  void setPlaying(bool playing) {
+    if (_player.currentUrl != null) return; // internet radio reports itself
+    playbackState.add(
+      playbackState.value.copyWith(
+        controls: _controlsFor(playing),
+        systemActions: _systemActions,
+        playing: playing,
+      ),
+    );
+  }
+
   void clearChannel() {
     mediaItem.add(null);
     playbackState.add(

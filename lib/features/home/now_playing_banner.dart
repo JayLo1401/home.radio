@@ -30,6 +30,12 @@ class NowPlayingBanner extends StatelessWidget {
   /// in place of [quality]; null for anything that isn't FM.
   final bool? fmStereo;
 
+  /// Stop (while something plays or tunes) or play again - shown as one
+  /// button; null hides it. [stopped] = stopped by the user ("Gestoppt").
+  final VoidCallback? onStop;
+  final VoidCallback? onPlay;
+  final bool stopped;
+
   const NowPlayingBanner({
     super.key,
     required this.programNumber,
@@ -43,6 +49,9 @@ class NowPlayingBanner extends StatelessWidget {
     this.snrDb,
     this.quality,
     this.fmStereo,
+    this.onStop,
+    this.onPlay,
+    this.stopped = false,
   });
 
   @override
@@ -104,9 +113,9 @@ class NowPlayingBanner extends StatelessWidget {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        errorMessage ??
-                            subtitle ??
-                            (isPlaying ? 'Wiedergabe läuft' : 'Pausiert'),
+                        stopped
+                            ? 'Gestoppt - Verbindung getrennt'
+                            : (errorMessage ?? subtitle ?? (isPlaying ? 'Wiedergabe läuft' : 'Pausiert')),
                         style: TextStyle(
                           color: errorMessage != null ? Colors.redAccent : Colors.white70,
                           fontSize: 22,
@@ -125,10 +134,20 @@ class NowPlayingBanner extends StatelessWidget {
                       child: CircularProgressIndicator(strokeWidth: 2.5),
                     ),
                   )
-                else if (isPlaying)
+                else if (isPlaying && !stopped)
                   const Padding(
                     padding: EdgeInsets.only(left: 12),
                     child: _PlayingPulse(),
+                  ),
+                if (onStop ?? onPlay case final onPressed?)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 16),
+                    child: IconButton.filledTonal(
+                      iconSize: 36,
+                      tooltip: onStop != null ? 'Stopp' : 'Abspielen',
+                      onPressed: onPressed,
+                      icon: Icon(onStop != null ? Icons.stop : Icons.play_arrow),
+                    ),
                   ),
               ],
             ),
