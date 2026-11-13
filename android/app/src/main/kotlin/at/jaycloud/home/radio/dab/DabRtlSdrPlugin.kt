@@ -202,12 +202,62 @@ class DabRtlSdrPlugin :
                     "noiseDb" to channelNoiseDb.toDouble(),
                 ),
             )
+        }
+
+        override fun onRxStatus(samplesPerSecond: Float, levelDb: Float, clipRatio: Float, gainDb: Float, channelLevelsDb: FloatArray) {
+            if (!adsbActive) return
+            emit(
+                mapOf(
+                    "type" to "rxStatus",
+                    "samplesPerSecond" to samplesPerSecond.toDouble(),
+                    "levelDb" to levelDb.toDouble(),
+                    "clipRatio" to clipRatio.toDouble(),
+                    "gainDb" to gainDb.toDouble(),
+                    "channelLevelsDb" to channelLevelsDb,
+                ),
+            )
+        }
+
+        override fun onAcarsFrame(freqHz: Int, frame: ByteArray) {
+            if (!adsbActive) return
+            emit(mapOf("type" to "acarsFrame", "freqHz" to freqHz, "data" to frame))
+        }
+
+        override fun onIsmBurst(modulation: String, durationsUs: IntArray, offsetHz: Float, levelDb: Float, snrDb: Float) {
+            if (!adsbActive) return
+            emit(
+                mapOf(
+                    "type" to "ismBurst",
+                    "modulation" to modulation,
+                    "durationsUs" to durationsUs,
+                    "offsetHz" to offsetHz.toDouble(),
+                    "levelDb" to levelDb.toDouble(),
+                    "snrDb" to snrDb.toDouble(),
+                ),
+            )
+        }
+
+        override fun onAdsbFrame(frame: ByteArray, icao: Int, signalDb: Float) {
+            if (!adsbActive) return
+            emit(mapOf("type" to "adsbFrame", "data" to frame, "icao" to icao, "signalDb" to signalDb.toDouble()))
+        }
+
+        // A ByteArray arrives in Dart as Uint8List.
+        override fun onNbPacket(kind: Int, frame: ByteArray) {
+            if (!nbActive) return
+            emit(mapOf("type" to "nbPacket", "kind" to kind, "data" to frame))
+        }
+
+        // ~20 Hz for the waterfall; a FloatArray arrives in Dart as Float32List.
+        override fun onNbSpectrum(centerHz: Int, spanHz: Int, binsDb: FloatArray, gainDb: Float) {
+            if (!nbActive) return
             emit(
                 mapOf(
                     "type" to "nbSpectrum",
                     "centerHz" to centerHz,
                     "spanHz" to spanHz,
-                    "binsDb" to spectrumDb.map { it.toDouble() },
+                    "binsDb" to binsDb,
+                    "gainDb" to gainDb.toDouble(),
                 ),
             )
         }
@@ -298,6 +348,9 @@ class DabRtlSdrPlugin :
     @Volatile private var nbPlayer: DabAacPlayer? = null
     // NB is on: audio and nbStatus/nbActivity/nbSpectrum events go out.
     @Volatile private var nbActive = false
+
+    // ADS-B or the ISM sensors are on: "adsbFrame"/"ismBurst" events go out.
+    @Volatile private var adsbActive = false
 
     // Last "nbSetFilters" (bandwidthHz, noiseBlanker, voiceFilter, agc code);
     // re-applied on nbStart, since a new native session starts with defaults.
@@ -758,6 +811,71 @@ class DabRtlSdrPlugin :
                 fmExecutor.execute {
                     if (created) engine.nbSetSquelch(squelchDb)
                     mainHandler.post { result.success(null) }
+                }
+            }
+            // ADS-B (1090 MHz): no audio, frames as "adsbFrame" events.
+            "adsbStart" -> {
+                fmExecutor.execute {
+                    stopDabActivities()
+                    stopFmActivities()
+                    leaveNb()
+                    val ok = ensureCreated() && engine.adsbStart()
+                    adsbActive = ok
+                    mainHandler.post { result.success(ok) }
+                }
+            }
+            // ISM sensors: bursts as "ismBurst" events; same stop as ADS-B.
+            "ismStart" -> {
+                val freqHz = call.argument<Int>("freqHz") ?: 433_920_000
+                fmExecutor.execute {
+                    stopDabActivities()
+                    stopFmActivities()
+                    leaveNb()
+                    val ok = ensureCreated() && engine.ismStart(freqHz)
+                    adsbActive = ok
+                    mainHandler.post { result.success(ok) }
+                }
+            }
+            "acarsStart" -> {
+                val centerHz = call.argument<Int>("centerHz") ?: 131_687_500
+                val channels = intList(call, "channelsHz")
+                fmExecutor.execute {
+                    stopDabActivities()
+                    stopFmActivities()
+                    leaveNb()
+                    val ok = ensureCreated() && engine.acarsStart(centerHz, channels)
+                    adsbActive = ok
+                    mainHandler.post { result.success(ok) }
+                }
+            }
+            "ismStop", "acarsStop" -> {
+                fmExecutor.execute {
+                    val wasActive = adsbActive
+                    adsbActive = false
+                    if (created && wasActive) engine.halt()
+                    mainHandler.post { result.success(null) }
+                }
+            }
+            "adsbStop" -> {
+                fmExecutor.execute {
+                    val wasActive = adsbActive
+                    adsbActive = false
+                    if (created && wasActive) engine.halt()
+                    mainHandler.post { result.success(null) }
+                }
+            }
+            "nbSetPacketDecoder" -> {
+                val kind = call.argument<Int>("kind") ?: 0
+                fmExecutor.execute {
+                    if (created) engine.nbSetPacketDecoder(kind)
+                    mainHandler.post { result.success(null) }
+                }
+            }
+            "nbSetGain" -> {
+                val gainIndex = call.argument<Int>("gainIndex") ?: -1
+                fmExecutor.execute {
+                    val db = if (created) engine.nbSetGain(gainIndex).toDouble() else 0.0
+                    mainHandler.post { result.success(db) }
                 }
             }
             "nbSetFilters" -> {
@@ -1262,7 +1380,9 @@ class DabRtlSdrPlugin :
                             return@Thread
                         }
                         attempt++
-                        engine.tune(freqKhz * 1000)
+                        // First attempt: keep a weak ensemble's progress from
+                        // the app's earlier tries; the PCM retry starts fresh.
+                        if (attempt == 1) engine.tuneKeep(freqKhz * 1000) else engine.tune(freqKhz * 1000)
                         lateinit var player: DabAacPlayer
                         player = DabAacPlayer(context) {
                             // Another app took the audio focus. Ignore stale

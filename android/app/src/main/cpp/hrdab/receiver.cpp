@@ -49,7 +49,10 @@ Receiver::Receiver(std::unique_ptr<SampleSource> source, ReceiverListener& liste
       superframe_(*this),
       pad_(*this),
       fm_(*this, *this),
-      nb_(*this, *this)
+      nb_(*this, *this),
+      adsb_(*this, *this),
+      ism_(*this, *this),
+      acarsMulti_(*this, *this)
 {
     source_->onStatus = [this](bool isError, const std::string& message) { listener_.onStatus(isError, message); };
 }
@@ -67,15 +70,22 @@ bool Receiver::startLocked(Mode mode)
     // DAB needs 2.048 MS/s, FM gets by with half (FmDemod::kRate); NB
     // brings its own rate. The source is stopped here, which is when a rate
     // change is allowed.
-    const uint32_t rate = mode == Mode::Nb   ? nbRate_
-                          : mode == Mode::Fm ? static_cast<uint32_t>(FmDemod::kRate)
-                                             : static_cast<uint32_t>(kSampleRate);
+    const uint32_t rate = mode == Mode::Nb     ? nbRate_
+                          : mode == Mode::Fm   ? static_cast<uint32_t>(FmDemod::kRate)
+                          : mode == Mode::Adsb ? AdsbDemod::kSampleRate
+                          : mode == Mode::Ism  ? IsmDemod::kSampleRate
+                          : mode == Mode::Acars ? AcarsMultiDemod::kSampleRate
+                                               : static_cast<uint32_t>(kSampleRate);
     if (source_->sampleRate() != rate && !source_->setSampleRate(rate)) {
         HR_LOGW("could not set the sample rate to %u", rate);
         return false;
     }
     ring_.reopen();
     stop_ = false;
+    // Status measured afresh (threads not running yet).
+    statusSince_ = {};
+    statusRmsSum_ = statusClipSum_ = 0;
+    statusN_ = 0;
     source_->setGainIndex(gainIndex_);
     if (!source_->start(ring_)) return false;
     mode_ = mode;
@@ -83,6 +93,21 @@ bool Receiver::startLocked(Mode mode)
         nbThread_ = std::thread([this] {
             raiseThreadPriority(-16);
             nb_.run(stop_);
+        });
+    } else if (mode == Mode::Adsb) {
+        adsbThread_ = std::thread([this] {
+            raiseThreadPriority(-16);
+            adsb_.run(stop_);
+        });
+    } else if (mode == Mode::Ism) {
+        ismThread_ = std::thread([this] {
+            raiseThreadPriority(-16);
+            ism_.run(stop_);
+        });
+    } else if (mode == Mode::Acars) {
+        acarsThread_ = std::thread([this] {
+            raiseThreadPriority(-16);
+            acarsMulti_.run(stop_);
         });
     } else if (mode == Mode::Dab) {
         ofdmThread_ = std::thread([this] {
@@ -113,6 +138,9 @@ void Receiver::stopLocked()
     if (decoderThread_.joinable()) decoderThread_.join();
     if (fmThread_.joinable()) fmThread_.join();
     if (nbThread_.joinable()) nbThread_.join();
+    if (adsbThread_.joinable()) adsbThread_.join();
+    if (ismThread_.joinable()) ismThread_.join();
+    if (acarsThread_.joinable()) acarsThread_.join();
     source_->stop();
     {
         std::lock_guard<std::mutex> lock(queueMutex_);
@@ -121,10 +149,15 @@ void Receiver::stopLocked()
     running_ = false;
 }
 
-bool Receiver::tune(uint32_t hz)
+bool Receiver::tune(uint32_t hz, bool keepIfTuned)
 {
     std::lock_guard<std::mutex> lock(lifecycleMutex_);
     stopService();
+    // Already there and receiving DAB: keep what the FIC has collected so
+    // far - a weak ensemble needs longer than one play attempt to describe
+    // its services, and a retune would start that over every time.
+    if (keepIfTuned && running_ && mode_ == Mode::Dab && dabHz_ == hz) return true;
+    dabHz_ = hz;
     generation_++;
     ensemble_.clear();
     const bool tuned = source_->setFrequency(hz);
@@ -262,6 +295,84 @@ bool Receiver::nbSetChannels(uint32_t centerHz, const std::vector<uint32_t>& cha
     return nbRetuneLocked(centerHz);
 }
 
+bool Receiver::adsbStart()
+{
+    std::lock_guard<std::mutex> lock(lifecycleMutex_);
+    stopService();
+    if (running_ && mode_ != Mode::Adsb) stopLocked();
+    const bool tuned = source_->setFrequency(AdsbDemod::kFrequencyHz);
+    if (!tuned) HR_LOGW("adsb: tuner did not accept %u Hz", AdsbDemod::kFrequencyHz);
+    ring_.clear();
+    ring_.interrupt();
+    if (!startLocked(Mode::Adsb)) return false;
+    return tuned;
+}
+
+bool Receiver::ismStart(uint32_t freqHz)
+{
+    std::lock_guard<std::mutex> lock(lifecycleMutex_);
+    stopService();
+    // Another frequency (433 <-> 868) restarts the thread too.
+    if (running_) stopLocked();
+    const bool tuned = source_->setFrequency(freqHz);
+    if (!tuned) HR_LOGW("ism: tuner did not accept %u Hz", freqHz);
+    ring_.clear();
+    ring_.interrupt();
+    if (!startLocked(Mode::Ism)) return false;
+    return tuned;
+}
+
+bool Receiver::acarsStart(uint32_t centerHz, const std::vector<uint32_t>& channelsHz)
+{
+    std::lock_guard<std::mutex> lock(lifecycleMutex_);
+    stopService();
+    if (running_) stopLocked();
+    acarsMulti_.configure(centerHz, channelsHz);  // thread not running
+    const bool tuned = source_->setFrequency(centerHz);
+    if (!tuned) HR_LOGW("acars: tuner did not accept %u Hz", centerHz);
+    ring_.clear();
+    ring_.interrupt();
+    if (!startLocked(Mode::Acars)) return false;
+    return tuned;
+}
+
+void Receiver::onAcarsFrame(uint32_t freqHz, const std::vector<uint8_t>& frame)
+{
+    listener_.onAcarsFrame(freqHz, frame);
+}
+
+void Receiver::onAcarsLevel(float rms, float clipRatio)
+{
+    onNbLevel(rms, clipRatio, true);
+    statusTick(rms, clipRatio, acarsMulti_.channelLevelsDb());
+}
+
+void Receiver::onIsmBurst(const char* modulation, const std::vector<int>& durationsUs, float offsetHz, float levelDb,
+                          float snrDb)
+{
+    // Level referred to the tuner input, like the other modes.
+    listener_.onIsmBurst(modulation, durationsUs, offsetHz, levelDb - gainDb(), snrDb);
+}
+
+void Receiver::onIsmLevel(float rms, float clipRatio)
+{
+    onNbLevel(rms, clipRatio, true);
+    statusTick(rms, clipRatio, {});
+}
+
+void Receiver::onAdsbFrame(const uint8_t* bytes, int length, uint32_t icao, float signalDbfs)
+{
+    listener_.onAdsbFrame(bytes, length, icao, signalDbfs);
+}
+
+void Receiver::onAdsbLevel(float rms, float clipRatio)
+{
+    // Same gain handling as NB (manual or automatic); bursts come and go,
+    // so the AGC acts as if settled (slow, mainly against overload).
+    onNbLevel(rms, clipRatio, true);
+    statusTick(rms, clipRatio, {});
+}
+
 void Receiver::halt()
 {
     std::lock_guard<std::mutex> lock(lifecycleMutex_);
@@ -369,7 +480,34 @@ std::string Receiver::fmCarriersJson(const std::vector<FmCarrier>& carriers)
 
 int Receiver::readIq(uint8_t* dst, int bytes)
 {
-    return static_cast<int>(ring_.read(dst, static_cast<size_t>(bytes)));
+    const int got = static_cast<int>(ring_.read(dst, static_cast<size_t>(bytes)));
+    if (got > 0) bytesRead_ += got;
+    return got;
+}
+
+void Receiver::statusTick(float rms, float clipRatio, const std::vector<float>& channelLevelsDb)
+{
+    // Data modes without audio: twice a second what actually arrives, so
+    // the screen can show that reception works.
+    statusRmsSum_ += rms;
+    statusClipSum_ += clipRatio;
+    statusN_++;
+    const auto now = std::chrono::steady_clock::now();
+    if (statusSince_.time_since_epoch().count() == 0) {
+        statusSince_ = now;
+        bytesRead_ = 0;
+        return;
+    }
+    const double s = std::chrono::duration<double>(now - statusSince_).count();
+    if (s < 0.5) return;
+    const double rate = bytesRead_.exchange(0) / 2.0 / s;
+    const float avgRms = static_cast<float>(statusRmsSum_ / statusN_);
+    const float levelDb = 20.f * std::log10(std::max(avgRms, 1e-6f));
+    listener_.onRxStatus(static_cast<float>(rate), levelDb, static_cast<float>(statusClipSum_ / statusN_), gainDb(),
+                         channelLevelsDb);
+    statusSince_ = now;
+    statusRmsSum_ = statusClipSum_ = 0;
+    statusN_ = 0;
 }
 
 void Receiver::onReset()
@@ -546,17 +684,56 @@ void Receiver::onFmRds(int pi, const std::string& ps, const std::string& rt)
 
 bool Receiver::onNbLevel(float rms, float clipRatio, bool settled)
 {
-    return adjustGain(rms, clipRatio, settled, std::chrono::milliseconds(0));
+    const int manual = nbManualGain_.load();
+    if (manual < 0) return adjustGain(rms, clipRatio, settled, std::chrono::milliseconds(0));
+    // Held fixed: only a newly chosen step is applied (on this thread, like
+    // the AGC's own changes).
+    if (!nbGainPending_.exchange(false) || manual == gainIndex_) return false;
+    gainIndex_ = manual;
+    lastGainChange_ = std::chrono::steady_clock::now();
+    source_->setGainIndex(manual);
+    HR_LOGI("NB manual gain %.1f dB", source_->gainTenthsDb(manual) / 10.0);
+    return true;
+}
+
+float Receiver::nbSetGain(int gainIndex)
+{
+    if (gainIndex >= source_->gainCount()) gainIndex = source_->gainCount() - 1;
+    if (gainIndex < -1) gainIndex = -1;
+    nbManualGain_ = gainIndex;
+    nbGainPending_ = gainIndex >= 0;
+    return source_->gainTenthsDb(gainIndex >= 0 ? gainIndex : gainIndex_.load()) / 10.f;
 }
 
 void Receiver::onNbAudio(const int16_t* pcm, int frames)
 {
     listener_.onNbAudio(pcm, frames);
+    // Packet decoders: created/dropped here on the NB thread.
+    const int kind = packetKind_.load();
+    if (kind != 1) afsk_.reset();
+    if (kind != 2) acars_.reset();
+    if (kind == 1) {
+        if (!afsk_) afsk_ = std::make_unique<Afsk1200Decoder>(NbDemod::kAudioRate);
+        afsk_->process(pcm, frames, [this](const std::vector<uint8_t>& frame) { listener_.onNbPacket(1, frame); });
+    } else if (kind == 2) {
+        if (!acars_) acars_ = std::make_unique<AcarsDecoder>(NbDemod::kAudioRate);
+        acars_->process(pcm, frames, [this](const std::vector<uint8_t>& frame) { listener_.onNbPacket(2, frame); });
+    }
+}
+
+void Receiver::nbSetPacketDecoder(int kind)
+{
+    packetKind_ = kind;
 }
 
 void Receiver::onNbReport(const NbReport& report)
 {
     listener_.onNbReport(report, gainDb());
+}
+
+void Receiver::onNbSpectrum(uint32_t centerHz, uint32_t spanHz, const std::vector<float>& binsDbfs)
+{
+    listener_.onNbSpectrum(centerHz, spanHz, binsDbfs, gainDb());
 }
 
 // --- decoder thread ---

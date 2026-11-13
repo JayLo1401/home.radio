@@ -117,6 +117,14 @@ private:
     void onFmRds(int pi, const std::string& ps, const std::string& rt) override;
     void onNbAudio(const int16_t* pcm, int frames) override;
     void onNbReport(const NbReport& report, float gainDb) override;
+    void onNbSpectrum(uint32_t centerHz, uint32_t spanHz, const std::vector<float>& binsDbfs, float gainDb) override;
+    void onNbPacket(int kind, const std::vector<uint8_t>& frame) override;
+    void onAdsbFrame(const uint8_t* bytes, int length, uint32_t icao, float signalDbfs) override;
+    void onIsmBurst(const char* modulation, const std::vector<int>& durationsUs, float offsetHz, float levelDb,
+                    float snrDb) override;
+    void onAcarsFrame(uint32_t freqHz, const std::vector<uint8_t>& frame) override;
+    void onRxStatus(float samplesPerSecond, float levelDbfs, float clipRatio, float gainDb,
+                    const std::vector<float>& channelLevelsDb) override;
 
     // --- output ---
     void emit(const std::string& json);
@@ -132,7 +140,7 @@ private:
     bool engineCreateTcp(const std::string& host, int port);
     bool engineCreateUsb(std::string& error);
     void engineDestroy();
-    void engineTune(uint32_t hz);
+    void engineTune(uint32_t hz, bool keepIfTuned = false);
     void engineHalt();
     std::string engineEnsembleLabel();
     std::vector<std::pair<int, std::string>> engineServices();
@@ -145,6 +153,11 @@ private:
                        float squelchDb);
     bool engineNbTune(int freqHz, int mode);
     void engineNbSetSquelch(float squelchDb);
+    float engineNbSetGain(int gainIndex);
+    void engineNbSetPacketDecoder(int kind);
+    bool engineAdsbStart();
+    bool engineIsmStart(uint32_t freqHz);
+    bool engineAcarsStart(uint32_t centerHz, const std::vector<uint32_t>& channels);
     bool engineNbSetChannels(int centerHz, const std::vector<uint32_t>& channels);
     void engineNbSetFilters(const NbFilterSettings& f);
 
@@ -221,6 +234,7 @@ private:
     std::atomic<bool> fmScanRunning_{false};
     std::atomic<int> fmSeekId_{0};
     std::atomic<bool> nbActive_{false};
+    std::atomic<bool> adsbActive_{false};  // "adsbFrame" events go out
 
     std::mutex nbFiltersMutex_;
     NbFilterSettings nbFilters_;

@@ -71,6 +71,24 @@ class IntegratedDabEngine(private val events: Events) {
             voiceFilter: Boolean,
             agc: String,
         )
+
+        /** NB: waterfall spectrum ~20 times a second, dB referred to the tuner input; [gainDb] = tuner gain now. */
+        fun onNbSpectrum(centerHz: Int, spanHz: Int, binsDb: FloatArray, gainDb: Float) {}
+
+        /** NB: a packet from the packet decoder - [kind] 1 = AX.25 (APRS), 2 = ACARS message; checksums checked. */
+        fun onNbPacket(kind: Int, frame: ByteArray) {}
+
+        /** ADS-B: a verified Mode S frame (7/14 bytes), its aircraft address and level (dBFS). */
+        fun onAdsbFrame(frame: ByteArray, icao: Int, signalDb: Float) {}
+
+        /** Data modes (ADS-B, ISM, ACARS), twice a second: arriving rate, input level, clipping, gain, ACARS channel levels. */
+        fun onRxStatus(samplesPerSecond: Float, levelDb: Float, clipRatio: Float, gainDb: Float, channelLevelsDb: FloatArray) {}
+
+        /** ACARS (multi-channel mode): a message on [freqHz], CRC checked. */
+        fun onAcarsFrame(freqHz: Int, frame: ByteArray) {}
+
+        /** ISM sensors: a burst as "ook"/"fsk" high/low durations (us), carrier offset, level, SNR. */
+        fun onIsmBurst(modulation: String, durationsUs: IntArray, offsetHz: Float, levelDb: Float, snrDb: Float) {}
     }
 
     companion object {
@@ -102,6 +120,7 @@ class IntegratedDabEngine(private val events: Events) {
     private external fun nativeCreateTcp(host: String, port: Int): Boolean
     private external fun nativeDestroy()
     private external fun nativeTune(hz: Int): Boolean
+    private external fun nativeTuneKeep(hz: Int): Boolean
     private external fun nativeHalt()
     private external fun nativeGetEnsembleLabel(): String
     private external fun nativeGetServiceListJson(): String
@@ -122,6 +141,26 @@ class IntegratedDabEngine(private val events: Events) {
     private external fun nativeNbSetSquelch(squelchDb: Float)
     private external fun nativeNbSetChannels(centerHz: Int, channelsHz: IntArray): Boolean
     private external fun nativeNbSetFilters(bandwidthHz: Int, noiseBlanker: Boolean, voiceFilter: Boolean, agc: Int)
+    private external fun nativeNbSetGain(gainIndex: Int): Float
+    private external fun nativeNbSetPacketDecoder(kind: Int)
+    private external fun nativeAdsbStart(): Boolean
+    private external fun nativeIsmStart(freqHz: Int): Boolean
+    private external fun nativeAcarsStart(centerHz: Int, channelsHz: IntArray): Boolean
+
+    /** ACARS on all [channelsHz] at once around [centerHz] (no audio); messages via [Events.onAcarsFrame]. */
+    fun acarsStart(centerHz: Int, channelsHz: IntArray): Boolean = nativeAcarsStart(centerHz, channelsHz)
+
+    /** ISM sensors on [freqHz] (433,92 / 868,3 MHz) at 1,024 MS/s; bursts via [Events.onIsmBurst]. Stop with [halt]. */
+    fun ismStart(freqHz: Int): Boolean = nativeIsmStart(freqHz)
+
+    /** ADS-B on 1090 MHz at 2 MS/s (leaves DAB/FM/NB); frames via [Events.onAdsbFrame]. Stop with [halt]. */
+    fun adsbStart(): Boolean = nativeAdsbStart()
+
+    /** NB: packet decoder on the listened channel - 0 off, 1 APRS, 2 ACARS; frames via [Events.onNbPacket]. */
+    fun nbSetPacketDecoder(kind: Int) = nativeNbSetPacketDecoder(kind)
+
+    /** NB tuner gain: step 0..30 held fixed, -1 = automatic. Returns its gain in dB. */
+    fun nbSetGain(gainIndex: Int): Float = nativeNbSetGain(gainIndex)
 
     /**
      * rtl_tcp client session to [host]:[port]; the protocol (rtl_tcp or
@@ -137,6 +176,15 @@ class IntegratedDabEngine(private val events: Events) {
     /** Retune (starting streaming if needed) and forget the old ensemble. */
     fun tune(hz: Int) {
         nativeTune(hz)
+    }
+
+    /**
+     * Like [tune], but when DAB is already being received on [hz] only the
+     * service stops - what the FIC collected so far stays (play retries on
+     * a weak ensemble build on each other instead of starting over).
+     */
+    fun tuneKeep(hz: Int) {
+        nativeTuneKeep(hz)
     }
 
     /** Stop streaming and decoding until the next [tune]. */
@@ -252,4 +300,20 @@ class IntegratedDabEngine(private val events: Events) {
         freqHz, levelDb, noiseDb, snrDb, squelchOpen, mode, centerHz, spanHz, channelsHz, levelsDb, channelNoiseDb,
         spectrumDb, bandwidthHz, noiseBlanker, voiceFilter, agc,
     )
+
+    private fun onNativeNbPacket(kind: Int, frame: ByteArray) = events.onNbPacket(kind, frame)
+
+    private fun onNativeRxStatus(samplesPerSecond: Float, levelDb: Float, clipRatio: Float, gainDb: Float, channelLevelsDb: FloatArray) =
+        events.onRxStatus(samplesPerSecond, levelDb, clipRatio, gainDb, channelLevelsDb)
+
+    private fun onNativeAcarsFrame(freqHz: Int, frame: ByteArray) = events.onAcarsFrame(freqHz, frame)
+
+    private fun onNativeIsmBurst(modulation: String, durationsUs: IntArray, offsetHz: Float, levelDb: Float, snrDb: Float) =
+        events.onIsmBurst(modulation, durationsUs, offsetHz, levelDb, snrDb)
+
+    private fun onNativeAdsbFrame(frame: ByteArray, icao: Int, signalDb: Float) =
+        events.onAdsbFrame(frame, icao, signalDb)
+
+    private fun onNativeNbSpectrum(centerHz: Int, spanHz: Int, binsDb: FloatArray, gainDb: Float) =
+        events.onNbSpectrum(centerHz, spanHz, binsDb, gainDb)
 }

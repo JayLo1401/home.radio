@@ -10,7 +10,12 @@
 #include <thread>
 #include <vector>
 
+#include "acars.h"
+#include "acars_multi.h"
+#include "adsb_demod.h"
+#include "afsk1200.h"
 #include "byte_ring.h"
+#include "ism_demod.h"
 #include "ensemble.h"
 #include "fic.h"
 #include "fm_demod.h"
@@ -48,6 +53,32 @@ public:
     // dBFS - subtract gainDb to refer them to the tuner input.
     virtual void onNbAudio(const int16_t* /*pcm*/, int /*frames*/) {}
     virtual void onNbReport(const NbReport& /*report*/, float /*gainDb*/) {}
+    // A packet decoded from the NB audio (see Receiver::nbSetPacketDecoder):
+    // kind 1 = AX.25 frame (APRS, FCS checked and removed), 2 = ACARS message
+    // (SOH .. ETX/ETB + BCS, CRC checked).
+    virtual void onNbPacket(int /*kind*/, const std::vector<uint8_t>& /*frame*/) {}
+    // ADS-B / Mode S frame (see AdsbSink); called on the ADS-B thread.
+    virtual void onAdsbFrame(const uint8_t* /*bytes*/, int /*length*/, uint32_t /*icao*/, float /*signalDbfs*/) {}
+    // Data modes (ADS-B, ISM, ACARS), twice a second: samples per second
+    // actually arriving, input level (dBFS), clipped share, tuner gain, and
+    // for ACARS each channel's level (dB).
+    virtual void onRxStatus(float /*samplesPerSecond*/, float /*levelDbfs*/, float /*clipRatio*/, float /*gainDb*/,
+                            const std::vector<float>& /*channelLevelsDb*/)
+    {
+    }
+    // ACARS message from the multi-channel mode (see AcarsSink).
+    virtual void onAcarsFrame(uint32_t /*freqHz*/, const std::vector<uint8_t>& /*frame*/) {}
+    // ISM sensor burst (see IsmSink); called on the ISM thread.
+    virtual void onIsmBurst(const char* /*modulation*/, const std::vector<int>& /*durationsUs*/, float /*offsetHz*/,
+                            float /*levelDb*/, float /*snrDb*/)
+    {
+    }
+    // Fast spectrum for the waterfall (~20 Hz, NbDemod::kFastSpectrumBins
+    // dBFS values across centerHz +- spanHz/2).
+    virtual void onNbSpectrum(uint32_t /*centerHz*/, uint32_t /*spanHz*/, const std::vector<float>& /*binsDbfs*/,
+                              float /*gainDb*/)
+    {
+    }
 };
 
 // Owns the whole receive chain: sample source -> OFDM thread -> decoder
@@ -61,14 +92,17 @@ public:
 // slow consumer (e.g. the audio output) can never stall the USB transfers
 // or the OFDM synchronisation.
 class Receiver : private OfdmSink, private FicListener, private SuperframeListener, private PadListener,
-                 private IqReader, private FmSink, private NbSink {
+                 private IqReader, private FmSink, private NbSink, private AdsbSink, private IsmSink,
+                 private AcarsSink {
 public:
     Receiver(std::unique_ptr<SampleSource> source, ReceiverListener& listener);
     ~Receiver() override;
 
     // Retunes (starting streaming on first use, leaving FM mode) and forgets
     // the old ensemble.
-    bool tune(uint32_t hz);
+    // keepIfTuned: when already receiving DAB on hz, only the service stops -
+    // the ensemble collected so far stays (retries on a weak channel).
+    bool tune(uint32_t hz, bool keepIfTuned = false);
     // Stops streaming and decoding until the next tune()/fmTune().
     void halt();
 
@@ -98,11 +132,29 @@ public:
     // outside it. False when NB is not running.
     bool nbTune(uint32_t freqHz, NbMode mode);
     void nbSetSquelch(float squelchDb);
+    // Tuner gain while listening: a gain step (0 = lowest) held fixed, or -1
+    // for the automatic one. Takes effect on the NB thread's next level
+    // report. Returns the step's gain in dB (or the current one for -1).
+    float nbSetGain(int gainIndex);
+    // Packet decoder on the listened channel's audio: 0 off, 1 APRS (AFSK
+    // 1200), 2 ACARS (MSK 2400); frames go to the listener's onNbPacket.
+    void nbSetPacketDecoder(int kind);
     // Signal filters (see NbFilters); kept across nbStart/nbTune.
     void nbSetFilters(const NbFilters& filters) { nb_.setFilters(filters); }
     // New window centre and/or monitored channels. The listened channel
     // stays; if it is outside the new window it is silent until nbTune.
     bool nbSetChannels(uint32_t centerHz, const std::vector<uint32_t>& channelsHz);
+
+    // ADS-B / Mode S on 1090 MHz at 2 MS/s (leaves DAB/FM/NB); frames go
+    // to the listener's onAdsbFrame. The gain follows nbSetGain. Stop with
+    // halt().
+    bool adsbStart();
+    // ISM sensors (433,92 / 868,3 MHz) at 1,024 MS/s: bursts go to the
+    // listener's onIsmBurst. Gain as nbSetGain; stop with halt().
+    bool ismStart(uint32_t freqHz);
+    // ACARS on several channels at once (no audio): messages go to the
+    // listener's onAcarsFrame. Gain as nbSetGain; stop with halt().
+    bool acarsStart(uint32_t centerHz, const std::vector<uint32_t>& channelsHz);
 
     // Starts decoding a service's audio. False while the FIC has not yet
     // described its sub-channel, or when it is not a DAB+ service.
@@ -172,8 +224,25 @@ private:
     bool onNbLevel(float rms, float clipRatio, bool settled) override;
     void onNbAudio(const int16_t* pcm, int frames) override;
     void onNbReport(const NbReport& report) override;
+    void onNbSpectrum(uint32_t centerHz, uint32_t spanHz, const std::vector<float>& binsDbfs) override;
+    // AdsbSink
+    void onAdsbFrame(const uint8_t* bytes, int length, uint32_t icao, float signalDbfs) override;
+    void onAdsbLevel(float rms, float clipRatio) override;
+    // IsmSink
+    void onIsmBurst(const char* modulation, const std::vector<int>& durationsUs, float offsetHz, float levelDb,
+                    float snrDb) override;
+    void onIsmLevel(float rms, float clipRatio) override;
+    // AcarsSink
+    void onAcarsFrame(uint32_t freqHz, const std::vector<uint8_t>& frame) override;
+    void onAcarsLevel(float rms, float clipRatio) override;
 
-    enum class Mode { Dab, Fm, Nb };
+    enum class Mode { Dab, Fm, Nb, Adsb, Ism, Acars };
+
+    void statusTick(float rms, float clipRatio, const std::vector<float>& channelLevelsDb);
+    std::atomic<long long> bytesRead_{0};
+    std::chrono::steady_clock::time_point statusSince_{};
+    double statusRmsSum_ = 0, statusClipSum_ = 0;
+    int statusN_ = 0;
 
     bool startLocked(Mode mode);
     bool nbRetuneLocked(uint32_t centerHz);
@@ -196,6 +265,9 @@ private:
     PadDecoder pad_;
     FmDemod fm_;
     NbDemod nb_;
+    AdsbDemod adsb_;
+    IsmDemod ism_;
+    AcarsMultiDemod acarsMulti_;
 
     std::mutex lifecycleMutex_;
     bool running_ = false;
@@ -205,6 +277,9 @@ private:
     std::thread decoderThread_;
     std::thread fmThread_;
     std::thread nbThread_;
+    std::thread adsbThread_;
+    std::thread ismThread_;
+    std::thread acarsThread_;
 
     // Narrowband state (lifecycleMutex_)
     uint32_t nbRate_ = kSampleRate;
@@ -235,6 +310,15 @@ private:
     std::atomic<int> gainIndex_{12};
     std::chrono::steady_clock::time_point lastGainChange_{};
     std::atomic<bool> synced_{false};
+    uint32_t dabHz_ = 0;           // last DAB tune (lifecycleMutex_)
+    // NB manual gain: step, -1 = automatic; pending until the NB thread
+    // applies it (onNbLevel).
+    std::atomic<int> nbManualGain_{-1};
+    // Packet decoders (NB thread); packetKind_ set from any thread.
+    std::unique_ptr<Afsk1200Decoder> afsk_;
+    std::unique_ptr<AcarsDecoder> acars_;
+    std::atomic<int> packetKind_{0};
+    std::atomic<bool> nbGainPending_{false};
 
     // Error reporting (decoder thread)
     std::chrono::steady_clock::time_point lastRsReport_{};

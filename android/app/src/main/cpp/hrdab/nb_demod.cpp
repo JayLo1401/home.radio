@@ -11,6 +11,7 @@ namespace {
 constexpr int kChunksPerSecond = 125;           // 8 ms per read at every rate
 constexpr int kChannelPerChunk = NbDemod::kChannelRate / kChunksPerSecond;  // 128
 constexpr int kReportChunks = 25;               // 0.2 s per report
+constexpr int kSpectrumChunks = 6;              // ~21 waterfall rows per second
 constexpr int kLevelChunks = 6;                 // ~50 ms per AGC report
 constexpr double kRetuneSkipS = 0.15;           // old data still in flight after a retune
 constexpr double kGainSkipS = 0.13;             // same after a gain change
@@ -323,6 +324,7 @@ NbDemod::NbDemod(IqReader& reader, NbSink& sink)
     hann(kMonitorFft, monWindow_, monWinPower_);
     hann(kClsFft, clsWindow_, clsWinPower_);
     monAcc_.assign(kMonitorFft, 0.0);
+    specAcc_.assign(kMonitorFft, 0.0);
     monBuf_.resize(kMonitorFft);
     clsBuf_.resize(kClsFft);
     clsAcc_.assign(kClsFft, 0.0);
@@ -444,6 +446,8 @@ void NbDemod::resetWindow()
     gainHold_ = 0;
     std::fill(monAcc_.begin(), monAcc_.end(), 0.0);
     monCount_ = 0;
+    std::fill(specAcc_.begin(), specAcc_.end(), 0.0);
+    specCount_ = 0;
     // The noise floor is measured anew: the squelch stays shut for the first
     // 0.2 s rather than judging by another window's floor.
     floorBin_ = 0;
@@ -622,6 +626,8 @@ void NbDemod::convert()
         gainHold_ = static_cast<long>(cfg_.sampleRate * kGainSkipS);
         std::fill(monAcc_.begin(), monAcc_.end(), 0.0);
         monCount_ = 0;
+        std::fill(specAcc_.begin(), specAcc_.end(), 0.0);
+        specCount_ = 0;
         clsFill_ = 0;
         std::fill(clsAcc_.begin(), clsAcc_.end(), 0.0);
         clsFfts_ = 0;
@@ -639,8 +645,42 @@ void NbDemod::monitorFft()
         monBuf_[static_cast<size_t>(i)] = cf32(x[2 * i] * w, x[2 * i + 1] * w);
     }
     monFft_.forward(monBuf_.data());
-    for (int k = 0; k < kMonitorFft; k++) monAcc_[static_cast<size_t>(k)] += std::norm(monBuf_[static_cast<size_t>(k)]);
+    for (int k = 0; k < kMonitorFft; k++) {
+        const double p = std::norm(monBuf_[static_cast<size_t>(k)]);
+        monAcc_[static_cast<size_t>(k)] += p;
+        specAcc_[static_cast<size_t>(k)] += p;
+    }
     monCount_++;
+    if (++specCount_ >= kSpectrumChunks) fastSpectrum();
+}
+
+void NbDemod::fastSpectrum()
+{
+    // A few FFTs averaged (smooth noise), then the strongest FFT bin per
+    // output bin - narrow carriers keep their height, as on a real SDR.
+    const int half = usableHalfSpan(cfg_.sampleRate);
+    const double binHz = static_cast<double>(cfg_.sampleRate) / kMonitorFft;
+    const double norm = 1.0 / (static_cast<double>(specCount_) * kMonitorFft * monWinPower_);
+    std::vector<double> peak(kFastSpectrumBins, -1.0);
+    for (int k = 0; k < kMonitorFft; k++) {
+        const double f = (k < kMonitorFft / 2 ? k : k - kMonitorFft) * binHz;
+        if (f < -half || f >= half || k == 0) continue;  // k 0 = DC spike
+        const int j = static_cast<int>((f + half) * kFastSpectrumBins / (2.0 * half));
+        if (j < 0 || j >= kFastSpectrumBins) continue;
+        const double p = specAcc_[static_cast<size_t>(k)] * norm;
+        if (p > peak[static_cast<size_t>(j)]) peak[static_cast<size_t>(j)] = p;
+    }
+    // Output bins narrower than an FFT bin (low rates): take the neighbour.
+    std::vector<float> out(kFastSpectrumBins);
+    double last = floorBin_ > 0 ? floorBin_ : 1e-12;
+    for (int j = 0; j < kFastSpectrumBins; j++) {
+        const double p = peak[static_cast<size_t>(j)];
+        if (p >= 0) last = p;
+        out[static_cast<size_t>(j)] = linToDb(last);
+    }
+    std::fill(specAcc_.begin(), specAcc_.end(), 0.0);
+    specCount_ = 0;
+    sink_.onNbSpectrum(cfg_.loHz, static_cast<uint32_t>(2 * half), out);
 }
 
 void NbDemod::channelChain(bool hold)

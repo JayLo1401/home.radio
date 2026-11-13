@@ -419,17 +419,23 @@ void RadioController::onNbReport(const NbReport& r, float gainDb)
         e.endArray().dbl("noiseDb", r.channelNoiseDbfs - gainDb).endObject();
         emit(e.text());
     }
-    {
-        Event e;
-        e.beginObject()
-            .str("type", "nbSpectrum")
-            .num("centerHz", static_cast<int32_t>(r.centerHz))
-            .num("spanHz", static_cast<int32_t>(r.spanHz))
-            .beginArray("binsDb");
-        for (float db : r.spectrumDbfs) e.dbl(db - gainDb, 1);
-        e.endArray().endObject();
-        emit(e.text());
-    }
+}
+
+void RadioController::onNbSpectrum(uint32_t centerHz, uint32_t spanHz, const std::vector<float>& binsDbfs,
+                                   float gainDb)
+{
+    if (!nbActive_) return;
+    // ~20 Hz for the waterfall.
+    Event e;
+    e.beginObject()
+        .str("type", "nbSpectrum")
+        .num("centerHz", static_cast<int32_t>(centerHz))
+        .num("spanHz", static_cast<int32_t>(spanHz))
+        .dbl("gainDb", gainDb, 1)
+        .beginArray("binsDb");
+    for (float db : binsDbfs) e.dbl(db - gainDb, 1);
+    e.endArray().endObject();
+    emit(e.text());
 }
 
 // --- engine ---
@@ -468,10 +474,10 @@ void RadioController::engineDestroy()
     rx.reset();
 }
 
-void RadioController::engineTune(uint32_t hz)
+void RadioController::engineTune(uint32_t hz, bool keepIfTuned)
 {
     std::lock_guard<std::mutex> lock(engineMutex_);
-    if (rx_) rx_->tune(hz);
+    if (rx_) rx_->tune(hz, keepIfTuned);
 }
 
 void RadioController::engineHalt()
@@ -569,6 +575,113 @@ void RadioController::engineNbSetSquelch(float squelchDb)
 {
     std::lock_guard<std::mutex> lock(engineMutex_);
     if (rx_) rx_->nbSetSquelch(squelchDb);
+}
+
+void RadioController::engineNbSetPacketDecoder(int kind)
+{
+    std::lock_guard<std::mutex> lock(engineMutex_);
+    if (rx_) rx_->nbSetPacketDecoder(kind);
+}
+
+bool RadioController::engineAdsbStart()
+{
+    std::lock_guard<std::mutex> lock(engineMutex_);
+    return rx_ && rx_->adsbStart();
+}
+
+bool RadioController::engineAcarsStart(uint32_t centerHz, const std::vector<uint32_t>& channels)
+{
+    std::lock_guard<std::mutex> lock(engineMutex_);
+    return rx_ && rx_->acarsStart(centerHz, channels);
+}
+
+void RadioController::onRxStatus(float samplesPerSecond, float levelDbfs, float clipRatio, float gainDb,
+                                 const std::vector<float>& channelLevelsDb)
+{
+    if (!adsbActive_) return;
+    Event e;
+    e.beginObject()
+        .str("type", "rxStatus")
+        .dbl("samplesPerSecond", samplesPerSecond, 0)
+        .dbl("levelDb", levelDbfs, 1)
+        .dbl("clipRatio", clipRatio, 4)
+        .dbl("gainDb", gainDb, 1)
+        .beginArray("channelLevelsDb");
+    for (float v : channelLevelsDb) e.dbl(v, 1);
+    e.endArray().endObject();
+    emit(e.text());
+}
+
+void RadioController::onAcarsFrame(uint32_t freqHz, const std::vector<uint8_t>& frame)
+{
+    if (!adsbActive_) return;  // shared flag: ADS-B / ISM / ACARS running
+    static const char* digits = "0123456789abcdef";
+    std::string hex;
+    for (uint8_t b : frame) {
+        hex += digits[b >> 4];
+        hex += digits[b & 15];
+    }
+    Event e;
+    e.beginObject().str("type", "acarsFrame").num("freqHz", static_cast<int32_t>(freqHz)).str("hex", hex).endObject();
+    emit(e.text());
+}
+
+bool RadioController::engineIsmStart(uint32_t freqHz)
+{
+    std::lock_guard<std::mutex> lock(engineMutex_);
+    return rx_ && rx_->ismStart(freqHz);
+}
+
+void RadioController::onIsmBurst(const char* modulation, const std::vector<int>& durationsUs, float offsetHz,
+                                 float levelDb, float snrDb)
+{
+    if (!adsbActive_) return;  // shared flag: ADS-B or ISM running
+    Event e;
+    e.beginObject().str("type", "ismBurst").str("modulation", modulation).beginArray("durationsUs");
+    for (int d : durationsUs) e.num(static_cast<int32_t>(d));
+    e.endArray().dbl("offsetHz", offsetHz, 0).dbl("levelDb", levelDb, 1).dbl("snrDb", snrDb, 1).endObject();
+    emit(e.text());
+}
+
+void RadioController::onAdsbFrame(const uint8_t* bytes, int length, uint32_t icao, float signalDbfs)
+{
+    if (!adsbActive_) return;
+    static const char* digits = "0123456789abcdef";
+    std::string hex;
+    for (int i = 0; i < length; i++) {
+        hex += digits[bytes[i] >> 4];
+        hex += digits[bytes[i] & 15];
+    }
+    Event e;
+    e.beginObject()
+        .str("type", "adsbFrame")
+        .str("hex", hex)
+        .num("icao", static_cast<int32_t>(icao))
+        .dbl("signalDb", signalDbfs, 1)
+        .endObject();
+    emit(e.text());
+}
+
+void RadioController::onNbPacket(int kind, const std::vector<uint8_t>& frame)
+{
+    if (!nbActive_) return;
+    // Hex in JSON; the Dart side turns it into bytes like Android's Uint8List.
+    static const char* digits = "0123456789abcdef";
+    std::string hex;
+    hex.reserve(frame.size() * 2);
+    for (uint8_t b : frame) {
+        hex += digits[b >> 4];
+        hex += digits[b & 15];
+    }
+    Event e;
+    e.beginObject().str("type", "nbPacket").num("kind", kind).str("hex", hex).endObject();
+    emit(e.text());
+}
+
+float RadioController::engineNbSetGain(int gainIndex)
+{
+    std::lock_guard<std::mutex> lock(engineMutex_);
+    return rx_ ? rx_->nbSetGain(gainIndex) : 0.f;
 }
 
 bool RadioController::engineNbSetChannels(int centerHz, const std::vector<uint32_t>& channels)
@@ -1305,6 +1418,55 @@ bool RadioController::handleNbCall(int64_t id, const std::string& method, const 
             if (created_) engineNbSetSquelch(squelchDb);
             replyNull(id);
         });
+    } else if (method == "adsbStart") {
+        fm_.post([=] {
+            stopDabActivities();
+            stopFmActivities();
+            leaveNb();
+            const bool ok = ensureCreated() && engineAdsbStart();
+            adsbActive_ = ok;
+            replyBool(id, ok);
+        });
+    } else if (method == "ismStart") {
+        const int freqHz = args.intOr("freqHz", 433920000);
+        fm_.post([=] {
+            stopDabActivities();
+            stopFmActivities();
+            leaveNb();
+            const bool ok = ensureCreated() && engineIsmStart(static_cast<uint32_t>(freqHz));
+            adsbActive_ = ok;
+            replyBool(id, ok);
+        });
+    } else if (method == "acarsStart") {
+        const int centerHz = args.intOr("centerHz", 131687500);
+        const auto channels = intList(args, "channelsHz");
+        fm_.post([=] {
+            stopDabActivities();
+            stopFmActivities();
+            leaveNb();
+            const bool ok = ensureCreated() && engineAcarsStart(static_cast<uint32_t>(centerHz), channels);
+            adsbActive_ = ok;
+            replyBool(id, ok);
+        });
+    } else if (method == "adsbStop" || method == "ismStop" || method == "acarsStop") {
+        fm_.post([=] {
+            const bool wasActive = adsbActive_.exchange(false);
+            if (created_ && wasActive) engineHalt();
+            replyNull(id);
+        });
+    } else if (method == "nbSetPacketDecoder") {
+        const int kind = args.intOr("kind", 0);
+        fm_.post([=] {
+            if (created_) engineNbSetPacketDecoder(kind);
+            replyNull(id);
+        });
+    } else if (method == "nbSetGain") {
+        const int gainIndex = args.intOr("gainIndex", -1);
+        fm_.post([=] {
+            Event v;
+            v.dbl(nullptr, created_ ? engineNbSetGain(gainIndex) : 0.0, 1);
+            replyRaw(id, v.text());
+        });
     } else if (method == "nbSetFilters") {
         const std::string agcName = args.stringOr("agc", "auto");
         const int agc = nbAgcCode(agcName);
@@ -1355,7 +1517,9 @@ void RadioController::playServiceThread(int64_t id, int freqKhz, int serviceId, 
             return;
         }
         attempt++;
-        engineTune(static_cast<uint32_t>(freqKhz) * 1000u);
+        // First attempt: keep a weak ensemble's progress from the app's
+        // earlier tries; the PCM retry starts fresh.
+        engineTune(static_cast<uint32_t>(freqKhz) * 1000u, attempt == 1);
         auto p = std::make_shared<AudioPlayer>();
         p->start();
         {

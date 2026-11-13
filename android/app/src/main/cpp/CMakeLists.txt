@@ -26,7 +26,12 @@ add_library(hrdab SHARED
     hrdab/fic.cpp
     hrdab/fm_demod.cpp
     hrdab/fm_dsp.cpp
+    hrdab/acars.cpp
+    hrdab/acars_multi.cpp
+    hrdab/adsb_demod.cpp
+    hrdab/afsk1200.cpp
     hrdab/hrdab_jni.cpp
+    hrdab/ism_demod.cpp
     hrdab/json.cpp
     hrdab/msc.cpp
     hrdab/nb_demod.cpp

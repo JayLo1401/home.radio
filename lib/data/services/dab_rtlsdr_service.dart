@@ -60,16 +60,20 @@ class DabRtlSdrService {
 
   /// The whole of Band III, or with [onlyFreqKhz] just that one channel
   /// (searched more patiently - see DabRtlSdrPlugin.scanBand3).
-  Future<void> scanBand3({int? onlyFreqKhz}) =>
-      _invokeMethod('scanBand3', {'freqKhz': ?onlyFreqKhz});
+  Future<void> scanBand3({int? onlyFreqKhz}) async {
+    await _settled();
+    await _invokeMethod('scanBand3', {'freqKhz': ?onlyFreqKhz});
+  }
 
   // FM (UKW) - same receiver and stick; starting FM leaves DAB+ and vice
   // versa (one tuner). Events: fmStatus, fmRds, fmSeekResult,
   // fmScanProgress, fmStationFound, fmScanFinished.
 
   /// Switches to FM, tunes [freqKhz] and plays it.
-  Future<bool> fmPlay(int freqKhz) async =>
-      await _invokeMethod<bool>('fmPlay', {'freqKhz': freqKhz}) ?? false;
+  Future<bool> fmPlay(int freqKhz) async {
+    await _settled();
+    return await _invokeMethod<bool>('fmPlay', {'freqKhz': freqKhz}) ?? false;
+  }
 
   /// Retunes while FM is playing (manual tuning) - audio continues.
   Future<bool> fmTune(int freqKhz) async =>
@@ -77,12 +81,17 @@ class DabRtlSdrService {
 
   /// Looks for the next station up or down from [fromKhz] and plays it;
   /// the result arrives as an `fmSeekResult` event.
-  Future<void> fmSeek({required int fromKhz, required bool up}) =>
-      _invokeMethod('fmSeek', {'fromKhz': fromKhz, 'up': up});
+  Future<void> fmSeek({required int fromKhz, required bool up}) async {
+    await _settled();
+    await _invokeMethod('fmSeek', {'fromKhz': fromKhz, 'up': up});
+  }
 
   Future<void> fmStop() => _invokeMethod('fmStop');
 
-  Future<void> fmScan() => _invokeMethod('fmScan');
+  Future<void> fmScan() async {
+    await _settled();
+    await _invokeMethod('fmScan');
+  }
 
   Future<void> stopFmScan() => _invokeMethod('stopFmScan');
 
@@ -96,16 +105,19 @@ class DabRtlSdrService {
     required int freqHz,
     required String mode,
     required double squelchDb,
-  }) async =>
-      await _invokeMethod<bool>('nbStart', {
-        'sampleRate': sampleRate,
-        'centerHz': centerHz,
-        'channelsHz': channelsHz,
-        'freqHz': freqHz,
-        'mode': mode,
-        'squelchDb': squelchDb,
-      }) ??
-      false;
+  }) async {
+    // A band switch (10 m -> 2 m) stops and starts again.
+    await _settled();
+    return await _invokeMethod<bool>('nbStart', {
+          'sampleRate': sampleRate,
+          'centerHz': centerHz,
+          'channelsHz': channelsHz,
+          'freqHz': freqHz,
+          'mode': mode,
+          'squelchDb': squelchDb,
+        }) ??
+        false;
+  }
 
   Future<bool> nbTune({required int freqHz, required String mode}) async =>
       await _invokeMethod<bool>('nbTune', {'freqHz': freqHz, 'mode': mode}) ?? false;
@@ -116,7 +128,79 @@ class DabRtlSdrService {
       await _invokeMethod<bool>('nbSetChannels', {'centerHz': centerHz, 'channelsHz': channelsHz}) ??
       false;
 
-  Future<void> nbStop() => _invokeMethod('nbStop');
+  /// Leaving a listening band: the scanner stops NB in dispose() without
+  /// waiting, while the home screen already tunes DAB+/FM again - an nbStop
+  /// arriving after that tune halted the stick ("Sender wird getunt" for
+  /// good). Every receiver start waits for a pending stop first ([_settled]).
+  Future<void> nbStop() {
+    final stop = _invokeMethod<void>('nbStop').catchError((Object _) {});
+    _stopping = stop;
+    return stop;
+  }
+
+  Future<void> _stopping = Future.value();
+
+  /// Waits for a pending [nbStop] - before anything that tunes.
+  Future<void> _settled() => _stopping;
+
+  /// Tuner gain while listening: step 0..[nbGainSteps]-1 held fixed, -1 =
+  /// automatic. Returns the step's gain in dB (the current one for -1). The
+  /// gain in effect also comes with every `nbSpectrum` event (`gainDb`).
+  Future<double> nbSetGain(int gainIndex) async =>
+      (await _invokeMethod<num>('nbSetGain', {'gainIndex': gainIndex}))?.toDouble() ?? 0;
+
+  /// ADS-B on 1090 MHz (leaves DAB+/FM/NB): verified Mode S frames arrive
+  /// as `adsbFrame` events (see adsbFrameFromEvent); [nbSetGain] sets the
+  /// gain here too.
+  Future<bool> adsbStart() async {
+    await _settled();
+    return await _invokeMethod<bool>('adsbStart') ?? false;
+  }
+
+  /// Like [nbStop]: a later receiver start waits for it.
+  Future<void> adsbStop() {
+    final stop = _invokeMethod<void>('adsbStop').catchError((Object _) {});
+    _stopping = stop;
+    return stop;
+  }
+
+  /// ACARS on all [channelsHz] at once around [centerHz] (no audio):
+  /// messages arrive as `acarsFrame` events with their `freqHz`.
+  Future<bool> acarsStart({required int centerHz, required List<int> channelsHz}) async {
+    await _settled();
+    return await _invokeMethod<bool>('acarsStart', {'centerHz': centerHz, 'channelsHz': channelsHz}) ?? false;
+  }
+
+  /// Like [nbStop]: a later receiver start waits for it.
+  Future<void> acarsStop() {
+    final stop = _invokeMethod<void>('acarsStop').catchError((Object _) {});
+    _stopping = stop;
+    return stop;
+  }
+
+  /// ISM sensors on [freqHz] (433,92 / 868,3 MHz): bursts arrive as
+  /// `ismBurst` events (see IsmBurst.fromEvent); gain via [nbSetGain].
+  Future<bool> ismStart(int freqHz) async {
+    await _settled();
+    return await _invokeMethod<bool>('ismStart', {'freqHz': freqHz}) ?? false;
+  }
+
+  /// Like [nbStop]: a later receiver start waits for it.
+  Future<void> ismStop() {
+    final stop = _invokeMethod<void>('ismStop').catchError((Object _) {});
+    _stopping = stop;
+    return stop;
+  }
+
+  /// Packet decoder on the listened channel's audio: [packetOff],
+  /// [packetAprs] (AFSK 1200) or [packetAcars] (MSK 2400). Frames arrive as
+  /// `nbPacket` events with that `kind` (see aprsFrameFromEvent).
+  Future<void> nbSetPacketDecoder(int kind) => _invokeMethod('nbSetPacketDecoder', {'kind': kind});
+
+  static const packetOff = 0, packetAprs = 1, packetAcars = 2;
+
+  /// Gain steps of the R820T/R828D tuner (see R82xx::kGainSteps).
+  static const nbGainSteps = 31;
 
   /// Signal filters for the listened channel: [bandwidthHz] (0 = mode
   /// default), impulse [noiseBlanker], [voiceFilter] (300-3000 Hz) and
@@ -155,11 +239,15 @@ class DabRtlSdrService {
 
   Future<void> stopScan() => _invokeMethod('stopScan');
 
-  Future<void> tuneFrequency(int freqKhz) => _invokeMethod('tuneFrequency', {'freqKhz': freqKhz});
+  Future<void> tuneFrequency(int freqKhz) async {
+    await _settled();
+    await _invokeMethod('tuneFrequency', {'freqKhz': freqKhz});
+  }
 
   /// Tunes to [freqKhz], waits for sync, then decodes+plays [serviceId]'s
   /// audio component. Returns whether playback actually started.
   Future<bool> playService({required int freqKhz, required int serviceId}) async {
+    await _settled();
     final result = await _invokeMethod<bool>(
       'playService',
       {'freqKhz': freqKhz, 'serviceId': serviceId},
@@ -187,7 +275,8 @@ class DabRtlSdrService {
   /// slower action from [scanBand3] (some stations take 10-30s to send a
   /// slide, some never do). Progress/results arrive via [events]
   /// (`logoScanProgress`, `logoFound`, `logoNotFound`, `logoScanFinished`).
-  Future<void> fetchLogos(List<({int freqKhz, int serviceId})> stations) {
+  Future<void> fetchLogos(List<({int freqKhz, int serviceId})> stations) async {
+    await _settled();
     return _invokeMethod('fetchLogos', {
       'stations': stations.map((s) => {'freqKhz': s.freqKhz, 'serviceId': s.serviceId}).toList(),
     });

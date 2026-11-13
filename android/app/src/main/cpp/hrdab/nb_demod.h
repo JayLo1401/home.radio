@@ -94,6 +94,9 @@ public:
     // 48 kHz mono PCM, continuously (silence while the squelch is closed).
     virtual void onNbAudio(const int16_t* pcm, int frames) = 0;
     virtual void onNbReport(const NbReport& report) = 0;
+    // Waterfall spectrum, ~20 times a second: kFastSpectrumBins dBFS values
+    // (strongest FFT bin in each) across centerHz +- spanHz/2.
+    virtual void onNbSpectrum(uint32_t /*centerHz*/, uint32_t /*spanHz*/, const std::vector<float>& /*binsDbfs*/) {}
 };
 
 struct NbConfig {
@@ -111,6 +114,7 @@ public:
     static constexpr int kAudioRate = 48000;
     static constexpr int kMonitorFft = 2048;
     static constexpr int kSpectrumBins = 256;
+    static constexpr int kFastSpectrumBins = 1024;
     static constexpr int kActivityBwHz = 8000;
 
     // 960000, 1024000, 1440000, 1920000, 2048000, 2400000 S/s.
@@ -184,6 +188,7 @@ private:
     void classifyAccumulate(const float* a, int n);
     void classify();
     void report();
+    void fastSpectrum();
     float channelNoise(NbMode mode) const;
 
     IqReader& reader_;
@@ -235,6 +240,8 @@ private:
     long gainHold_ = 0;          // samples after a gain change
     std::vector<double> monAcc_;
     int monCount_ = 0;
+    std::vector<double> specAcc_; // same FFTs, for fastSpectrum()
+    int specCount_ = 0;
     std::vector<cf32> monBuf_;
     double floorBin_ = 0;        // noise power per monitor FFT bin, 0 = unknown
     double n0_ = 0;              // noise density per Hz (floorBin_ / bin width)

@@ -27,7 +27,7 @@ JavaVM* g_jvm = nullptr;
 struct Methods {
     jmethodID onSync, onEnsembleLabel, onServiceDetected, onDynamicLabel, onSnr, onRsErrors, onAacErrors,
         onAudioFormat, onAudioConfig, onAccessUnit, onSlide, onStatus, onFmPcm, onFmStatus, onFmRds, onNbPcm,
-        onNbReport;
+        onNbReport, onNbSpectrum, onNbPacket, onAdsbFrame, onIsmBurst, onAcarsFrame, onRxStatus;
 };
 
 // ART aborts when a thread exits while still attached, so every thread we
@@ -116,6 +116,12 @@ public:
         };
         m_.onNbPcm = optional("onNativeNbPcm", "([S)V");
         m_.onNbReport = optional("onNativeNbReport", "(IFFFZLjava/lang/String;II[I[FF[FIZZLjava/lang/String;)V");
+        m_.onNbSpectrum = optional("onNativeNbSpectrum", "(II[FF)V");
+        m_.onNbPacket = optional("onNativeNbPacket", "(I[B)V");
+        m_.onAdsbFrame = optional("onNativeAdsbFrame", "([BIF)V");
+        m_.onIsmBurst = optional("onNativeIsmBurst", "(Ljava/lang/String;[IFFF)V");
+        m_.onAcarsFrame = optional("onNativeAcarsFrame", "(I[B)V");
+        m_.onRxStatus = optional("onNativeRxStatus", "(FFFF[F)V");
         e->DeleteLocalRef(c);
     }
 
@@ -252,6 +258,82 @@ public:
         if (mode) e->DeleteLocalRef(mode);
         clear(e);
     }
+    void onRxStatus(float samplesPerSecond, float levelDbfs, float clipRatio, float gainDb,
+                    const std::vector<float>& channelLevelsDb) override
+    {
+        JNIEnv* e = env();
+        if (!e || !m_.onRxStatus) return;
+        const jsize n = static_cast<jsize>(channelLevelsDb.size());
+        jfloatArray a = e->NewFloatArray(n);
+        if (a) {
+            if (n) e->SetFloatArrayRegion(a, 0, n, channelLevelsDb.data());
+            e->CallVoidMethod(target_, m_.onRxStatus, static_cast<jfloat>(samplesPerSecond), static_cast<jfloat>(levelDbfs),
+                              static_cast<jfloat>(clipRatio), static_cast<jfloat>(gainDb), a);
+            e->DeleteLocalRef(a);
+        }
+        clear(e);
+    }
+    void onAcarsFrame(uint32_t freqHz, const std::vector<uint8_t>& frame) override
+    {
+        JNIEnv* e = env();
+        if (!e || !m_.onAcarsFrame) return;
+        jbyteArray a = byteArray(e, frame.data(), static_cast<int>(frame.size()));
+        e->CallVoidMethod(target_, m_.onAcarsFrame, static_cast<jint>(freqHz), a);
+        e->DeleteLocalRef(a);
+        clear(e);
+    }
+    void onIsmBurst(const char* modulation, const std::vector<int>& durationsUs, float offsetHz, float levelDb,
+                    float snrDb) override
+    {
+        JNIEnv* e = env();
+        if (!e || !m_.onIsmBurst) return;
+        const jsize n = static_cast<jsize>(durationsUs.size());
+        std::vector<jint> d(durationsUs.begin(), durationsUs.end());
+        jintArray a = e->NewIntArray(n);
+        jstring mod = e->NewStringUTF(modulation);
+        if (a && mod) {
+            if (n) e->SetIntArrayRegion(a, 0, n, d.data());
+            e->CallVoidMethod(target_, m_.onIsmBurst, mod, a, static_cast<jfloat>(offsetHz), static_cast<jfloat>(levelDb),
+                              static_cast<jfloat>(snrDb));
+        }
+        if (a) e->DeleteLocalRef(a);
+        if (mod) e->DeleteLocalRef(mod);
+        clear(e);
+    }
+    void onAdsbFrame(const uint8_t* bytes, int length, uint32_t icao, float signalDbfs) override
+    {
+        JNIEnv* e = env();
+        if (!e || !m_.onAdsbFrame) return;
+        jbyteArray a = byteArray(e, bytes, length);
+        e->CallVoidMethod(target_, m_.onAdsbFrame, a, static_cast<jint>(icao), static_cast<jfloat>(signalDbfs));
+        e->DeleteLocalRef(a);
+        clear(e);
+    }
+    void onNbPacket(int kind, const std::vector<uint8_t>& frame) override
+    {
+        JNIEnv* e = env();
+        if (!e || !m_.onNbPacket) return;
+        jbyteArray a = byteArray(e, frame.data(), static_cast<int>(frame.size()));
+        e->CallVoidMethod(target_, m_.onNbPacket, static_cast<jint>(kind), a);
+        e->DeleteLocalRef(a);
+        clear(e);
+    }
+    void onNbSpectrum(uint32_t centerHz, uint32_t spanHz, const std::vector<float>& bins, float gainDb) override
+    {
+        JNIEnv* e = env();
+        if (!e || !m_.onNbSpectrum) return;
+        const jsize n = static_cast<jsize>(bins.size());
+        std::vector<jfloat> sp(static_cast<size_t>(n));
+        for (jsize i = 0; i < n; i++) sp[static_cast<size_t>(i)] = bins[static_cast<size_t>(i)] - gainDb;
+        jfloatArray a = e->NewFloatArray(n);
+        if (a) {
+            if (n) e->SetFloatArrayRegion(a, 0, n, sp.data());
+            e->CallVoidMethod(target_, m_.onNbSpectrum, static_cast<jint>(centerHz), static_cast<jint>(spanHz), a,
+                              static_cast<jfloat>(gainDb));
+            e->DeleteLocalRef(a);
+        }
+        clear(e);
+    }
 
 private:
     static void clear(JNIEnv* e)
@@ -354,6 +436,14 @@ Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeTune(JNIEnv*, jobject,
     std::lock_guard<std::mutex> lock(g_mutex);
     if (!g_session) return JNI_FALSE;
     return g_session->receiver->tune(static_cast<uint32_t>(hz)) ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeTuneKeep(JNIEnv*, jobject, jint hz)
+{
+    std::lock_guard<std::mutex> lock(g_mutex);
+    if (!g_session) return JNI_FALSE;
+    return g_session->receiver->tune(static_cast<uint32_t>(hz), true) ? JNI_TRUE : JNI_FALSE;
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -477,6 +567,47 @@ Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeNbSetSquelch(JNIEnv*, 
 {
     std::lock_guard<std::mutex> lock(g_mutex);
     if (g_session) g_session->receiver->nbSetSquelch(squelchDb);
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeAcarsStart(JNIEnv* e, jobject, jint centerHz,
+                                                                    jintArray channelsHz)
+{
+    const jsize n = channelsHz ? e->GetArrayLength(channelsHz) : 0;
+    std::vector<jint> raw(static_cast<size_t>(n));
+    if (n) e->GetIntArrayRegion(channelsHz, 0, n, raw.data());
+    std::vector<uint32_t> channels(raw.begin(), raw.end());
+    std::lock_guard<std::mutex> lock(g_mutex);
+    return g_session && g_session->receiver->acarsStart(static_cast<uint32_t>(centerHz), channels) ? JNI_TRUE
+                                                                                                   : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeIsmStart(JNIEnv*, jobject, jint freqHz)
+{
+    std::lock_guard<std::mutex> lock(g_mutex);
+    return g_session && g_session->receiver->ismStart(static_cast<uint32_t>(freqHz)) ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeAdsbStart(JNIEnv*, jobject)
+{
+    std::lock_guard<std::mutex> lock(g_mutex);
+    return g_session && g_session->receiver->adsbStart() ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeNbSetPacketDecoder(JNIEnv*, jobject, jint kind)
+{
+    std::lock_guard<std::mutex> lock(g_mutex);
+    if (g_session) g_session->receiver->nbSetPacketDecoder(kind);
+}
+
+extern "C" JNIEXPORT jfloat JNICALL
+Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeNbSetGain(JNIEnv*, jobject, jint gainIndex)
+{
+    std::lock_guard<std::mutex> lock(g_mutex);
+    return g_session ? g_session->receiver->nbSetGain(gainIndex) : 0.f;
 }
 
 extern "C" JNIEXPORT void JNICALL
