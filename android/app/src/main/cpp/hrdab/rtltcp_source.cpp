@@ -563,7 +563,6 @@ void RtlTcpSource::loop()
 {
     raiseThreadPriority(-19);
     std::vector<uint8_t> buf(65536);
-    bool everConnected = false;
     bool reportedDown = false;
     while (running_) {
         const Connect c = connectOnce();
@@ -580,8 +579,10 @@ void RtlTcpSource::loop()
             for (int i = 0; i < waits && running_; i++) std::this_thread::sleep_for(std::chrono::milliseconds(100));
             continue;
         }
-        if (reportedDown || everConnected) status(false, "Verbindung zur rtl_tcp-Quelle hergestellt");
-        everConnected = true;
+        // Every time, also the first: the app's connection setup shows the
+        // stick as reached on it (the server has it open by now - after the
+        // v2 handshake, or before a classic server's greeting).
+        status(false, "Verbindung zur rtl_tcp-Quelle hergestellt");
         reportedDown = false;
         const auto connectedAt = std::chrono::steady_clock::now();
         intptr_t s;

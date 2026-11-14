@@ -119,6 +119,7 @@ add_library(hrdab SHARED
   "${HRDAB_SRC}/fm_demod.cpp"
   "${HRDAB_SRC}/acars.cpp"
   "${HRDAB_SRC}/acars_multi.cpp"
+  "${HRDAB_SRC}/vdl2.cpp"
   "${HRDAB_SRC}/adsb_demod.cpp"
   "${HRDAB_SRC}/afsk1200.cpp"
   "${HRDAB_SRC}/fm_dsp.cpp"

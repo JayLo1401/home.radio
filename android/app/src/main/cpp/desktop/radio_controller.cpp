@@ -32,6 +32,7 @@ constexpr int64_t kFmWeakWaitMs = 2500;
 constexpr int64_t kFmWeakRdsWaitMs = 5000;
 constexpr int64_t kFmRdsWaitMs = 4000;
 constexpr int64_t kFmNoRdsMs = 2000;
+constexpr int kDabPrebufferMs = 400; // DAB+ arrives in 120 ms super frames
 constexpr int kFmAudioRate = 48000;
 constexpr int kFmPrebufferMs = 250;
 
@@ -205,6 +206,22 @@ void RadioController::call(int64_t id, const std::string& method, const std::str
 {
     Json args = Json::parse(argsJson);
     main_.post([this, id, method, args = std::move(args)] { onMethodCall(id, method, args); });
+}
+
+// A started player whose equalizer levels go out as `audioLevels` events
+// (8 bytes 0..255, bass first; an empty list = the player stopped).
+std::shared_ptr<AudioPlayer> RadioController::startPlayer(int prebufferMs)
+{
+    auto p = std::make_shared<AudioPlayer>(prebufferMs);
+    p->setLevelsListener([this](const uint8_t* levels, int count) {
+        Event e;
+        e.beginObject().str("type", "audioLevels").beginArray("levels");
+        for (int i = 0; i < count; i++) e.num(levels[i]);
+        e.endArray().endObject();
+        emit(e.text());
+    });
+    p->start();
+    return p;
 }
 
 std::shared_ptr<AudioPlayer> RadioController::player(std::shared_ptr<AudioPlayer>& slot)
@@ -1029,9 +1046,7 @@ void RadioController::ensureNbPlayer()
 {
     std::lock_guard<std::mutex> lock(playerMutex_);
     if (nbPlayer_) return;
-    auto p = std::make_shared<AudioPlayer>(kNbPrebufferMs);
-    p->start();
-    nbPlayer_ = p;
+    nbPlayer_ = startPlayer(kNbPrebufferMs);
 }
 
 void RadioController::applyNbFilters()
@@ -1073,9 +1088,7 @@ void RadioController::ensureFmPlayer()
 {
     std::lock_guard<std::mutex> lock(playerMutex_);
     if (fmPlayer_) return;
-    auto p = std::make_shared<AudioPlayer>(kFmPrebufferMs);
-    p->start();
-    fmPlayer_ = p;
+    fmPlayer_ = startPlayer(kFmPrebufferMs);
 }
 
 bool RadioController::fmPlayBlocking(int freqKhz)
@@ -1520,8 +1533,7 @@ void RadioController::playServiceThread(int64_t id, int freqKhz, int serviceId, 
         // First attempt: keep a weak ensemble's progress from the app's
         // earlier tries; the PCM retry starts fresh.
         engineTune(static_cast<uint32_t>(freqKhz) * 1000u, attempt == 1);
-        auto p = std::make_shared<AudioPlayer>();
-        p->start();
+        auto p = startPlayer(kDabPrebufferMs);
         {
             std::lock_guard<std::mutex> lock(playerMutex_);
             audioPlayer_ = p;

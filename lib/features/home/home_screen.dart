@@ -22,6 +22,7 @@ import '../../data/services/update_service.dart';
 import '../settings/settings_screen.dart';
 import '../settings/update_settings_screen.dart';
 import 'background_layer.dart';
+import 'connection_chain.dart';
 import 'favorites_sidebar.dart';
 import 'now_playing_banner.dart';
 import 'radar_panel.dart';
@@ -73,6 +74,76 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   String? _fmPs;
   String? _fmRt;
 
+  /// The receiver's connection setup (App - RTL-Server - Stick - Sender),
+  /// shown in the banner instead of a plain "wird getunt" while a DAB+/FM
+  /// station connects - see ReceiverLink for which results/events drive it.
+  final _link = ReceiverLink();
+
+  /// Bumped whenever a new setup starts, so a pending "all green" hide of an
+  /// older one doesn't hide the new one.
+  int _linkGeneration = 0;
+
+  /// After the chain turned all green, it stays a moment before the
+  /// station's own text (radiotext/RDS) takes its place.
+  void _onLinkChanged() {
+    if (!_link.visible || !_link.complete) return;
+    final generation = _linkGeneration;
+    Future.delayed(const Duration(milliseconds: 1200), () {
+      if (!mounted || generation != _linkGeneration || !_link.complete) return;
+      setState(() => _link.visible = false);
+    });
+  }
+
+  /// Internet radio's setup: "App — Internet — Sender", driven by the
+  /// player's own states - loading (connecting to the stream), buffering
+  /// (connected, filling the buffer), ready and playing (all green).
+  bool _netLinkVisible = false;
+  bool _netReached = false; // the stream answered since this station started
+  int _netLinkGeneration = 0;
+
+  LinkView? _netLinkView() {
+    if (_stopped || !_netLinkVisible) return null;
+    final ps = _playerState?.processingState;
+    final playing = ps == ProcessingState.ready && (_playerState?.playing ?? false);
+    if (_playbackError case final error?) {
+      return LinkView.internet(
+        connection: _netReached ? LinkState.done : LinkState.failed,
+        station: _netReached ? LinkState.failed : LinkState.pending,
+        message: error,
+      );
+    }
+    if (playing) {
+      return const LinkView.internet(
+        connection: LinkState.done,
+        station: LinkState.done,
+        message: 'Sender verbunden',
+      );
+    }
+    if (_netReached) {
+      return const LinkView.internet(
+        connection: LinkState.done,
+        station: LinkState.active,
+        message: 'Stream wird gepuffert…',
+      );
+    }
+    return const LinkView.internet(
+      connection: LinkState.active,
+      station: LinkState.pending,
+      message: 'Verbinde mit dem Sender…',
+    );
+  }
+
+  /// Starts showing the setup for a new DAB+/FM tune.
+  void _startLink({required bool fm, required int freqKhz, int? serviceId}) {
+    _linkGeneration++;
+    _link.start(
+      viaServer: ref.read(receiverModeProvider) == ReceiverMode.tcp,
+      fm: fm,
+      freqKhz: freqKhz,
+      serviceId: serviceId,
+    );
+  }
+
   /// Stopped with the Stop button (or the remote's Stop key): nothing plays,
   /// the receiver's connection is closed, and coming back from another
   /// screen doesn't start anything on its own.
@@ -105,6 +176,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       _fmStereo = false;
       _fmPs = null;
       _fmRt = null;
+      _linkGeneration++;
+      _link.reset();
+      _netLinkGeneration++;
+      _netLinkVisible = false;
+      _netReached = false;
     });
     ref.read(liveStationImageProvider.notifier).set(null);
   }
@@ -126,13 +202,37 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     super.initState();
     final audio = ref.read(audioPlayerServiceProvider);
     audio.playerStateStream.listen((s) {
-      if (mounted) setState(() => _playerState = s);
+      if (!mounted) return;
+      final ps = s.processingState;
+      setState(() {
+        _playerState = s;
+        // Internet radio's connection setup (see _netLinkView): shown while
+        // the stream connects or buffers (also a rebuffer mid-play).
+        if (ps == ProcessingState.loading || ps == ProcessingState.buffering) _netLinkVisible = true;
+        if (ps == ProcessingState.buffering || ps == ProcessingState.ready) _netReached = true;
+      });
+      if (ps == ProcessingState.ready && s.playing && _netLinkVisible) {
+        // All green for a moment, then the stream's own title again.
+        final generation = ++_netLinkGeneration;
+        Future.delayed(const Duration(milliseconds: 1200), () {
+          if (!mounted || generation != _netLinkGeneration) return;
+          final now = _playerState;
+          if (now?.processingState == ProcessingState.ready && (now?.playing ?? false)) {
+            setState(() => _netLinkVisible = false);
+          }
+        });
+      }
     });
     audio.icyTitleStream.listen((t) {
       if (mounted) setState(() => _icyTitle = t);
     });
     audio.errorStream.listen((e) {
-      if (mounted) setState(() => _playbackError = e);
+      if (mounted) {
+        setState(() {
+          _playbackError = e;
+          if (e != null) _netLinkVisible = true;
+        });
+      }
     });
     audio.qualityStream.listen((q) {
       if (mounted) setState(() => _netQuality = q);
@@ -173,6 +273,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   /// between songs) and fall back to no subtitle rather than an empty one.
   void _onDabEvent(Map<String, dynamic> event) {
     if (!mounted) return;
+    // Only while the receiver is ours (not while a scan/listening screen
+    // drives it) - its events then describe this station's setup.
+    if (_receiverWanted && !_stopped) {
+      // A drop mid-playback shows the chain again, with the broken hop.
+      if (event['type'] == 'connectionMessage' && event['isError'] == true) _link.visible = true;
+      if (_link.onEvent(event)) {
+        setState(() {});
+        _onLinkChanged();
+      }
+    }
     switch (event['type']) {
       case 'dynamicLabel' when _dabTuned:
         final label = event['label'] as String? ?? '';
@@ -222,6 +332,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         setState(() {
           _dabTuned = false;
           _dabStatusText = 'Pausiert - eine andere App spielt Audio ab.';
+          _link.reset();
         });
       case 'connectionMessage':
         // Deliberately not guarded on _dabTuned (unlike the cases above):
@@ -269,8 +380,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         setState(() {
           _dabServerReady = false;
           _dabTuned = false;
+          _link.setServerReady(false);
           if (wasDabPlaying) {
             _dabStatusText = 'USB-Stick getrennt - warte auf Wiederanschluss…';
+            _link.tuned(false);
+            _link.fail(LinkStage.stick, _dabStatusText!, retrying: true);
+            _link.visible = true;
           }
         });
       } else {
@@ -332,6 +447,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Future<void> _initDabServer() async {
     final settings = ref.read(settingsRepositoryProvider);
     final dab = ref.read(dabRtlSdrServiceProvider);
+    // (Re)pointing the receiver: its source connects anew with the next tune.
+    _link.sourceDown();
     if (await settings.getReceiverMode() == ReceiverMode.none) {
       if (mounted) setState(() => _dabServerReady = false);
       return;
@@ -342,7 +459,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             host: await settings.getRtlSdrHost(),
             port: await settings.getRtlSdrPort(),
           );
-    if (mounted) setState(() => _dabServerReady = ok);
+    if (mounted) {
+      setState(() {
+        _dabServerReady = ok;
+        _link.setServerReady(ok);
+      });
+    }
   }
 
   Future<void> _autostart() async {
@@ -368,7 +490,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     // it's a favorite or a DAB+ station played directly from "Alle DAB+
     // Sender" without being one (see FavoritesSidebar/LastPlayed).
     final lastPlayed = await settings.getLastPlayed();
-    final lastFmFreq = lastPlayed?.fmFreqKhz;
+    // A station from a list hidden in the settings ("DAB/FM anzeigen" off)
+    // isn't started - the favorites below are.
+    final lastFmFreq = await settings.getFmEnabled() ? lastPlayed?.fmFreqKhz : null;
     if (lastFmFreq != null) {
       final stations = await ref.read(fmStationsRepositoryProvider).watchAll().first;
       final station = stations.where((s) => s.freqKhz == lastFmFreq).firstOrNull;
@@ -377,7 +501,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         return;
       }
     }
-    final lastDabFreq = lastPlayed?.dabFreqKhz;
+    final lastDabFreq = await settings.getDabEnabled() ? lastPlayed?.dabFreqKhz : null;
     final lastDabServiceId = lastPlayed?.dabServiceId;
     if (lastDabFreq != null && lastDabServiceId != null) {
       final stations = await ref
@@ -517,6 +641,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   /// Stops whatever the receiver is doing (DAB+ or FM) - before internet
   /// radio, or on pause.
   Future<void> _stopReceiver() async {
+    _link.sourceDown(); // fmStop halts the receiver, its source with it
     final dab = ref.read(dabRtlSdrServiceProvider);
     await dab.stopPlayback();
     // Unconditionally: callers may already have reset _fmFreqKhz.
@@ -563,7 +688,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       _receiverWanted = false;
       await _stopReceiver();
       ref.read(receiverInterruptedProvider.notifier).set(true);
-      if (mounted) setState(() => _dabTuned = false);
+      if (mounted) {
+        setState(() {
+          _dabTuned = false;
+          _link.reset();
+        });
+      }
       return;
     }
     final audio = ref.read(audioPlayerServiceProvider);
@@ -577,6 +707,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   /// ([_reconnectIfReleased]).
   Future<void> _releaseReceiver() {
     _receiverReleased = true;
+    // Reopened by _reconnectIfReleased - the setup starts from the server.
+    _link.sourceDown();
+    _link.setServerReady(false);
     return _releasing = ref.read(dabRtlSdrServiceProvider).resetSession();
   }
 
@@ -604,6 +737,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           _dabTuned = false;
           _dabSnrDb = null;
           _dabStatusText = null;
+          _link.reset();
         });
       }
     } else {
@@ -640,12 +774,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       if (mounted) setState(() => _dabStatusText = 'Kein Radio-Empfänger eingerichtet (Einstellungen)');
       return;
     }
+    // Shown from the start: reopening a released receiver is the first hop.
+    if (!mounted) return;
+    setState(() => _startLink(fm: true, freqKhz: freqKhz));
     await _reconnectIfReleased();
     if (!mounted || myGeneration != _dabPlayGeneration) return;
     if (mounted) {
       setState(() {
         _fmFreqKhz = freqKhz;
-        _dabStatusText = 'Sender wird eingestellt…';
+        _dabStatusText = null; // the connection chain tells
       });
     }
     final ok = await ref.read(dabRtlSdrServiceProvider).fmPlay(freqKhz);
@@ -657,7 +794,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ? null
           : (_dabConnectionWarning ??
               (_dabServerReady ? 'UKW-Empfang fehlgeschlagen.' : 'RTL-SDR-Quelle nicht erreichbar - versuche erneut…'));
+      _link.tuned(ok);
+      if (!ok && _dabConnectionWarning == null) {
+        if (_dabServerReady) {
+          _link.fail(LinkStage.station, 'UKW-Empfang fehlgeschlagen', retrying: false);
+        } else {
+          _failSourceUnreachable(retrying: true);
+        }
+      }
     });
+    _onLinkChanged();
     if (ok) {
       onPlaying();
     } else if (!_dabServerReady) {
@@ -693,6 +839,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (!_receiverWanted) await _stopReceiver();
   }
 
+  /// setServer()'s probe / useDirectUsb() failed: the first hop is broken.
+  void _failSourceUnreachable({required bool retrying}) {
+    if (_link.viaServer) {
+      _link.fail(
+        LinkStage.server,
+        retrying ? 'RTL-Server nicht erreichbar - versuche erneut…' : 'RTL-Server nicht erreichbar',
+        retrying: retrying,
+      );
+    } else {
+      _link.fail(LinkStage.stick, 'USB-Stick nicht gefunden oder kein Zugriff', retrying: retrying);
+    }
+  }
+
   /// Shared DAB+ playback path for both [_play] (favorites) and
   /// [_playDabStation]: tunes+decodes via the DAB+ receiver
   /// (DabRtlSdrService) and waits for the result in a single await.
@@ -708,9 +867,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       if (mounted) setState(() => _dabStatusText = 'Kein Radio-Empfänger eingerichtet (Einstellungen)');
       return;
     }
+    // Shown from the start: reopening a released receiver is the first hop.
+    if (!mounted) return;
+    setState(() => _startLink(fm: false, freqKhz: freqKhz, serviceId: serviceId));
     await _reconnectIfReleased();
     if (!mounted || myGeneration != _dabPlayGeneration) return;
-    if (mounted) setState(() => _dabStatusText = 'Sender wird getunt…');
+    if (mounted) setState(() => _dabStatusText = null); // the connection chain tells
     final ok = await ref
         .read(dabRtlSdrServiceProvider)
         .playService(freqKhz: freqKhz, serviceId: serviceId);
@@ -747,7 +909,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     : (sourceUnreachable
                           ? 'RTL-SDR-Quelle nicht erreichbar - versuche erneut…'
                           : 'RTL-SDR-Quelle nicht erreichbar.')));
+      _link.tuned(ok);
+      // A source message (_dabConnectionWarning) has already marked its hop.
+      if (!ok && _dabConnectionWarning == null) {
+        if (!_dabServerReady) {
+          _failSourceUnreachable(retrying: sourceUnreachable);
+        } else if (noSignal) {
+          _link.fail(LinkStage.station, 'Kein Signal - versuche erneut…', retrying: true);
+        }
+      }
     });
+    _onLinkChanged();
     if (noSignal) {
       Future.delayed(const Duration(seconds: 1), () {
         if (!mounted || myGeneration != _dabPlayGeneration) return;
@@ -941,6 +1113,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ? (_dabStatusText ?? _fmRt)
         : (isDab ? _dabStatusText : _icyTitle);
     final errorMessage = isDab ? _dabConnectionWarning : _playbackError;
+    // Receiver parts: only with a receiver, and as shown in the settings.
+    final shown = ref.watch(receiverSectionsShownProvider);
 
     return Focus(
       onKeyEvent: _handleKey,
@@ -953,8 +1127,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               child: Column(
                 children: [
                   _MenuBar(
-                    // No DAB+/FM station search without a receiver.
-                    onOpenDabStations: ref.watch(receiverModeProvider) == ReceiverMode.none
+                    // No DAB+/FM station search without a receiver, or
+                    // when hidden in the settings.
+                    onOpenDabStations: !shown.dab
                         ? null
                         : () async {
                             await _prepareReceiverScreen();
@@ -966,7 +1141,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     // All listening bands and the free band scan in one
                     // window (see ListeningHubScreen).
                     listeningButtons: [
-                      if (ref.watch(receiverModeProvider) != ReceiverMode.none)
+                      if (shown.funk)
                         (
                           Icons.settings_input_antenna,
                           'Funk',
@@ -979,7 +1154,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           },
                         ),
                     ],
-                    onOpenFmStations: ref.watch(receiverModeProvider) == ReceiverMode.none
+                    onOpenFmStations: !shown.fm
                         ? null
                         : () async {
                             await _prepareReceiverScreen();
@@ -1055,6 +1230,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     isBuffering: isBuffering,
                     subtitle: (subtitle?.isEmpty ?? true) ? null : subtitle,
                     errorMessage: errorMessage,
+                    status: isDab
+                        ? (!_stopped && _link.visible ? ConnectionChain(view: _link.view) : null)
+                        : switch (_netLinkView()) {
+                            final view? => ConnectionChain(view: view),
+                            null => null,
+                          },
                     snrDb: (isDab && isPlaying) ? _dabSnrDb : null,
                     quality: isPlaying ? (isDab ? _dabQuality : _netQuality) : null,
                     fmStereo: isPlaying && _fmFreqKhz != null ? _fmStereo : null,

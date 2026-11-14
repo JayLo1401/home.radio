@@ -443,6 +443,9 @@ class DabRtlSdrPlugin :
         mainHandler.post { eventSink?.success(event) }
     }
 
+    /** Equalizer bars of the playing player (8 bytes 0..255, bass first; empty = stopped). */
+    private fun emitAudioLevels(levels: ByteArray) = emit(mapOf("type" to "audioLevels", "levels" to levels))
+
     private fun ensureCreated(): Boolean {
         if (created) return true
         created = engine.createTcp(lastHost, lastPort)
@@ -743,7 +746,7 @@ class DabRtlSdrPlugin :
     private fun ensureNbPlayer() {
         if (nbPlayer != null) return
         lateinit var player: DabAacPlayer
-        player = DabAacPlayer(context, NB_PREBUFFER_MS) {
+        player = DabAacPlayer(context, NB_PREBUFFER_MS, ::emitAudioLevels) {
             mainHandler.post {
                 if (nbPlayer !== player) return@post
                 Log.i(TAG, "NB: audio focus lost, stopping")
@@ -942,7 +945,7 @@ class DabRtlSdrPlugin :
     private fun ensureFmPlayer() {
         if (fmPlayer != null) return
         lateinit var player: DabAacPlayer
-        player = DabAacPlayer(context, FM_PREBUFFER_MS) {
+        player = DabAacPlayer(context, FM_PREBUFFER_MS, ::emitAudioLevels) {
             mainHandler.post {
                 if (fmPlayer !== player) return@post
                 Log.i(TAG, "FM: audio focus lost, stopping playback")
@@ -1384,7 +1387,7 @@ class DabRtlSdrPlugin :
                         // the app's earlier tries; the PCM retry starts fresh.
                         if (attempt == 1) engine.tuneKeep(freqKhz * 1000) else engine.tune(freqKhz * 1000)
                         lateinit var player: DabAacPlayer
-                        player = DabAacPlayer(context) {
+                        player = DabAacPlayer(context, onLevels = ::emitAudioLevels) {
                             // Another app took the audio focus. Ignore stale
                             // callbacks of a player already replaced by a
                             // station switch (Android may report those too).

@@ -10,7 +10,7 @@ namespace {
 constexpr double kPi = 3.14159265358979323846;
 constexpr int kBaud = 2400;
 constexpr double kCentreHz = 1800.0;
-constexpr double kPllInertia = 0.74;
+constexpr double kPllInertia = 0.85;  // calmer: noisy transitions jitter the clock less
 constexpr size_t kMaxBytes = 260;
 constexpr uint8_t kSoh = 0x01, kEtx = 0x03, kEtb = 0x17;
 
@@ -106,9 +106,11 @@ void AcarsDecoder::framerBit(Framer& f, bool b, const FrameCallback& onFrame)
     // Newest bit in at the top: the last 40 bits, the oldest lowest.
     f.shift = (f.shift >> 1) | (static_cast<uint64_t>(b) << 39);
     if (!f.inFrame) {
-        // The sync characters, LSB first, parity ignored.
+        // The sync characters, LSB first, parity ignored. Not the "+": the
+        // bit clock is still settling while it arrives (the pre-key before
+        // it has no transitions) and it's often garbled.
         bool match = true;
-        for (int c = 0; c < 5 && match; c++) {
+        for (int c = 1; c < 5 && match; c++) {
             const uint8_t ch = static_cast<uint8_t>((f.shift >> (8 * c)) & 0x7F);
             if (ch != kSync[c]) match = false;
         }
@@ -117,6 +119,7 @@ void AcarsDecoder::framerBit(Framer& f, bool b, const FrameCallback& onFrame)
             f.bitCount = 0;
             f.cur = 0;
             f.bytes.assign(1, kSoh);
+            f.badBytes.clear();
             f.trailer = -1;
         }
         return;
@@ -130,8 +133,8 @@ void AcarsDecoder::framerBit(Framer& f, bool b, const FrameCallback& onFrame)
     if (f.trailer > 0) {
         if (--f.trailer == 0) {
             // SOH .. ETX/ETB + BCS: the CRC from after SOH over the BCS is 0.
-            const auto& m = f.bytes;
-            if (m.size() > 4 && crc(m.data() + 1, m.size() - 1) == 0) {
+            auto& m = f.bytes;
+            if (m.size() > 4 && repair(m, f.badBytes)) {
                 if (std::find(recent_.begin(), recent_.end(), m) == recent_.end()) {
                     recent_.push_back(m);
                     if (recent_.size() > 8) recent_.erase(recent_.begin());
@@ -143,12 +146,34 @@ void AcarsDecoder::framerBit(Framer& f, bool b, const FrameCallback& onFrame)
         return;
     }
     const uint8_t c = byte & 0x7F;
-    if (c == kEtx || c == kEtb) {
+    const bool parityOk = withOddParity(c) == byte;
+    if (parityOk && (c == kEtx || c == kEtb)) {
         f.trailer = 2;
         return;
     }
-    // A character with wrong parity or a runaway message: give up.
-    if (withOddParity(c) != byte || f.bytes.size() > kMaxBytes) f.inFrame = false;
+    // A wrong parity bit is noted for the repair; more than two, or a
+    // runaway message: give up (noise after a false sync ends here quickly).
+    if (!parityOk) f.badBytes.push_back(static_cast<int>(f.bytes.size()) - 1);
+    if (f.badBytes.size() > 2 || f.bytes.size() > kMaxBytes) f.inFrame = false;
+}
+
+bool AcarsDecoder::repair(std::vector<uint8_t>& m, const std::vector<int>& bad)
+{
+    const auto ok = [&m] { return crc(m.data() + 1, m.size() - 1) == 0; };
+    if (bad.empty()) return ok();
+    // 8 or 64 tries: a chance of ~1:1000 that a broken message passes - and
+    // it still has to have the right parity everywhere.
+    const int n = static_cast<int>(bad.size());
+    const int tries = n == 1 ? 8 : 64;
+    for (int t = 0; t < tries; t++) {
+        const uint8_t m0 = static_cast<uint8_t>(1 << (t % 8)), m1 = static_cast<uint8_t>(1 << (t / 8));
+        m[static_cast<size_t>(bad[0])] ^= m0;
+        if (n > 1) m[static_cast<size_t>(bad[1])] ^= m1;
+        if (ok()) return true;
+        m[static_cast<size_t>(bad[0])] ^= m0;
+        if (n > 1) m[static_cast<size_t>(bad[1])] ^= m1;
+    }
+    return false;
 }
 
 std::vector<int16_t> acarsEncode(const std::vector<uint8_t>& sohToEtx, int sampleRate)

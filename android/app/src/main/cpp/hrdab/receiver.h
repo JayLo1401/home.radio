@@ -12,6 +12,7 @@
 
 #include "acars.h"
 #include "acars_multi.h"
+#include "vdl2.h"
 #include "adsb_demod.h"
 #include "afsk1200.h"
 #include "byte_ring.h"
@@ -73,8 +74,8 @@ public:
                             float /*levelDb*/, float /*snrDb*/)
     {
     }
-    // Fast spectrum for the waterfall (~20 Hz, NbDemod::kFastSpectrumBins
-    // dBFS values across centerHz +- spanHz/2).
+    // Fast spectrum for the waterfall (~20 Hz, every FFT bin of the usable
+    // span in dBFS, across centerHz +- spanHz/2).
     virtual void onNbSpectrum(uint32_t /*centerHz*/, uint32_t /*spanHz*/, const std::vector<float>& /*binsDbfs*/,
                               float /*gainDb*/)
     {
@@ -153,7 +154,9 @@ public:
     // listener's onIsmBurst. Gain as nbSetGain; stop with halt().
     bool ismStart(uint32_t freqHz);
     // ACARS on several channels at once (no audio): messages go to the
-    // listener's onAcarsFrame. Gain as nbSetGain; stop with halt().
+    // listener's onAcarsFrame. Channels above 136 MHz mean VDL Mode 2
+    // (Vdl2MultiDemod, its ACARS messages the same way). Gain as nbSetGain;
+    // stop with halt().
     bool acarsStart(uint32_t centerHz, const std::vector<uint32_t>& channelsHz);
 
     // Starts decoding a service's audio. False while the FIC has not yet
@@ -239,8 +242,9 @@ private:
     enum class Mode { Dab, Fm, Nb, Adsb, Ism, Acars };
 
     void statusTick(float rms, float clipRatio, const std::vector<float>& channelLevelsDb);
-    // ADS-B automatic gain: this step (~40 dB on the R820T) and never above.
-    static constexpr int kAdsbAutoGain = 22;
+    // Automatic gain of the radio modes (NB, ACARS, ISM, ADS-B): never above
+    // this step (40.2 dB on the R820T) - more only adds noise and overdrive.
+    static constexpr int kAutoGainCeiling = 22;
     std::atomic<long long> bytesRead_{0};
     std::chrono::steady_clock::time_point statusSince_{};
     double statusRmsSum_ = 0, statusClipSum_ = 0;
@@ -250,7 +254,8 @@ private:
     bool nbRetuneLocked(uint32_t centerHz);
     void nbConfigureLocked();
     void stopLocked();
-    bool adjustGain(float rms, float clipRatio, bool settled, std::chrono::milliseconds searchInterval);
+    bool adjustGain(float rms, float clipRatio, bool settled, std::chrono::milliseconds searchInterval,
+                    int maxIndex = 1000);
     void decoderLoop();
     void pushItem(const int8_t* soft, bool lost, bool erased);
     void applyServiceRequest();
@@ -270,6 +275,8 @@ private:
     AdsbDemod adsb_;
     IsmDemod ism_;
     AcarsMultiDemod acarsMulti_;
+    Vdl2MultiDemod vdl2Multi_;
+    bool vdl2_ = false;  // Mode::Acars runs VDL2 (set while no thread runs)
 
     std::mutex lifecycleMutex_;
     bool running_ = false;

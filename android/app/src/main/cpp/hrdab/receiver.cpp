@@ -52,7 +52,8 @@ Receiver::Receiver(std::unique_ptr<SampleSource> source, ReceiverListener& liste
       nb_(*this, *this),
       adsb_(*this, *this),
       ism_(*this, *this),
-      acarsMulti_(*this, *this)
+      acarsMulti_(*this, *this),
+      vdl2Multi_(*this, *this)
 {
     source_->onStatus = [this](bool isError, const std::string& message) { listener_.onStatus(isError, message); };
 }
@@ -74,7 +75,7 @@ bool Receiver::startLocked(Mode mode)
                           : mode == Mode::Fm   ? static_cast<uint32_t>(FmDemod::kRate)
                           : mode == Mode::Adsb ? AdsbDemod::kSampleRate
                           : mode == Mode::Ism  ? IsmDemod::kSampleRate
-                          : mode == Mode::Acars ? AcarsMultiDemod::kSampleRate
+                          : mode == Mode::Acars ? (vdl2_ ? Vdl2MultiDemod::kSampleRate : AcarsMultiDemod::kSampleRate)
                                                : static_cast<uint32_t>(kSampleRate);
     if (source_->sampleRate() != rate && !source_->setSampleRate(rate)) {
         HR_LOGW("could not set the sample rate to %u", rate);
@@ -107,7 +108,8 @@ bool Receiver::startLocked(Mode mode)
     } else if (mode == Mode::Acars) {
         acarsThread_ = std::thread([this] {
             raiseThreadPriority(-16);
-            acarsMulti_.run(stop_);
+            if (vdl2_) vdl2Multi_.run(stop_);
+            else acarsMulti_.run(stop_);
         });
     } else if (mode == Mode::Dab) {
         ofdmThread_ = std::thread([this] {
@@ -304,7 +306,7 @@ bool Receiver::adsbStart()
     if (!tuned) HR_LOGW("adsb: tuner did not accept %u Hz", AdsbDemod::kFrequencyHz);
     // Automatic gain starts at its ceiling (see onAdsbLevel), not wherever
     // the last mode left it; startLocked() hands it to the stick.
-    if (nbManualGain_.load() < 0) gainIndex_ = kAdsbAutoGain;
+    if (nbManualGain_.load() < 0) gainIndex_ = kAutoGainCeiling;
     ring_.clear();
     ring_.interrupt();
     if (!startLocked(Mode::Adsb)) return false;
@@ -330,7 +332,11 @@ bool Receiver::acarsStart(uint32_t centerHz, const std::vector<uint32_t>& channe
     std::lock_guard<std::mutex> lock(lifecycleMutex_);
     stopService();
     if (running_) stopLocked();
-    acarsMulti_.configure(centerHz, channelsHz);  // thread not running
+    // VDL2 lives at 136.7-137 MHz, classic ACARS around 131 MHz.
+    vdl2_ = !channelsHz.empty() && channelsHz.front() >= 136000000;
+    // Thread not running.
+    if (vdl2_) vdl2Multi_.configure(centerHz, channelsHz);
+    else acarsMulti_.configure(centerHz, channelsHz);
     const bool tuned = source_->setFrequency(centerHz);
     if (!tuned) HR_LOGW("acars: tuner did not accept %u Hz", centerHz);
     ring_.clear();
@@ -347,7 +353,7 @@ void Receiver::onAcarsFrame(uint32_t freqHz, const std::vector<uint8_t>& frame)
 void Receiver::onAcarsLevel(float rms, float clipRatio)
 {
     onNbLevel(rms, clipRatio, true);
-    statusTick(rms, clipRatio, acarsMulti_.channelLevelsDb());
+    statusTick(rms, clipRatio, vdl2_ ? vdl2Multi_.channelLevelsDb() : acarsMulti_.channelLevelsDb());
 }
 
 void Receiver::onIsmBurst(const char* modulation, const std::vector<int>& durationsUs, float offsetHz, float levelDb,
@@ -383,8 +389,8 @@ void Receiver::onAdsbLevel(float rms, float clipRatio)
     if (now - lastGainChange_ < std::chrono::milliseconds(2000)) return;
     int g = gainIndex_;
     if (clipRatio > 0.002f) g--;
-    else if (g < kAdsbAutoGain && clipRatio == 0.f) g++;
-    else if (g > kAdsbAutoGain) g = kAdsbAutoGain;
+    else if (g < kAutoGainCeiling && clipRatio == 0.f) g++;
+    else if (g > kAutoGainCeiling) g = kAutoGainCeiling;
     g = std::max(0, std::min(g, source_->gainCount() - 1));
     if (g == gainIndex_) return;
     gainIndex_ = g;
@@ -638,7 +644,7 @@ void Receiver::onLevel(float rms, float clipRatio)
     adjustGain(rms, clipRatio, synced_, std::chrono::milliseconds(250));
 }
 
-bool Receiver::adjustGain(float rms, float clipRatio, bool synced, std::chrono::milliseconds searchInterval)
+bool Receiver::adjustGain(float rms, float clipRatio, bool synced, std::chrono::milliseconds searchInterval, int maxIndex)
 {
     // Software AGC on the tuner's LNA/mixer gain. While searching it reacts
     // quickly; once synchronised it only steps for clear over/under drive,
@@ -663,8 +669,10 @@ bool Receiver::adjustGain(float rms, float clipRatio, bool synced, std::chrono::
         if (rms < 0.05f) step = 1;
         else if (rms > 0.55f) step = -1;
     }
-    if (step == 0) return false;
+    // Above the ceiling (e.g. left there by DAB) it comes down right away.
+    if (step == 0 && gainIndex_ <= maxIndex) return false;
     int g = gainIndex_ + step;
+    if (g > maxIndex) g = maxIndex;
     if (g < 0) g = 0;
     if (g >= source_->gainCount()) g = source_->gainCount() - 1;
     if (g == gainIndex_) return false;
@@ -705,7 +713,9 @@ void Receiver::onFmRds(int pi, const std::string& ps, const std::string& rt)
 bool Receiver::onNbLevel(float rms, float clipRatio, bool settled)
 {
     const int manual = nbManualGain_.load();
-    if (manual < 0) return adjustGain(rms, clipRatio, settled, std::chrono::milliseconds(0));
+    // Automatic: never above ~40 dB - higher only brings up the noise and
+    // lets strong signals nearby overdrive the stick (see kAutoGainCeiling).
+    if (manual < 0) return adjustGain(rms, clipRatio, settled, std::chrono::milliseconds(0), kAutoGainCeiling);
     // Held fixed: only a newly chosen step is applied (on this thread, like
     // the AGC's own changes).
     if (!nbGainPending_.exchange(false) || manual == gainIndex_) return false;

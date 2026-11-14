@@ -28,6 +28,7 @@ add_library(hrdab SHARED
     hrdab/fm_dsp.cpp
     hrdab/acars.cpp
     hrdab/acars_multi.cpp
+    hrdab/vdl2.cpp
     hrdab/adsb_demod.cpp
     hrdab/afsk1200.cpp
     hrdab/hrdab_jni.cpp

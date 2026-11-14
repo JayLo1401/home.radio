@@ -148,49 +148,52 @@ class ShowClockDateNotifier extends Notifier<bool> {
 
 final showClockDateProvider = NotifierProvider<ShowClockDateNotifier, bool>(ShowClockDateNotifier.new);
 
-/// Which extra listening bands are switched on in the settings (CB radio,
-/// airband) - each gets a tile in the "Funk" window (ListeningHubScreen).
-typedef ListeningBands = ({bool cb, bool ham, bool airband, bool mil});
+/// Which parts of the receiver side the settings show ("Funk anzeigen",
+/// "DAB anzeigen", "FM anzeigen") - on top of a receiver being set up at
+/// all (see [receiverModeProvider]; use [receiverSectionsShownProvider]).
+typedef ReceiverSections = ({bool funk, bool dab, bool fm});
 
-class ListeningBandsNotifier extends Notifier<ListeningBands> {
+class ReceiverSectionsNotifier extends Notifier<ReceiverSections> {
   @override
-  ListeningBands build() {
+  ReceiverSections build() {
     final repo = ref.watch(settingsRepositoryProvider);
     () async {
       state = (
-        cb: await repo.getCbEnabled(),
-        ham: await repo.getHamEnabled(),
-        airband: await repo.getAirbandEnabled(),
-        mil: await repo.getMilEnabled(),
+        funk: await repo.getFunkEnabled(),
+        dab: await repo.getDabEnabled(),
+        fm: await repo.getFmEnabled(),
       );
     }();
-    return (cb: false, ham: false, airband: false, mil: false);
+    return (funk: false, dab: true, fm: true);
   }
 
   SettingsRepository get _repo => ref.read(settingsRepositoryProvider);
 
-  Future<void> setCb(bool value) async {
-    state = (cb: value, ham: state.ham, airband: state.airband, mil: state.mil);
-    await _repo.setCbEnabled(value);
+  Future<void> setFunk(bool value) async {
+    state = (funk: value, dab: state.dab, fm: state.fm);
+    await _repo.setFunkEnabled(value);
   }
 
-  Future<void> setHam(bool value) async {
-    state = (cb: state.cb, ham: value, airband: state.airband, mil: state.mil);
-    await _repo.setHamEnabled(value);
+  Future<void> setDab(bool value) async {
+    state = (funk: state.funk, dab: value, fm: state.fm);
+    await _repo.setDabEnabled(value);
   }
 
-  Future<void> setAirband(bool value) async {
-    state = (cb: state.cb, ham: state.ham, airband: value, mil: state.mil);
-    await _repo.setAirbandEnabled(value);
-  }
-
-  Future<void> setMil(bool value) async {
-    state = (cb: state.cb, ham: state.ham, airband: state.airband, mil: value);
-    await _repo.setMilEnabled(value);
+  Future<void> setFm(bool value) async {
+    state = (funk: state.funk, dab: state.dab, fm: value);
+    await _repo.setFmEnabled(value);
   }
 }
 
-final listeningBandsProvider = NotifierProvider<ListeningBandsNotifier, ListeningBands>(ListeningBandsNotifier.new);
+final receiverSectionsProvider =
+    NotifierProvider<ReceiverSectionsNotifier, ReceiverSections>(ReceiverSectionsNotifier.new);
+
+/// What actually shows: [receiverSectionsProvider], with nothing of it
+/// without a receiver ("Kein Empfänger").
+final receiverSectionsShownProvider = Provider<ReceiverSections>((ref) {
+  if (ref.watch(receiverModeProvider) == ReceiverMode.none) return (funk: false, dab: false, fm: false);
+  return ref.watch(receiverSectionsProvider);
+});
 
 /// [dabStationsStreamProvider], sorted per [dabSortModeProvider] - what
 /// FavoritesSidebar's DAB-Sender tab and DabStationsScreen actually display,
@@ -321,12 +324,18 @@ final sidebarCategoryProvider = NotifierProvider<SidebarCategoryNotifier, Sideba
 /// currentProgramNumberProvider instead), including by autostart restoring
 /// last session's pick before the user has touched either tab.
 final effectiveSidebarCategoryProvider = Provider<SidebarCategory>((ref) {
-  // Without a receiver there are no DAB+/FM tabs at all.
-  if (ref.watch(receiverModeProvider) == ReceiverMode.none) return SidebarCategory.favorites;
+  // Without a receiver there are no DAB+/FM tabs at all, and each only
+  // while shown in the settings ("DAB anzeigen"/"FM anzeigen").
+  final shown = ref.watch(receiverSectionsShownProvider);
+  bool available(SidebarCategory c) => switch (c) {
+        SidebarCategory.favorites => true,
+        SidebarCategory.dabStations => shown.dab,
+        SidebarCategory.fmStations => shown.fm,
+      };
   final manual = ref.watch(sidebarCategoryProvider);
-  if (manual != null) return manual;
-  if (ref.watch(currentDabStationProvider) != null) return SidebarCategory.dabStations;
-  if (ref.watch(currentFmStationProvider) != null) return SidebarCategory.fmStations;
+  if (manual != null && available(manual)) return manual;
+  if (ref.watch(currentDabStationProvider) != null && shown.dab) return SidebarCategory.dabStations;
+  if (ref.watch(currentFmStationProvider) != null && shown.fm) return SidebarCategory.fmStations;
   return SidebarCategory.favorites;
 });
 

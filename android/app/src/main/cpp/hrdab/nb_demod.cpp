@@ -656,31 +656,22 @@ void NbDemod::monitorFft()
 
 void NbDemod::fastSpectrum()
 {
-    // A few FFTs averaged (smooth noise), then the strongest FFT bin per
-    // output bin - narrow carriers keep their height, as on a real SDR.
-    const int half = usableHalfSpan(cfg_.sampleRate);
+    // A few FFTs averaged (smooth noise); every FFT bin of the usable span
+    // goes out as it is - the waterfall gets the full resolution (~1600 bins
+    // at 2 MS/s), nothing merged.
     const double binHz = static_cast<double>(cfg_.sampleRate) / kMonitorFft;
+    const int halfBins = static_cast<int>(usableHalfSpan(cfg_.sampleRate) / binHz);
     const double norm = 1.0 / (static_cast<double>(specCount_) * kMonitorFft * monWinPower_);
-    std::vector<double> peak(kFastSpectrumBins, -1.0);
-    for (int k = 0; k < kMonitorFft; k++) {
-        const double f = (k < kMonitorFft / 2 ? k : k - kMonitorFft) * binHz;
-        if (f < -half || f >= half || k == 0) continue;  // k 0 = DC spike
-        const int j = static_cast<int>((f + half) * kFastSpectrumBins / (2.0 * half));
-        if (j < 0 || j >= kFastSpectrumBins) continue;
-        const double p = specAcc_[static_cast<size_t>(k)] * norm;
-        if (p > peak[static_cast<size_t>(j)]) peak[static_cast<size_t>(j)] = p;
-    }
-    // Output bins narrower than an FFT bin (low rates): take the neighbour.
-    std::vector<float> out(kFastSpectrumBins);
-    double last = floorBin_ > 0 ? floorBin_ : 1e-12;
-    for (int j = 0; j < kFastSpectrumBins; j++) {
-        const double p = peak[static_cast<size_t>(j)];
-        if (p >= 0) last = p;
-        out[static_cast<size_t>(j)] = linToDb(last);
+    std::vector<float> out(static_cast<size_t>(2 * halfBins));
+    for (int j = 0; j < 2 * halfBins; j++) {
+        const int b = j - halfBins;  // -halfBins .. halfBins-1
+        // Bin 0 is the stick's DC spike: its neighbour instead.
+        const int k = b == 0 ? 1 : (b < 0 ? b + kMonitorFft : b);
+        out[static_cast<size_t>(j)] = linToDb(specAcc_[static_cast<size_t>(k)] * norm);
     }
     std::fill(specAcc_.begin(), specAcc_.end(), 0.0);
     specCount_ = 0;
-    sink_.onNbSpectrum(cfg_.loHz, static_cast<uint32_t>(2 * half), out);
+    sink_.onNbSpectrum(cfg_.loHz, static_cast<uint32_t>(std::lround(2 * halfBins * binHz)), out);
 }
 
 void NbDemod::channelChain(bool hold)

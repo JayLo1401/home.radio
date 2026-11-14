@@ -37,10 +37,16 @@ import java.util.concurrent.TimeUnit
  * FM uses the same output with ready-made PCM ([onPcm]): no codec, the
  * decoder thread just idles. FM delivers audio continuously, so it gets by
  * with a smaller [prebufferMs].
+ *
+ * [onLevels] gets the equalizer band levels of what is playing
+ * ([AudioLevelMeter], 25 times a second, timed to when the AudioTrack
+ * actually plays that audio) on the playback thread; an empty array = the
+ * player stopped.
  */
 class DabAacPlayer(
     private val context: Context,
     private val prebufferMs: Int = PREBUFFER_MS,
+    private val onLevels: ((ByteArray) -> Unit)? = null,
     private val onAudioFocusLost: () -> Unit,
 ) {
 
@@ -289,6 +295,11 @@ class DabAacPlayer(
         var prebuffering = true
         var fadeStep = 0
         var block = ShortArray(0)
+        val meter = if (onLevels != null) AudioLevelMeter() else null
+        // Levels waiting for the speaker: (frames written up to their audio,
+        // levels). Int on purpose - wraps like playbackHeadPosition.
+        val pendingLevels = ArrayDeque<Pair<Int, ByteArray>>()
+        var framesWritten = 0
         try {
             while (running) {
                 val rate = outRate
@@ -308,6 +319,8 @@ class DabAacPlayer(
                     trackChannels = channels
                     prebuffering = true
                     fadeStep = 0
+                    framesWritten = 0
+                    pendingLevels.clear()
                 }
                 val frames = rate / 100 // 10 ms blocks
                 val prebufferSamples = rate * channels * prebufferMs / 1000
@@ -346,6 +359,19 @@ class DabAacPlayer(
                 }
                 val t = track!!
                 t.write(block, 0, block.size)
+                if (meter != null && onLevels != null) {
+                    framesWritten += block.size / channels
+                    meter.push(block, block.size, channels, rate)?.let {
+                        if (pendingLevels.size >= MAX_PENDING_LEVELS) pendingLevels.removeFirst()
+                        pendingLevels.addLast(framesWritten to it)
+                    }
+                    // The AudioTrack's own buffer plays 100+ ms later:
+                    // hand each set on once the speaker reaches its audio.
+                    val head = t.playbackHeadPosition
+                    while (pendingLevels.isNotEmpty() && pendingLevels.first().first - head <= 0) {
+                        onLevels.invoke(pendingLevels.removeFirst().second)
+                    }
+                }
                 if (real && !prebuffering) {
                     writes++
                     if (fadeStep < FADE_STEPS) {
@@ -359,6 +385,7 @@ class DabAacPlayer(
             Log.w(TAG, "playback thread failed", e)
         } finally {
             track?.let { releaseTrack(it) }
+            onLevels?.invoke(ByteArray(0))
         }
     }
 
@@ -442,5 +469,6 @@ class DabAacPlayer(
         private const val BAND_MS = 60
         private const val RING_MS = 3000
         private const val FADE_STEPS = 30 // x 10 ms
+        private const val MAX_PENDING_LEVELS = 32 // x 40 ms
     }
 }

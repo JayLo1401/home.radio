@@ -1,6 +1,7 @@
 #include "audio_player.h"
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cstring>
 
@@ -286,6 +287,10 @@ void AudioPlayer::render(int16_t* out, uint32_t frames)
             for (size_t i = 0; i < want; i++) out[i] = static_cast<int16_t>(out[i] * gain / 256);
         }
     }
+    if (levelsListener_) {
+        std::lock_guard<std::mutex> lock(levelsMutex_);
+        levels_.push(out, frames, channels, outRate_);
+    }
 }
 
 void AudioPlayer::outputLoop()
@@ -295,6 +300,8 @@ void AudioPlayer::outputLoop()
     int devRate = 0;
     int devChannels = 0;
     auto lastStats = std::chrono::steady_clock::now();
+    std::array<float, AudioLevels::kSize> levelWindow{};
+    std::array<uint8_t, AudioLevels::kBands> bands{};
     auto close = [&] {
         if (dev) ma_device_uninit(&dev->device);
         dev.reset();
@@ -335,7 +342,18 @@ void AudioPlayer::outputLoop()
             devChannels = channels;
             HR_LOGI("audio: %d Hz x%d, prebuffer %d ms", rate, channels, prebufferMs_);
         }
-        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        // 10 ms: one device period, so the 40 ms level updates stay even.
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        if (levelsListener_) {
+            int rate;
+            {
+                std::lock_guard<std::mutex> lock(levelsMutex_);
+                rate = levels_.take(levelWindow.data());
+            }
+            if (rate > 0 && levels_.analyze(levelWindow.data(), rate, bands.data())) {
+                levelsListener_(bands.data(), AudioLevels::kBands);
+            }
+        }
         const auto now = std::chrono::steady_clock::now();
         if (now - lastStats >= std::chrono::seconds(10)) {
             lastStats = now;
@@ -354,6 +372,7 @@ void AudioPlayer::outputLoop()
         }
     }
     close();
+    if (levelsListener_) levelsListener_(nullptr, 0);
 }
 
 } // namespace hrdab

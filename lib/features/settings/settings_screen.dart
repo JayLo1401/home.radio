@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/display_mode.dart';
@@ -8,6 +9,7 @@ import '../../core/providers.dart';
 import '../../core/theme.dart';
 import '../../data/models/favorite_channel.dart';
 import '../../data/repositories/settings_repository.dart';
+import '../../data/services/desktop/hrdab_desktop.dart';
 import '../rtlsdr/rtl_sdr_test_screen.dart';
 import 'backup_settings_screen.dart';
 import 'update_settings_screen.dart';
@@ -149,7 +151,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final favorites = ref.watch(favoritesStreamProvider).value ?? const <FavoriteChannel>[];
     final locationName = ref.watch(weatherDisplaySettingsProvider).locationName;
     final receiverMode = ref.watch(receiverModeProvider);
-    final listeningBands = ref.watch(listeningBandsProvider);
+    final receiverSections = ref.watch(receiverSectionsProvider);
     // Only the kind of source, not its address - the settings list
     // shouldn't advertise whichever third-party radar is set up.
     final radarSettings = ref.watch(weatherDisplaySettingsProvider);
@@ -286,16 +288,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
               ),
             ),
-            // Extra listening bands, shown in the top bar's "Funk" window.
+            // Which parts of the receiver side the app shows: DAB+ and FM
+            // (station search, sidebar tab) and the top bar's "Funk" window.
             if (receiverMode != ReceiverMode.none) ...[
-              tileToggle('CB-Funk anzeigen', listeningBands.cb, (v) {
-                ref.read(listeningBandsProvider.notifier).setCb(v);
+              tileToggle('DAB anzeigen', receiverSections.dab, (v) {
+                ref.read(receiverSectionsProvider.notifier).setDab(v);
               }),
-              tileToggle('Amateurfunk anzeigen', listeningBands.ham, (v) {
-                ref.read(listeningBandsProvider.notifier).setHam(v);
+              tileToggle('FM anzeigen', receiverSections.fm, (v) {
+                ref.read(receiverSectionsProvider.notifier).setFm(v);
               }),
-              tileToggle('Militärfunk anzeigen', listeningBands.mil, (v) {
-                ref.read(listeningBandsProvider.notifier).setMil(v);
+              tileToggle('Funk anzeigen', receiverSections.funk, (v) {
+                ref.read(receiverSectionsProvider.notifier).setFunk(v);
               }),
             ],
             const Divider(height: 32),
@@ -498,10 +501,51 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               order: NumericFocusOrder(nextOrder()),
               child: const _AboutBlock(),
             ),
+            const Divider(height: 32),
+            FocusTraversalOrder(
+              order: NumericFocusOrder(nextOrder()),
+              child: _TvNavTile(
+                label: 'Programm beenden',
+                icon: Icons.power_settings_new,
+                onTap: _quitApp,
+              ),
+            ),
+            const SizedBox(height: 24),
           ],
         ),
       ),
     );
+  }
+
+  /// Closes the app after asking ("Abbrechen" focused - an OK pressed by
+  /// mistake on the remote doesn't end it). Playback and the receiver are
+  /// stopped first; on desktop the receiver is shut down so rtl_tcp is free
+  /// for the next start.
+  Future<void> _quitApp() async {
+    final quit = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Programm beenden?'),
+        actions: [
+          TextButton(autofocus: true, onPressed: () => Navigator.of(context).pop(false), child: const Text('Abbrechen')),
+          FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Beenden')),
+        ],
+      ),
+    );
+    if (quit != true) return;
+    try {
+      await ref.read(dabRtlSdrServiceProvider).stopPlayback();
+    } catch (_) {}
+    try {
+      await (await ref.read(radioAudioHandlerProvider.future)).stop();
+    } catch (_) {}
+    if (Platform.isAndroid) {
+      await SystemNavigator.pop();
+    } else {
+      HrdabDesktop.shutdownIfStarted();
+    }
+    // Also ends the media session's foreground service on Android.
+    exit(0);
   }
 }
 

@@ -6,7 +6,10 @@
 // around 1800 Hz), a PLL for the bit clock, then the character framing:
 // "+*" SYN SYN SOH starts a message, 7 data bits + odd parity per character,
 // LSB first. Polarity and differential coding are not assumed - four
-// variants run side by side and the first good copy wins.
+// variants run side by side and the first good copy wins. Up to two
+// characters with a wrong parity bit are repaired against the CRC (a single
+// flipped bit each), like acarsdec does - weak signals mostly lose a bit or
+// two per message.
 #pragma once
 
 #include <cstdint>
@@ -36,11 +39,14 @@ private:
         int bitCount = 0;
         uint8_t cur = 0;
         std::vector<uint8_t> bytes;
+        std::vector<int> badBytes; // positions with wrong parity (repaired at the end)
         int trailer = -1;          // BCS bytes still to come after ETX/ETB
     };
 
     void bit(bool raw, const FrameCallback& onFrame);
     void framerBit(Framer& f, bool b, const FrameCallback& onFrame);
+    // Flips one bit in each wrong-parity character until the CRC fits.
+    static bool repair(std::vector<uint8_t>& m, const std::vector<int>& bad);
 
     int rate_;
     int window_;                   // samples per bit

@@ -1,10 +1,10 @@
 import 'dart:io';
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
 import '../../core/retrying_network_image.dart';
 import '../../data/models/audio_quality.dart';
+import 'audio_level_bars.dart';
 
 /// Bottom banner showing the currently playing station, logo and metadata.
 /// Source-agnostic (internet radio vs. DAB+, favorite or a DAB+ station
@@ -20,6 +20,10 @@ class NowPlayingBanner extends StatelessWidget {
   final bool isBuffering;
   final String? subtitle;
   final String? errorMessage;
+
+  /// Shown in place of the subtitle/error line, e.g. the receiver's
+  /// connection setup (see ConnectionChain).
+  final Widget? status;
   final double? snrDb;
 
   /// Bitrate/codec of what's playing (internet radio or DAB+), shown
@@ -46,6 +50,7 @@ class NowPlayingBanner extends StatelessWidget {
     this.isBuffering = false,
     this.subtitle,
     this.errorMessage,
+    this.status,
     this.snrDb,
     this.quality,
     this.fmStereo,
@@ -112,16 +117,19 @@ class NowPlayingBanner extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 6),
-                      Text(
-                        stopped
-                            ? 'Gestoppt - Verbindung getrennt'
-                            : (errorMessage ?? subtitle ?? (isPlaying ? 'Wiedergabe läuft' : 'Pausiert')),
-                        style: TextStyle(
-                          color: errorMessage != null ? Colors.redAccent : Colors.white70,
-                          fontSize: 22,
+                      if (status != null && !stopped)
+                        status!
+                      else
+                        Text(
+                          stopped
+                              ? 'Gestoppt - Verbindung getrennt'
+                              : (errorMessage ?? subtitle ?? (isPlaying ? 'Wiedergabe läuft' : 'Pausiert')),
+                          style: TextStyle(
+                            color: errorMessage != null ? Colors.redAccent : Colors.white70,
+                            fontSize: 22,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
                     ],
                   ),
                 ),
@@ -137,7 +145,7 @@ class NowPlayingBanner extends StatelessWidget {
                 else if (isPlaying && !stopped)
                   const Padding(
                     padding: EdgeInsets.only(left: 12),
-                    child: _PlayingPulse(),
+                    child: AudioLevelBars(),
                   ),
                 if (onStop ?? onPlay case final onPressed?)
                   Padding(
@@ -234,58 +242,6 @@ class _RingsPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _RingsPainter old) => old.color != color || old.twoRings != twoRings;
-}
-
-/// Small looping equalizer-bar animation, shown only while audio is
-/// actually playing (not during buffering/paused/error states).
-class _PlayingPulse extends StatefulWidget {
-  const _PlayingPulse();
-
-  @override
-  State<_PlayingPulse> createState() => _PlayingPulseState();
-}
-
-class _PlayingPulseState extends State<_PlayingPulse> with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 900),
-  )..repeat();
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    const color = Colors.greenAccent;
-    return SizedBox(
-      width: 28,
-      height: 24,
-      child: AnimatedBuilder(
-        animation: _controller,
-        builder: (context, _) {
-          return Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: List.generate(3, (i) {
-              final phase = _controller.value * 2 * 3.14159265 + i * 2.0;
-              final height = 6 + (1 + math.sin(phase)) * 8;
-              return Container(
-                width: 4,
-                height: height,
-                decoration: BoxDecoration(
-                  color: color,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              );
-            }),
-          );
-        },
-      ),
-    );
-  }
 }
 
 class _BannerLogo extends StatelessWidget {

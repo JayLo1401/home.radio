@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import 'desktop/hrdab_desktop.dart';
@@ -28,14 +29,36 @@ class DabRtlSdrService {
   /// `aacErrors`, `playbackStatus`).
   Stream<Map<String, dynamic>> get events => _eventsController.stream;
 
+  /// Equalizer bars of whatever the receiver is playing (DAB+, FM or
+  /// narrowband): 8 band levels 0..255, bass first, measured natively on
+  /// the PCM that goes to the speaker, ~25 times a second (silence only
+  /// once a second). Null while none of the receiver's players runs.
+  /// Deliberately not on [events], which would wake every listener 25
+  /// times a second.
+  final ValueNotifier<Uint8List?> audioLevels = ValueNotifier(null);
+
   DabRtlSdrService() {
     if (_desktop) {
-      _eventSub = HrdabDesktop.instance.events.listen(_eventsController.add);
+      _eventSub = HrdabDesktop.instance.events.listen(_onEvent);
       return;
     }
     _eventSub = _eventChannel.receiveBroadcastStream().listen((event) {
-      _eventsController.add((event as Map).cast<String, dynamic>());
+      _onEvent((event as Map).cast<String, dynamic>());
     });
+  }
+
+  void _onEvent(Map<String, dynamic> event) {
+    if (event['type'] == 'audioLevels') {
+      final levels = event['levels'];
+      final bytes = switch (levels) {
+        Uint8List() => levels,
+        List() => Uint8List.fromList(levels.cast<int>()),
+        _ => null,
+      };
+      audioLevels.value = (bytes == null || bytes.isEmpty) ? null : bytes;
+      return;
+    }
+    _eventsController.add(event);
   }
 
   Future<T?> _invokeMethod<T>(String method, [Map<String, dynamic>? arguments]) => _desktop
@@ -287,5 +310,6 @@ class DabRtlSdrService {
   Future<void> dispose() async {
     await _eventSub?.cancel();
     await _eventsController.close();
+    audioLevels.dispose();
   }
 }

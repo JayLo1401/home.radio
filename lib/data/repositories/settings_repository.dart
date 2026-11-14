@@ -125,10 +125,14 @@ class SettingsRepository {
   static const _keyRtlSdrMode = 'rtl_sdr_mode'; // 'own' | 'external'
   static const _keyDabSortMode = 'dab_sort_mode'; // 'grouped' | 'ensemble' | 'alphabet'
   static const _keyShowClockDate = 'show_clock_date';
+  // Before "Funk anzeigen": one toggle each for CB, amateur and military
+  // radio - only read once more, to carry them over (see getFunkEnabled).
   static const _keyCbEnabled = 'cb_enabled';
-  static const _keyAirbandEnabled = 'airband_enabled';
   static const _keyHamEnabled = 'ham_enabled';
   static const _keyMilEnabled = 'mil_enabled';
+  static const _keyFunkEnabled = 'funk_enabled';
+  static const _keyDabEnabled = 'dab_enabled';
+  static const _keyFmEnabled = 'fm_enabled';
   static const _keyNbSampleRate = 'nb_sample_rate';
   static const _keyCbAll80 = 'cb_all_80';
   static const _keyAutoUpdate = 'auto_update';
@@ -444,16 +448,27 @@ class SettingsRepository {
 
   Future<void> setShowClockDate(bool value) => _db.setSetting(_keyShowClockDate, '$value');
 
-  /// Extra listening bands (see ScannerScreen) - off by default, they're
-  /// for the curious, not everyday radio.
-  Future<bool> getCbEnabled() async => (await _db.getSetting(_keyCbEnabled)) == 'true';
-  Future<void> setCbEnabled(bool value) => _db.setSetting(_keyCbEnabled, '$value');
-  Future<bool> getAirbandEnabled() async => (await _db.getSetting(_keyAirbandEnabled)) == 'true';
-  Future<void> setAirbandEnabled(bool value) => _db.setSetting(_keyAirbandEnabled, '$value');
-  Future<bool> getHamEnabled() async => (await _db.getSetting(_keyHamEnabled)) == 'true';
-  Future<void> setHamEnabled(bool value) => _db.setSetting(_keyHamEnabled, '$value');
-  Future<bool> getMilEnabled() async => (await _db.getSetting(_keyMilEnabled)) == 'true';
-  Future<void> setMilEnabled(bool value) => _db.setSetting(_keyMilEnabled, '$value');
+  /// "Funk anzeigen": the listening bands, aircraft, sensors and band scan
+  /// (the top bar's "Funk" window) - off by default, they're for the
+  /// curious, not everyday radio. Until it's set, on if one of the former
+  /// CB/amateur/military radio toggles was.
+  Future<bool> getFunkEnabled() async {
+    final value = await _db.getSetting(_keyFunkEnabled);
+    if (value != null) return value == 'true';
+    for (final key in const [_keyCbEnabled, _keyHamEnabled, _keyMilEnabled]) {
+      if (await _db.getSetting(key) == 'true') return true;
+    }
+    return false;
+  }
+
+  Future<void> setFunkEnabled(bool value) => _db.setSetting(_keyFunkEnabled, '$value');
+
+  /// "DAB anzeigen" / "FM anzeigen": the DAB+ resp. FM parts of the app
+  /// (station search, sidebar tab) - on by default.
+  Future<bool> getDabEnabled() async => (await _db.getSetting(_keyDabEnabled)) != 'false';
+  Future<void> setDabEnabled(bool value) => _db.setSetting(_keyDabEnabled, '$value');
+  Future<bool> getFmEnabled() async => (await _db.getSetting(_keyFmEnabled)) != 'false';
+  Future<void> setFmEnabled(bool value) => _db.setSetting(_keyFmEnabled, '$value');
 
   /// Which band of a multi-band listening screen was last open (amateur
   /// radio: "ham2" etc.), keyed by the screen's first band.

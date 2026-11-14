@@ -9,6 +9,9 @@ import '../../core/theme.dart' show brandGreen, brandGreenDark;
 /// A band plan part drawn under the spectrum (see BandSegment).
 typedef WaterfallSegment = ({int lowHz, int highHz, String name, Color color});
 
+/// A channel's activity: [heat] 1 = signal now, fading to 0 after it.
+typedef WaterfallActivity = ({int hz, double heat});
+
 /// Spectrum and waterfall of the receiver window, SDR style: the spectrum
 /// with dB and MHz scales and the band plan underneath, below it the history
 /// as a waterfall (dark blue = noise, through cyan and yellow to red =
@@ -32,6 +35,11 @@ class WaterfallView extends StatefulWidget {
   /// Band plan parts, shown as a coloured strip with their names.
   final List<WaterfallSegment> segments;
 
+  /// Channels with a signal now or lately, shown in the strip under the
+  /// waterfall; [channelsHz] is the raster drawn there as faint ticks.
+  final List<WaterfallActivity> activity;
+  final List<int> channelsHz;
+
   /// Width of the listened channel (filter), shown as a shaded band; for
   /// [upperSideband]/[lowerSideband] on that side of [markHz] only.
   final int bandwidthHz;
@@ -47,6 +55,8 @@ class WaterfallView extends StatefulWidget {
     this.onTapFreq,
     this.view,
     this.segments = const [],
+    this.activity = const [],
+    this.channelsHz = const [],
     this.bandwidthHz = 0,
     this.upperSideband = false,
     this.lowerSideband = false,
@@ -57,8 +67,18 @@ class WaterfallView extends StatefulWidget {
 }
 
 class _WaterfallViewState extends State<WaterfallView> {
-  // ~15 s of history at ~20 rows per second.
-  static const _rows = 300;
+  static const _stripHeight = 26.0;
+
+  // One row per screen pixel of the waterfall's height (see build), at
+  // ~20 rows per second; capped so a TV box isn't swamped.
+  static const _maxRows = 720;
+  int _rows = 300;
+
+  // t (0..1, 1024 steps) -> offset into [_lut], gamma applied: weak traces
+  // still show, the noise around them stays dark.
+  static final Int32List _gammaLut = Int32List.fromList([
+    for (var i = 0; i < 1024; i++) (math.pow(i / 1023, 0.8) * 255).round() * 3,
+  ]);
 
   // The palette as 256 RGB entries, built once.
   static final Uint8List _lut = () {
@@ -72,11 +92,14 @@ class _WaterfallViewState extends State<WaterfallView> {
     return lut;
   }();
 
-  // The history as RGBA pixels, newest row on top; turned into an image
-  // after each row.
+  // The history as RGBA pixels in a ring: each new row goes one above the
+  // last ([_head]), nothing is moved; the painter draws the ring from
+  // [_head] down. Turned into an image after each row.
   Uint8List? _pixels;
   int _width = 0;
+  int _head = 0;
   ui.Image? _image;
+  int _imageHead = 0;
   int _generation = 0;
   bool _decoding = false;
 
@@ -104,9 +127,10 @@ class _WaterfallViewState extends State<WaterfallView> {
 
   void _addRow(List<double> bins) {
     final w = bins.length;
-    if (_pixels == null || _width != w) {
+    if (_pixels == null || _width != w || _pixels!.length != w * _rows * 4) {
       _width = w;
       _pixels = Uint8List(w * _rows * 4);
+      _head = 0;
     }
     // Range: noise floor (25th percentile) to well above it, smoothed so the
     // colours don't flicker.
@@ -128,13 +152,12 @@ class _WaterfallViewState extends State<WaterfallView> {
     if (_scaleHi == null || (wantHi - _scaleHi!).abs() >= 10 || _scaleHi! - _scaleLo! < 50) _scaleHi = wantHi;
 
     final px = _pixels!;
-    // Scroll down one row, write the new row on top.
-    px.setRange(w * 4, px.length, px, 0);
+    _head = (_head - 1 + _rows) % _rows;
+    final base = _head * w * 4;
+    final scale = 1023 / range;
     for (var x = 0; x < w; x++) {
-      final t = ((bins[x] - lo) / range).clamp(0.0, 1.0);
-      // Gamma: weak traces still show, the noise around them stays dark.
-      final i = (math.pow(t, 0.8) * 255).round() * 3;
-      final o = x * 4;
+      final i = _gammaLut[((bins[x] - lo) * scale).round().clamp(0, 1023)];
+      final o = base + x * 4;
       px[o] = _lut[i];
       px[o + 1] = _lut[i + 1];
       px[o + 2] = _lut[i + 2];
@@ -148,6 +171,7 @@ class _WaterfallViewState extends State<WaterfallView> {
     }
     _decoding = true;
     final generation = ++_generation;
+    final head = _head;
     ui.decodeImageFromPixels(px, w, _rows, ui.PixelFormat.rgba8888, (image) {
       _decoding = false;
       if (!mounted || generation != _generation) {
@@ -155,7 +179,10 @@ class _WaterfallViewState extends State<WaterfallView> {
         return;
       }
       final old = _image;
-      setState(() => _image = image);
+      setState(() {
+        _image = image;
+        _imageHead = head;
+      });
       // Freed right away (a picture keeps its own reference) - not left
       // to pile up as GPU textures on a TV box running for hours.
       old?.dispose();
@@ -216,34 +243,73 @@ class _WaterfallViewState extends State<WaterfallView> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
+        // Given a height (the scanner page): the spectrum takes ~40 %, the
+        // waterfall the rest. Else fixed sizes.
+        final strip = widget.spanHz > 0 ? _stripHeight : 0.0;
+        final double spectrumHeight, waterfallHeight;
+        if (constraints.hasBoundedHeight) {
+          final h = constraints.maxHeight;
+          spectrumHeight = (h * 0.4).clamp(170.0, 340.0);
+          waterfallHeight = (h - spectrumHeight - strip).clamp(60.0, double.infinity);
+        } else {
+          spectrumHeight = widget.segments.isEmpty ? 150 : 170;
+          waterfallHeight = 220;
+        }
+        // As many rows as the waterfall has pixels (applied with the next
+        // row; a new size starts a new history).
+        final dpr = MediaQuery.devicePixelRatioOf(context);
+        _rows = (waterfallHeight * dpr).round().clamp(120, _maxRows);
         return GestureDetector(
           onTapUp: (d) =>
               _tap(d.localPosition - const Offset(_SpectrumPainter.axisWidth, 0), width - _SpectrumPainter.axisWidth),
           child: Column(
             children: [
               SizedBox(
-                height: widget.segments.isEmpty ? 150 : 170,
+                height: spectrumHeight,
                 width: width,
-                child: CustomPaint(
-                  painter: _SpectrumPainter(
-                    bins: widget.bins,
-                    centerHz: widget.centerHz,
-                    spanHz: widget.spanHz,
-                    markHz: widget.markHz,
-                    range: _range,
-                    dbLo: _scaleLo,
-                    dbHi: _scaleHi,
-                    segments: widget.segments,
-                    passband: _passband,
-                  ),
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: CustomPaint(
+                        painter: _SpectrumPainter(
+                          bins: widget.bins,
+                          centerHz: widget.centerHz,
+                          spanHz: widget.spanHz,
+                          markHz: widget.markHz,
+                          range: _range,
+                          dbLo: _scaleLo,
+                          dbHi: _scaleHi,
+                          hasSegments: widget.segments.isNotEmpty,
+                          passband: _passband,
+                        ),
+                      ),
+                    ),
+                    // The band plan strip on its own layer: its labels are
+                    // laid out only when the window moves, not with every
+                    // spectrum line (amateur bands and the free scan have
+                    // many parts).
+                    if (widget.segments.isNotEmpty)
+                      Positioned(
+                        left: _SpectrumPainter.axisWidth,
+                        right: 0,
+                        bottom: _SpectrumPainter._axisHeight,
+                        height: _SpectrumPainter._segmentHeight,
+                        child: RepaintBoundary(
+                          child: CustomPaint(
+                            painter: _SegmentStripPainter(segments: widget.segments, range: _range),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
               SizedBox(
-                height: 220,
+                height: waterfallHeight,
                 width: width,
                 child: CustomPaint(
                   painter: _WaterfallPainter(
                     image: _image,
+                    head: _imageHead,
                     centerHz: widget.centerHz,
                     spanHz: widget.spanHz,
                     markHz: widget.markHz,
@@ -251,12 +317,92 @@ class _WaterfallViewState extends State<WaterfallView> {
                   ),
                 ),
               ),
+              if (widget.spanHz > 0)
+                SizedBox(
+                  height: _stripHeight,
+                  width: width,
+                  child: RepaintBoundary(
+                    child: CustomPaint(
+                      painter: _ActivityPainter(
+                        activity: widget.activity,
+                        channelsHz: widget.channelsHz,
+                        markHz: widget.markHz,
+                        range: _range,
+                      ),
+                    ),
+                  ),
+                ),
             ],
           ),
         );
       },
     );
   }
+}
+
+/// The activity strip under the waterfall: a bar at every channel with a
+/// signal, bright while it's on air and fading out afterwards - where there
+/// is traffic, at a glance. Faint ticks show the channel raster when it's
+/// coarse enough to see (CB, PMR, airband).
+class _ActivityPainter extends CustomPainter {
+  final List<WaterfallActivity> activity;
+  final List<int> channelsHz;
+  final int markHz;
+  final (double, double) range;
+
+  _ActivityPainter({required this.activity, required this.channelsHz, required this.markHz, required this.range});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const left = _SpectrumPainter.axisWidth;
+    final width = size.width - left;
+    final area = Rect.fromLTRB(left, 0, size.width, size.height);
+    canvas.drawRect(area, Paint()..color = const Color(0xFF050807));
+    if (width <= 0) return;
+    canvas.save();
+    canvas.clipRect(area);
+    final (lo, hi) = range;
+    final shown = channelsHz.where((hz) => hz >= lo && hz <= hi).length;
+    final pitch = shown > 0 ? width / shown : width;
+    if (pitch >= 6) {
+      final tick = Paint()..color = Colors.white24;
+      for (final hz in channelsHz) {
+        final x = _xOf(hz, range, left, width);
+        canvas.drawLine(Offset(x, size.height - 5), Offset(x, size.height), tick);
+      }
+    }
+    // Wide enough to catch the eye, never wider than a channel.
+    final barW = (pitch * 0.6).clamp(2.0, 14.0);
+    for (final a in activity) {
+      final x = _xOf(a.hz, range, left, width);
+      final paint = Paint()
+        ..color = Color.lerp(brandGreenDark, const Color(0xFFB9F6CA), a.heat)!.withValues(alpha: 0.3 + 0.7 * a.heat);
+      final top = a.heat >= 1 ? 0.0 : 3.0;
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(Rect.fromLTRB(x - barW / 2, top, x + barW / 2, size.height), const Radius.circular(2)),
+        paint,
+      );
+      // On air right now: a glow around it, like the tiles' flash.
+      if (a.heat >= 1) {
+        canvas.drawRect(
+          Rect.fromLTRB(x - barW / 2 - 3, 0, x + barW / 2 + 3, size.height),
+          Paint()
+            ..color = const Color(0xFF69F0AE).withValues(alpha: 0.35)
+            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
+        );
+      }
+    }
+    final mx = _xOf(markHz, range, left, width);
+    canvas.drawLine(Offset(mx, 0), Offset(mx, size.height), Paint()..color = Colors.redAccent.withValues(alpha: 0.6));
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _ActivityPainter old) =>
+      !identical(old.activity, activity) ||
+      !identical(old.channelsHz, channelsHz) ||
+      old.markHz != markHz ||
+      old.range != range;
 }
 
 double _xOf(num hz, (double, double) range, double left, double width) =>
@@ -282,7 +428,7 @@ class _SpectrumPainter extends CustomPainter {
   final (double, double) range;
   final double? dbLo;
   final double? dbHi;
-  final List<WaterfallSegment> segments;
+  final bool hasSegments;
   final (double, double)? passband;
 
   _SpectrumPainter({
@@ -293,13 +439,14 @@ class _SpectrumPainter extends CustomPainter {
     required this.range,
     required this.dbLo,
     required this.dbHi,
-    required this.segments,
+    required this.hasSegments,
     required this.passband,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    final segH = segments.isEmpty ? 0.0 : _segmentHeight;
+    // Room for the band plan strip (see _SegmentStripPainter).
+    final segH = hasSegments ? _segmentHeight : 0.0;
     final plot = Rect.fromLTRB(axisWidth, 0, size.width, size.height - _axisHeight - segH);
     canvas.drawRect(plot, Paint()..color = const Color(0xFF050807));
     if (bins.length < 2 || spanHz <= 0 || dbLo == null || dbHi == null) return;
@@ -335,32 +482,6 @@ class _SpectrumPainter extends CustomPainter {
       );
     }
 
-    // Band plan strip right under the plot, like an SDR's band overlay.
-    if (segments.isNotEmpty) {
-      final top = plot.bottom + 1, bottom = plot.bottom + segH - 1;
-      canvas.save();
-      canvas.clipRect(Rect.fromLTRB(plot.left, top, plot.right, bottom));
-      for (final s in segments) {
-        final x0 = _xOf(s.lowHz, range, plot.left, plot.width), x1 = _xOf(s.highHz, range, plot.left, plot.width);
-        if (x1 < plot.left || x0 > plot.right) continue;
-        final r = Rect.fromLTRB(x0, top, x1, bottom);
-        canvas.drawRect(r, Paint()..color = s.color.withValues(alpha: 0.55));
-        canvas.drawLine(Offset(x0, top), Offset(x0, bottom), Paint()..color = Colors.black54);
-        final visible = Rect.fromLTRB(x0.clamp(plot.left, plot.right), top, x1.clamp(plot.left, plot.right), bottom);
-        final tp = TextPainter(
-          text: TextSpan(
-            text: s.name,
-            style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
-          ),
-          textDirection: TextDirection.ltr,
-          maxLines: 1,
-          ellipsis: '…',
-        )..layout(maxWidth: (visible.width - 6).clamp(0, double.infinity));
-        if (visible.width > 24) tp.paint(canvas, Offset(visible.center.dx - tp.width / 2, top + 2));
-      }
-      canvas.restore();
-    }
-
     // Listened channel: its passband shaded.
     if (passband case (final p0, final p1)) {
       final x0 = _xOf(p0, range, plot.left, plot.width), x1 = _xOf(p1, range, plot.left, plot.width);
@@ -387,11 +508,10 @@ class _SpectrumPainter extends CustomPainter {
     canvas.drawPath(
       fill,
       Paint()
-        ..shader = ui.Gradient.linear(
-          Offset(0, plot.top),
-          Offset(0, plot.bottom),
-          [brandGreen.withValues(alpha: 0.45), brandGreen.withValues(alpha: 0.08)],
-        ),
+        ..shader = ui.Gradient.linear(Offset(0, plot.top), Offset(0, plot.bottom), [
+          brandGreen.withValues(alpha: 0.45),
+          brandGreen.withValues(alpha: 0.08),
+        ]),
     );
     canvas.drawPath(
       line,
@@ -423,13 +543,54 @@ class _SpectrumPainter extends CustomPainter {
       old.spanHz != spanHz ||
       old.range != range ||
       old.passband != passband ||
-      old.segments != segments ||
+      old.hasSegments != hasSegments ||
       old.dbLo != dbLo ||
       old.dbHi != dbHi;
 }
 
+/// The band plan strip right under the spectrum, like an SDR's band overlay.
+class _SegmentStripPainter extends CustomPainter {
+  final List<WaterfallSegment> segments;
+  final (double, double) range;
+
+  _SegmentStripPainter({required this.segments, required this.range});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const top = 1.0;
+    final bottom = size.height - 1, right = size.width;
+    canvas.save();
+    canvas.clipRect(Rect.fromLTRB(0, top, right, bottom));
+    for (final s in segments) {
+      final x0 = _xOf(s.lowHz, range, 0, right), x1 = _xOf(s.highHz, range, 0, right);
+      if (x1 < 0 || x0 > right) continue;
+      canvas.drawRect(Rect.fromLTRB(x0, top, x1, bottom), Paint()..color = s.color.withValues(alpha: 0.55));
+      canvas.drawLine(Offset(x0, top), Offset(x0, bottom), Paint()..color = Colors.black54);
+      final visible = Rect.fromLTRB(x0.clamp(0, right), top, x1.clamp(0, right), bottom);
+      if (visible.width <= 24) continue;
+      final tp = TextPainter(
+        text: TextSpan(
+          text: s.name,
+          style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+        ),
+        textDirection: TextDirection.ltr,
+        maxLines: 1,
+        ellipsis: '…',
+      )..layout(maxWidth: visible.width - 6);
+      tp.paint(canvas, Offset(visible.center.dx - tp.width / 2, top + 2));
+    }
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _SegmentStripPainter old) => old.range != range || !identical(old.segments, segments);
+}
+
 class _WaterfallPainter extends CustomPainter {
   final ui.Image? image;
+
+  /// The newest row in [image] (a ring, see _WaterfallViewState._head).
+  final int head;
   final int centerHz;
   final int spanHz;
   final int markHz;
@@ -437,6 +598,7 @@ class _WaterfallPainter extends CustomPainter {
 
   _WaterfallPainter({
     required this.image,
+    required this.head,
     required this.centerHz,
     required this.spanHz,
     required this.markHz,
@@ -453,17 +615,34 @@ class _WaterfallPainter extends CustomPainter {
       // Just the shown part of each row.
       final low = centerHz - spanHz / 2;
       final x0 = (range.$1 - low) / spanHz * img.width, x1 = (range.$2 - low) / spanHz * img.width;
+      // The ring from the newest row down: [head, end) on top, then
+      // [0, head) below it.
+      final rows = img.height, h = head.clamp(0, rows - 1);
+      final split = area.top + area.height * (rows - h) / rows;
+      final paint = Paint()..filterQuality = FilterQuality.low;
       canvas.drawImageRect(
         img,
-        Rect.fromLTRB(x0, 0, x1, img.height.toDouble()),
-        area,
-        Paint()..filterQuality = FilterQuality.medium,
+        Rect.fromLTRB(x0, h.toDouble(), x1, rows.toDouble()),
+        Rect.fromLTRB(area.left, area.top, area.right, split),
+        paint,
       );
+      if (h > 0) {
+        canvas.drawImageRect(
+          img,
+          Rect.fromLTRB(x0, 0, x1, h.toDouble()),
+          Rect.fromLTRB(area.left, split, area.right, area.bottom),
+          paint,
+        );
+      }
     }
     if (spanHz > 0) {
       final mx = _xOf(markHz, range, left, area.width);
       if (mx >= left && mx <= size.width) {
-        canvas.drawLine(Offset(mx, 0), Offset(mx, size.height), Paint()..color = Colors.redAccent.withValues(alpha: 0.6));
+        canvas.drawLine(
+          Offset(mx, 0),
+          Offset(mx, size.height),
+          Paint()..color = Colors.redAccent.withValues(alpha: 0.6),
+        );
       }
     }
   }
@@ -471,6 +650,7 @@ class _WaterfallPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _WaterfallPainter old) =>
       old.image != image ||
+      old.head != head ||
       old.markHz != markHz ||
       old.centerHz != centerHz ||
       old.spanHz != spanHz ||

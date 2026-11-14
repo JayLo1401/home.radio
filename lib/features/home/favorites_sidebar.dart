@@ -11,7 +11,7 @@ import '../../data/db/database.dart' show DabStation, FmStation;
 import '../../data/models/favorite_channel.dart';
 import '../../data/repositories/dab_stations_repository.dart' show DabStationDisplay, dabEnsembleHeading;
 import '../../data/repositories/fm_stations_repository.dart' show FmStationDisplay, sameProgrammeHint;
-import '../../data/repositories/settings_repository.dart' show DabSortMode, ReceiverMode;
+import '../../data/repositories/settings_repository.dart' show DabSortMode;
 import '../shared/station_edit_dialog.dart';
 
 /// Categorized, scrollable list of stations shown on the right edge of the
@@ -53,7 +53,8 @@ class _FavoritesSidebarState extends ConsumerState<FavoritesSidebar> {
     // that provider's own doc comment for why the category lives there
     // instead of as this widget's own private State.
     final category = ref.watch(effectiveSidebarCategoryProvider);
-    final hasDab = ref.watch(receiverModeProvider) != ReceiverMode.none;
+    // Only with a receiver, and as shown in the settings.
+    final shown = ref.watch(receiverSectionsShownProvider);
     final editing = _editing && category == SidebarCategory.favorites;
 
     return Container(
@@ -96,23 +97,22 @@ class _FavoritesSidebarState extends ConsumerState<FavoritesSidebar> {
                     ),
                   ),
                 ),
-                if (hasDab)
-                  for (final (tab, label) in const [
-                    (SidebarCategory.dabStations, 'DAB+'),
-                    (SidebarCategory.fmStations, 'FM'),
-                  ]) ...[
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _CategoryTab(
-                        label: label,
-                        selected: category == tab,
-                        onTap: () {
-                          setState(() => _editing = false);
-                          ref.read(sidebarCategoryProvider.notifier).set(tab);
-                        },
-                      ),
+                for (final (tab, label) in [
+                  if (shown.dab) (SidebarCategory.dabStations, 'DAB+'),
+                  if (shown.fm) (SidebarCategory.fmStations, 'FM'),
+                ]) ...[
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _CategoryTab(
+                      label: label,
+                      selected: category == tab,
+                      onTap: () {
+                        setState(() => _editing = false);
+                        ref.read(sidebarCategoryProvider.notifier).set(tab);
+                      },
                     ),
-                  ],
+                  ),
+                ],
               ],
             ),
           ),

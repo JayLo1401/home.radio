@@ -10,7 +10,7 @@ namespace {
 constexpr double kPi = 3.14159265358979323846;
 constexpr int kTableBits = 10;
 constexpr int kFirTaps = 41;
-constexpr double kCutoffHz = 5000;     // AM channel +-5 kHz
+constexpr double kCutoffHz = 10000;    // +-10 kHz: room for the stick's tuning error (~70 ppm)
 constexpr int kPcmBlock = 960;         // 20 ms at 48 kHz
 constexpr int kReadSamples = 65536;
 

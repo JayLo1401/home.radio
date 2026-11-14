@@ -13,7 +13,9 @@ import '../shared/logo_picker_dialog.dart' show connectDecoder;
 import 'reception_status.dart';
 
 /// ACARS: short text messages between aircraft and their airlines on the
-/// VHF airband (AM, 2400 bit/s). The receiver decodes all European ACARS
+/// VHF airband. Two ways they travel: classic ACARS (AM, 2400 bit/s, around
+/// 131 MHz) and VDL Mode 2 (D8PSK, 31,5 kbit/s, around 136,9 MHz) - in Europe
+/// most airliners use VDL2 by now. Either way the receiver decodes all
 /// channels at once - they fit into one window of the stick.
 class AcarsScreen extends ConsumerStatefulWidget {
   const AcarsScreen({super.key});
@@ -28,10 +30,16 @@ class _AcarsScreenState extends ConsumerState<AcarsScreen> {
   StreamSubscription<Map<String, dynamic>>? _sub;
   Timer? _tick;
 
-  /// European ACARS channels (131,725 the main one); the window's centre
-  /// lies between them (no channel on the tuner's DC spike).
-  static const _channels = [131525000, 131725000, 131825000, 131850000];
-  static const _centerHz = 131687500;
+  /// European ACARS channels (131,725 the main one) and VDL2 channels
+  /// (136,975 the common one); each window's centre lies between them (no
+  /// channel on the tuner's DC spike).
+  static const _acarsChannels = [131525000, 131725000, 131825000, 131850000];
+  static const _acarsCenterHz = 131687500;
+  static const _vdl2Channels = [136725000, 136775000, 136825000, 136875000, 136975000];
+  static const _vdl2CenterHz = 136850000;
+
+  bool _vdl2 = false;
+  List<int> get _channels => _vdl2 ? _vdl2Channels : _acarsChannels;
 
   bool _started = false;
   bool _failed = false;
@@ -77,22 +85,39 @@ class _AcarsScreenState extends ConsumerState<AcarsScreen> {
 
   Future<void> _start() async {
     _gainIndex = await _settings.getNbGain(_gainKey);
+    _vdl2 = await _settings.getNbVariant(_gainKey) == 'vdl2';
     // The home screen tunes its station in again once back.
     ref.read(receiverInterruptedProvider.notifier).set(true);
     if (!await connectDecoder(ref)) {
       if (mounted) setState(() => _failed = true);
       return;
     }
-    final ok = await _rx.acarsStart(centerHz: _centerHz, channelsHz: _channels);
+    await _tune();
+    _tick = Timer.periodic(const Duration(seconds: 2), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  Future<void> _tune() async {
+    final ok = await _rx.acarsStart(centerHz: _vdl2 ? _vdl2CenterHz : _acarsCenterHz, channelsHz: _channels);
     if (ok) _gainDb = await _rx.nbSetGain(_gainIndex);
     if (!mounted) return;
     setState(() {
       _started = ok;
       _failed = !ok;
     });
-    _tick = Timer.periodic(const Duration(seconds: 2), (_) {
-      if (mounted) setState(() {});
+  }
+
+  /// Classic ACARS or VDL2: the other window; the messages so far stay.
+  Future<void> _setVdl2(bool on) async {
+    if (on == _vdl2) return;
+    setState(() {
+      _vdl2 = on;
+      _started = false;
+      _status = null;
     });
+    await _settings.setNbVariant(_gainKey, on ? 'vdl2' : 'acars');
+    await _tune();
   }
 
   Future<void> _stepGain(int delta) async {
@@ -152,6 +177,22 @@ class _AcarsScreenState extends ConsumerState<AcarsScreen> {
                     child: Text(warning, style: const TextStyle(color: Colors.orangeAccent, fontSize: 16)),
                   ),
                 Wrap(
+                  spacing: 8,
+                  children: [
+                    ChoiceChip(
+                      label: const Text('VDL2 · 136,9 MHz'),
+                      selected: _vdl2,
+                      onSelected: (_) => _setVdl2(true),
+                    ),
+                    ChoiceChip(
+                      label: const Text('ACARS klassisch · 131 MHz'),
+                      selected: !_vdl2,
+                      onSelected: (_) => _setVdl2(false),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Wrap(
                   spacing: 16,
                   runSpacing: 8,
                   crossAxisAlignment: WrapCrossAlignment.center,
@@ -184,23 +225,28 @@ class _AcarsScreenState extends ConsumerState<AcarsScreen> {
                 const SizedBox(height: 8),
                 ReceptionStatus(
                   status: _status,
-                  expectedRate: 1152000,
+                  expectedRate: _vdl2 ? 1050000 : 1152000,
                   lastSignal: _messages.isEmpty ? null : _messages.first.receivedAt,
                 ),
                 const SizedBox(height: 6),
-                const Text(
-                  'Alle vier Kanäle werden gleichzeitig dekodiert. Punkt grün = Meldung in den letzten 10 s, '
-                  'Balken grün = auf dem Kanal wird gerade gesendet.',
-                  style: TextStyle(color: Colors.white38, fontSize: 12),
+                Text(
+                  'Alle ${_channels.length} Kanäle werden gleichzeitig dekodiert. Punkt grün = Meldung in den '
+                  'letzten 10 s, Balken grün = auf dem Kanal wird gerade gesendet.'
+                  '${_vdl2 ? ' VDL2 ist digital: Bodenstationen und Flugzeuge senden kurze Datenpakete, '
+                            'Textmeldungen (ACARS) sind ein Teil davon.' : ''}',
+                  style: const TextStyle(color: Colors.white38, fontSize: 12),
                 ),
                 const SizedBox(height: 16),
                 if (_started && _messages.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 24),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 24),
                     child: Text(
                       'Warte auf Meldungen… Bei Flugverkehr in der Nähe kommen meist mehrere pro Minute.\n'
-                      'Antenne für 131 MHz: senkrecht, ~57 cm (Viertelwelle) - möglichst frei, am Fenster.',
-                      style: TextStyle(color: Colors.white54, fontSize: 16),
+                      'Antenne für ${_vdl2 ? '137 MHz: senkrecht, ~55 cm' : '131 MHz: senkrecht, ~57 cm'} '
+                      '(Viertelwelle) - möglichst frei, am Fenster.'
+                      '${_vdl2 ? '' : '\nIn Europa senden die meisten Flugzeuge inzwischen über VDL2 - kommt hier '
+                                'nichts, oben auf VDL2 umschalten.'}',
+                      style: const TextStyle(color: Colors.white54, fontSize: 16),
                     ),
                   ),
                 if (_messages.isNotEmpty) const _Header(),

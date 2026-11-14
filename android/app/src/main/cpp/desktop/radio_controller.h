@@ -192,6 +192,7 @@ private:
     void seekFm(int fromKhz, bool up, int myId);
     void playServiceThread(int64_t id, int freqKhz, int serviceId, int myRequestId);
 
+    std::shared_ptr<AudioPlayer> startPlayer(int prebufferMs);
     std::shared_ptr<AudioPlayer> player(std::shared_ptr<AudioPlayer>& slot);
     std::shared_ptr<AudioPlayer> takePlayer(std::shared_ptr<AudioPlayer>& slot);
     std::shared_ptr<BgThread> getThread(std::shared_ptr<BgThread>& slot);

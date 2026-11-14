@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderProxyBox;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -79,6 +80,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
   bool _squelchOpen = false;
   String? _detectedMode;
   List<double> _spectrum = const [];
+  final _spectrumTick = ValueNotifier<int>(0);
   int _spectrumCenterHz = 0;
   int _spectrumSpanHz = 0;
 
@@ -124,6 +126,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     FocusManager.instance.removeListener(_recoverFocus);
     _screenFocus.dispose();
     _waterfallFocus.dispose();
+    _spectrumTick.dispose();
     Future.microtask(() => _stepOverride.set(null));
     if (_decoderSent ?? false) _rx.nbSetPacketDecoder(DabRtlSdrService.packetOff);
     _rx.nbStop();
@@ -132,7 +135,8 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
   }
 
   /// Next/previous (remote's track or channel keys): jumps only between
-  /// channels that are green - on air now or recently (see [_heat]); with
+  /// channels lit in the activity strip - on air now or recently (see
+  /// [_heat]); with
   /// none, nothing happens. Stepping through every channel is left/right on
   /// the waterfall.
   void _stepActive(int direction) {
@@ -153,7 +157,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
   final _waterfallFocus = FocusNode(debugLabel: 'waterfall');
 
   /// The focused control can vanish under the remote - a range button greys
-  /// out at the band edge, a channel button leaves when the window moves.
+  /// out at the band edge.
   /// Focus then falls back to the page itself and the arrow keys find
   /// nothing; put it on the waterfall instead.
   void _recoverFocus() {
@@ -396,26 +400,28 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
         });
         if (open) _lastOpenAt = DateTime.now();
         if (_scanning) _scanStep();
+      // Activity and spectrum don't rebuild the whole page (20 times a
+      // second is too much for a TV box): the waterfall listens to
+      // [_spectrumTick] and takes the activity strip along.
       case 'nbActivity':
         final channels = (event['channelsHz'] as List).cast<int>();
         final levels = (event['levelsDb'] as List).map((v) => (v as num?)?.toDouble()).toList();
-        setState(() {
-          _noiseDb = (event['noiseDb'] as num?)?.toDouble() ?? _noiseDb;
-          for (var i = 0; i < channels.length && i < levels.length; i++) {
-            _levels[channels[i]] = levels[i];
-          }
-          final now = DateTime.now();
-          for (final c in _window) {
-            if (_isActive(c)) _lastActive[c.freqHz] = now;
-          }
-        });
+        _noiseDb = (event['noiseDb'] as num?)?.toDouble() ?? _noiseDb;
+        for (var i = 0; i < channels.length && i < levels.length; i++) {
+          _levels[channels[i]] = levels[i];
+        }
+        final now = DateTime.now();
+        for (final c in _window) {
+          if (_isActive(c)) _lastActive[c.freqHz] = now;
+        }
+        _updateActivity();
       case 'nbSpectrum':
-        setState(() {
-          _spectrum = [for (final v in event['binsDb'] as List) (v as num).toDouble()];
-          _spectrumCenterHz = event['centerHz'] as int;
-          _spectrumSpanHz = event['spanHz'] as int;
-          _gainDb = (event['gainDb'] as num?)?.toDouble() ?? _gainDb;
-        });
+        _spectrum = [for (final v in event['binsDb'] as List) (v as num).toDouble()];
+        _spectrumCenterHz = event['centerHz'] as int;
+        _spectrumSpanHz = event['spanHz'] as int;
+        _spectrumTick.value++;
+        final gain = (event['gainDb'] as num?)?.toDouble();
+        if (gain != null && gain != _gainDb) setState(() => _gainDb = gain);
       case 'nbPacket':
         _onPacket(event);
       case 'connectionMessage':
@@ -442,6 +448,30 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     return age >= 1 ? 0 : 0.85 * (1 - age);
   }
 
+  /// The channels with a signal now or lately, for the activity strip under
+  /// the waterfall - a new list per nbActivity event; the waterfall picks it
+  /// up with its next spectrum line.
+  List<WaterfallActivity> _activity = const [];
+
+  void _updateActivity() {
+    _activity = [
+      for (final c in _window)
+        if (_heat(c) case final heat when heat > 0) (hz: c.freqHz, heat: heat),
+    ];
+  }
+
+  // The window's channel frequencies for the strip's raster ticks.
+  List<BandChannel>? _channelsHzFor;
+  List<int> _channelsHz = const [];
+
+  List<int> get _windowChannelsHz {
+    if (!identical(_channelsHzFor, _window)) {
+      _channelsHzFor = _window;
+      _channelsHz = [for (final c in _window) c.freqHz];
+    }
+    return _channelsHz;
+  }
+
   /// Another band of [ScannerScreen.variants]: a fresh start there.
   Future<void> _switchVariant(BandPlan plan) async {
     if (plan.id == _plan.id) return;
@@ -453,6 +483,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
       _started = false;
       _levels.clear();
       _lastActive.clear();
+      _activity = const [];
       _spectrum = const [];
     });
     await _rx.nbStop();
@@ -555,7 +586,11 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     if (hz < _plan.lowHz || hz > _plan.highHz) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Der Stick empfängt ${formatMhz(_plan.lowHz, decimals: 0)}–${formatMhz(_plan.highHz, decimals: 0)} MHz.')),
+          SnackBar(
+            content: Text(
+              'Der Stick empfängt ${formatMhz(_plan.lowHz, decimals: 0)}–${formatMhz(_plan.highHz, decimals: 0)} MHz.',
+            ),
+          ),
         );
       }
       return;
@@ -571,12 +606,8 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
   }
 
   // The Auto preference is kept even while an SSB part uses its sideband.
-  void _remember() => _settings.setNbLast(
-    _plan.id,
-    freqHz: _channel.freqHz,
-    mode: _preferAuto ? 'auto' : _mode,
-    squelchDb: _squelchDb,
-  );
+  void _remember() =>
+      _settings.setNbLast(_plan.id, freqHz: _channel.freqHz, mode: _preferAuto ? 'auto' : _mode, squelchDb: _squelchDb);
 
   /// Scan: stays while the squelch is open (and a moment after), then moves
   /// on to the next active channel - within the current window only; it
@@ -655,6 +686,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
       _sampleRate = rate;
       _started = false;
       _levels.clear();
+      _activity = const [];
       _placeWindow(_channel.freqHz);
     });
     await _rx.nbStop();
@@ -705,301 +737,371 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
         appBar: AppBar(title: Text(_plan.title)),
         body: _failed
             ? const Center(child: Text('Empfänger konnte nicht gestartet werden.'))
-            : ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  if (widget.variants case final variants?)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Wrap(
-                        spacing: 8,
-                        children: [
-                          for (final v in variants)
-                            ChoiceChip(
-                              label: Text(hamBandShort(v)),
-                              selected: v.id == _plan.id,
-                              onSelected: (_) => _switchVariant(v),
+            // The controls on top, the waterfall fills the rest of the screen
+            // (scrolls only when there's too little room for it).
+            : CustomScrollView(
+                slivers: [
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                    sliver: SliverList.list(
+                      children: [
+                        if (widget.variants case final variants?)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: Wrap(
+                              spacing: 8,
+                              children: [
+                                for (final v in variants)
+                                  ChoiceChip(
+                                    label: Text(hamBandShort(v)),
+                                    selected: v.id == _plan.id,
+                                    onSelected: (_) => _switchVariant(v),
+                                  ),
+                              ],
                             ),
-                        ],
-                      ),
-                    ),
-                  // The receiver's source has a problem (rtl_tcp gone, with
-                  // rtl_tcp Jay extended e.g. the server's stick not ready,
-                  // server busy).
-                  if (_sourceWarning case final warning?)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.warning_amber, color: Colors.orangeAccent),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(warning, style: const TextStyle(color: Colors.orangeAccent, fontSize: 16)),
                           ),
-                        ],
-                      ),
-                    ),
-                  // What's tuned.
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Icon(
-                        _squelchOpen ? Icons.volume_up : Icons.volume_off,
-                        color: _squelchOpen ? Colors.greenAccent : Colors.white38,
-                        size: 36,
-                      ),
-                      const SizedBox(width: 16),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(_plan.longLabel(channel), style: Theme.of(context).textTheme.headlineMedium),
-                          Text(
-                            '${_fineHz == 0 ? formatMhzAuto(_tunedHz) : formatMhz(_tunedHz, decimals: 4)} MHz · '
-                            '${modeLabel(_mode)}'
-                            '${_mode == 'auto' && _detectedMode != null ? ' → ${modeLabel(_detectedMode!)}' : ''}'
-                            '${segment != null && segment.name.isNotEmpty && _plan.segments.length > 1 ? ' · ${segment.name}' : ''}',
-                            style: const TextStyle(color: Colors.white70, fontSize: 18),
+                        // The receiver's source has a problem (rtl_tcp gone, with
+                        // rtl_tcp Jay extended e.g. the server's stick not ready,
+                        // server busy).
+                        if (_sourceWarning case final warning?)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.warning_amber, color: Colors.orangeAccent),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    warning,
+                                    style: const TextStyle(color: Colors.orangeAccent, fontSize: 16),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ],
-                      ),
-                      const SizedBox(width: 24),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        // What's tuned.
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
-                            LinearProgressIndicator(value: _snrDb == null ? 0 : signal, color: signalColor),
-                            const SizedBox(height: 4),
-                            Text(
-                              _snrDb == null
-                                  ? (_started ? '' : 'Starte Empfänger…')
-                                  : 'Signal ${_snrDb!.round()} dB über Rauschen'
-                                        '${_levelDb == null ? '' : ' (${_levelDb!.round()} dB)'}',
-                              style: const TextStyle(color: Colors.white54),
+                            Icon(
+                              _squelchOpen ? Icons.volume_up : Icons.volume_off,
+                              color: _squelchOpen ? Colors.greenAccent : Colors.white38,
+                              size: 36,
+                            ),
+                            const SizedBox(width: 16),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(_plan.longLabel(channel), style: Theme.of(context).textTheme.headlineMedium),
+                                Text(
+                                  '${_fineHz == 0 ? formatMhzAuto(_tunedHz) : formatMhz(_tunedHz, decimals: 4)} MHz · '
+                                  '${modeLabel(_mode)}'
+                                  '${_mode == 'auto' && _detectedMode != null ? ' → ${modeLabel(_detectedMode!)}' : ''}'
+                                  '${segment != null && segment.name.isNotEmpty && _plan.segments.length > 1 ? ' · ${segment.name}' : ''}',
+                                  style: const TextStyle(color: Colors.white70, fontSize: 18),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(width: 24),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  LinearProgressIndicator(value: _snrDb == null ? 0 : signal, color: signalColor),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    _snrDb == null
+                                        ? (_started ? '' : 'Starte Empfänger…')
+                                        : 'Signal ${_snrDb!.round()} dB über Rauschen'
+                                              '${_levelDb == null ? '' : ' (${_levelDb!.round()} dB)'}',
+                                    style: const TextStyle(color: Colors.white54),
+                                  ),
+                                ],
+                              ),
                             ),
                           ],
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 16),
+                        // Controls - left/right with the remote moves between them.
+                        Wrap(
+                          spacing: 12,
+                          runSpacing: 8,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            FilledButton.tonalIcon(
+                              onPressed: () => _select(_index - 1),
+                              icon: const Icon(Icons.chevron_left),
+                              label: const Text('Kanal'),
+                            ),
+                            FilledButton.tonalIcon(
+                              autofocus: true,
+                              onPressed: () => _select(_index + 1),
+                              icon: const Icon(Icons.chevron_right),
+                              label: const Text('Kanal'),
+                            ),
+                            if (_plan.isFree) ...[
+                              OutlinedButton.icon(
+                                onPressed: _pickJump,
+                                icon: const Icon(Icons.bookmarks_outlined),
+                                label: const Text('Springen zu…'),
+                              ),
+                              OutlinedButton.icon(
+                                onPressed: _enterFrequency,
+                                icon: const Icon(Icons.dialpad),
+                                label: const Text('Frequenz…'),
+                              ),
+                            ],
+                            if (_fineTunable) ...[
+                              const Text('Fein', style: muted),
+                              IconButton(
+                                tooltip: '−100 Hz',
+                                onPressed: () => _fineTune(-100),
+                                icon: const Icon(Icons.remove),
+                              ),
+                              Text('${_fineHz >= 0 ? '+' : ''}$_fineHz Hz'),
+                              IconButton(
+                                tooltip: '+100 Hz',
+                                onPressed: () => _fineTune(100),
+                                icon: const Icon(Icons.add),
+                              ),
+                            ],
+                            if (widget.plan.id == 'cb')
+                              for (final all80 in const [false, true])
+                                ChoiceChip(
+                                  label: Text(all80 ? '80 Kanäle' : '40 Kanäle'),
+                                  selected: _cbAll80 == all80,
+                                  onSelected: (_) => _setCbAll80(all80),
+                                ),
+                            FilterChip(
+                              label: const Text('Suchlauf'),
+                              selected: _scanning,
+                              onSelected: (v) => setState(() {
+                                _scanning = v;
+                                _lastTuneAt = DateTime.now();
+                              }),
+                            ),
+                            if (_fmLike)
+                              Tooltip(
+                                message: 'APRS-Pakete (1200 Baud) dekodieren - auf 144,800 und 145,825 automatisch',
+                                child: FilterChip(
+                                  label: const Text('APRS'),
+                                  selected: _decoderOn,
+                                  onSelected: (v) async {
+                                    setState(() => _aprsChoice = v);
+                                    await _syncDecoder();
+                                  },
+                                ),
+                              ),
+                            if (_plan.segments.length > 1)
+                              Tooltip(
+                                message: 'Modulation und Filter passend zum Bereich des Bandplans',
+                                child: FilterChip(
+                                  label: const Text('Bandplan'),
+                                  selected: _bandPlanAuto,
+                                  onSelected: _setBandPlanAuto,
+                                ),
+                              ),
+                            const SizedBox(width: 8),
+                            const Text('Rauschsperre', style: muted),
+                            IconButton(onPressed: () => _setSquelch(_squelchDb - 2), icon: const Icon(Icons.remove)),
+                            Text('${_squelchDb.round()} dB'),
+                            IconButton(onPressed: () => _setSquelch(_squelchDb + 2), icon: const Icon(Icons.add)),
+                            const SizedBox(width: 8),
+                            const Text('Verstärkung', style: muted),
+                            IconButton(onPressed: () => _stepGain(-1), icon: const Icon(Icons.remove)),
+                            Text(
+                              _gainIndex < 0
+                                  ? 'Auto${_gainDb == null ? '' : ' (${_gainDb!.toStringAsFixed(1).replaceAll('.', ',')} dB)'}'
+                                  : '${(_gainDb ?? 0).toStringAsFixed(1).replaceAll('.', ',')} dB',
+                            ),
+                            IconButton(onPressed: () => _stepGain(1), icon: const Icon(Icons.add)),
+                            if (_plan.modes.length > 1)
+                              for (final m in _plan.modes)
+                                ChoiceChip(
+                                  label: Text(modeLabel(m)),
+                                  selected: _mode == m,
+                                  onSelected: (_) => _setMode(m),
+                                ),
+                            DropdownButton<int>(
+                              value: _sampleRate,
+                              items: [
+                                for (final r in SettingsRepository.nbSampleRates)
+                                  DropdownMenuItem(
+                                    value: r,
+                                    // 2 bytes per sample over rtl_tcp.
+                                    child: Text(
+                                      'Bandbreite ${formatMhz(r, decimals: 2)} MHz (~${(r * 16 / 1e6).round()} Mbit/s)',
+                                    ),
+                                  ),
+                              ],
+                              onChanged: (r) => r == null || r == _sampleRate ? null : _setSampleRate(r),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: () => showDialog<void>(
+                                context: context,
+                                builder: (_) => _FilterDialog(
+                                  bandwidthHz: _bandwidthHz,
+                                  bandwidthChoices: _bandwidthChoices,
+                                  noiseBlanker: _noiseBlanker,
+                                  voiceFilter: _voiceFilter,
+                                  agc: _agc,
+                                  onChanged: _setFilters,
+                                ),
+                              ),
+                              icon: const Icon(Icons.tune),
+                              label: const Text('Signalfilter'),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        // A band wider than the window: move it along.
+                        if (pagesWindow)
+                          Row(
+                            children: [
+                              TextButton.icon(
+                                // Greyed out at the band edges.
+                                onPressed: _plan.lowHz < _centerHz - _usableHz ~/ 2
+                                    ? () => _select(
+                                        _plan.channels.lastIndexWhere((c) => c.freqHz < _centerHz - _usableHz ~/ 2),
+                                      )
+                                    : null,
+                                icon: const Icon(Icons.keyboard_double_arrow_left),
+                                label: const Text('Bereich'),
+                              ),
+                              Expanded(
+                                child: Text(
+                                  'Zeigt ${formatMhz(_window.first.freqHz)}–${formatMhz(_window.last.freqHz)} MHz',
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(color: Colors.white54),
+                                ),
+                              ),
+                              TextButton.icon(
+                                onPressed: _plan.highHz > _centerHz + _usableHz ~/ 2
+                                    ? () => _select(
+                                        _plan.channels.indexWhere((c) => c.freqHz > _centerHz + _usableHz ~/ 2),
+                                      )
+                                    : null,
+                                icon: const Icon(Icons.keyboard_double_arrow_right),
+                                label: const Text('Bereich'),
+                              ),
+                            ],
+                          ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 16),
-                  // Controls - left/right with the remote moves between them.
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 8,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      FilledButton.tonalIcon(
-                        onPressed: () => _select(_index - 1),
-                        icon: const Icon(Icons.chevron_left),
-                        label: const Text('Kanal'),
-                      ),
-                      FilledButton.tonalIcon(
-                        autofocus: true,
-                        onPressed: () => _select(_index + 1),
-                        icon: const Icon(Icons.chevron_right),
-                        label: const Text('Kanal'),
-                      ),
-                      if (_plan.isFree) ...[
-                        OutlinedButton.icon(
-                          onPressed: _pickJump,
-                          icon: const Icon(Icons.bookmarks_outlined),
-                          label: const Text('Springen zu…'),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: _enterFrequency,
-                          icon: const Icon(Icons.dialpad),
-                          label: const Text('Frequenz…'),
-                        ),
-                      ],
-                      if (_fineTunable) ...[
-                        const Text('Fein', style: muted),
-                        IconButton(
-                          tooltip: '−100 Hz',
-                          onPressed: () => _fineTune(-100),
-                          icon: const Icon(Icons.remove),
-                        ),
-                        Text('${_fineHz >= 0 ? '+' : ''}$_fineHz Hz'),
-                        IconButton(tooltip: '+100 Hz', onPressed: () => _fineTune(100), icon: const Icon(Icons.add)),
-                      ],
-                      if (widget.plan.id == 'cb')
-                        for (final all80 in const [false, true])
-                          ChoiceChip(
-                            label: Text(all80 ? '80 Kanäle' : '40 Kanäle'),
-                            selected: _cbAll80 == all80,
-                            onSelected: (_) => _setCbAll80(all80),
-                          ),
-                      FilterChip(
-                        label: const Text('Suchlauf'),
-                        selected: _scanning,
-                        onSelected: (v) => setState(() {
-                          _scanning = v;
-                          _lastTuneAt = DateTime.now();
-                        }),
-                      ),
-                      if (_fmLike)
-                        Tooltip(
-                          message: 'APRS-Pakete (1200 Baud) dekodieren - auf 144,800 und 145,825 automatisch',
-                          child: FilterChip(
-                            label: const Text('APRS'),
-                            selected: _decoderOn,
-                            onSelected: (v) async {
-                              setState(() => _aprsChoice = v);
-                              await _syncDecoder();
-                            },
-                          ),
-                        ),
-                      if (_plan.segments.length > 1)
-                        Tooltip(
-                          message: 'Modulation und Filter passend zum Bereich des Bandplans',
-                          child: FilterChip(
-                            label: const Text('Bandplan'),
-                            selected: _bandPlanAuto,
-                            onSelected: _setBandPlanAuto,
-                          ),
-                        ),
-                      const SizedBox(width: 8),
-                      const Text('Rauschsperre', style: muted),
-                      IconButton(onPressed: () => _setSquelch(_squelchDb - 2), icon: const Icon(Icons.remove)),
-                      Text('${_squelchDb.round()} dB'),
-                      IconButton(onPressed: () => _setSquelch(_squelchDb + 2), icon: const Icon(Icons.add)),
-                      const SizedBox(width: 8),
-                      const Text('Verstärkung', style: muted),
-                      IconButton(onPressed: () => _stepGain(-1), icon: const Icon(Icons.remove)),
-                      Text(
-                        _gainIndex < 0
-                            ? 'Auto${_gainDb == null ? '' : ' (${_gainDb!.toStringAsFixed(1).replaceAll('.', ',')} dB)'}'
-                            : '${(_gainDb ?? 0).toStringAsFixed(1).replaceAll('.', ',')} dB',
-                      ),
-                      IconButton(onPressed: () => _stepGain(1), icon: const Icon(Icons.add)),
-                      if (_plan.modes.length > 1)
-                        for (final m in _plan.modes)
-                          ChoiceChip(label: Text(modeLabel(m)), selected: _mode == m, onSelected: (_) => _setMode(m)),
-                      DropdownButton<int>(
-                        value: _sampleRate,
-                        items: [
-                          for (final r in SettingsRepository.nbSampleRates)
-                            DropdownMenuItem(
-                              value: r,
-                              // 2 bytes per sample over rtl_tcp.
-                              child: Text(
-                                'Bandbreite ${formatMhz(r, decimals: 2)} MHz (~${(r * 16 / 1e6).round()} Mbit/s)',
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                      child: _MinHeight(
+                        minHeight: _decoderOn || _packets.isNotEmpty ? 560 : 360,
+                        child: Column(
+                          children: [
+                            // Spectrum + waterfall of the window, under it the activity
+                            // strip (where there is or was traffic); a tap tunes the
+                            // nearest channel (SSB/CW: right where tapped), left/right
+                            // on the remote step through the channels.
+                            Expanded(
+                              flex: 3,
+                              child: _StepFocus(
+                                focusNode: _waterfallFocus,
+                                onStep: (direction) => _select(_index + direction),
+                                child: ValueListenableBuilder<int>(
+                                  valueListenable: _spectrumTick,
+                                  builder: (context, _, _) => WaterfallView(
+                                    bins: _spectrum,
+                                    centerHz: _spectrumCenterHz,
+                                    spanHz: _spectrumSpanHz,
+                                    markHz: _tunedHz,
+                                    segments: _segmentsOfPlan,
+                                    activity: _activity,
+                                    channelsHz: _windowChannelsHz,
+                                    bandwidthHz: _effectiveBandwidthHz,
+                                    upperSideband: _mode == 'usb' || _mode == 'cw',
+                                    lowerSideband: _mode == 'lsb',
+                                    // A band that fits into the window (CB) is shown on
+                                    // its own, with a little margin.
+                                    view: _window.length == _plan.channels.length
+                                        ? (lowHz: _plan.lowHz - 15000, highHz: _plan.highHz + 15000)
+                                        : null,
+                                    onTapFreq: (hz) {
+                                      if (_window.isEmpty) return;
+                                      final nearest = _window.reduce(
+                                        (a, b) => (a.freqHz - hz).abs() <= (b.freqHz - hz).abs() ? a : b,
+                                      );
+                                      final index = _plan.channels.indexOf(nearest);
+                                      if (!_fineTunable) {
+                                        _select(index);
+                                        return;
+                                      }
+                                      // The segment's settings first, then right where tapped.
+                                      final fine = ((hz - nearest.freqHz) / 100).round() * 100;
+                                      _select(index, fineHz: fine.clamp(-25000, 25000));
+                                    },
+                                  ),
+                                ),
                               ),
                             ),
-                        ],
-                        onChanged: (r) => r == null || r == _sampleRate ? null : _setSampleRate(r),
+                            // APRS: what the packet decoder received, newest first.
+                            if (_decoderOn || _packets.isNotEmpty) ...[
+                              const SizedBox(height: 12),
+                              _AprsHeader(
+                                count: _packets.length,
+                                decoding: _decoderOn,
+                                onClear: _packets.isEmpty ? null : () => setState(_packets.clear),
+                              ),
+                              Expanded(
+                                flex: 2,
+                                child: ListView(
+                                  children: [
+                                    for (final p in _packets.take(50))
+                                      _AprsTile(packet: p, homeLat: _homeLat, homeLon: _homeLon),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
                       ),
-                      OutlinedButton.icon(
-                        onPressed: () => showDialog<void>(
-                          context: context,
-                          builder: (_) => _FilterDialog(
-                            bandwidthHz: _bandwidthHz,
-                            bandwidthChoices: _bandwidthChoices,
-                            noiseBlanker: _noiseBlanker,
-                            voiceFilter: _voiceFilter,
-                            agc: _agc,
-                            onChanged: _setFilters,
-                          ),
-                        ),
-                        icon: const Icon(Icons.tune),
-                        label: const Text('Signalfilter'),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  // Spectrum + waterfall of the window; a tap tunes the
-                  // nearest channel (SSB/CW: right where tapped).
-                  _StepFocus(
-                    focusNode: _waterfallFocus,
-                    onStep: (direction) => _select(_index + direction),
-                    child: WaterfallView(
-                      bins: _spectrum,
-                      centerHz: _spectrumCenterHz,
-                      spanHz: _spectrumSpanHz,
-                      markHz: _tunedHz,
-                      segments: _segmentsOfPlan,
-                      bandwidthHz: _effectiveBandwidthHz,
-                      upperSideband: _mode == 'usb' || _mode == 'cw',
-                      lowerSideband: _mode == 'lsb',
-                      // A band that fits into the window (CB) is shown on
-                      // its own, with a little margin.
-                      view: _window.length == _plan.channels.length
-                          ? (lowHz: _plan.lowHz - 15000, highHz: _plan.highHz + 15000)
-                          : null,
-                      onTapFreq: (hz) {
-                        if (_window.isEmpty) return;
-                        final nearest = _window.reduce(
-                          (a, b) => (a.freqHz - hz).abs() <= (b.freqHz - hz).abs() ? a : b,
-                        );
-                        final index = _plan.channels.indexOf(nearest);
-                        if (!_fineTunable) {
-                          _select(index);
-                          return;
-                        }
-                        // The segment's settings first, then right where tapped.
-                        final fine = ((hz - nearest.freqHz) / 100).round() * 100;
-                        _select(index, fineHz: fine.clamp(-25000, 25000));
-                      },
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  // APRS: what the packet decoder received, newest first.
-                  if (_decoderOn || _packets.isNotEmpty) ...[
-                    _AprsHeader(
-                      count: _packets.length,
-                      decoding: _decoderOn,
-                      onClear: _packets.isEmpty ? null : () => setState(_packets.clear),
-                    ),
-                    for (final p in _packets.take(50))
-                      _AprsTile(packet: p, homeLat: _homeLat, homeLon: _homeLon),
-                    const SizedBox(height: 12),
-                  ],
-                  if (pagesWindow)
-                    Row(
-                      children: [
-                        TextButton.icon(
-                          // Greyed out at the band edges.
-                          onPressed: _plan.lowHz < _centerHz - _usableHz ~/ 2
-                              ? () =>
-                                    _select(_plan.channels.lastIndexWhere((c) => c.freqHz < _centerHz - _usableHz ~/ 2))
-                              : null,
-                          icon: const Icon(Icons.keyboard_double_arrow_left),
-                          label: const Text('Bereich'),
-                        ),
-                        Expanded(
-                          child: Text(
-                            'Zeigt ${formatMhz(_window.first.freqHz)}–${formatMhz(_window.last.freqHz)} MHz',
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(color: Colors.white54),
-                          ),
-                        ),
-                        TextButton.icon(
-                          onPressed: _plan.highHz > _centerHz + _usableHz ~/ 2
-                              ? () => _select(_plan.channels.indexWhere((c) => c.freqHz > _centerHz + _usableHz ~/ 2))
-                              : null,
-                          icon: const Icon(Icons.keyboard_double_arrow_right),
-                          label: const Text('Bereich'),
-                        ),
-                      ],
-                    ),
-                  // Every channel in the window - green while active.
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: [
-                      for (final c in _window)
-                        _ChannelButton(
-                          label: _plan.id == 'cb' || c.name == null ? c.label : c.name!,
-                          selected: c.freqHz == channel.freqHz,
-                          heat: _heat(c),
-                          onPressed: () => _select(_plan.channels.indexOf(c)),
-                        ),
-                    ],
                   ),
                 ],
               ),
       ),
     );
   }
+}
+
+/// Reports [minHeight] as its intrinsic height: SliverFillRemaining then
+/// gives the waterfall at least that much and the page scrolls if the screen
+/// is shorter (the waterfall itself has no natural height).
+class _MinHeight extends SingleChildRenderObjectWidget {
+  final double minHeight;
+
+  const _MinHeight({required this.minHeight, required super.child});
+
+  @override
+  RenderObject createRenderObject(BuildContext context) => _RenderMinHeight(minHeight);
+
+  @override
+  void updateRenderObject(BuildContext context, _RenderMinHeight renderObject) => renderObject.minHeight = minHeight;
+}
+
+class _RenderMinHeight extends RenderProxyBox {
+  _RenderMinHeight(this._minHeight);
+
+  double _minHeight;
+  set minHeight(double value) {
+    if (value == _minHeight) return;
+    _minHeight = value;
+    markNeedsLayout();
+  }
+
+  @override
+  double computeMinIntrinsicHeight(double width) => _minHeight;
+
+  @override
+  double computeMaxIntrinsicHeight(double width) => _minHeight;
 }
 
 /// Makes [child] (the waterfall) reachable with the remote: focused it gets
@@ -1040,38 +1142,6 @@ class _StepFocusState extends State<_StepFocus> {
           border: Border.all(color: _focused ? Theme.of(context).colorScheme.primary : Colors.transparent, width: 2),
         ),
         child: widget.child,
-      ),
-    );
-  }
-}
-
-class _ChannelButton extends StatelessWidget {
-  final String label;
-  final bool selected;
-
-  /// 1 = signal now, fading towards 0 after it (see _heat).
-  final double heat;
-  final VoidCallback onPressed;
-
-  const _ChannelButton({required this.label, required this.selected, required this.heat, required this.onPressed});
-
-  @override
-  Widget build(BuildContext context) {
-    final primary = Theme.of(context).colorScheme.primary;
-    return SizedBox(
-      height: 40,
-      child: OutlinedButton(
-        style: OutlinedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          minimumSize: const Size(52, 40),
-          backgroundColor: heat > 0 ? Colors.green.withValues(alpha: 0.08 + 0.5 * heat) : null,
-          side: BorderSide(color: selected ? primary : Colors.white24, width: selected ? 3 : 1),
-        ),
-        onPressed: onPressed,
-        child: Text(
-          label,
-          style: TextStyle(color: Colors.white, fontWeight: selected ? FontWeight.bold : null),
-        ),
       ),
     );
   }
@@ -1215,16 +1285,11 @@ class _AprsHeader extends StatelessWidget {
         children: [
           Icon(Icons.location_on, color: decoding ? Colors.greenAccent : Colors.white38),
           const SizedBox(width: 8),
-          Text(
-            'APRS · $count ${count == 1 ? 'Paket' : 'Pakete'}',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
+          Text('APRS · $count ${count == 1 ? 'Paket' : 'Pakete'}', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              decoding
-                  ? (count == 0 ? 'Dekoder läuft - warte auf Pakete…' : 'Dekoder läuft')
-                  : 'Dekoder aus',
+              decoding ? (count == 0 ? 'Dekoder läuft - warte auf Pakete…' : 'Dekoder läuft') : 'Dekoder aus',
               style: const TextStyle(color: Colors.white54),
             ),
           ),
@@ -1314,7 +1379,10 @@ class _AprsTile extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SizedBox(width: 70, child: Text(_time, style: const TextStyle(color: Colors.white54))),
+              SizedBox(
+                width: 70,
+                child: Text(_time, style: const TextStyle(color: Colors.white54)),
+              ),
               SizedBox(
                 width: 130,
                 child: Text(packet.source, style: const TextStyle(fontWeight: FontWeight.bold)),
@@ -1326,9 +1394,17 @@ class _AprsTile extends StatelessWidget {
                   style: const TextStyle(color: Colors.white70),
                 ),
               ),
-              SizedBox(width: 110, child: Text(where ?? '', style: const TextStyle(color: Colors.greenAccent))),
+              SizedBox(
+                width: 110,
+                child: Text(where ?? '', style: const TextStyle(color: Colors.greenAccent)),
+              ),
               Expanded(
-                child: Text(text, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70)),
+                child: Text(
+                  text,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.white70),
+                ),
               ),
             ],
           ),

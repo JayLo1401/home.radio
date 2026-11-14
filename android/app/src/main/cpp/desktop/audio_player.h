@@ -4,10 +4,13 @@
 #include <condition_variable>
 #include <cstdint>
 #include <deque>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <thread>
 #include <vector>
+
+#include "audio_levels.h"
 
 namespace hrdab {
 
@@ -23,13 +26,21 @@ namespace hrdab {
 //  - miniaudio's device callback: ring buffer -> speaker, with the
 //    prebuffer (start and after an underrun), +-60 ms clock drift band
 //    (one sample frame dropped/repeated per period) and fade-in
-//  - output thread: (re)opens the device whenever rate/channels change
+//  - output thread: (re)opens the device whenever rate/channels change, and
+//    turns what the callback played into equalizer levels (AudioLevels)
 //
 // FM and NB use the same output with ready-made PCM (onPcm).
 class AudioPlayer {
 public:
+    // Band levels of what is playing (see AudioLevels), 25 times a second
+    // from the player's own thread; count 0 = the player stopped.
+    using LevelsListener = std::function<void(const uint8_t* levels, int count)>;
+
     explicit AudioPlayer(int prebufferMs = 400);
     ~AudioPlayer();
+
+    // Before start().
+    void setLevelsListener(LevelsListener listener) { levelsListener_ = std::move(listener); }
 
     void start();
     void stop();
@@ -92,6 +103,11 @@ private:
     std::atomic<int> decodeErrors_{0}; // FDK rejected the AU: silence
     std::atomic<int> ausDropped_{0};   // queue full
     std::atomic<int> minFillMs_{-1};
+
+    // Equalizer bars: fed by the device callback, analysed by the output thread.
+    LevelsListener levelsListener_;
+    std::mutex levelsMutex_;
+    AudioLevels levels_;
 };
 
 } // namespace hrdab

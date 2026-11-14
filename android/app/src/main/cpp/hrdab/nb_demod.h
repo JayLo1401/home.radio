@@ -94,8 +94,8 @@ public:
     // 48 kHz mono PCM, continuously (silence while the squelch is closed).
     virtual void onNbAudio(const int16_t* pcm, int frames) = 0;
     virtual void onNbReport(const NbReport& report) = 0;
-    // Waterfall spectrum, ~20 times a second: kFastSpectrumBins dBFS values
-    // (strongest FFT bin in each) across centerHz +- spanHz/2.
+    // Waterfall spectrum, ~20 times a second: every FFT bin (dBFS) of the
+    // usable span, across centerHz +- spanHz/2 (~1600 values at 2 MS/s).
     virtual void onNbSpectrum(uint32_t /*centerHz*/, uint32_t /*spanHz*/, const std::vector<float>& /*binsDbfs*/) {}
 };
 
@@ -114,7 +114,6 @@ public:
     static constexpr int kAudioRate = 48000;
     static constexpr int kMonitorFft = 2048;
     static constexpr int kSpectrumBins = 256;
-    static constexpr int kFastSpectrumBins = 1024;
     static constexpr int kActivityBwHz = 8000;
 
     // 960000, 1024000, 1440000, 1920000, 2048000, 2400000 S/s.

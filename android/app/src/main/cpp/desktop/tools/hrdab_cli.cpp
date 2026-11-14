@@ -8,6 +8,8 @@
 //   hrdab_cli <source> fmscan
 //   hrdab_cli <source> fmseek <fromKhz> up|down
 //   hrdab_cli <source> nb <freqHz> <mode> <seconds> [squelchDb] [sampleRate]
+//   hrdab_cli <source> acars <centerHz> <channelHz,channelHz,...> <seconds>
+//     (channels from 136 MHz: VDL Mode 2)
 //   hrdab_cli usbdevices
 // <source> is host:port (rtl_tcp) or "usb".
 #include <atomic>
@@ -139,6 +141,11 @@ int main(int argc, char** argv)
         std::printf("nbStart -> %s\n", call("nbStart", args).c_str());
         std::this_thread::sleep_for(std::chrono::seconds(std::atoi(argv[5])));
         call("nbStop", "{}");
+    } else if (cmd == "acars" && argc > 5) {
+        const std::string args = std::string("{\"centerHz\":") + argv[3] + ",\"channelsHz\":[" + argv[4] + "]}";
+        std::printf("acarsStart -> %s\n", call("acarsStart", args).c_str());
+        std::this_thread::sleep_for(std::chrono::seconds(std::atoi(argv[5])));
+        call("acarsStop", "{}");
     } else {
         std::fprintf(stderr, "unknown command\n");
     }
