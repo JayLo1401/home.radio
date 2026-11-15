@@ -3,6 +3,7 @@
 #include <cstring>
 
 #include "common.h"
+#include "hf.h"
 
 namespace hrdab {
 
@@ -88,6 +89,30 @@ bool Rtl2832Source::i2cRepeater(bool on)
     return demodWrite(1, 0x01, on ? 0x18 : 0x10, 1);
 }
 
+std::string Rtl2832Source::usbString(int descriptorOffset)
+{
+    uint8_t dev[18] = {0};
+    if (usb_->getDescriptor(0x0100, 0, dev, sizeof(dev)) < static_cast<int>(sizeof(dev))) return {};
+    const uint8_t index = dev[descriptorOffset];
+    if (index == 0) return {};
+    // First language of string descriptor 0, else US English.
+    uint8_t langs[4] = {0};
+    const uint16_t lang = usb_->getDescriptor(0x0300, 0, langs, sizeof(langs)) >= 4
+                              ? static_cast<uint16_t>(langs[2] | (langs[3] << 8))
+                              : 0x0409;
+    uint8_t buf[255] = {0};
+    const int n = usb_->getDescriptor(static_cast<uint16_t>(0x0300 | index), lang, buf, sizeof(buf));
+    if (n < 2) return {};
+    // UTF-16LE after the 2-byte header; anything outside ASCII as '?'.
+    std::string out;
+    const int len = buf[0] < n ? buf[0] : n;
+    for (int i = 2; i + 1 < len; i += 2) {
+        const unsigned c = buf[i] | (buf[i + 1] << 8);
+        out += c >= 0x20 && c < 0x7f ? static_cast<char>(c) : '?';
+    }
+    return out;
+}
+
 uint8_t Rtl2832Source::probe(uint8_t addr)
 {
     const uint8_t reg = 0;
@@ -139,10 +164,30 @@ bool Rtl2832Source::initBaseband()
 
 bool Rtl2832Source::setIfFrequency(uint32_t hz)
 {
-    const int64_t v = -(static_cast<int64_t>(hz) * (1ll << 22)) / kRtlXtal;
+    const uint32_t v = rtlIfWord(hz, kRtlXtal);
     return demodWrite(1, 0x19, static_cast<uint16_t>((v >> 16) & 0x3f), 1) &&
            demodWrite(1, 0x1a, static_cast<uint16_t>((v >> 8) & 0xff), 1) &&
            demodWrite(1, 0x1b, static_cast<uint16_t>(v & 0xff), 1);
+}
+
+// Direct sampling: the Q-ADC (where the V3-style boards have their HF input)
+// takes the I path, real input at the IF set by setIfFrequency, no spectrum
+// inversion; the RTL2832U's digital AGC makes up for the missing tuner gain.
+// Off: back to the tuner's low IF. The tuner itself keeps running.
+bool Rtl2832Source::setDirectSampling(bool on)
+{
+    if (on) {
+        if (!demodWrite(1, 0xb1, 0x1a, 1) || !demodWrite(1, 0x15, 0x00, 1) || !demodWrite(0, 0x08, 0x4d, 1) ||
+            !demodWrite(0, 0x06, 0x90, 1) || !demodWrite(0, 0x19, 0x25, 1)) {
+            return false;
+        }
+    } else if (!demodWrite(0, 0x06, 0x80, 1) || !demodWrite(0, 0x19, 0x05, 1) || !demodWrite(1, 0x15, 0x01, 1) ||
+               !setIfFrequency(R82xx::kIfHz)) {
+        return false;
+    }
+    directSampling_ = on;
+    HR_LOGI("RTL2832: direct sampling %s", on ? "on (Q branch)" : "off");
+    return true;
 }
 
 bool Rtl2832Source::programSampleRate(uint32_t rate)
@@ -163,6 +208,8 @@ bool Rtl2832Source::open()
         HR_LOGE("RTL2832: device does not answer");
         return false;
     }
+    const std::string manufacturer = usbString(14);
+    const std::string product = usbString(15);
     if (!initBaseband()) return false;
 
     if (!i2cRepeater(true)) return false;
@@ -184,7 +231,11 @@ bool Rtl2832Source::open()
         i2cRepeater(false);
         return false;
     }
-    tuner_ = std::make_unique<R82xx>(static_cast<I2cBus&>(*this), addr, r828d_ ? kR828dXtal : kRtlXtal, r828d_);
+    // The Blog V4's R828D runs from the stick's 28.8 MHz reference, other
+    // R828D sticks (DVB-T2) from their own 16 MHz crystal.
+    blogV4_ = r828d_ && manufacturer == "RTLSDRBlog" && product == "Blog V4";
+    tuner_ = std::make_unique<R82xx>(static_cast<I2cBus&>(*this), addr, r828d_ && !blogV4_ ? kR828dXtal : kRtlXtal,
+                                     r828d_, blogV4_);
     const bool tunerOk = tuner_->init();
     i2cRepeater(false);
     if (!tunerOk) {
@@ -192,7 +243,7 @@ bool Rtl2832Source::open()
         return false;
     }
     if (!programSampleRate(sampleRate())) return false;
-    HR_LOGI("RTL2832 ready, tuner %s", tunerName());
+    HR_LOGI("RTL2832 ready, tuner %s (\"%s\" / \"%s\")", tunerName(), manufacturer.c_str(), product.c_str());
     return true;
 }
 
@@ -207,14 +258,18 @@ bool Rtl2832Source::setSampleRate(uint32_t hz)
 
 const char* Rtl2832Source::tunerName() const
 {
-    return r828d_ ? "R828D" : "R820T";
+    return blogV4_ ? "R828D (RTL-SDR Blog V4)" : (r828d_ ? "R828D" : "R820T");
 }
 
 bool Rtl2832Source::setFrequency(uint32_t hz)
 {
     std::lock_guard<std::mutex> lock(ctrlMutex_);
-    if (!tuner_ || !i2cRepeater(true)) return false;
-    const bool ok = tuner_->setFrequency(hz);
+    if (!tuner_) return false;
+    const HfTuning t = planHf(hz, !r828d_, externalUpconverterHz().load());
+    if (t.directSampling != directSampling_ && !setDirectSampling(t.directSampling)) return false;
+    if (t.directSampling) return setIfFrequency(t.rfHz);
+    if (!i2cRepeater(true)) return false;
+    const bool ok = tuner_->setFrequency(t.rfHz);
     i2cRepeater(false);
     return ok;
 }

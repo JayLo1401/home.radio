@@ -28,11 +28,28 @@
     Rechtsberatung). Alternative: lizenzierter DVSI-Chip per USB (AMBE-3000,
     z. B. ThumbDV).
 
--   Kurzwelle (HF, unter 24 MHz): schaltet auf einen Schlag ~12 Punkte frei
-    (KW-Rundfunk, Morse, RTTY, Wetterfax, FT8, Zeitzeichen, Baken, …).
-    Vorher klären: RTL-SDR Blog V3 (Direct Sampling) oder V4 (eingebauter
-    Aufwärtsmischer)? Über rtl_tcp evtl. schon durch den Server-Treiber
-    erledigt, für direkt USB in den eigenen Treiber einbauen.
+-   Kurzwelle Stufe 2 – Dekoder. Stufe 1 (Empfang + Hören) ist da: Funk →
+    Kurzwelle (KW-Rundfunk MW/75–11 m, Amateurfunk 160–10 m mit Bandplan,
+    KW-Funkdienste: Zeitzeichen, VOLMET, Shanwick, DWD-Wetterfax/-RTTY),
+    freier Band-Scan ab 0,5 MHz. Unter 24 MHz schaltet der eigene Treiber
+    R820T-Sticks auf Direct Sampling (Q-Zweig: Blog V3, NESDR SMArt v5), der
+    RTL-SDR Blog V4 (an den USB-Strings erkannt) nutzt seinen Aufwärtsmischer;
+    über rtl_tcp geht Befehl 0x09 an den Server; ein externer Aufwärtsmischer
+    (Ham It Up 125 MHz, SpyVerter 120 MHz) ist unter Funk → Kurzwelle
+    einstellbar. Offen:
+    - Dekoder: RTTY (DWD 50 Bd/450 Hz), Wetterfax (DWD Pinneberg, 120 U/min,
+      IOC 576), FT8 (15-s-Zyklen, braucht UTC-genaue Uhr), CW als Text.
+    - Echter CW-Modus im NB-Demodulator (schmales Filter um 700 Hz statt
+      USB 300–1300 Hz), Synchron-AM gegen Selektivschwund.
+    - Direct Sampling: Verstärkungsanzeige stimmt nicht (Tuner ist außen vor,
+      geregelt wird mit der digitalen AGC des RTL2832U); Pegel daher nicht
+      mit UKW vergleichbar.
+    - rtltcp.server: Blog-V4-Aufwärtsmischer im Server-Treiber nachrüsten,
+      sonst ist Kurzwelle mit einem V4 nur per USB möglich.
+    - Mit echtem Blog V4 und V3 testen. Bisher nur NESDR SMArt v5 über
+      rtl_tcp: Umschalten und Datenstrom klappen, mit der Stabantenne kam
+      mittags auf 6–21 MHz aber nur Eigenrauschen (Störlinien im 128-kHz-
+      Raster) – mit Langdraht/Aktivantenne und abends wiederholen.
 
 -   SSTV: schöne Bilder, auf 2 m (145,500) und von der ISS (145,800).
 

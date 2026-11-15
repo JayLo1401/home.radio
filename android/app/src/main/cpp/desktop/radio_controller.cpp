@@ -10,6 +10,7 @@
 #include <set>
 
 #include "common.h"
+#include "hf.h"
 #include "libusb_transport.h"
 #include "rtl2832.h"
 #include "rtltcp_source.h"
@@ -1433,6 +1434,12 @@ bool RadioController::handleNbCall(int64_t id, const std::string& method, const 
             return true;
         }
         fm_.post([=] { replyBool(id, nbActive_ && created_ && engineNbTune(freqHz, mode)); });
+    } else if (method == "setUpconverter") {
+        // Shortwave via an external upconverter (0 = none); process-wide,
+        // applies from the next retune.
+        const int hz = args.intOr("hz", 0);
+        externalUpconverterHz() = hz > 0 ? static_cast<uint32_t>(hz) : 0u;
+        replyNull(id);
     } else if (method == "nbSetSquelch") {
         const float squelchDb = static_cast<float>(args.doubleOr("squelchDb", 0.0));
         fm_.post([=] {

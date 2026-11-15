@@ -815,6 +815,12 @@ class DabRtlSdrPlugin :
                     mainHandler.post { result.success(ok) }
                 }
             }
+            // Shortwave via an external upconverter (0 = none); process-wide,
+            // applies from the next retune - no engine needed.
+            "setUpconverter" -> {
+                IntegratedDabEngine.setUpconverter(call.argument<Number>("hz")?.toInt() ?: 0)
+                result.success(null)
+            }
             "nbSetSquelch" -> {
                 val squelchDb = (call.argument<Number>("squelchDb") ?: 0.0).toFloat()
                 fmExecutor.execute {

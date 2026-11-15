@@ -164,6 +164,13 @@ bool LibusbTransport::control(uint8_t requestType, uint16_t value, uint16_t inde
     return true;
 }
 
+int LibusbTransport::getDescriptor(uint16_t value, uint16_t index, uint8_t* data, uint16_t len)
+{
+    const int r = libusb_control_transfer(handle_, LIBUSB_ENDPOINT_IN, LIBUSB_REQUEST_GET_DESCRIPTOR, value, index, data,
+                                          len, 300);
+    return r < 0 ? -1 : r;
+}
+
 void LibusbTransport::streamBulk(uint8_t endpoint, const std::atomic<bool>& running,
                                  const std::function<void(const uint8_t*, size_t)>& onData,
                                  const std::function<void(const std::string&)>& onError)

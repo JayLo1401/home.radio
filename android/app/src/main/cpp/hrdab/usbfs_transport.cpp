@@ -42,6 +42,20 @@ bool UsbfsTransport::control(uint8_t requestType, uint16_t value, uint16_t index
     return true;
 }
 
+int UsbfsTransport::getDescriptor(uint16_t value, uint16_t index, uint8_t* data, uint16_t len)
+{
+    usbdevfs_ctrltransfer ct{};
+    ct.bRequestType = 0x80;
+    ct.bRequest = 0x06; // GET_DESCRIPTOR
+    ct.wValue = value;
+    ct.wIndex = index;
+    ct.wLength = len;
+    ct.timeout = 300;
+    ct.data = data;
+    const int r = ioctl(fd_, USBDEVFS_CONTROL, &ct);
+    return r < 0 ? -1 : r;
+}
+
 void UsbfsTransport::streamBulk(uint8_t endpoint, const std::atomic<bool>& running,
                                 const std::function<void(const uint8_t*, size_t)>& onData,
                                 const std::function<void(const std::string&)>& onError)

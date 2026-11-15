@@ -12,6 +12,7 @@ public:
     explicit UsbfsTransport(int fd) : fd_(fd) {}
 
     bool control(uint8_t requestType, uint16_t value, uint16_t index, uint8_t* data, uint16_t len) override;
+    int getDescriptor(uint16_t value, uint16_t index, uint8_t* data, uint16_t len) override;
     void streamBulk(uint8_t endpoint, const std::atomic<bool>& running,
                     const std::function<void(const uint8_t*, size_t)>& onData,
                     const std::function<void(const std::string&)>& onError) override;

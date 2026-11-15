@@ -491,6 +491,14 @@ class SettingsRepository {
   Future<bool> getCbAll80() async => (await _db.getSetting(_keyCbAll80)) == 'true';
   Future<void> setCbAll80(bool value) => _db.setSetting(_keyCbAll80, '$value');
 
+  /// Shortwave: LO of an external upconverter in front of the stick (e.g.
+  /// 125 MHz for a Ham It Up), 0 = none - then direct sampling or the
+  /// RTL-SDR Blog V4's own upconverter.
+  static const hfUpconverterChoices = [0, 125000000, 120000000, 100000000];
+
+  Future<int> getHfUpconverterHz() async => int.tryParse(await _db.getSetting('hf_upconverter_hz') ?? '') ?? 0;
+  Future<void> setHfUpconverterHz(int hz) => _db.setSetting('hf_upconverter_hz', '$hz');
+
   /// Install new versions from the update server on start (default on).
   Future<bool> getAutoUpdate() async => (await _db.getSetting(_keyAutoUpdate)) != 'false';
   Future<void> setAutoUpdate(bool value) => _db.setSetting(_keyAutoUpdate, '$value');

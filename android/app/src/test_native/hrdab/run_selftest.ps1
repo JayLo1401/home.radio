@@ -1,5 +1,5 @@
 # Builds the hrdab self test with the NDK and runs it on an adb device.
-#   .\run_selftest.ps1 [-Abi arm64-v8a|armeabi-v7a] [-Serial <adb serial>] [-Mode quick|full|fm|fmsep|demod|nb|dmr]
+#   .\run_selftest.ps1 [-Abi arm64-v8a|armeabi-v7a] [-Serial <adb serial>] [-Mode quick|full|fm|fmsep|demod|nb|dmr|hf]
 param(
     [string]$Abi = "arm64-v8a",
     [string]$Serial = "",

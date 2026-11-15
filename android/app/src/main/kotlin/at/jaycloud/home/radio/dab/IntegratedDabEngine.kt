@@ -99,6 +99,12 @@ class IntegratedDabEngine(private val events: Events) {
             System.loadLibrary("hrdab")
         }
 
+        // Instance method of the companion (JNI: IntegratedDabEngine_00024Companion).
+        private external fun nativeSetUpconverter(hz: Int)
+
+        /** Shortwave through an external upconverter: below 30 MHz tune [hz] higher; 0 = none. */
+        fun setUpconverter(hz: Int) = nativeSetUpconverter(hz)
+
         /** NB mode names as the method channel uses them -> native code (NbMode). */
         fun nbModeCode(mode: String): Int? = when (mode) {
             "auto" -> 0

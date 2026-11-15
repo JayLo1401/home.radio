@@ -105,6 +105,16 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
   DateTime _lastOpenAt = DateTime.now();
   DateTime _lastTuneAt = DateTime.now();
 
+  /// Shortwave below the tuner's own range (24 MHz - CB and 10 m it tunes
+  /// itself): since when nothing has come in (no signal on the channel, no
+  /// activity in the window) - after [_hfHintAfter] a hint what HF needs.
+  DateTime? _hfQuietSince;
+  static const _hfHintBelowHz = 24000000, _hfHintAfter = Duration(seconds: 15);
+  bool get _hfHint =>
+      _tunedHz < _hfHintBelowHz &&
+      _hfQuietSince != null &&
+      DateTime.now().difference(_hfQuietSince!) >= _hfHintAfter;
+
   BandChannel get _channel => _plan.channels[_index];
   BandSegment? get _segment => _plan.segmentAt(_channel.freqHz);
   int get _tunedHz => _channel.freqHz + _fineHz;
@@ -239,7 +249,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     if (variants != null && !_variantLoaded) {
       _variantLoaded = true;
       final id = await _settings.getNbVariant(widget.plan.id);
-      _plan = variants.firstWhere((p) => p.id == id, orElse: () => variants.first);
+      _plan = variants.firstWhere((p) => p.id == id, orElse: () => widget.plan);
       _index = _plan.channels.length ~/ 2;
       _mode = _plan.modes.first;
     }
@@ -274,6 +284,8 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     _homeLat = await _settings.getWeatherLat();
     _homeLon = await _settings.getWeatherLon();
     _placeWindow(_channel.freqHz);
+    // Shortwave through an external upconverter (applies from the next tune).
+    await _rx.setUpconverter(await _settings.getHfUpconverterHz());
     // The home screen tunes its station in again once back.
     ref.read(receiverInterruptedProvider.notifier).set(true);
     if (!await connectDecoder(ref)) {
@@ -445,6 +457,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
           _detectedMode = mode == null || mode == 'auto' ? null : mode;
         });
         if (open) _lastOpenAt = DateTime.now();
+        _trackHfQuiet();
         if (_scanning) _scanStep();
       // Activity and spectrum don't rebuild the whole page (20 times a
       // second is too much for a TV box): the waterfall listens to
@@ -476,6 +489,17 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
         final isError = event['isError'] as bool? ?? false;
         final message = (event['message'] as String?)?.trim() ?? '';
         setState(() => _sourceWarning = isError && message.isNotEmpty ? message : null);
+    }
+  }
+
+  /// See [_hfQuietSince]: reset by a signal on the channel or anywhere in
+  /// the window, and when leaving shortwave.
+  void _trackHfQuiet() {
+    final heard = (_snrDb ?? 0) >= 6 || _window.any(_isActive);
+    if (_tunedHz >= _hfHintBelowHz || heard) {
+      _hfQuietSince = null;
+    } else {
+      _hfQuietSince ??= DateTime.now();
     }
   }
 
@@ -638,7 +662,8 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Der Stick empfängt ${formatMhz(_plan.lowHz, decimals: 0)}–${formatMhz(_plan.highHz, decimals: 0)} MHz.',
+              'Der Stick empfängt ${formatMhz(_plan.lowHz, decimals: _plan.lowHz < 1000000 ? 1 : 0)}–'
+              '${formatMhz(_plan.highHz, decimals: 0)} MHz.',
             ),
           ),
         );
@@ -805,7 +830,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
                               children: [
                                 for (final v in variants)
                                   ChoiceChip(
-                                    label: Text(hamBandShort(v)),
+                                    label: Text(bandShortTitle(v)),
                                     selected: v.id == _plan.id,
                                     onSelected: (_) => _switchVariant(v),
                                   ),
@@ -826,6 +851,26 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
                                   child: Text(
                                     warning,
                                     style: const TextStyle(color: Colors.orangeAccent, fontSize: 16),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        // Shortwave and nothing comes in: what it takes.
+                        if (_hfHint)
+                          const Padding(
+                            padding: EdgeInsets.only(bottom: 12),
+                            child: Row(
+                              children: [
+                                Icon(Icons.info_outline, color: Colors.white54),
+                                SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Nichts zu hören? Kurzwelle braucht einen Stick mit Direct Sampling '
+                                    '(RTL-SDR Blog V3, NESDR SMArt v5), einen RTL-SDR Blog V4 (über rtl_tcp nur '
+                                    'mit dem Blog-V4-Treiber am Server) oder einen Aufwärtsmischer '
+                                    '(Funk → Kurzwelle) - und eine Antenne für Kurzwelle.',
+                                    style: TextStyle(color: Colors.white54, fontSize: 15),
                                   ),
                                 ),
                               ],

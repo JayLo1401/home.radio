@@ -13,6 +13,7 @@
 #include <string>
 
 #include "common.h"
+#include "hf.h"
 #include "receiver.h"
 #include "rtl2832.h"
 #include "rtltcp_source.h"
@@ -607,6 +608,12 @@ Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeAdsbStart(JNIEnv*, job
 {
     std::lock_guard<std::mutex> lock(g_mutex);
     return g_session && g_session->receiver->adsbStart() ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_00024Companion_nativeSetUpconverter(JNIEnv*, jobject, jint hz)
+{
+    externalUpconverterHz() = hz > 0 ? static_cast<uint32_t>(hz) : 0u;
 }
 
 extern "C" JNIEXPORT void JNICALL

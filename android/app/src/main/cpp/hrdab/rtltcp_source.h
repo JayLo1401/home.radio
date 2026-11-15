@@ -25,6 +25,12 @@ class Json;
 //   server says when it's back); after a fatal error (busy, kicked) it does
 //   not reconnect until the next start().
 // - "RTL0": classic rtl_tcp, which ignores HELLO as an unknown command.
+//
+// Shortwave (see hf.h): with an R820T-class stick (tuner type from the RTL0
+// header or the v2 status) frequencies below 24 MHz switch the server to
+// direct sampling on the Q branch (command 0x09) with the RTL2832U's digital
+// AGC; an R828D stick is tuned as asked - a server with the RTL-SDR Blog V4
+// driver does the upconverting itself, other servers can't receive there.
 class RtlTcpSource : public SampleSource {
 public:
     RtlTcpSource(std::string host, int port);
@@ -54,6 +60,12 @@ private:
     bool sendFrame(uint8_t type, const uint8_t* data, size_t len);
     bool sendJson(const std::string& json);
     bool sendCommand(uint8_t cmd, uint32_t param);
+    // Sends the frequency - and before it direct sampling, the RTL2832U AGC
+    // and the gain when the direct sampling state changes (or with force,
+    // on every connect: a server may still be in the previous client's
+    // mode). The gain follows because a server re-initialises the tuner
+    // when direct sampling goes off.
+    bool sendTuning(bool force);
     void closeSocket();
     // A JSON frame during the session; false = fatal error, stop.
     bool handleMessage(const Json& msg);
@@ -77,6 +89,10 @@ private:
     ByteRing* ring_ = nullptr;
     std::atomic<uint32_t> freqHz_{0};
     std::atomic<int> gainIndex_{-1};
+    std::atomic<int> tunerType_{0}; // v1 numbering (5 R820T, 6 R828D), 0 = unknown
+    std::mutex tuneMutex_;          // sendTuning
+    int directSamplingSent_ = -1;   // last 0x09 sent on this connection, -1 = none
+    bool warnedR828dHf_ = false;
     std::string lastStatus_; // last v2 message shown, to avoid repeats
 };
 

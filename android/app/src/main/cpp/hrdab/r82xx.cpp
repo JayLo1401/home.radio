@@ -4,6 +4,7 @@
 #include <thread>
 
 #include "common.h"
+#include "hf.h"
 
 namespace hrdab {
 
@@ -52,8 +53,8 @@ void sleepMs(int ms)
 
 } // namespace
 
-R82xx::R82xx(I2cBus& bus, uint8_t addr, uint32_t xtalHz, bool r828d)
-    : bus_(bus), addr_(addr), xtal_(xtalHz), r828d_(r828d)
+R82xx::R82xx(I2cBus& bus, uint8_t addr, uint32_t xtalHz, bool r828d, bool blogV4)
+    : bus_(bus), addr_(addr), xtal_(xtalHz), r828d_(r828d), blogV4_(r828d && blogV4)
 {
 }
 
@@ -100,14 +101,16 @@ bool R82xx::readStatus(uint8_t* out, int len)
     return true;
 }
 
-bool R82xx::setMux(uint32_t loHz)
+bool R82xx::setMux(uint32_t loHz, uint32_t rfHz)
 {
     const uint32_t mhz = loHz / 1000000;
     const MuxRange* r = &kMux[0];
     for (const auto& m : kMux) {
         if (mhz >= m.mhz) r = &m;
     }
-    return writeMask(0x17, r->openDrain, 0x08) && writeMask(0x1a, r->rfMuxPoly, 0xc3) &&
+    // The Blog V4 wires the open-drain output to its notch filters instead.
+    const uint8_t openDrain = blogV4_ ? (blogV4NotchOn(rfHz) ? 0x08 : 0x00) : r->openDrain;
+    return writeMask(0x17, openDrain, 0x08) && writeMask(0x1a, r->rfMuxPoly, 0xc3) &&
            writeReg(0x1b, r->tfBand) && writeMask(0x10, 0x00, 0x0b) && writeMask(0x08, 0x00, 0x3f) &&
            writeMask(0x09, 0x00, 0x3f);
 }
@@ -222,14 +225,31 @@ bool R82xx::init()
         !writeMask(0x1a, 0x20, 0x30)) {
         return false;
     }
-    input_ = 0;
+    // Power-on registers select the "air" input (0x05 bits 5-6 clear); the
+    // Blog V4 also has to set its cable-2 bit, so it starts unknown.
+    input_ = blogV4_ ? -1 : 0;
+    return true;
+}
+
+bool R82xx::selectBlogV4Input(uint32_t rfHz)
+{
+    // Triplexer: HF (from the upconverter) on cable 2 (0x06 bit 3), VHF on
+    // cable 1 (0x05 bit 6), UHF on the air input (0x05 bit 5 clear = on).
+    const BlogV4Band band = blogV4Band(rfHz);
+    const int input = static_cast<int>(band);
+    if (input == input_) return true;
+    const uint8_t cable2 = band == BlogV4Band::Hf ? 0x08 : 0x00;
+    const uint8_t cable1Air = band == BlogV4Band::Vhf ? 0x60 : (band == BlogV4Band::Hf ? 0x20 : 0x00);
+    if (!writeMask(0x06, cable2, 0x08) || !writeMask(0x05, cable1Air, 0x60)) return false;
+    input_ = input;
     return true;
 }
 
 bool R82xx::setFrequency(uint32_t rfHz)
 {
-    const uint32_t lo = rfHz + kIfHz;
-    if (!setMux(lo) || !setPll(lo)) return false;
+    const uint32_t lo = (blogV4_ ? blogV4TunerHz(rfHz) : rfHz) + kIfHz;
+    if (!setMux(lo, rfHz) || !setPll(lo)) return false;
+    if (blogV4_) return selectBlogV4Input(rfHz);
     if (r828d_) {
         // R828D sticks wire the VHF antenna to the "cable 1" input.
         const int input = rfHz > 345000000u ? 0x00 : 0x60;

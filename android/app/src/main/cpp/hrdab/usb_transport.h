@@ -19,6 +19,14 @@ public:
     // Vendor control transfer with bRequest 0, ~300 ms timeout.
     virtual bool control(uint8_t requestType, uint16_t value, uint16_t index, uint8_t* data, uint16_t len) = 0;
 
+    // Standard GET_DESCRIPTOR (wValue = type << 8 | index, wIndex = language
+    // for strings); bytes received, -1 on error.
+    virtual int getDescriptor(uint16_t value, uint16_t index, uint8_t* data, uint16_t len)
+    {
+        (void)value, (void)index, (void)data, (void)len;
+        return -1;
+    }
+
     // Keeps a set of bulk transfers in flight on `endpoint` and hands every
     // completed one to onData, until `running` turns false (then returns
     // once all transfers are back) or the device is gone (onError with a

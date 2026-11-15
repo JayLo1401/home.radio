@@ -1,16 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/providers.dart';
 import '../../core/theme.dart' show TvFocusHighlight;
 import '../../data/models/band_plan.dart';
+import '../../data/repositories/settings_repository.dart';
 import 'acars_screen.dart';
 import 'adsb_screen.dart';
 import 'ism_screen.dart';
 import 'scanner_screen.dart';
 
 /// "Funk": all listening bands in one place - CB radio, PMR446, amateur
-/// radio, military airband, the "Flugzeuge" group (airband voice, ACARS,
-/// ADS-B radar), wireless sensors and the free band scan over the stick's
-/// whole range. Reachable while "Funk anzeigen" is on in the settings.
+/// radio, the "Kurzwelle" group, military airband, the "Flugzeuge" group
+/// (airband voice, ACARS, ADS-B radar), wireless sensors and the free band
+/// scan over the stick's whole range. Reachable while "Funk anzeigen" is on
+/// in the settings.
 class ListeningHubScreen extends StatelessWidget {
   const ListeningHubScreen({super.key});
 
@@ -35,8 +39,14 @@ class ListeningHubScreen extends StatelessWidget {
         _Tile(
           icon: Icons.cell_tower,
           title: 'Amateurfunk',
-          subtitle: '10 m · 6 m · 2 m · 70 cm · 23 cm mit Bandplan',
-          onTap: () => open(() => ScannerScreen(plan: hamBandPlans.first, variants: hamBandPlans)),
+          subtitle: '160 m bis 23 cm mit Bandplan',
+          onTap: () => open(() => ScannerScreen(plan: hamBandPlans.first, variants: allHamBandPlans)),
+        ),
+        _Tile(
+          icon: Icons.public,
+          title: 'Kurzwelle',
+          subtitle: 'KW-Rundfunk · Amateurfunk KW · Zeitzeichen & Flugwetter',
+          onTap: () => open(() => const ShortwaveHubScreen()),
         ),
         _Tile(
           icon: Icons.flight,
@@ -59,7 +69,7 @@ class ListeningHubScreen extends StatelessWidget {
         _Tile(
           icon: Icons.manage_search,
           title: 'Freier Band-Scan',
-          subtitle: '24–1766 MHz frei abstimmen, Bänder eingezeichnet',
+          subtitle: '0,5–1766 MHz frei abstimmen, Bänder eingezeichnet',
           onTap: () => open(() => ScannerScreen(plan: worldBandPlan)),
         ),
       ],
@@ -100,6 +110,99 @@ class AircraftHubScreen extends StatelessWidget {
   }
 }
 
+/// "Kurzwelle" (below 30 MHz): broadcasting, the shortwave amateur bands,
+/// utility stations - and how the stick gets there (see hf.h): by itself
+/// with direct sampling (RTL-SDR Blog V3, NooElec NESDR SMArt v5) or the
+/// RTL-SDR Blog V4's upconverter, or through an external upconverter set
+/// here.
+class ShortwaveHubScreen extends ConsumerStatefulWidget {
+  const ShortwaveHubScreen({super.key});
+
+  @override
+  ConsumerState<ShortwaveHubScreen> createState() => _ShortwaveHubScreenState();
+}
+
+class _ShortwaveHubScreenState extends ConsumerState<ShortwaveHubScreen> {
+  int? _upconverterHz;
+
+  @override
+  void initState() {
+    super.initState();
+    ref.read(settingsRepositoryProvider).getHfUpconverterHz().then((hz) {
+      if (mounted) setState(() => _upconverterHz = hz);
+    });
+  }
+
+  static String _upconverterLabel(int hz) => switch (hz) {
+    0 => 'Keiner – Direct Sampling oder RTL-SDR Blog V4',
+    125000000 => '125 MHz (Ham It Up)',
+    120000000 => '120 MHz (SpyVerter)',
+    _ => '${formatMhzAuto(hz)} MHz',
+  };
+
+  Future<void> _pickUpconverter() async {
+    final current = _upconverterHz ?? 0;
+    final hz = await showDialog<int>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('Aufwärtsmischer vor dem Stick'),
+        children: [
+          for (final choice in SettingsRepository.hfUpconverterChoices)
+            ListTile(
+              autofocus: choice == current,
+              selected: choice == current,
+              onTap: () => Navigator.of(context).pop(choice),
+              title: Text(_upconverterLabel(choice)),
+            ),
+        ],
+      ),
+    );
+    if (hz == null || !mounted) return;
+    setState(() => _upconverterHz = hz);
+    await ref.read(settingsRepositoryProvider).setHfUpconverterHz(hz);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    void open(Widget Function() screen) => Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen()));
+    final upconverter = _upconverterHz;
+    return _TileGrid(
+      title: 'Kurzwelle',
+      tiles: [
+        _Tile(
+          icon: Icons.radio,
+          title: 'KW-Rundfunk',
+          subtitle: 'Mittelwelle · 75 m bis 11 m · AM',
+          onTap: () => open(() => ScannerScreen(plan: broadcastBandPlans[2], variants: broadcastBandPlans)),
+        ),
+        _Tile(
+          icon: Icons.cell_tower,
+          title: 'Amateurfunk KW',
+          subtitle: '160 m bis 10 m · SSB, CW, FT8',
+          onTap: () => open(() => ScannerScreen(plan: hfHamBandPlans.first, variants: [...hfHamBandPlans, hamBandPlans.first])),
+        ),
+        _Tile(
+          icon: Icons.schedule,
+          title: 'KW-Funkdienste',
+          subtitle: 'Zeitzeichen · VOLMET · Shanwick · Wetterfax',
+          onTap: () => open(() => ScannerScreen(plan: hfUtilityBandPlan)),
+        ),
+        _Tile(
+          icon: Icons.settings_input_antenna,
+          title: 'Aufwärtsmischer',
+          subtitle: upconverter == null ? '…' : _upconverterLabel(upconverter),
+          onTap: _pickUpconverter,
+        ),
+      ],
+      footer: 'Kurzwelle braucht einen passenden Stick: RTL-SDR Blog V3 oder NooElec NESDR SMArt v5 '
+          '(Direct Sampling, schaltet unter 24 MHz automatisch um), RTL-SDR Blog V4 (eingebauter '
+          'Aufwärtsmischer; über rtl_tcp nur, wenn der Server den Blog-V4-Treiber nutzt) oder einen '
+          'Aufwärtsmischer wie den Ham It Up. Dazu eine Antenne für Kurzwelle – eine Langdraht- oder '
+          'Aktivantenne, die UKW-Stabantenne reicht kaum.',
+    );
+  }
+}
+
 class _Tile {
   final IconData icon;
   final String title;
@@ -109,12 +212,14 @@ class _Tile {
   const _Tile({required this.icon, required this.title, required this.subtitle, required this.onTap});
 }
 
-/// A page of tiles; the first one has the focus (remote).
+/// A page of tiles; the first one has the focus (remote). [footer]: a note
+/// under them.
 class _TileGrid extends StatelessWidget {
   final String title;
   final List<_Tile> tiles;
+  final String? footer;
 
-  const _TileGrid({required this.title, required this.tiles});
+  const _TileGrid({required this.title, required this.tiles, this.footer});
 
   @override
   Widget build(BuildContext context) {
@@ -130,6 +235,11 @@ class _TileGrid extends StatelessWidget {
               for (final (i, t) in tiles.indexed) _HubTile(tile: t, autofocus: i == 0),
             ],
           ),
+          if (footer case final text?)
+            Padding(
+              padding: const EdgeInsets.only(top: 24),
+              child: Text(text, style: const TextStyle(color: Colors.white60, fontSize: 16)),
+            ),
         ],
       ),
     );

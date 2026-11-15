@@ -70,6 +70,9 @@ class BandPlan {
   /// to, and frequency entry offered.
   final List<(String, int)> jumpTargets;
 
+  /// Name on the chip when switching between bands (see [bandShortTitle]).
+  final String? shortTitle;
+
   const BandPlan({
     required this.id,
     required this.title,
@@ -79,6 +82,7 @@ class BandPlan {
     this.segments = const [],
     this.defaultFreqHz,
     this.jumpTargets = const [],
+    this.shortTitle,
   });
 
   bool get isFree => jumpTargets.isNotEmpty;
@@ -217,10 +221,75 @@ BandSegment _nfm(double lo, double hi, String name, {int step = 12500, int bw = 
 BandSegment _fmOrDmr(double lo, double hi, String name) =>
     BandSegment(_mhz(lo), _mhz(hi), name, mode: 'auto', stepHz: 12500);
 
-/// The amateur radio bands this stick (R820T2, from ~24 MHz) can receive -
-/// shortwave below would need direct sampling. Built from the IARU Region 1
-/// band plans: each part of a band with its own raster and the settings the
-/// scanner switches to there.
+// Below 10 MHz SSB voice is on the lower sideband.
+BandSegment _lsb(double lo, double hi, String name, {int step = 2500, List<(String, int)> marks = const []}) =>
+    BandSegment(_mhz(lo), _mhz(hi), name, mode: 'lsb', bandwidthHz: 2700, stepHz: step, marks: marks);
+
+/// Shortwave ends here: below, the receiver switches to direct sampling,
+/// the RTL-SDR Blog V4's upconverter or an external one (see hf.h).
+const hfTopHz = 30000000;
+
+/// The shortwave amateur bands (IARU Region 1, 60 m as allowed in Austria
+/// and Germany), 160 m to 12 m - 10 m is in [hamBandPlans]. Digital modes
+/// (FT8 & co.) always on the upper sideband, voice below 10 MHz on the lower
+/// one; the FT8 frequencies are marked.
+final hfHamBandPlans = [
+  _hamPlan('ham160', 'Amateurfunk 160 m', _mhz(1.850), [
+    _cw(1.810, 1.838, 'Telegrafie'),
+    _ssb(1.838, 1.843, 'Digitale Betriebsarten', step: 1000, marks: [('FT8', _mhz(1.840))]),
+    _lsb(1.843, 2.000, 'Sprechfunk (LSB)'),
+  ]),
+  _hamPlan('ham80', 'Amateurfunk 80 m', _mhz(3.700), [
+    _cw(3.500, 3.570, 'Telegrafie'),
+    _ssb(3.570, 3.600, 'Digitale Betriebsarten', step: 1000, marks: [('FT8', _mhz(3.573))]),
+    _lsb(3.600, 3.800, 'Sprechfunk (LSB)'),
+  ]),
+  _hamPlan('ham60', 'Amateurfunk 60 m', _mhz(5.357), [
+    _cw(5.3515, 5.354, 'Telegrafie'),
+    _ssb(5.354, 5.3665, 'Digital & Sprechfunk (USB)', step: 1000, marks: [('FT8', _mhz(5.357))]),
+  ]),
+  _hamPlan('ham40', 'Amateurfunk 40 m', _mhz(7.100), [
+    _cw(7.000, 7.040, 'Telegrafie'),
+    _ssb(7.040, 7.060, 'Digitale Betriebsarten', step: 1000),
+    _lsb(7.060, 7.074, 'Sprechfunk (LSB)'),
+    // FT8 sits in the voice part, on the upper sideband.
+    _ssb(7.074, 7.0775, 'FT8', step: 1000, marks: [('FT8', _mhz(7.074))]),
+    _lsb(7.0775, 7.200, 'Sprechfunk (LSB)'),
+  ]),
+  _hamPlan('ham30', 'Amateurfunk 30 m', _mhz(10.136), [
+    _cw(10.100, 10.130, 'Telegrafie'),
+    _ssb(10.130, 10.150, 'Digitale Betriebsarten', step: 1000, marks: [('FT8', _mhz(10.136))]),
+  ]),
+  _hamPlan('ham20', 'Amateurfunk 20 m', _mhz(14.200), [
+    _cw(14.000, 14.070, 'Telegrafie'),
+    _ssb(14.070, 14.099, 'Digitale Betriebsarten', step: 1000, marks: [('FT8', _mhz(14.074))]),
+    _cw(14.099, 14.101, 'Baken', marks: [('NCDXF', _mhz(14.100))]),
+    _ssb(14.101, 14.1125, 'Digital & alle Betriebsarten', step: 1000),
+    _ssb(14.1125, 14.350, 'Sprechfunk (USB)'),
+  ]),
+  _hamPlan('ham17', 'Amateurfunk 17 m', _mhz(18.130), [
+    _cw(18.068, 18.095, 'Telegrafie'),
+    _ssb(18.095, 18.109, 'Digitale Betriebsarten', step: 1000, marks: [('FT8', _mhz(18.100))]),
+    _cw(18.109, 18.1125, 'Baken', marks: [('NCDXF', _mhz(18.110))]),
+    _ssb(18.1125, 18.168, 'Sprechfunk (USB)'),
+  ]),
+  _hamPlan('ham15', 'Amateurfunk 15 m', _mhz(21.250), [
+    _cw(21.000, 21.070, 'Telegrafie'),
+    _ssb(21.070, 21.149, 'Digitale Betriebsarten', step: 1000, marks: [('FT8', _mhz(21.074))]),
+    _cw(21.149, 21.1525, 'Baken', marks: [('NCDXF', _mhz(21.150))]),
+    _ssb(21.1525, 21.450, 'Sprechfunk (USB)'),
+  ]),
+  _hamPlan('ham12', 'Amateurfunk 12 m', _mhz(24.950), [
+    _cw(24.890, 24.915, 'Telegrafie'),
+    _ssb(24.915, 24.929, 'Digitale Betriebsarten', step: 1000, marks: [('FT8', _mhz(24.915))]),
+    _cw(24.929, 24.9325, 'Baken', marks: [('NCDXF', _mhz(24.930))]),
+    _ssb(24.9325, 24.990, 'Sprechfunk (USB)'),
+  ]),
+];
+
+/// The amateur radio bands from 10 m up, which the tuner receives itself.
+/// Built from the IARU Region 1 band plans: each part of a band with its
+/// own raster and the settings the scanner switches to there.
 final hamBandPlans = [
   _hamPlan('ham10', 'Amateurfunk 10 m', _mhz(28.074), [
     _cw(28.000, 28.070, 'Telegrafie'),
@@ -297,16 +366,118 @@ const aprsIssName = 'ISS APRS';
 /// (Europe 144,800, the ISS digipeater 145,825).
 const aprsFrequenciesHz = {144800000, 145825000};
 
-/// Short names for switching between [hamBandPlans].
-String hamBandShort(BandPlan p) => p.title.replaceFirst('Amateurfunk ', '');
+/// All amateur bands, 160 m to 23 cm.
+final allHamBandPlans = [...hfHamBandPlans, ...hamBandPlans];
+
+/// Short names for switching between bands ([allHamBandPlans],
+/// [broadcastBandPlans]).
+String bandShortTitle(BandPlan p) => p.shortTitle ?? p.title.replaceFirst('Amateurfunk ', '');
+
+// --- Kurzwelle: broadcasting and utility stations ---
+
+BandPlan _broadcastPlan(String id, String title, String short, double lo, double hi, {int step = 5000}) {
+  final segment = BandSegment(_mhz(lo), _mhz(hi), '$title (AM)', mode: 'am', bandwidthHz: 8000, stepHz: step);
+  return BandPlan(
+    id: id,
+    title: title,
+    shortTitle: short,
+    channels: _segmentChannels([segment]),
+    modes: const ['am', 'usb', 'lsb', 'auto'],
+    longLabel: _mhzLabel,
+    segments: [segment],
+  );
+}
+
+/// Medium wave (9 kHz raster, Europe) and the shortwave broadcasting bands
+/// (5 kHz raster), all AM.
+final broadcastBandPlans = [
+  _broadcastPlan('bcmw', 'Mittelwelle', 'MW', 0.531, 1.611, step: 9000),
+  _broadcastPlan('bc75', 'KW-Rundfunk 75 m', '75 m', 3.900, 4.000),
+  _broadcastPlan('bc49', 'KW-Rundfunk 49 m', '49 m', 5.900, 6.200),
+  _broadcastPlan('bc41', 'KW-Rundfunk 41 m', '41 m', 7.200, 7.450),
+  _broadcastPlan('bc31', 'KW-Rundfunk 31 m', '31 m', 9.400, 9.900),
+  _broadcastPlan('bc25', 'KW-Rundfunk 25 m', '25 m', 11.600, 12.100),
+  _broadcastPlan('bc22', 'KW-Rundfunk 22 m', '22 m', 13.570, 13.870),
+  _broadcastPlan('bc19', 'KW-Rundfunk 19 m', '19 m', 15.100, 15.800),
+  _broadcastPlan('bc16', 'KW-Rundfunk 16 m', '16 m', 17.480, 17.900),
+  _broadcastPlan('bc15', 'KW-Rundfunk 15 m', '15 m', 18.900, 19.020),
+  _broadcastPlan('bc13', 'KW-Rundfunk 13 m', '13 m', 21.450, 21.850),
+  _broadcastPlan('bc11', 'KW-Rundfunk 11 m', '11 m', 25.670, 26.100),
+];
+
+/// Shortwave utility stations worth listening to: time signals (AM),
+/// aeronautical weather (VOLMET) and the North Atlantic oceanic control
+/// (Shanwick), DWD weather fax and RTTY (USB; their dial frequencies put the
+/// tones at 1500-2300 Hz resp. 1275/1725 Hz - the decoders are stage 2).
+final BandPlan hfUtilityBandPlan = () {
+  const stations = [
+    ('Zeitzeichen CHU', 3.330, 'am'),
+    ('VOLMET Shannon', 3.413, 'usb'),
+    ('Wetterfax DWD', 3.8531, 'usb'),
+    ('Wetter-RTTY DWD', 4.5815, 'usb'),
+    ('Zeitzeichen RWM', 4.996, 'am'),
+    ('Zeitzeichen WWV', 5.000, 'am'),
+    ('VOLMET RAF', 5.450, 'usb'),
+    ('VOLMET Shannon', 5.505, 'usb'),
+    ('Shanwick Oceanic', 5.598, 'usb'),
+    ('Shanwick Oceanic', 5.616, 'usb'),
+    ('Wetter-RTTY DWD', 7.6445, 'usb'),
+    ('Zeitzeichen CHU', 7.850, 'am'),
+    ('Wetterfax DWD', 7.8781, 'usb'),
+    ('Shanwick Oceanic', 8.864, 'usb'),
+    ('Shanwick Oceanic', 8.879, 'usb'),
+    ('Shanwick Oceanic', 8.891, 'usb'),
+    ('VOLMET Shannon', 8.957, 'usb'),
+    ('Zeitzeichen RWM', 9.996, 'am'),
+    ('Zeitzeichen WWV', 10.000, 'am'),
+    ('Wetter-RTTY DWD', 11.0375, 'usb'),
+    ('VOLMET RAF', 11.253, 'usb'),
+    ('Shanwick Oceanic', 11.279, 'usb'),
+    ('VOLMET Shannon', 13.264, 'usb'),
+    ('Shanwick Oceanic', 13.306, 'usb'),
+    ('Wetterfax DWD', 13.8806, 'usb'),
+    ('Wetter-RTTY DWD', 14.4658, 'usb'),
+    ('Zeitzeichen CHU', 14.670, 'am'),
+    ('Zeitzeichen RWM', 14.996, 'am'),
+    ('Zeitzeichen WWV', 15.000, 'am'),
+  ];
+  final segments = <BandSegment>[];
+  for (final (name, mhz, mode) in stations) {
+    final hz = _mhz(mhz);
+    // AM both sides of the carrier, USB above the dial frequency; never
+    // overlapping the previous station (RWM 9,996 / WWV 10,000).
+    var low = mode == 'am' ? hz - 2000 : hz;
+    if (segments.isNotEmpty && low < segments.last.highHz) low = segments.last.highHz;
+    segments.add(
+      BandSegment(
+        low,
+        mode == 'am' ? hz + 2000 : hz + 3000,
+        '$name (${modeLabel(mode)})',
+        mode: mode,
+        bandwidthHz: mode == 'am' ? 6000 : 2700,
+      ),
+    );
+  }
+  return BandPlan(
+    id: 'hfutil',
+    title: 'KW-Funkdienste',
+    channels: [for (final (name, mhz, _) in stations) BandChannel(formatMhzAuto(_mhz(mhz)), _mhz(mhz), name: name)],
+    modes: const ['usb', 'am', 'lsb', 'cw', 'auto'],
+    longLabel: _mhzLabel,
+    segments: segments,
+    defaultFreqHz: _mhz(9.996),
+  );
+}();
 
 // --- Freier Band-Scan: the whole range of the stick, SDR style ---
 
-/// The tuner's range (R820T/R828D without direct sampling).
-const worldLowHz = 24000000, worldHighHz = 1766000000;
+/// The stick's range: the tuner's from 24 MHz up to 1766 MHz, below that
+/// direct sampling, the RTL-SDR Blog V4's or an external upconverter (see
+/// [hfTopHz]).
+const worldLowHz = 500000, worldHighHz = 1766000000;
 
-/// Raster in the gaps between known bands.
-const _gapStepHz = 25000;
+/// Raster in the gaps between known bands; shortwave gaps in AM 5 kHz.
+const _gapStepHz = 25000, _hfGapStepHz = 5000;
 
 /// What's where in Austria/Germany (CEPT), each with its usual modulation,
 /// filter and raster - the amateur bands with their own band plans. Sorted,
@@ -315,7 +486,14 @@ final List<BandSegment> _worldSegments = () {
   BandSegment s(double lo, double hi, String name, String mode, {int bw = 0, int step = 12500, List<(String, int)> marks = const []}) =>
       BandSegment(_mhz(lo), _mhz(hi), name, mode: mode, bandwidthHz: bw, stepHz: step, marks: marks);
   final ham = {for (final p in hamBandPlans) p.id: p.segments};
+  // Shortwave: broadcasting and amateur bands, by frequency (they don't
+  // overlap).
+  final hf = [
+    for (final p in broadcastBandPlans) ...p.segments,
+    for (final p in hfHamBandPlans) ...p.segments,
+  ]..sort((a, b) => a.lowHz.compareTo(b.lowHz));
   return [
+    ...hf,
     s(26.565, 27.360, 'CB-Funk', 'fm', bw: 10000, step: 10000, marks: [('CB 9', _mhz(27.065)), ('CB 19', _mhz(27.185))]),
     s(27.360, 27.410, 'CB-Funk SSB', 'lsb', bw: 2700, step: 10000),
     ...ham['ham10']!,
@@ -361,16 +539,26 @@ final List<BandSegment> _worldSegments = () {
 /// settings, the gaps in [_gapStepHz] FM channels (named "", not drawn).
 final BandPlan worldBandPlan = () {
   final segments = <BandSegment>[];
+  // A gap: AM on the 5 kHz raster below [hfTopHz], FM channels above.
+  void gap(int from, int to) {
+    if (from < hfTopHz) {
+      final end = to < hfTopHz ? to : hfTopHz;
+      final start = (from + _hfGapStepHz - 1) ~/ _hfGapStepHz * _hfGapStepHz;
+      if (start < end) segments.add(BandSegment(start, end, '', mode: 'am', stepHz: _hfGapStepHz));
+      from = end;
+    }
+    if (from >= to) return;
+    final start = (from + _gapStepHz - 1) ~/ _gapStepHz * _gapStepHz;
+    if (start < to) segments.add(BandSegment(start, to, '', mode: 'fm', bandwidthHz: 0, stepHz: _gapStepHz));
+  }
+
   var at = worldLowHz;
   for (final seg in _worldSegments) {
-    if (seg.lowHz > at) {
-      final start = (at + _gapStepHz - 1) ~/ _gapStepHz * _gapStepHz;
-      segments.add(BandSegment(start, seg.lowHz, '', mode: 'fm', bandwidthHz: 0, stepHz: _gapStepHz));
-    }
+    if (seg.lowHz > at) gap(at, seg.lowHz);
     segments.add(seg);
     at = seg.highHz;
   }
-  if (at < worldHighHz) segments.add(BandSegment(at, worldHighHz + 1, '', mode: 'fm', stepHz: _gapStepHz));
+  if (at < worldHighHz) gap(at, worldHighHz + 1);
   return BandPlan(
     id: 'world',
     title: 'Freier Band-Scan',
@@ -380,6 +568,18 @@ final BandPlan worldBandPlan = () {
     segments: segments,
     defaultFreqHz: _mhz(145.500),
     jumpTargets: [
+      ('Mittelwelle', _mhz(0.999)),
+      ('Amateurfunk 80 m (3,700)', _mhz(3.700)),
+      ('KW-Rundfunk 49 m', _mhz(6.000)),
+      ('Amateurfunk 40 m (FT8 7,074)', _mhz(7.074)),
+      ('KW-Rundfunk 41 m', _mhz(7.300)),
+      ('Shanwick Oceanic 8,864', _mhz(8.864)),
+      ('KW-Rundfunk 31 m', _mhz(9.600)),
+      ('Zeitzeichen RWM 9,996', _mhz(9.996)),
+      ('KW-Rundfunk 25 m', _mhz(11.800)),
+      ('Amateurfunk 20 m (FT8 14,074)', _mhz(14.074)),
+      ('KW-Rundfunk 19 m', _mhz(15.400)),
+      ('KW-Rundfunk 13 m', _mhz(21.600)),
       ('CB-Funk Kanal 19', _mhz(27.185)),
       ('Amateurfunk 10 m (FT8 28,074)', _mhz(28.074)),
       ('Amateurfunk 6 m', _mhz(50.150)),

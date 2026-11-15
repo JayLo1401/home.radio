@@ -29,6 +29,7 @@
 #endif
 
 #include "common.h"
+#include "hf.h"
 #include "json.h"
 #include "r82xx.h"
 
@@ -41,6 +42,8 @@ constexpr uint8_t kCmdSampleRate = 0x02;
 constexpr uint8_t kCmdGainMode = 0x03;
 constexpr uint8_t kCmdGain = 0x04;
 constexpr uint8_t kCmdAgcMode = 0x08;
+constexpr uint8_t kCmdDirectSampling = 0x09;
+constexpr int kTunerR828d = 6;
 
 // rtl_tcp Jay extended, wire name rtltcp_v2 (rtltcp.server docs/protocol-v2.md).
 constexpr uint8_t kHelloV2[5] = {0xF2, 'R', 'T', 'L', '2'};
@@ -215,7 +218,34 @@ bool RtlTcpSource::sendCommand(uint8_t cmd, uint32_t param)
 bool RtlTcpSource::setFrequency(uint32_t hz)
 {
     freqHz_ = hz;
-    return sendCommand(kCmdFrequency, hz) || !running_;
+    return sendTuning(false) || !running_;
+}
+
+bool RtlTcpSource::sendTuning(bool force)
+{
+    std::lock_guard<std::mutex> lock(tuneMutex_);
+    const uint32_t hz = freqHz_;
+    if (hz == 0) return true;
+    const bool r828d = tunerType_ == kTunerR828d;
+    const HfTuning t = planHf(hz, !r828d, externalUpconverterHz().load());
+    if (r828d && hz < kBlogV4UpconvertBelowHz && t.rfHz == hz) {
+        if (!warnedR828dHf_) {
+            HR_LOGW("rtl_tcp: R828D below 28.8 MHz - only works if the server drives an RTL-SDR Blog V4");
+            warnedR828dHf_ = true;
+        }
+    } else {
+        warnedR828dHf_ = false;
+    }
+    const int ds = t.directSampling ? 2 : 0; // 2 = Q branch
+    if (force || ds != directSamplingSent_) {
+        if (!sendCommand(kCmdDirectSampling, static_cast<uint32_t>(ds))) return false;
+        directSamplingSent_ = ds;
+        sendCommand(kCmdAgcMode, t.directSampling ? 1 : 0);
+        sendCommand(kCmdGainMode, 1); // manual - the receiver runs its own AGC
+        if (gainIndex_ >= 0) sendCommand(kCmdGain, static_cast<uint32_t>(R82xx::gainTenthsDb(gainIndex_)));
+        HR_LOGI("rtl_tcp: direct sampling %s", ds ? "on (Q branch)" : "off");
+    }
+    return sendCommand(kCmdFrequency, t.rfHz);
 }
 
 bool RtlTcpSource::setGainIndex(int index)
@@ -378,6 +408,7 @@ RtlTcpSource::Connect RtlTcpSource::handshakeV2(intptr_t s)
                     msg.stringOr("version", "?").c_str(), deviceName_.c_str());
             gotInfo = true;
         } else if (kind == "status") {
+            tunerType_ = msg["tuner"].intOr("type", tunerType_);
             handleMessage(msg);
             if (gotInfo) return Connect::Ok;
         }
@@ -440,16 +471,25 @@ RtlTcpSource::Connect RtlTcpSource::connectOnce()
             return c;
         }
     } else if (std::memcmp(greeting, "RTL0", 4) == 0) {
-        HR_LOGI("rtl_tcp: classic rtl_tcp server");
+        tunerType_ = static_cast<int>(be32(greeting + 4));
+        HR_LOGI("rtl_tcp: classic rtl_tcp server, tuner type %d", tunerType_.load());
     } else {
         closeSocket();
         return Connect::Failed;
     }
     sendCommand(kCmdSampleRate, sampleRate());
-    sendCommand(kCmdAgcMode, 0);
-    sendCommand(kCmdGainMode, 1); // manual - the receiver runs its own AGC
-    if (gainIndex_ >= 0) sendCommand(kCmdGain, static_cast<uint32_t>(R82xx::gainTenthsDb(gainIndex_)));
-    if (freqHz_ != 0) sendCommand(kCmdFrequency, freqHz_);
+    {
+        std::lock_guard<std::mutex> lock(tuneMutex_);
+        directSamplingSent_ = -1;
+    }
+    if (freqHz_ != 0) {
+        // Direct sampling state, AGC, gain mode and gain, then the frequency.
+        sendTuning(true);
+    } else {
+        sendCommand(kCmdAgcMode, 0);
+        sendCommand(kCmdGainMode, 1); // manual - the receiver runs its own AGC
+        if (gainIndex_ >= 0) sendCommand(kCmdGain, static_cast<uint32_t>(R82xx::gainTenthsDb(gainIndex_)));
+    }
     return Connect::Ok;
 }
 
@@ -460,6 +500,7 @@ bool RtlTcpSource::handleMessage(const Json& msg)
     std::string text;
     bool isError = false;
     if (kind == "status") {
+        tunerType_ = msg["tuner"].intOr("type", tunerType_);
         const std::string state = msg.stringOr("state", "");
         if (state == "ready" || state == "device_restored") {
             // Only worth saying when something was wrong before.

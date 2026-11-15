@@ -147,6 +147,11 @@ class DabRtlSdrService {
 
   Future<void> nbSetSquelch(double squelchDb) => _invokeMethod('nbSetSquelch', {'squelchDb': squelchDb});
 
+  /// Shortwave through an external upconverter: below 30 MHz the stick is
+  /// tuned [hz] higher (e.g. 125 MHz for a Ham It Up); 0 = none (direct
+  /// sampling or the RTL-SDR Blog V4's own upconverter).
+  Future<void> setUpconverter(int hz) => _invokeMethod('setUpconverter', {'hz': hz});
+
   Future<bool> nbSetChannels({required int centerHz, required List<int> channelsHz}) async =>
       await _invokeMethod<bool>('nbSetChannels', {'centerHz': centerHz, 'channelsHz': channelsHz}) ??
       false;

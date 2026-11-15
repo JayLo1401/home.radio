@@ -24,6 +24,7 @@
 #include "fm_demod.h"
 #include "fm_dsp.h"
 #include "fm_tx_sim.h"
+#include "hf.h"
 #include "nb_demod.h"
 #include "nb_tx_sim.h"
 #include "rds.h"
@@ -1299,6 +1300,47 @@ void testNbWfm(uint32_t rate, int bandwidthHz, double deviationHz, std::vector<d
     CHECK(wfm == 0, "auto picked wfm in %d reports", wfm);
 }
 
+// Shortwave frequency planning (hf.h): direct sampling, Blog V4, external
+// upconverter, and the DDC word in the second Nyquist zone.
+void testHf()
+{
+    // R820T: tuner from 24 MHz, direct sampling below.
+    HfTuning t = planHf(7100000, true, 0);
+    CHECK(t.directSampling && t.rfHz == 7100000, "40 m on R820T: ds %d rf %u", t.directSampling, t.rfHz);
+    t = planHf(27185000, true, 0);
+    CHECK(!t.directSampling && t.rfHz == 27185000, "CB on R820T via tuner");
+    t = planHf(23999999, true, 0);
+    CHECK(t.directSampling, "just below 24 MHz: direct sampling");
+    // R828D: never direct sampling (the Blog V4 tuner upconverts itself).
+    t = planHf(7100000, false, 0);
+    CHECK(!t.directSampling && t.rfHz == 7100000, "40 m on R828D: plain frequency");
+    // External upconverter wins below 30 MHz, not above.
+    t = planHf(7100000, true, 125000000);
+    CHECK(!t.directSampling && t.rfHz == 132100000, "Ham It Up: rf %u", t.rfHz);
+    t = planHf(145500000, true, 125000000);
+    CHECK(t.rfHz == 145500000, "Ham It Up leaves VHF alone");
+
+    // Blog V4: HF +28.8 MHz on the HF input, VHF/UHF inputs, notches.
+    CHECK(blogV4TunerHz(7100000) == 35900000, "V4 40 m tuner %u", blogV4TunerHz(7100000));
+    CHECK(blogV4TunerHz(28800000) == 28800000, "V4 28.8 MHz not upconverted");
+    CHECK(blogV4Band(1000000) == BlogV4Band::Hf && blogV4Band(28799999) == BlogV4Band::Hf, "V4 HF band");
+    CHECK(blogV4Band(100000000) == BlogV4Band::Vhf && blogV4Band(249999999) == BlogV4Band::Vhf, "V4 VHF band");
+    CHECK(blogV4Band(250000000) == BlogV4Band::Uhf && blogV4Band(1090000000) == BlogV4Band::Uhf, "V4 UHF band");
+    CHECK(!blogV4NotchOn(1000000) && !blogV4NotchOn(100000000) && !blogV4NotchOn(200000000),
+          "V4 notches off inside MW/FM/DAB");
+    CHECK(blogV4NotchOn(7100000) && blogV4NotchOn(145000000) && blogV4NotchOn(433000000), "V4 notches on elsewhere");
+
+    // DDC word: 3.57 MHz low IF as before; 20 MHz (2nd Nyquist zone) is the
+    // same word as its alias at 20 - 28.8 = -8.8 MHz.
+    const uint32_t xtal = 28800000;
+    const int64_t ifWord = -(int64_t(3570000) << 22) / xtal;
+    CHECK(rtlIfWord(3570000, xtal) == (static_cast<uint32_t>(ifWord) & 0x3fffff), "IF word");
+    const int64_t alias = (int64_t(8800000) << 22) / xtal; // -(-8.8 MHz)
+    const int64_t w20 = rtlIfWord(20000000, xtal);
+    CHECK(std::llabs(w20 - alias) <= 1, "20 MHz word %lld vs alias %lld", (long long)w20, (long long)alias);
+    std::printf("[hf] frequency planning checked\n");
+}
+
 void testNb()
 {
     {
@@ -1795,6 +1837,11 @@ int main(int argc, char** argv)
     if (argc > 3 && std::strcmp(argv[1], "file") == 0)
         return runFile(argv[2], static_cast<uint32_t>(std::strtoul(argv[3], nullptr, 0)));
     const bool quick = argc > 1 && std::strcmp(argv[1], "quick") == 0;
+    if (argc > 1 && std::strcmp(argv[1], "hf") == 0) {
+        testHf();
+        std::printf("\n%s (%d failures)\n", g_failures ? "FAILED" : "ALL PASSED", g_failures);
+        return g_failures ? 1 : 0;
+    }
     if (argc > 1 && std::strcmp(argv[1], "nb") == 0) {
         testFft();
         testNb();
@@ -1863,6 +1910,7 @@ int main(int argc, char** argv)
     testTables();
     testViterbi();
     testReedSolomon();
+    testHf();
     testFm(quick);
     testNb();
     testDmr();

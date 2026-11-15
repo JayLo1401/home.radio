@@ -3,6 +3,7 @@
 #include <atomic>
 #include <memory>
 #include <mutex>
+#include <string>
 #include <thread>
 #include <vector>
 
@@ -15,6 +16,9 @@ namespace hrdab {
 // RTL2832U USB demodulator in SDR mode with an R820T/R828D tuner. The USB
 // access itself goes through a UsbTransport: usbfs ioctls on the fd Android's
 // UsbManager hands out (UsbfsTransport), or libusb on the desktop builds.
+// Shortwave (see hf.h): below 24 MHz an R820T stick switches to direct
+// sampling on the Q branch, an RTL-SDR Blog V4 (found by its USB strings)
+// uses its upconverter; both on every retune.
 class Rtl2832Source : public SampleSource, private I2cBus {
 public:
     explicit Rtl2832Source(std::unique_ptr<UsbTransport> usb);
@@ -43,7 +47,11 @@ private:
     bool initBaseband();
     bool programSampleRate(uint32_t rate);
     bool setIfFrequency(uint32_t hz);
+    bool setDirectSampling(bool on);
     uint8_t probe(uint8_t addr);
+    // USB string descriptor 14 (manufacturer) / 15 (product) of the device
+    // descriptor; empty if unavailable.
+    std::string usbString(int descriptorOffset);
 
     bool i2cWrite(uint8_t addr, const uint8_t* data, int len) override;
     bool i2cRead(uint8_t addr, uint8_t* data, int len) override;
@@ -54,6 +62,8 @@ private:
     std::mutex ctrlMutex_; // tuner/register access vs. AGC from another thread
     std::unique_ptr<R82xx> tuner_;
     bool r828d_ = false;
+    bool blogV4_ = false;
+    bool directSampling_ = false;
 
     std::thread thread_;
     std::atomic<bool> streaming_{false};
