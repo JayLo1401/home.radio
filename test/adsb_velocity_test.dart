@@ -13,6 +13,18 @@ void main() {
     final a = t.aircraft[0x485020]!;
     expect(a.track!, closeTo(182.88, 0.5));
   });
+  test('identification message: callsign and emitter category', () {
+    final t = AircraftTracker(homeLat: 47, homeLon: 15);
+    // KLM1023 (1090 MHz Riddle), the category set to TC 4 / CA 3 (large).
+    t.update(hex('8D4840D6232CC371C32CE0576098'), 0x4840D6, -10);
+    final a = t.aircraft[0x4840D6]!;
+    expect(a.callsign, 'KLM1023');
+    expect(a.category, AircraftCategory.large);
+    expect(AircraftCategory.from(4, 5), AircraftCategory.heavy);
+    expect(AircraftCategory.from(4, 7), AircraftCategory.rotorcraft);
+    expect(AircraftCategory.from(3, 1), AircraftCategory.glider);
+    expect(AircraftCategory.from(4, 0), AircraftCategory.unknown);
+  });
   test('velocity message type 3 (heading)', () {
     final t = AircraftTracker(homeLat: 47, homeLon: 15);
     // Airspeed message: heading 243.98°, airspeed 375 kt.

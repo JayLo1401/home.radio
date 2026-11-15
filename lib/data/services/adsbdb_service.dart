@@ -50,6 +50,8 @@ class FlightInfo {
   final Airport? origin;
   final Airport? destination;
   final String? aircraftType;
+  /// ICAO type designator ("A320", "B77W", "C172") - short, for the list.
+  final String? icaoType;
   final String? manufacturer;
   final String? registration;
   final String? owner;
@@ -59,6 +61,7 @@ class FlightInfo {
     this.origin,
     this.destination,
     this.aircraftType,
+    this.icaoType,
     this.manufacturer,
     this.registration,
     this.owner,
@@ -105,28 +108,43 @@ class FlightInfo {
 /// the publicly broadcast address and callsign.
 class AdsbdbService {
   static final Map<String, Future<FlightInfo?>> _cache = {};
+  static final Map<String, FlightInfo?> _done = {};
+
+  static String _key(String icaoHex, String? callsign) => '$icaoHex/${callsign?.trim().toUpperCase() ?? ''}';
+
+  /// Whether this aircraft + callsign was asked already (answer or not).
+  static bool known({required String icaoHex, String? callsign}) => _cache.containsKey(_key(icaoHex, callsign));
+
+  /// The answer if it's there already (no request).
+  static FlightInfo? cached({required String icaoHex, String? callsign}) => _done[_key(icaoHex, callsign)];
 
   static Future<FlightInfo?> lookup({required String icaoHex, String? callsign}) {
     final cs = callsign?.trim().toUpperCase();
-    final key = '$icaoHex/${cs ?? ''}';
+    final key = _key(icaoHex, callsign);
     return _cache.putIfAbsent(key, () async {
-      try {
-        final uri = Uri.https('api.adsbdb.com', '/v0/aircraft/$icaoHex', {
-          if (cs != null && cs.isNotEmpty) 'callsign': cs,
-        });
-        final r = await http.get(uri, headers: {'User-Agent': 'home_radio/1.0'}).timeout(const Duration(seconds: 10));
-        // 404 with "unknown aircraft": the callsign alone may still be known.
-        if (r.statusCode == 404 && cs != null && cs.isNotEmpty) return _routeOnly(cs);
-        if (r.statusCode != 200) return null;
-        final response = (jsonDecode(r.body) as Map<String, dynamic>)['response'];
-        if (response is! Map<String, dynamic>) return null;
-        return _parse(response);
-      } catch (_) {
-        // Network trouble: ask again next time.
-        _cache.remove(key);
-        return null;
-      }
+      final info = await _fetch(key, icaoHex, cs);
+      _done[key] = info;
+      return info;
     });
+  }
+
+  static Future<FlightInfo?> _fetch(String key, String icaoHex, String? cs) async {
+    try {
+      final uri = Uri.https('api.adsbdb.com', '/v0/aircraft/$icaoHex', {
+        if (cs != null && cs.isNotEmpty) 'callsign': cs,
+      });
+      final r = await http.get(uri, headers: {'User-Agent': 'home_radio/1.0'}).timeout(const Duration(seconds: 10));
+      // 404 with "unknown aircraft": the callsign alone may still be known.
+      if (r.statusCode == 404 && cs != null && cs.isNotEmpty) return _routeOnly(cs);
+      if (r.statusCode != 200) return null;
+      final response = (jsonDecode(r.body) as Map<String, dynamic>)['response'];
+      if (response is! Map<String, dynamic>) return null;
+      return _parse(response);
+    } catch (_) {
+      // Network trouble: ask again next time.
+      _cache.remove(key);
+      return null;
+    }
   }
 
   static Future<FlightInfo?> _routeOnly(String callsign) async {
@@ -151,6 +169,7 @@ class AdsbdbService {
       origin: Airport.fromJson(route?['origin']),
       destination: Airport.fromJson(route?['destination']),
       aircraftType: s(aircraft, 'type'),
+      icaoType: s(aircraft, 'icao_type'),
       manufacturer: s(aircraft, 'manufacturer'),
       registration: s(aircraft, 'registration'),
       owner: s(aircraft, 'registered_owner'),

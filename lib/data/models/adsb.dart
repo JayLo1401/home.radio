@@ -1,6 +1,43 @@
 import 'dart:math' as math;
 import 'dart:typed_data';
 
+/// What kind of aircraft (ADS-B emitter category, sent with the callsign):
+/// by weight class for aeroplanes, else the type of craft.
+enum AircraftCategory {
+  unknown('', ''),
+  light('Leichtflugzeug', 'leicht'),
+  small('Kleinflugzeug', 'klein'),
+  large('Verkehrsflugzeug', 'groß'),
+  heavy('Großraumflugzeug', 'schwer'),
+  highPerformance('Hochleistungs-/Militärjet', 'Jet'),
+  rotorcraft('Hubschrauber', 'Heli'),
+  glider('Segelflugzeug', 'Segler'),
+  balloon('Ballon / Luftschiff', 'Ballon'),
+  ultralight('Ultraleicht / Gleitschirm', 'UL'),
+  uav('Drohne', 'Drohne'),
+  surface('Bodenfahrzeug', 'Boden');
+
+  final String label;
+  final String short;
+  const AircraftCategory(this.label, this.short);
+
+  /// From the identification message's type code (1-4) and category (CA).
+  static AircraftCategory from(int typeCode, int ca) => switch ((typeCode, ca)) {
+    (4, 1) => light,
+    (4, 2) => small,
+    (4, 3) || (4, 4) => large, // 4: high-vortex large (B757)
+    (4, 5) => heavy,
+    (4, 6) => highPerformance,
+    (4, 7) => rotorcraft,
+    (3, 1) => glider,
+    (3, 2) => balloon,
+    (3, 4) => ultralight,
+    (3, 6) => uav,
+    (2, _) when ca != 0 => surface,
+    _ => unknown,
+  };
+}
+
 /// One aircraft as put together from its Mode S / ADS-B messages.
 class Aircraft {
   final int icao;
@@ -12,6 +49,7 @@ class Aircraft {
   double? lat;
   double? lon;
   String? squawk;
+  AircraftCategory category = AircraftCategory.unknown;
   bool onGround = false;
   DateTime lastSeen;
   DateTime? lastPosition;
@@ -112,6 +150,8 @@ class AircraftTracker {
       }
       final cs = sb.toString().replaceAll('#', '').trim();
       if (cs.isNotEmpty) a.callsign = cs;
+      final category = AircraftCategory.from(tc, bits(6, 3));
+      if (category != AircraftCategory.unknown) a.category = category;
     } else if ((tc >= 9 && tc <= 18) || (tc >= 20 && tc <= 22)) {
       a.onGround = false;
       if (tc <= 18) {

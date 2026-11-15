@@ -156,6 +156,7 @@ class _AdsbScreenState extends ConsumerState<AdsbScreen> {
       // The callsign often arrives after the position: ask again with it.
       final open = _expanded == null ? null : t.aircraft[_expanded];
       if (open != null && !_infoLoading && open.callsign != null && open.callsign != _infoCallsign) _loadInfo(open);
+      _prefetchTypes();
       setState(() {
         _rate = (t.messageCount - _lastCount).toDouble();
         _lastCount = t.messageCount;
@@ -190,6 +191,22 @@ class _AdsbScreenState extends ConsumerState<AdsbScreen> {
     await _settings.setNbGain(_gainKey, next);
     final db = await _rx.nbSetGain(next);
     if (mounted) setState(() => _gainDb = db);
+  }
+
+  /// The aircraft type for the list (adsbdb.com) - asked in the background,
+  /// at most two aircraft a second, nearest first, once each callsign is
+  /// known (one request gives type and route); answers are kept.
+  void _prefetchTypes() {
+    var started = 0;
+    for (final a in _sorted) {
+      if (started >= 2) break;
+      final cs = a.callsign;
+      if (cs == null || AdsbdbService.known(icaoHex: a.icaoHex, callsign: cs)) continue;
+      started++;
+      AdsbdbService.lookup(icaoHex: a.icaoHex, callsign: cs).then((_) {
+        if (mounted) setState(() {});
+      });
+    }
   }
 
   /// With position first, nearest first; then the rest by last heard.
@@ -361,7 +378,7 @@ String _thousands(int v) {
 }
 
 // Column widths, shared by the header and the rows.
-const _wFlight = 120.0, _wAlt = 190.0, _wSpeed = 100.0, _wClimb = 80.0, _wDist = 90.0;
+const _wFlight = 150.0, _wAlt = 190.0, _wSpeed = 100.0, _wClimb = 80.0, _wDist = 90.0;
 
 /// Column titles above the aircraft list.
 class _AircraftHeader extends StatelessWidget {
@@ -483,6 +500,7 @@ class _AircraftTileState extends State<_AircraftTile> {
           if (info?.registration != null) line('Kennzeichen', info!.registration!),
           if (info?.owner != null) line('Halter', info!.owner!),
           const SizedBox(height: 4),
+          if (a.category != AircraftCategory.unknown) line('Art', a.category.label),
           line('ICAO-Adresse', '${a.icaoHex}${a.country != null ? ' (${a.country})' : ''}'),
           if (a.squawk != null) line('Squawk', a.squawk!),
           if (a.track != null) line('Kurs', '${a.track!.round()}°'),
@@ -533,7 +551,17 @@ class _AircraftTileState extends State<_AircraftTile> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(a.callsign ?? '—', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                        Text(a.icaoHex, style: const TextStyle(color: Colors.white54, fontSize: 12)),
+                        // The type (A320, C172 …) if known, else the class
+                        // from ADS-B (klein / groß / Heli …), then the address.
+                        Text(
+                          [
+                            AdsbdbService.cached(icaoHex: a.icaoHex, callsign: a.callsign)?.icaoType ?? a.category.short,
+                            a.icaoHex,
+                          ].where((s) => s.isNotEmpty).join(' · '),
+                          style: const TextStyle(color: Colors.white54, fontSize: 12),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ],
                     ),
                   ),
@@ -674,21 +702,93 @@ class _RadarPainter extends CustomPainter {
       if ((p - c).distance > r) continue;
       final isSel = a.icao == selected;
       final color = isSel ? Colors.amberAccent : (a.onGround ? Colors.white54 : Colors.greenAccent);
-      final paint = Paint()
-        ..color = color
-        ..strokeWidth = isSel ? 3 : 2;
-      canvas.drawCircle(p, isSel ? 6 : 4, paint);
-      if (a.track != null) {
-        final t = a.track! * math.pi / 180;
-        canvas.drawLine(p, p + Offset(math.sin(t), -math.cos(t)) * 16, paint);
-      }
+      final size = _symbol(canvas, p, a, color, isSel);
       _text(
         canvas,
         a.callsign ?? a.icaoHex,
-        p + const Offset(7, -7),
+        p + Offset(size * 0.6 + 3, -size * 0.6 - 3),
         TextStyle(color: color, fontSize: isSel ? 13 : 11, fontWeight: isSel ? FontWeight.bold : null),
       );
     }
+  }
+
+  /// The aircraft as a symbol by its kind - small planes small, airliners
+  /// bigger, wide-bodies biggest, helicopters with a rotor, balloons round -
+  /// turned to its track (north up). Returns its size for the label.
+  static double _symbol(Canvas canvas, Offset p, Aircraft a, Color color, bool selected) {
+    final cat = a.category;
+    // Size: the weight class; unknown as a mid-size plane.
+    var size = switch (cat) {
+      AircraftCategory.light || AircraftCategory.ultralight || AircraftCategory.uav => 11.0,
+      AircraftCategory.small || AircraftCategory.glider => 13.0,
+      AircraftCategory.heavy => 22.0,
+      AircraftCategory.large || AircraftCategory.highPerformance => 17.0,
+      AircraftCategory.rotorcraft => 13.0,
+      _ => 15.0,
+    };
+    if (selected) size *= 1.25;
+    final fill = Paint()..color = color;
+    final outline = Paint()
+      ..color = Colors.black
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2;
+    if (cat == AircraftCategory.balloon) {
+      canvas.drawCircle(p, size * 0.4, fill);
+      canvas.drawCircle(p, size * 0.4, outline);
+      return size;
+    }
+    canvas.save();
+    canvas.translate(p.dx, p.dy);
+    if (a.track != null) canvas.rotate(a.track! * math.pi / 180);
+    canvas.scale(size / 2);
+    if (cat == AircraftCategory.rotorcraft) {
+      // Body and tail boom, the rotor disc as a cross.
+      final body = Path()
+        ..addOval(Rect.fromCenter(center: const Offset(0, 0.1), width: 0.7, height: 1.0))
+        ..addRect(Rect.fromLTRB(-0.08, 0.5, 0.08, 1.0));
+      canvas.drawPath(body, fill);
+      canvas.drawPath(body, outline..strokeWidth = 1.2 / (size / 2));
+      final rotor = Paint()
+        ..color = color
+        ..strokeWidth = 1.6 / (size / 2);
+      canvas.drawLine(const Offset(-1, -0.9), const Offset(1, 1.1), rotor);
+      canvas.drawLine(const Offset(1, -0.9), const Offset(-1, 1.1), rotor);
+    } else {
+      // A plane pointing up (unit size): fuselage, wings, tailplane; gliders
+      // with long thin wings, wide-bodies with broader ones.
+      final wing = switch (cat) {
+        AircraftCategory.glider => (span: 1.0, chord: 0.12, sweep: 0.0),
+        AircraftCategory.heavy || AircraftCategory.large || AircraftCategory.highPerformance =>
+          (span: 0.95, chord: 0.3, sweep: 0.35),
+        _ => (span: 0.85, chord: 0.24, sweep: 0.1),
+      };
+      final path = Path()
+        // nose to tail along the fuselage, right side first
+        ..moveTo(0, -1)
+        ..quadraticBezierTo(0.12, -0.85, 0.12, -0.5)
+        ..lineTo(0.12, -0.2)
+        ..lineTo(wing.span, -0.2 + wing.sweep)
+        ..lineTo(wing.span, -0.2 + wing.sweep + wing.chord)
+        ..lineTo(0.12, 0.15)
+        ..lineTo(0.1, 0.65)
+        ..lineTo(0.4, 0.85)
+        ..lineTo(0.4, 0.97)
+        ..lineTo(0, 0.9)
+        ..lineTo(-0.4, 0.97)
+        ..lineTo(-0.4, 0.85)
+        ..lineTo(-0.1, 0.65)
+        ..lineTo(-0.12, 0.15)
+        ..lineTo(-wing.span, -0.2 + wing.sweep + wing.chord)
+        ..lineTo(-wing.span, -0.2 + wing.sweep)
+        ..lineTo(-0.12, -0.2)
+        ..lineTo(-0.12, -0.5)
+        ..quadraticBezierTo(-0.12, -0.85, 0, -1)
+        ..close();
+      canvas.drawPath(path, fill);
+      canvas.drawPath(path, outline..strokeWidth = 1.2 / (size / 2));
+    }
+    canvas.restore();
+    return size;
   }
 
   /// The opened flight's route: flown part (origin → aircraft) dashed, the
