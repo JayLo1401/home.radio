@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:http/http.dart' as http;
 
@@ -64,6 +65,37 @@ class FlightInfo {
   });
 
   bool get hasRoute => origin != null && destination != null;
+
+  /// Whether the route fits an aircraft at ([lat], [lon]) flying [track]:
+  /// heading roughly towards the destination. adsbdb knows routes by
+  /// callsign, and many airlines (Ryanair, easyJet, Wizz, ...) give their
+  /// alphanumeric callsigns to other routes from day to day - then adsbdb
+  /// still has the old one (about one in six around Graz, checked against
+  /// live tracks). Near the destination (approach turns) or without a track
+  /// it counts as fitting.
+  bool fits({double? lat, double? lon, double? track}) {
+    final d = destination;
+    if (d == null || lat == null || lon == null || track == null) return true;
+    if (_km(lat, lon, d.lat, d.lon) < 80) return true;
+    final off = ((_bearing(lat, lon, d.lat, d.lon) - track + 540) % 360) - 180;
+    return off.abs() <= 75;
+  }
+
+  static double _rad(double d) => d * math.pi / 180;
+
+  static double _bearing(double lat1, double lon1, double lat2, double lon2) {
+    final y = math.sin(_rad(lon2 - lon1)) * math.cos(_rad(lat2));
+    final x = math.cos(_rad(lat1)) * math.sin(_rad(lat2)) -
+        math.sin(_rad(lat1)) * math.cos(_rad(lat2)) * math.cos(_rad(lon2 - lon1));
+    return (math.atan2(y, x) * 180 / math.pi + 360) % 360;
+  }
+
+  static double _km(double lat1, double lon1, double lat2, double lon2) {
+    final dLat = _rad(lat2 - lat1), dLon = _rad(lon2 - lon1);
+    final a = math.pow(math.sin(dLat / 2), 2) +
+        math.cos(_rad(lat1)) * math.cos(_rad(lat2)) * math.pow(math.sin(dLon / 2), 2);
+    return 2 * 6371 * math.asin(math.sqrt(a));
+  }
 }
 
 /// Route and aircraft data from adsbdb.com (free, no key, open-source

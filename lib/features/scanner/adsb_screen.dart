@@ -447,7 +447,18 @@ class _AircraftTileState extends State<_AircraftTile> {
         children: [
           if (widget.loading && info == null)
             const Text('Route wird geladen…', style: label)
-          else if (info?.hasRoute ?? false) ...[
+          else if ((info?.hasRoute ?? false) && !info!.fits(lat: a.lat, lon: a.lon, track: a.track)) ...[
+            // A stale route: the callsign flies something else today.
+            Text(
+              '${info.origin!.code}  →  ${info.destination!.code}  ?',
+              style: const TextStyle(color: Colors.white38, fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const Text(
+              'Passt nicht zur Flugrichtung – die Fluglinie vergibt dieses Rufzeichen offenbar für eine '
+              'andere Strecke; die Routendaten sind veraltet.',
+              style: TextStyle(color: Colors.orangeAccent),
+            ),
+          ] else if (info?.hasRoute ?? false) ...[
             Text(
               '${info!.origin!.code}  →  ${info.destination!.code}',
               style: const TextStyle(color: Colors.amberAccent, fontSize: 18, fontWeight: FontWeight.bold),
@@ -599,7 +610,10 @@ class _RadarPainter extends CustomPainter {
     }
     // An opened flight's route: zoomed out until both airports are on it.
     final routeInfo = route;
-    final routeAirports = routeInfo != null && routeInfo.hasRoute
+    final routeAircraft = aircraft.where((x) => x.icao == routeIcao).firstOrNull;
+    final routeAirports = routeInfo != null &&
+            routeInfo.hasRoute &&
+            routeInfo.fits(lat: routeAircraft?.lat, lon: routeAircraft?.lon, track: routeAircraft?.track)
         ? [routeInfo.origin!, routeInfo.destination!]
         : const <Airport>[];
     for (final ap in routeAirports) {
@@ -685,6 +699,8 @@ class _RadarPainter extends CustomPainter {
     if (info == null || !info.hasRoute) return;
     final a = aircraft.where((x) => x.icao == routeIcao).firstOrNull;
     if (a == null || !a.hasPosition) return;
+    // A stale route (see FlightInfo.fits) isn't drawn.
+    if (!info.fits(lat: a.lat, lon: a.lon, track: a.track)) return;
     Offset at(double lat, double lon) => c + (MapTiles.project(lat, lon, zoom) - home);
     final pa = at(a.lat!, a.lon!);
     if ((pa - c).distance > r) return;
