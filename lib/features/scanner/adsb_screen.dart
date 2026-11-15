@@ -8,6 +8,7 @@ import '../../core/providers.dart';
 import '../../core/theme.dart' show brandGreen, TvFocusHighlight;
 import '../../data/models/adsb.dart';
 import '../../data/repositories/settings_repository.dart';
+import '../../data/services/adsbdb_service.dart';
 import '../../data/services/dab_rtlsdr_service.dart' show DabRtlSdrService;
 import '../shared/logo_picker_dialog.dart' show connectDecoder;
 import 'map_tiles.dart';
@@ -44,6 +45,59 @@ class _AdsbScreenState extends ConsumerState<AdsbScreen> {
 
   /// The aircraft focused in the list - highlighted on the radar.
   int? _selected;
+
+  /// The aircraft opened with OK: its details unfold in the list. OK again
+  /// (or the "Flugroute zeigen" button) draws its route (adsbdb.com) on the
+  /// radar, zoomed out to both airports; Back hides it again, Back once more
+  /// folds the details. Up/down to another flight folds everything.
+  int? _expanded;
+  bool _showRoute = false;
+  FlightInfo? _info;
+  bool _infoLoading = false;
+  String? _infoCallsign; // the callsign the info was asked with
+
+  Future<void> _onOk(Aircraft a) async {
+    if (_expanded == a.icao) {
+      setState(() => _showRoute = !_showRoute);
+      return;
+    }
+    setState(() {
+      _expanded = a.icao;
+      _selected = a.icao;
+      _showRoute = false;
+      _info = null;
+    });
+    await _loadInfo(a);
+  }
+
+  void _collapse() => setState(() {
+    _expanded = null;
+    _showRoute = false;
+    _info = null;
+  });
+
+  /// Back: route off first, then the details, then leave the screen.
+  void _onBack() {
+    if (_showRoute) {
+      setState(() => _showRoute = false);
+    } else if (_expanded != null) {
+      _collapse();
+    }
+  }
+
+  Future<void> _loadInfo(Aircraft a) async {
+    final icao = a.icao, callsign = a.callsign;
+    setState(() {
+      _infoLoading = true;
+      _infoCallsign = callsign;
+    });
+    final info = await AdsbdbService.lookup(icaoHex: a.icaoHex, callsign: callsign);
+    if (!mounted || _expanded != icao) return;
+    setState(() {
+      _info = info;
+      _infoLoading = false;
+    });
+  }
 
   // Reception indicator (see ReceptionStatus).
   RxStatus? _status;
@@ -99,6 +153,9 @@ class _AdsbScreenState extends ConsumerState<AdsbScreen> {
       final t = _tracker;
       if (t == null || !mounted) return;
       t.prune();
+      // The callsign often arrives after the position: ask again with it.
+      final open = _expanded == null ? null : t.aircraft[_expanded];
+      if (open != null && !_infoLoading && open.callsign != null && open.callsign != _infoCallsign) _loadInfo(open);
       setState(() {
         _rate = (t.messageCount - _lastCount).toDouble();
         _lastCount = t.messageCount;
@@ -157,7 +214,13 @@ class _AdsbScreenState extends ConsumerState<AdsbScreen> {
     final withPos = list.where((a) => a.hasPosition).length;
     const muted = TextStyle(color: Colors.white70);
     String db(double v) => v.toStringAsFixed(1).replaceAll('.', ',');
-    return Scaffold(
+    // Back hides the route, then folds the details, then leaves.
+    return PopScope(
+      canPop: _expanded == null && !_showRoute,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _onBack();
+      },
+      child: Scaffold(
       appBar: AppBar(title: const Text('Flugzeuge (ADS-B 1090 MHz)')),
       body: _failed
           ? const Center(child: Text('Empfänger konnte nicht gestartet werden.'))
@@ -223,6 +286,8 @@ class _AdsbScreenState extends ConsumerState<AdsbScreen> {
                                     homeLon: t.homeLon,
                                     selected: _selected,
                                     tiles: _showMap ? _tiles : null,
+                                    routeIcao: _showRoute ? _expanded : null,
+                                    route: _showRoute ? _info : null,
                                   ),
                                 ),
                         ),
@@ -247,8 +312,21 @@ class _AdsbScreenState extends ConsumerState<AdsbScreen> {
                                         aircraft: a,
                                         homeLat: t!.homeLat,
                                         homeLon: t.homeLon,
+                                        expanded: _expanded == a.icao,
+                                        routeShown: _expanded == a.icao && _showRoute,
+                                        info: _expanded == a.icao ? _info : null,
+                                        loading: _expanded == a.icao && _infoLoading,
+                                        onTap: () => _onOk(a),
+                                        onRoute: () => setState(() => _showRoute = !_showRoute),
                                         onFocus: (focused) {
-                                          if (focused) setState(() => _selected = a.icao);
+                                          if (!focused) return;
+                                          // On to another flight: the open one folds.
+                                          if (_expanded != null && _expanded != a.icao) {
+                                            _expanded = null;
+                                            _showRoute = false;
+                                            _info = null;
+                                          }
+                                          setState(() => _selected = a.icao);
                                         },
                                       ),
                                   ],
@@ -260,6 +338,7 @@ class _AdsbScreenState extends ConsumerState<AdsbScreen> {
                 ],
               ),
             ),
+      ),
     );
   }
 }
@@ -310,14 +389,32 @@ class _AircraftHeader extends StatelessWidget {
 }
 
 /// One aircraft in the list - focusable with the remote (it's then marked
-/// on the radar), OK shows all details.
+/// on the radar); OK unfolds the details (route, airline, aircraft), OK
+/// again shows the route on the radar - the table itself stays compact.
 class _AircraftTile extends StatefulWidget {
   final Aircraft aircraft;
   final double homeLat;
   final double homeLon;
+  final bool expanded;
+  final bool routeShown;
+  final FlightInfo? info;
+  final bool loading;
+  final VoidCallback onTap;
+  final VoidCallback onRoute;
   final ValueChanged<bool> onFocus;
 
-  const _AircraftTile({required this.aircraft, required this.homeLat, required this.homeLon, required this.onFocus});
+  const _AircraftTile({
+    required this.aircraft,
+    required this.homeLat,
+    required this.homeLon,
+    required this.expanded,
+    required this.routeShown,
+    required this.info,
+    required this.loading,
+    required this.onTap,
+    required this.onRoute,
+    required this.onFocus,
+  });
 
   @override
   State<_AircraftTile> createState() => _AircraftTileState();
@@ -326,33 +423,67 @@ class _AircraftTile extends StatefulWidget {
 class _AircraftTileState extends State<_AircraftTile> {
   bool _focused = false;
 
-  void _details() {
+  /// The unfolded part: route, airline, aircraft, then the live data.
+  Widget _details() {
     final a = widget.aircraft;
+    final info = widget.info;
     final km = a.distanceKm(widget.homeLat, widget.homeLon);
     String n(double v, int d) => v.toStringAsFixed(d).replaceAll('.', ',');
-    showDialog<void>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Text(a.callsign ?? a.icaoHex),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('ICAO-Adresse: ${a.icaoHex}${a.country != null ? ' (${a.country})' : ''}'),
-            if (a.squawk != null) Text('Squawk: ${a.squawk}'),
-            if (_fmtAlt(a).isNotEmpty) Text('Höhe: ${_fmtAlt(a)}'),
-            if (a.speedKmh != null) Text('Geschwindigkeit: ${a.speedKmh} km/h (${a.speedKt!.round()} kn)'),
-            if (a.track != null) Text('Kurs: ${a.track!.round()}°'),
-            if (a.verticalRateFpm != null)
-              Text('Steigen/Sinken: ${n(a.verticalRateFpm! * 0.00508, 1)} m/s (${a.verticalRateFpm} ft/min)'),
-            if (a.hasPosition) Text('Position: ${n(a.lat!, 4)}° N, ${n(a.lon!, 4)}° O'),
-            if (km != null)
-              Text('Entfernung: ${n(km, 1)} km, Richtung ${bearingDeg(widget.homeLat, widget.homeLon, a.lat!, a.lon!).round()}°'),
-            Text('Meldungen: ${a.messages} · Signal ${n(a.signalDb, 1)} dB'),
-          ],
-        ),
-        actions: [
-          TextButton(autofocus: true, onPressed: () => Navigator.of(context).pop(), child: const Text('Schließen')),
+    String place(Airport p) => '${p.city ?? p.name} (${p.code})${p.country != null ? ', ${p.country}' : ''}';
+    const label = TextStyle(color: Colors.white54);
+    const value = TextStyle(color: Colors.white);
+    Widget line(String l, String v) => Padding(
+          padding: const EdgeInsets.only(bottom: 2),
+          child: Text.rich(TextSpan(children: [TextSpan(text: '$l  ', style: label), TextSpan(text: v, style: value)])),
+        );
+    final aircraftText = [
+      if (info?.manufacturer != null) info!.manufacturer!,
+      if (info?.aircraftType != null) info!.aircraftType!,
+    ].join(' ');
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(0, 8, 0, 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (widget.loading && info == null)
+            const Text('Route wird geladen…', style: label)
+          else if (info?.hasRoute ?? false) ...[
+            Text(
+              '${info!.origin!.code}  →  ${info.destination!.code}',
+              style: const TextStyle(color: Colors.amberAccent, fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            line('Von', place(info.origin!)),
+            line('Nach', place(info.destination!)),
+            const SizedBox(height: 4),
+            // For the mouse; with the remote it's OK on the row (the button
+            // stays out of the focus order, so up/down go to the next flight).
+            ExcludeFocus(
+              child: OutlinedButton.icon(
+                onPressed: widget.onRoute,
+                icon: Icon(widget.routeShown ? Icons.layers_clear : Icons.route),
+                label: Text(widget.routeShown ? 'Flugroute ausblenden (Zurück)' : 'Flugroute zeigen (OK)'),
+              ),
+            ),
+            const SizedBox(height: 4),
+          ] else
+            const Text('Keine Routendaten bekannt', style: label),
+          if (info?.airline != null) line('Fluglinie', info!.airline!),
+          if (aircraftText.isNotEmpty) line('Flugzeug', aircraftText),
+          if (info?.registration != null) line('Kennzeichen', info!.registration!),
+          if (info?.owner != null) line('Halter', info!.owner!),
+          const SizedBox(height: 4),
+          line('ICAO-Adresse', '${a.icaoHex}${a.country != null ? ' (${a.country})' : ''}'),
+          if (a.squawk != null) line('Squawk', a.squawk!),
+          if (a.track != null) line('Kurs', '${a.track!.round()}°'),
+          if (a.verticalRateFpm != null)
+            line('Steigen/Sinken', '${n(a.verticalRateFpm! * 0.00508, 1)} m/s (${a.verticalRateFpm} ft/min)'),
+          if (a.speedKt != null) line('Geschwindigkeit', '${a.speedKmh} km/h (${a.speedKt!.round()} kn)'),
+          if (a.hasPosition) line('Position', '${n(a.lat!, 4)}° N, ${n(a.lon!, 4)}° O'),
+          if (km != null)
+            line('Richtung', '${bearingDeg(widget.homeLat, widget.homeLon, a.lat!, a.lon!).round()}° in ${n(km, 1)} km'),
+          line('Empfang', '${a.messages} Meldungen · Signal ${n(a.signalDb, 1)} dB'),
+          const SizedBox(height: 2),
+          const Text('Route und Flugzeugdaten: adsbdb.com', style: TextStyle(color: Colors.white38, fontSize: 11)),
         ],
       ),
     );
@@ -377,10 +508,13 @@ class _AircraftTileState extends State<_AircraftTile> {
               setState(() => _focused = v);
               widget.onFocus(v);
             },
-            onTap: _details,
+            onTap: widget.onTap,
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+              Row(
                 children: [
                   SizedBox(
                     width: _wFlight,
@@ -412,6 +546,10 @@ class _AircraftTileState extends State<_AircraftTile> {
                   ),
                   Expanded(child: Text(a.country ?? '', style: const TextStyle(color: Colors.white54))),
                   Text(age <= 1 ? '' : 'vor $age s', style: const TextStyle(color: Colors.white38, fontSize: 12)),
+                  Icon(widget.expanded ? Icons.expand_less : Icons.expand_more, color: Colors.white38),
+                ],
+              ),
+                  if (widget.expanded) _details(),
                 ],
               ),
             ),
@@ -433,12 +571,19 @@ class _RadarPainter extends CustomPainter {
   /// The background map, null = off.
   final MapTiles? tiles;
 
+  /// The opened aircraft and its route (adsbdb.com), drawn origin →
+  /// aircraft → destination.
+  final int? routeIcao;
+  final FlightInfo? route;
+
   _RadarPainter({
     required this.aircraft,
     required this.homeLat,
     required this.homeLon,
     required this.selected,
     required this.tiles,
+    required this.routeIcao,
+    required this.route,
   });
 
   @override
@@ -452,9 +597,30 @@ class _RadarPainter extends CustomPainter {
       final d = a.distanceKm(homeLat, homeLon);
       if (d != null && d > maxKm) maxKm = d;
     }
+    // An opened flight's route: zoomed out until both airports are on it.
+    final routeInfo = route;
+    final routeAirports = routeInfo != null && routeInfo.hasRoute
+        ? [routeInfo.origin!, routeInfo.destination!]
+        : const <Airport>[];
+    for (final ap in routeAirports) {
+      final d = greatCircleKm(homeLat, homeLon, ap.lat, ap.lon);
+      if (d > maxKm) maxKm = d;
+    }
     // Ranges whose quarter is a round number (rings at 10/20/25/50/... km).
-    final steps = [40.0, 80.0, 100.0, 200.0, 400.0, 600.0];
-    final range = steps.firstWhere((s) => s >= maxKm * 1.05, orElse: () => 600);
+    final steps = [40.0, 80.0, 100.0, 200.0, 400.0, 600.0, 1000.0, 2000.0, 4000.0, 6000.0, 8000.0, 12000.0];
+    var step = steps.indexWhere((s) => s >= maxKm * 1.05);
+    if (step < 0) step = steps.length - 1;
+    // Web Mercator stretches towards the poles: step on until the airports
+    // really sit inside the circle (with room for their labels).
+    double zoomAt(int i) => MapTiles.zoomFor(homeLat, steps[i], r);
+    bool fits(int i) => routeAirports.every((ap) {
+      final z = zoomAt(i);
+      return (MapTiles.project(ap.lat, ap.lon, z) - MapTiles.project(homeLat, homeLon, z)).distance <= r * 0.85;
+    });
+    while (step < steps.length - 1 && !fits(step)) {
+      step++;
+    }
+    final range = steps[step];
 
     // Map under it, dimmed so the aircraft stand out; same Web Mercator
     // projection for the aircraft below, so they sit right on the map.
@@ -486,6 +652,8 @@ class _RadarPainter extends CustomPainter {
     _text(canvas, 'N', c - Offset(4, r - 2), const TextStyle(color: Colors.white70, fontSize: 13));
     canvas.drawCircle(c, 4, Paint()..color = Colors.white);
 
+    _paintRoute(canvas, c, r, zoom, home);
+
     for (final a in aircraft) {
       if (!a.hasPosition) continue;
       final p = c + (MapTiles.project(a.lat!, a.lon!, zoom) - home);
@@ -507,6 +675,97 @@ class _RadarPainter extends CustomPainter {
         TextStyle(color: color, fontSize: isSel ? 13 : 11, fontWeight: isSel ? FontWeight.bold : null),
       );
     }
+  }
+
+  /// The opened flight's route: flown part (origin → aircraft) dashed, the
+  /// rest (aircraft → destination) bright; airports mostly lie beyond the
+  /// radar, then their code sits at the edge where the line leaves it.
+  void _paintRoute(Canvas canvas, Offset c, double r, double zoom, Offset home) {
+    final info = route;
+    if (info == null || !info.hasRoute) return;
+    final a = aircraft.where((x) => x.icao == routeIcao).firstOrNull;
+    if (a == null || !a.hasPosition) return;
+    Offset at(double lat, double lon) => c + (MapTiles.project(lat, lon, zoom) - home);
+    final pa = at(a.lat!, a.lon!);
+    if ((pa - c).distance > r) return;
+    final po = at(info.origin!.lat, info.origin!.lon), pd = at(info.destination!.lat, info.destination!.lon);
+    const flown = Color(0xB3FFFFFF), ahead = Colors.amberAccent;
+    canvas.save();
+    canvas.clipPath(Path()..addOval(Rect.fromCircle(center: c, radius: r)));
+    _dashed(canvas, po, pa, Paint()
+      ..color = flown
+      ..strokeWidth = 2);
+    canvas.drawLine(pa, pd, Paint()
+      ..color = ahead
+      ..strokeWidth = 2.5);
+    canvas.restore();
+    _airportLabel(canvas, c, r, pa, po, info.origin!, flown);
+    _airportLabel(canvas, c, r, pa, pd, info.destination!, ahead);
+  }
+
+  /// Dashes from [to] backwards, so they stay put next to the aircraft
+  /// however far away the airport is.
+  static void _dashed(Canvas canvas, Offset from, Offset to, Paint paint) {
+    final d = from - to;
+    final len = d.distance;
+    if (len < 1) return;
+    final u = d / len;
+    final end = math.min(len, 3000.0); // beyond the radar anyway
+    for (var t = 0.0; t < end; t += 12) {
+      canvas.drawLine(to + u * t, to + u * math.min(t + 6, end), paint);
+    }
+  }
+
+  /// The airport as a marker with a readable sign (code and city) at its
+  /// spot - the radar is zoomed out to show it; should it still lie
+  /// outside (very long routes), at the edge towards it.
+  static void _airportLabel(Canvas canvas, Offset c, double r, Offset from, Offset to, Airport ap, Color color) {
+    var p = to;
+    final inner = r - 8;
+    if ((to - c).distance > inner) {
+      final d = to - from;
+      final len = d.distance;
+      if (len < 1) return;
+      final u = d / len, f = from - c;
+      final b = f.dx * u.dx + f.dy * u.dy;
+      final disc = b * b - (f.distanceSquared - inner * inner);
+      if (disc < 0) return;
+      p = from + u * (-b + math.sqrt(disc));
+    }
+    canvas.drawCircle(p, 7, Paint()..color = Colors.black);
+    canvas.drawCircle(p, 5, Paint()..color = color);
+    final tp = TextPainter(
+      text: TextSpan(
+        children: [
+          TextSpan(
+            text: ap.code,
+            style: TextStyle(color: color, fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          if (ap.city != null)
+            TextSpan(text: '\n${ap.city}', style: const TextStyle(color: Colors.white, fontSize: 12)),
+        ],
+      ),
+      textDirection: TextDirection.ltr,
+      maxLines: 2,
+    )..layout(maxWidth: 160);
+    // The sign beside the marker, on the side towards the centre, kept
+    // inside the radar.
+    const pad = 5.0;
+    final w = tp.width + 2 * pad, h = tp.height + 2 * pad;
+    var x = p.dx < c.dx ? p.dx + 10 : p.dx - 10 - w;
+    var y = p.dy < c.dy ? p.dy + 8 : p.dy - 8 - h;
+    x = x.clamp(c.dx - r, c.dx + r - w);
+    y = y.clamp(c.dy - r, c.dy + r - h);
+    final box = RRect.fromRectAndRadius(Rect.fromLTWH(x, y, w, h), const Radius.circular(6));
+    canvas.drawRRect(box, Paint()..color = const Color(0xE6000000));
+    canvas.drawRRect(
+      box,
+      Paint()
+        ..color = color.withValues(alpha: 0.7)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5,
+    );
+    tp.paint(canvas, Offset(x + pad, y + pad));
   }
 
   static void _text(Canvas canvas, String text, Offset at, TextStyle style) {
