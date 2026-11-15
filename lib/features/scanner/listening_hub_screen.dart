@@ -110,11 +110,11 @@ class AircraftHubScreen extends StatelessWidget {
   }
 }
 
-/// "Kurzwelle" (below 30 MHz): broadcasting, the shortwave amateur bands,
-/// utility stations - and how the stick gets there (see hf.h): by itself
-/// with direct sampling (RTL-SDR Blog V3, NooElec NESDR SMArt v5) or the
-/// RTL-SDR Blog V4's upconverter, or through an external upconverter set
-/// here.
+/// "Kurzwelle" (below 30 MHz): the shortwave amateur bands and utility
+/// stations (broadcasting has its own entry, see AmRadio in home_screen) -
+/// and how the stick gets there (see hf.h): by itself with direct sampling
+/// (RTL-SDR Blog V3) or the RTL-SDR Blog V4's upconverter, or through an
+/// external upconverter set here.
 class ShortwaveHubScreen extends ConsumerStatefulWidget {
   const ShortwaveHubScreen({super.key});
 
@@ -170,12 +170,6 @@ class _ShortwaveHubScreenState extends ConsumerState<ShortwaveHubScreen> {
       title: 'Kurzwelle',
       tiles: [
         _Tile(
-          icon: Icons.radio,
-          title: 'KW-Rundfunk',
-          subtitle: 'Mittelwelle · 75 m bis 11 m · AM',
-          onTap: () => open(() => ScannerScreen(plan: broadcastBandPlans[2], variants: broadcastBandPlans)),
-        ),
-        _Tile(
           icon: Icons.cell_tower,
           title: 'Amateurfunk KW',
           subtitle: '160 m bis 10 m · SSB, CW, FT8',
@@ -194,11 +188,12 @@ class _ShortwaveHubScreenState extends ConsumerState<ShortwaveHubScreen> {
           onTap: _pickUpconverter,
         ),
       ],
-      footer: 'Kurzwelle braucht einen passenden Stick: RTL-SDR Blog V3 oder NooElec NESDR SMArt v5 '
-          '(Direct Sampling, schaltet unter 24 MHz automatisch um), RTL-SDR Blog V4 (eingebauter '
-          'Aufwärtsmischer; über rtl_tcp nur, wenn der Server den Blog-V4-Treiber nutzt) oder einen '
-          'Aufwärtsmischer wie den Ham It Up. Dazu eine Antenne für Kurzwelle – eine Langdraht- oder '
-          'Aktivantenne, die UKW-Stabantenne reicht kaum.',
+      footer: 'Kurzwelle braucht einen Stick mit Kurzwelleneingang: RTL-SDR Blog V3 (Direct Sampling, '
+          'schaltet unter 24 MHz automatisch um), RTL-SDR Blog V4 (eingebauter Aufwärtsmischer; über '
+          'rtl_tcp nur, wenn der Server ihn unterstützt) – oder einen beliebigen Stick mit einem '
+          'Aufwärtsmischer wie dem Ham It Up. Gewöhnliche Sticks (z. B. NooElec NESDR) haben keinen. '
+          'Dazu eine Antenne für Kurzwelle – eine Langdraht- oder Aktivantenne. '
+          'Rundfunk auf Lang-, Mittel- und Kurzwelle: eigener Punkt „LW/MW/KW“ oben.',
     );
   }
 }

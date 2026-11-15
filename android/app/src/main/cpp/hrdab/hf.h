@@ -3,8 +3,9 @@
 // The R820T/R828D tuners do not go below ~24 MHz. Three ways around that,
 // all chosen per tuned frequency (switching on retune, no hysteresis):
 //  - direct sampling: the antenna feeds the RTL2832U's Q-ADC directly (RTL-SDR
-//    Blog V3, NooElec NESDR SMArt v5 and other boards with an HF input on the
-//    Q branch); the tuner is bypassed and the RTL2832U's DDC tunes. Only for
+//    Blog V3 and other boards with an HF input on the Q branch - not the
+//    NooElec NESDR SMArt v5: measured, its Q-ADC sees no antenna signal);
+//    the tuner is bypassed and the RTL2832U's DDC tunes. Only for
 //    R820T-class tuners - an R828D stick is either a Blog V4 (own path below)
 //    or a DVB-T2 stick without such an input;
 //  - RTL-SDR Blog V4 (R828D, USB strings "RTLSDRBlog" / "Blog V4"): an

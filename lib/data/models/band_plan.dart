@@ -388,9 +388,10 @@ BandPlan _broadcastPlan(String id, String title, String short, double lo, double
   );
 }
 
-/// Medium wave (9 kHz raster, Europe) and the shortwave broadcasting bands
-/// (5 kHz raster), all AM.
+/// Long and medium wave (9 kHz raster, Europe) and the shortwave
+/// broadcasting bands (5 kHz raster), all AM.
 final broadcastBandPlans = [
+  _broadcastPlan('bclw', 'Langwelle', 'LW', 0.153, 0.2835, step: 9000),
   _broadcastPlan('bcmw', 'Mittelwelle', 'MW', 0.531, 1.611, step: 9000),
   _broadcastPlan('bc75', 'KW-Rundfunk 75 m', '75 m', 3.900, 4.000),
   _broadcastPlan('bc49', 'KW-Rundfunk 49 m', '49 m', 5.900, 6.200),
@@ -474,7 +475,7 @@ final BandPlan hfUtilityBandPlan = () {
 /// The stick's range: the tuner's from 24 MHz up to 1766 MHz, below that
 /// direct sampling, the RTL-SDR Blog V4's or an external upconverter (see
 /// [hfTopHz]).
-const worldLowHz = 500000, worldHighHz = 1766000000;
+const worldLowHz = 150000, worldHighHz = 1766000000;
 
 /// Raster in the gaps between known bands; shortwave gaps in AM 5 kHz.
 const _gapStepHz = 25000, _hfGapStepHz = 5000;

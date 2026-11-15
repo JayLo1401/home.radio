@@ -297,6 +297,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               tileToggle('FM anzeigen', receiverSections.fm, (v) {
                 ref.read(receiverSectionsProvider.notifier).setFm(v);
               }),
+              tileToggle('LW/MW/KW anzeigen', receiverSections.am, (v) {
+                ref.read(receiverSectionsProvider.notifier).setAm(v);
+              }),
               tileToggle('Funk anzeigen', receiverSections.funk, (v) {
                 ref.read(receiverSectionsProvider.notifier).setFunk(v);
               }),

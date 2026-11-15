@@ -149,9 +149,10 @@ class ShowClockDateNotifier extends Notifier<bool> {
 final showClockDateProvider = NotifierProvider<ShowClockDateNotifier, bool>(ShowClockDateNotifier.new);
 
 /// Which parts of the receiver side the settings show ("Funk anzeigen",
-/// "DAB anzeigen", "FM anzeigen") - on top of a receiver being set up at
-/// all (see [receiverModeProvider]; use [receiverSectionsShownProvider]).
-typedef ReceiverSections = ({bool funk, bool dab, bool fm});
+/// "DAB anzeigen", "FM anzeigen", "LW/MW/KW anzeigen") - on top of a
+/// receiver being set up at all (see [receiverModeProvider]; use
+/// [receiverSectionsShownProvider]).
+typedef ReceiverSections = ({bool funk, bool dab, bool fm, bool am});
 
 class ReceiverSectionsNotifier extends Notifier<ReceiverSections> {
   @override
@@ -162,26 +163,32 @@ class ReceiverSectionsNotifier extends Notifier<ReceiverSections> {
         funk: await repo.getFunkEnabled(),
         dab: await repo.getDabEnabled(),
         fm: await repo.getFmEnabled(),
+        am: await repo.getAmEnabled(),
       );
     }();
-    return (funk: false, dab: true, fm: true);
+    return (funk: false, dab: true, fm: true, am: true);
   }
 
   SettingsRepository get _repo => ref.read(settingsRepositoryProvider);
 
   Future<void> setFunk(bool value) async {
-    state = (funk: value, dab: state.dab, fm: state.fm);
+    state = (funk: value, dab: state.dab, fm: state.fm, am: state.am);
     await _repo.setFunkEnabled(value);
   }
 
   Future<void> setDab(bool value) async {
-    state = (funk: state.funk, dab: value, fm: state.fm);
+    state = (funk: state.funk, dab: value, fm: state.fm, am: state.am);
     await _repo.setDabEnabled(value);
   }
 
   Future<void> setFm(bool value) async {
-    state = (funk: state.funk, dab: state.dab, fm: value);
+    state = (funk: state.funk, dab: state.dab, fm: value, am: state.am);
     await _repo.setFmEnabled(value);
+  }
+
+  Future<void> setAm(bool value) async {
+    state = (funk: state.funk, dab: state.dab, fm: state.fm, am: value);
+    await _repo.setAmEnabled(value);
   }
 }
 
@@ -191,7 +198,7 @@ final receiverSectionsProvider =
 /// What actually shows: [receiverSectionsProvider], with nothing of it
 /// without a receiver ("Kein Empfänger").
 final receiverSectionsShownProvider = Provider<ReceiverSections>((ref) {
-  if (ref.watch(receiverModeProvider) == ReceiverMode.none) return (funk: false, dab: false, fm: false);
+  if (ref.watch(receiverModeProvider) == ReceiverMode.none) return (funk: false, dab: false, fm: false, am: false);
   return ref.watch(receiverSectionsProvider);
 });
 

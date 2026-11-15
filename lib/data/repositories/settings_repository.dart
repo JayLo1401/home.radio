@@ -133,6 +133,7 @@ class SettingsRepository {
   static const _keyFunkEnabled = 'funk_enabled';
   static const _keyDabEnabled = 'dab_enabled';
   static const _keyFmEnabled = 'fm_enabled';
+  static const _keyAmEnabled = 'am_enabled';
   static const _keyNbSampleRate = 'nb_sample_rate';
   static const _keyCbAll80 = 'cb_all_80';
   static const _keyAutoUpdate = 'auto_update';
@@ -469,6 +470,11 @@ class SettingsRepository {
   Future<void> setDabEnabled(bool value) => _db.setSetting(_keyDabEnabled, '$value');
   Future<bool> getFmEnabled() async => (await _db.getSetting(_keyFmEnabled)) != 'false';
   Future<void> setFmEnabled(bool value) => _db.setSetting(_keyFmEnabled, '$value');
+
+  /// "LW/MW/KW anzeigen": AM broadcasting on long, medium and short wave as
+  /// its own entry in the top bar - on by default.
+  Future<bool> getAmEnabled() async => (await _db.getSetting(_keyAmEnabled)) != 'false';
+  Future<void> setAmEnabled(bool value) => _db.setSetting(_keyAmEnabled, '$value');
 
   /// Which band of a multi-band listening screen was last open (amateur
   /// radio: "ham2" etc.), keyed by the screen's first band.

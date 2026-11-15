@@ -17,6 +17,8 @@ import '../../data/repositories/settings_repository.dart' show AutostartMode, Re
 import '../dab_stations/dab_stations_screen.dart';
 import '../fm_stations/fm_stations_screen.dart';
 import '../scanner/listening_hub_screen.dart';
+import '../scanner/scanner_screen.dart';
+import '../../data/models/band_plan.dart' show broadcastBandPlans;
 import '../search_internet/internet_radio_search_screen.dart';
 import '../../data/services/update_service.dart';
 import '../settings/settings_screen.dart';
@@ -1163,6 +1165,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                 .push(MaterialPageRoute(builder: (_) => const FmStationsScreen()));
                             await _afterReceiverScreen();
                           },
+                    // AM broadcasting: long, medium and short wave - one
+                    // screen, the bands switchable (starts on medium wave).
+                    onOpenAmStations: !shown.am
+                        ? null
+                        : () async {
+                            await _prepareReceiverScreen();
+                            if (!context.mounted) return;
+                            await Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    ScannerScreen(plan: broadcastBandPlans[1], variants: broadcastBandPlans),
+                              ),
+                            );
+                            await _afterReceiverScreen();
+                          },
                     onOpenInternetSearch: () => Navigator.of(context).push(
                       MaterialPageRoute(
                         builder: (_) => const InternetRadioSearchScreen(),
@@ -1408,6 +1425,7 @@ class _MenuBar extends StatelessWidget {
   /// Null hides the button (no receiver set up) - same for FM.
   final VoidCallback? onOpenDabStations;
   final VoidCallback? onOpenFmStations;
+  final VoidCallback? onOpenAmStations;
   /// Listening bands (see ScannerScreen): icon, label, open - left of a
   /// divider, apart from the radio buttons.
   final List<(IconData, String, VoidCallback)> listeningButtons;
@@ -1417,6 +1435,7 @@ class _MenuBar extends StatelessWidget {
   const _MenuBar({
     required this.onOpenDabStations,
     required this.onOpenFmStations,
+    required this.onOpenAmStations,
     this.listeningButtons = const [],
     required this.onOpenInternetSearch,
     required this.onOpenSettings,
@@ -1513,6 +1532,14 @@ class _MenuBar extends StatelessWidget {
                     _MenuBarButton(
                       icon: Icons.graphic_eq,
                       label: 'UKW-Sender (FM)',
+                      onPressed: onOpen,
+                    ),
+                    const SizedBox(width: 4),
+                  ],
+                  if (onOpenAmStations case final onOpen?) ...[
+                    _MenuBarButton(
+                      icon: Icons.waves,
+                      label: 'LW/MW/KW',
                       onPressed: onOpen,
                     ),
                     const SizedBox(width: 4),
