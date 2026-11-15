@@ -15,13 +15,21 @@ find_library(log-lib log)
 # (DabAacPlayer). Also the FM (UKW) receiver with stereo decoder and RDS
 # (fm_demod, rds), sharing the same stick and sample stream, and the
 # narrowband receiver for CB/airband (nb_demod: AM/NFM/SSB, squelch, auto
-# mode, activity monitor).
+# mode, activity monitor) with the DMR decoder (dmr, dmr_fec: written from
+# ETSI TS 102 361).
+#
+# The one third-party piece: DMR's AMBE+2 voice frames are decoded by mbelib
+# (third_party/mbelib, ISC license, see its COPYRIGHT and the patent note
+# there). -DHRDAB_MBELIB=OFF builds without it: DMR then shows calls and IDs
+# but plays no voice.
 #
 # The Windows/Linux desktop builds compile the same sources (minus the JNI
 # glue and usbfs) into hrdab.dll / libhrdab.so - see desktop/CMakeLists.txt.
 add_library(hrdab SHARED
     hrdab/charset.cpp
     hrdab/dab_tables.cpp
+    hrdab/dmr.cpp
+    hrdab/dmr_fec.cpp
     hrdab/fft.cpp
     hrdab/fic.cpp
     hrdab/fm_demod.cpp
@@ -54,3 +62,17 @@ target_compile_features(hrdab PRIVATE cxx_std_17)
 # cannot keep up with 2 MS/s on TV-box CPUs).
 target_compile_options(hrdab PRIVATE -O2)
 target_link_libraries(hrdab ${log-lib})
+
+option(HRDAB_MBELIB "Decode DMR voice (AMBE+2) with the vendored mbelib" ON)
+if(HRDAB_MBELIB)
+    set(MBELIB_SOURCES
+        third_party/mbelib/mbelib.c
+        third_party/mbelib/ecc.c
+        third_party/mbelib/ambe3600x2450.c
+    )
+    target_sources(hrdab PRIVATE ${MBELIB_SOURCES})
+    # Third-party C as it is: no warnings.
+    set_source_files_properties(${MBELIB_SOURCES} PROPERTIES COMPILE_OPTIONS "-w")
+    target_include_directories(hrdab PRIVATE third_party/mbelib)
+    target_compile_definitions(hrdab PRIVATE HRDAB_MBELIB)
+endif()

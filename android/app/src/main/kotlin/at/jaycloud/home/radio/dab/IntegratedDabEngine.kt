@@ -46,7 +46,7 @@ class IntegratedDabEngine(private val events: Events) {
 
         /**
          * NB: every ~200 ms. All levels in dB referred to the tuner input.
-         * [mode] is "am"/"fm"/"usb"/"lsb"/"wfm", or "auto" while auto mode has not
+         * [mode] is "am"/"fm"/"usb"/"lsb"/"wfm"/"dmr", or "auto" while auto mode has not
          * detected anything yet. [levelsDb] has NaN for channels outside the
          * window; [spectrumDb] is empty when there is no activity data this
          * time (then [channelsHz]/[levelsDb] are empty too). The last four are
@@ -78,6 +78,9 @@ class IntegratedDabEngine(private val events: Events) {
         /** NB: a packet from the packet decoder - [kind] 1 = AX.25 (APRS), 2 = ACARS message; checksums checked. */
         fun onNbPacket(kind: Int, frame: ByteArray) {}
 
+        /** NB: DMR state (slots, IDs, alias) as JSON - with every report while DMR is decoded. */
+        fun onNbDmr(json: String) {}
+
         /** ADS-B: a verified Mode S frame (7/14 bytes), its aircraft address and level (dBFS). */
         fun onAdsbFrame(frame: ByteArray, icao: Int, signalDb: Float) {}
 
@@ -104,6 +107,7 @@ class IntegratedDabEngine(private val events: Events) {
             "usb" -> 3
             "lsb" -> 4
             "wfm" -> 5
+            "dmr" -> 6
             else -> null
         }
 
@@ -302,6 +306,8 @@ class IntegratedDabEngine(private val events: Events) {
     )
 
     private fun onNativeNbPacket(kind: Int, frame: ByteArray) = events.onNbPacket(kind, frame)
+
+    private fun onNativeNbDmr(json: String) = events.onNbDmr(json)
 
     private fun onNativeRxStatus(samplesPerSecond: Float, levelDb: Float, clipRatio: Float, gainDb: Float, channelLevelsDb: FloatArray) =
         events.onRxStatus(samplesPerSecond, levelDb, clipRatio, gainDb, channelLevelsDb)

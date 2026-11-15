@@ -248,6 +248,12 @@ class DabRtlSdrPlugin :
             emit(mapOf("type" to "nbPacket", "kind" to kind, "data" to frame))
         }
 
+        // Already JSON natively (the desktop sends the same object as is).
+        override fun onNbDmr(json: String) {
+            if (!nbActive) return
+            emit(mapOf("type" to "nbDmr", "json" to json))
+        }
+
         // ~20 Hz for the waterfall; a FloatArray arrives in Dart as Float32List.
         override fun onNbSpectrum(centerHz: Int, spanHz: Int, binsDb: FloatArray, gainDb: Float) {
             if (!nbActive) return

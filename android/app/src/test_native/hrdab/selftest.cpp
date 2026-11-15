@@ -17,6 +17,9 @@
 
 #include "charset.h"
 #include "dab_tables.h"
+#include "dmr.h"
+#include "dmr_fec.h"
+#include "dmr_tx_sim.h"
 #include "fft.h"
 #include "fm_demod.h"
 #include "fm_dsp.h"
@@ -28,6 +31,12 @@
 #include "reed_solomon.h"
 #include "tx_sim.h"
 #include "viterbi.h"
+
+#ifdef HRDAB_MBELIB
+extern "C" {
+#include "mbelib.h"
+}
+#endif
 
 using namespace hrdab;
 using namespace hrdab::test;
@@ -744,6 +753,12 @@ class NbCollector : public FmCollector {
 public:
     std::vector<int16_t> nbPcm;
     std::vector<NbReport> reports;
+    std::vector<DmrStatus> dmr;
+    void onNbDmr(const DmrStatus& s) override
+    {
+        std::lock_guard<std::mutex> l(m);
+        dmr.push_back(s);
+    }
     void onNbAudio(const int16_t* p, int frames) override
     {
         std::lock_guard<std::mutex> l(m);
@@ -772,6 +787,7 @@ size_t pcmIndex(double t)
 struct NbRun {
     std::vector<int16_t> pcm;
     std::vector<NbReport> reports;
+    std::vector<DmrStatus> dmr;  // with the reports, while DMR is decoded
     double realtime = 0;
 };
 
@@ -809,6 +825,7 @@ NbRun runNb(const std::vector<uint8_t>& iq, uint32_t rate, uint32_t centerHz, co
     std::lock_guard<std::mutex> l(col.m);
     r.pcm = col.nbPcm;
     r.reports = col.reports;
+    r.dmr = col.dmr;
     const double seconds = static_cast<double>(iq.size()) / 2 / rate;
     r.realtime = (seconds - kNbStart) / std::max(1e-3, std::chrono::duration<double>(lastGrowth - start).count());
     return r;
@@ -1308,6 +1325,434 @@ void testNb()
     }
 }
 
+// --- DMR ---
+
+int bitCount(uint32_t v)
+{
+    int n = 0;
+    for (; v; v &= v - 1) n++;
+    return n;
+}
+
+uint32_t randomErrors(std::mt19937& rng, int bits, int count)
+{
+    uint32_t e = 0;
+    while (bitCount(e) < count) e |= 1u << (rng() % static_cast<unsigned>(bits));
+    return e;
+}
+
+// The coding blocks against the tables of TS 102 361-1 annex B, round
+// trips with errors, and the AMBE+2 frame layout against mbelib's FEC.
+void testDmrFec()
+{
+    std::printf("[dmr fec]\n");
+    std::mt19937 rng(77);
+
+    // Golay (20,8): table B.11's first row; every word with up to 3 errors.
+    CHECK(dmr::golay2087Encode(0x80) == 0x803DAu, "Golay (20,8) row 0: %05x", dmr::golay2087Encode(0x80));
+    int bad = 0, minDist = 99;
+    for (int d = 0; d < 256; d++) {
+        for (int e = 0; e <= 3; e++) {
+            bad += dmr::golay2087Decode(dmr::golay2087Encode(d) ^ randomErrors(rng, 20, e)) != d;
+        }
+        for (int d2 = d + 1; d2 < 256; d2++) {
+            minDist = std::min(minDist, bitCount(dmr::golay2087Encode(d) ^ dmr::golay2087Encode(d2)));
+        }
+    }
+    CHECK(bad == 0 && minDist == 8, "Golay (20,8): %d wrong, distance %d", bad, minDist);
+    // QR (16,7,6): up to 2 errors.
+    bad = 0;
+    minDist = 99;
+    for (int d = 0; d < 128; d++) {
+        for (int e = 0; e <= 2; e++) bad += dmr::qr1676Decode(dmr::qr1676Encode(d) ^ randomErrors(rng, 16, e)) != d;
+        for (int d2 = d + 1; d2 < 128; d2++) minDist = std::min(minDist, bitCount(dmr::qr1676Encode(d) ^ dmr::qr1676Encode(d2)));
+    }
+    CHECK(bad == 0 && minDist == 6, "QR (16,7,6): %d wrong, distance %d", bad, minDist);
+    // Hamming (7,4): one error.
+    bad = 0;
+    for (int d = 0; d < 16; d++) {
+        for (int b = -1; b < 7; b++) bad += dmr::hamming743Decode(dmr::hamming743Encode(d) ^ (b < 0 ? 0u : 1u << b)) != d;
+    }
+    CHECK(bad == 0, "Hamming (7,4): %d wrong", bad);
+
+    // RS (12,9): table B.18's rows (unit messages) give its parity columns.
+    const uint8_t rows[9][3] = {{0x1C, 0xBC, 0xFD}, {0x89, 0x31, 0x08}, {0xAD, 0x41, 0x36}, {0x7D, 0x71, 0x16}, {0xF3, 0xA6, 0x3A},
+                                {0x08, 0x83, 0x7B}, {0x3F, 0x6F, 0x02}, {0x6C, 0x0D, 0xA7}, {0x0E, 0x38, 0x40}};
+    bad = 0;
+    for (int r = 0; r < 9; r++) {
+        uint8_t m[9] = {}, p[3];
+        m[r] = 1;
+        dmr::rs129Parity(m, p);
+        bad += p[0] != rows[r][0] || p[1] != rows[r][1] || p[2] != rows[r][2];
+    }
+    CHECK(bad == 0, "RS (12,9): %d generator rows wrong", bad);
+
+    // BPTC (196,96): any 2 errors, nearly all patterns of 3.
+    int bad2 = 0, bad3 = 0;
+    const int trials = 400;
+    for (int t = 0; t < trials; t++) {
+        uint8_t info[96], tx[196], out[96];
+        for (auto& b : info) b = static_cast<uint8_t>(rng() & 1);
+        dmr::bptc19696Encode(info, tx);
+        for (int errors : {2, 3}) {
+            uint8_t rx[196];
+            std::memcpy(rx, tx, sizeof(rx));
+            std::vector<int> pos;
+            while (static_cast<int>(pos.size()) < errors) {
+                const int p = static_cast<int>(rng() % 196);
+                if (std::find(pos.begin(), pos.end(), p) == pos.end()) pos.push_back(p);
+            }
+            for (int p : pos) rx[p] ^= 1;
+            const bool ok = dmr::bptc19696Decode(rx, out) && std::memcmp(out, info, 96) == 0;
+            (errors == 2 ? bad2 : bad3) += !ok;
+        }
+    }
+    CHECK(bad2 == 0 && bad3 < trials / 20, "BPTC (196,96): %d of %d with 2 errors, %d with 3 not decoded", bad2, trials, bad3);
+    // Its interleaver (table B.3): TX(193), the third bit sent, is I(77).
+    {
+        uint8_t info[96] = {}, tx[196];
+        info[95 - 77] = 1;
+        dmr::bptc19696Encode(info, tx);
+        int ones = 0;
+        for (uint8_t v : tx) ones += v;
+        CHECK(tx[2] == 1, "BPTC: I(77) not sent third (%d ones)", ones);
+    }
+
+    // Embedded LC: one error in each Hamming row; a wrong checksum is caught.
+    bad = 0;
+    int missed = 0;
+    for (int t = 0; t < 200; t++) {
+        uint8_t lc[72], tx[128], out[72];
+        for (auto& b : lc) b = static_cast<uint8_t>(rng() & 1);
+        dmr::embeddedLcEncode(lc, tx);
+        uint8_t rx[128];
+        std::memcpy(rx, tx, sizeof(rx));
+        for (int row = 0; row < 7; row++) rx[(rng() % 16) * 8 + row] ^= 1;  // row r, any column
+        bad += !(dmr::embeddedLcDecode(rx, out) && std::memcmp(out, lc, 72) == 0);
+        // Row 0 of another LC: a valid Hamming word, the checksum must
+        // catch it.
+        uint8_t lc2[72];
+        std::memcpy(lc2, lc, 72);
+        lc2[3] ^= 1;
+        uint8_t tx2[128];
+        dmr::embeddedLcEncode(lc2, tx2);
+        std::memcpy(rx, tx, sizeof(rx));
+        for (int k = 0; k < 128; k += 8) rx[k] = tx2[k];
+        missed += dmr::embeddedLcDecode(rx, out);
+    }
+    CHECK(bad == 0 && missed == 0, "embedded LC: %d not decoded, %d bad checksums accepted", bad, missed);
+
+    // AMBE+2: transmitted bit 1 is C0(5) (18 x 4 block); round trip.
+    {
+        char fr[4][24] = {}, back[4][24];
+        uint8_t tx[72] = {};
+        tx[1] = 1;
+        dmr::ambeDeinterleave(tx, fr);
+        CHECK(fr[0][5] == 1, "AMBE: bit 1 is not C0(5)");
+        bad = 0;
+        for (int t = 0; t < 50; t++) {
+            for (int i = 0; i < 72; i++) tx[i] = static_cast<uint8_t>(rng() & 1);
+            uint8_t again[72];
+            dmr::ambeDeinterleave(tx, fr);
+            dmr::ambeInterleave(fr, again);
+            dmr::ambeDeinterleave(again, back);
+            bad += std::memcmp(tx, again, 72) != 0;
+        }
+        CHECK(bad == 0, "AMBE interleaver round trip");
+    }
+#ifdef HRDAB_MBELIB
+    // Encoded frames through mbelib's own FEC: the same 49 bits back; up to
+    // 3 errors in C0 and in C1 corrected and counted.
+    int wrong = 0, errMismatch = 0;
+    std::vector<int> c0, c1;  // transmit positions of C0's (minus its extra parity bit) and C1's bits
+    for (int i = 0; i < 72; i++) {
+        const int code = 18 * (i % 4) + i / 4;
+        if (code < 23) c0.push_back(i);
+        else if (code >= 24 && code < 47) c1.push_back(i);
+    }
+    for (int t = 0; t < 300; t++) {
+        AmbeBits d;
+        for (auto& b : d) b = static_cast<char>(rng() & 1);
+        uint8_t tx[72];
+        ambeEncode(d, tx);
+        const int e = t % 4;
+        for (int k = 0; k < e; k++) {
+            tx[c0[static_cast<size_t>(k * 5 + t % 5)]] ^= 1;
+            tx[c1[static_cast<size_t>(k * 7 + t % 7)]] ^= 1;
+        }
+        char fr[4][24], ambe[49];
+        dmr::ambeDeinterleave(tx, fr);
+        const int errs = mbe_eccAmbe3600x2450C0(fr);
+        mbe_demodulateAmbe3600x2450Data(fr);
+        const int errs2 = errs + mbe_eccAmbe3600x2450Data(fr, ambe);
+        wrong += std::memcmp(ambe, d.data(), 49) != 0;
+        // mbelib counts the errors among the data bits.
+        errMismatch += errs2 > 2 * e;
+    }
+    CHECK(wrong == 0 && errMismatch == 0, "AMBE through mbelib: %d frames wrong, %d error counts off", wrong, errMismatch);
+#endif
+    std::printf("  codes ok: Golay (20,8), QR (16,7,6), Hamming (7,4), RS (12,9), BPTC (196,96) (%d/%d with 3 errors "
+                "left), embedded LC, AMBE layout\n",
+                bad3, trials);
+}
+
+struct DmrDecoded {
+    std::vector<AmbeBits> frames[2];
+    std::vector<DmrStatus> statuses;  // every 0.2 s
+    std::vector<float> audio;         // 8 kHz
+};
+
+// DmrDecoder alone on the transmitter's deviation plus white noise (Hz rms)
+// and a carrier offset.
+DmrDecoded runDmrDecoder(const DmrTx& tx, double noiseHz, double offsetHz, double scale, unsigned seed)
+{
+    auto hz = dmrDeviationHz(tx, DmrDecoder::kInputRate, scale);
+    std::mt19937 rng(seed);
+    std::normal_distribution<float> normal(0.f, static_cast<float>(std::max(noiseHz, 1e-3)));
+    for (auto& v : hz) v += static_cast<float>(offsetHz) + (noiseHz > 0 ? normal(rng) : 0.f);
+    DmrDecoder dec;
+    DmrDecoded out;
+    dec.onAmbeFrame = [&](int slot, const char* d, int) {
+        AmbeBits b;
+        std::memcpy(b.data(), d, 49);
+        out.frames[slot].push_back(b);
+    };
+    std::vector<float> pcm(64);
+    for (size_t i = 0; i + 128 <= hz.size(); i += 128) {
+        dec.process(&hz[i], 128);
+        dec.pullAudio(pcm.data(), 64);
+        out.audio.insert(out.audio.end(), pcm.begin(), pcm.end());
+        if ((i / 128 + 1) % 25 == 0) out.statuses.push_back(dec.status());
+    }
+    return out;
+}
+
+// How many of the sent frames came out (frames are random: equal = right).
+int framesFound(const std::vector<AmbeBits>& sent, const std::vector<AmbeBits>& got)
+{
+    int n = 0;
+    size_t from = 0;
+    for (const auto& f : sent) {
+        for (size_t k = from; k < got.size() && k < from + 40; k++) {
+            if (got[k] == f) {
+                n++;
+                from = k + 1;
+                break;
+            }
+        }
+    }
+    return n;
+}
+
+void testDmrDecoder()
+{
+    std::printf("[dmr decoder]\n");
+    // A repeater: slot 1 a group call with header and talker alias, slot 2
+    // later a private call joined late (no header), overlapping.
+    DmrTxConfig cfg;
+    cfg.kind = DmrTxKind::Repeater;
+    cfg.colorCode = 5;
+    DmrTxCall a;
+    a.slot = 0;
+    a.src = 2321234;
+    a.dst = 91;
+    a.alias = "OE1XYZ Jo";
+    a.superframes = 6;
+    a.startS = 0.25;
+    DmrTxCall b;
+    b.slot = 1;
+    b.group = false;
+    b.src = 2329999;
+    b.dst = 2320001;
+    b.header = false;
+    b.superframes = 4;
+    b.startS = 1.0;
+    cfg.calls = {a, b};
+    const DmrTx tx = buildDmr(cfg, 3.6);
+    struct Case {
+        const char* name;
+        double noiseHz, offsetHz, scale;
+        int minPercent;
+    };
+    const Case cases[] = {{"clean", 0, 0, 1, 100},
+                          {"offset", 150, -900, 1, 99},
+                          {"deviation +12%", 150, 400, 1.12, 99},
+                          {"deviation -15%", 150, 0, 0.85, 99},
+                          {"noisy", 420, 300, 1, 85}};
+    for (const Case& c : cases) {
+        const DmrDecoded d = runDmrDecoder(tx, c.noiseHz, c.offsetHz, c.scale, 3);
+        const int f0 = framesFound(tx.frames[0], d.frames[0]), f1 = framesFound(tx.frames[1], d.frames[1]);
+        const int p0 = static_cast<int>(100 * f0 / std::max<size_t>(1, tx.frames[0].size()));
+        const int p1 = static_cast<int>(100 * f1 / std::max<size_t>(1, tx.frames[1].size()));
+        // During both calls (t = 1.8 s): IDs, alias, colour code.
+        const DmrStatus& mid = d.statuses[std::min<size_t>(8, d.statuses.size() - 1)];
+        const DmrSlotStatus& s0 = mid.slots[0];
+        const DmrSlotStatus& s1 = mid.slots[1];
+        const DmrStatus& end = d.statuses.back();
+        double rms = 0;
+        for (size_t i = static_cast<size_t>(0.6 * 8000); i < static_cast<size_t>(2.4 * 8000) && i < d.audio.size(); i++) {
+            rms += d.audio[i] * d.audio[i];
+        }
+        rms = std::sqrt(rms / (1.8 * 8000));
+        float tail = 0;
+        for (size_t i = static_cast<size_t>(3.3 * 8000); i < d.audio.size(); i++) tail = std::max(tail, std::fabs(d.audio[i]));
+        std::printf("  %-15s frames %d%% / %d%%, slot 1 %s %u->%u '%s', slot 2 %s %u->%u, cc %d, source %d, audio rms "
+                    "%.3f, end %s/%s\n",
+                    c.name, p0, p1, s0.active ? "on" : "off", s0.src, s0.dst, s0.alias.c_str(), s1.active ? "on" : "off",
+                    s1.src, s1.dst, mid.colorCode, mid.source, rms, end.slots[0].active ? "on" : "off",
+                    end.slots[1].active ? "on" : "off");
+#ifdef HRDAB_MBELIB  // frames are counted as mbelib decodes them
+        CHECK(p0 >= c.minPercent && p1 >= c.minPercent, "%s: frames %d%% / %d%%", c.name, p0, p1);
+#endif
+        CHECK(s0.active && s0.callType == 1 && s0.src == a.src && s0.dst == a.dst, "%s: slot 1 call", c.name);
+        CHECK(s0.alias == a.alias, "%s: alias '%s'", c.name, s0.alias.c_str());
+        CHECK(s1.active && s1.callType == 2 && s1.src == b.src && s1.dst == b.dst, "%s: slot 2 late entry", c.name);
+        CHECK(mid.sync && mid.colorCode == 5 && mid.source == 1, "%s: sync %d cc %d source %d", c.name, mid.sync,
+              mid.colorCode, mid.source);
+        CHECK(!end.slots[0].active && !end.slots[1].active, "%s: calls not ended", c.name);
+#ifdef HRDAB_MBELIB
+        CHECK(rms > 0.01 && mid.audioSlot == 0, "%s: audio rms %.3f, playing slot %d", c.name, rms, mid.audioSlot);
+        CHECK(tail == 0, "%s: audio after the calls (%.3f)", c.name, tail);
+#endif
+    }
+
+    // A radio on its own (MS sourced, carrier only during its bursts),
+    // joined late; and TDMA direct mode slot 2.
+    for (DmrTxKind kind : {DmrTxKind::Radio, DmrTxKind::Direct}) {
+        DmrTxConfig r;
+        r.kind = kind;
+        r.colorCode = 2;
+        DmrTxCall c;
+        c.slot = kind == DmrTxKind::Direct ? 1 : 0;
+        c.header = false;
+        c.src = 2620555;
+        c.dst = 8;
+        c.superframes = 4;
+        c.startS = 0.3;
+        r.calls = {c};
+        const DmrTx t = buildDmr(r, 2.4);
+        const DmrDecoded d = runDmrDecoder(t, 150, 600, 1, 9);
+        const int found = framesFound(t.frames[c.slot], d.frames[c.slot]);
+        const DmrStatus& mid = d.statuses[5];
+        const DmrSlotStatus& s = mid.slots[c.slot];
+        const char* name = kind == DmrTxKind::Radio ? "radio" : "direct slot 2";
+        std::printf("  %-15s frames %d of %zu, slot %d %s %u->%u, cc %d, source %d\n", name, found, t.frames[c.slot].size(),
+                    c.slot + 1, s.active ? "on" : "off", s.src, s.dst, mid.colorCode, mid.source);
+#ifdef HRDAB_MBELIB
+        CHECK(found == static_cast<int>(t.frames[c.slot].size()), "%s: %d frames", name, found);
+#endif
+        CHECK(s.active && s.src == c.src && s.dst == c.dst && s.callType == 1, "%s: call", name);
+        CHECK(mid.source == (kind == DmrTxKind::Radio ? 2 : 3), "%s: source %d", name, mid.source);
+    }
+
+    // Noise only: no call, no audio.
+    {
+        DmrTx none;
+        none.symbols.assign(4800 * 5, 0);
+        none.on.assign(none.symbols.size(), 0);
+        const DmrDecoded d = runDmrDecoder(none, 2500, 0, 1, 4);
+        int calls = 0;
+        for (const auto& st : d.statuses) calls += st.sync || st.slots[0].active || st.slots[1].active;
+        float peak = 0;
+        for (float v : d.audio) peak = std::max(peak, std::fabs(v));
+        std::printf("  noise only: %d of %zu reports with sync/call, audio peak %.3f\n", calls, d.statuses.size(), peak);
+        CHECK(calls == 0 && peak == 0, "noise taken for DMR");
+    }
+}
+
+// Through the whole receiver (8-bit I/Q, channel filter, discriminator).
+void testDmrReceiver()
+{
+    const uint32_t rate = 2048000, freq = 438800000;
+    std::printf("[dmr receiver %u S/s]\n", rate);
+    const std::vector<uint32_t> channels = {438775000, 438787500, 438800000, 438812500, 438825000};
+    const uint32_t lo = NbDemod::placeLo(rate, freq, channels);
+    DmrTxConfig cfg;
+    cfg.sampleRate = rate;
+    cfg.kind = DmrTxKind::Repeater;
+    cfg.colorCode = 3;
+    cfg.offsetHz = static_cast<double>(freq) - lo + 700;  // a little off frequency
+    cfg.clockPpm = 40;
+    DmrTxCall c;
+    c.slot = 1;
+    c.src = 2627777;
+    c.dst = 26232;
+    c.alias = "DL1ABC";
+    c.superframes = 5;
+    c.startS = 0.4;
+    cfg.calls = {c};
+    const double seconds = 3.4;
+    for (double snr : {25.0, 13.0, 8.0}) {
+        cfg.snrDb = snr;
+        const auto iq = modulateDmr(cfg, buildDmr(cfg, seconds));
+        for (NbMode mode : {NbMode::Dmr, NbMode::Auto}) {
+            if (mode == NbMode::Auto && snr < 20) continue;
+            NbRun r = runNb(iq, rate, freq, channels, freq, mode, 10.f);
+            DmrSlotStatus call;
+            bool seen = false;
+            int cc = -1;
+            for (const auto& st : r.dmr) {
+                if (st.slots[1].active) {
+                    call = st.slots[1];
+                    seen = true;
+                    cc = st.colorCode;
+                }
+            }
+            double firstDmr = -1;
+            int openReports = 0;
+            for (size_t k = 0; k < r.reports.size(); k++) {
+                if (firstDmr < 0 && r.reports[k].mode == NbMode::Dmr) firstDmr = reportTime(k);
+                const double t = reportTime(k);
+                if (t > 1.0 && t < 2.2) openReports += r.reports[k].squelchOpen;
+            }
+            double sum = 0;
+            for (size_t i = pcmIndex(0.9); i < pcmIndex(2.2) && i < r.pcm.size(); i++) {
+                sum += static_cast<double>(r.pcm[i]) * r.pcm[i];
+            }
+            const double rmsDb = 10 * std::log10(sum / (1.3 * 48000) / (32768.0 * 32768.0) + 1e-20);
+            int tail = 0;
+            for (size_t i = pcmIndex(3.0); i < r.pcm.size(); i++) tail = std::max(tail, std::abs(static_cast<int>(r.pcm[i])));
+            std::printf("  %-4s SNR %.0f dB: call %s %u->%u '%s' cc %d, bit errors %.2f/frame, mode dmr after %.2f s, "
+                        "voice in %d/6 reports, audio %.1f dBFS, tail %d, %.1fx realtime\n",
+                        nbModeName(mode), snr, seen ? "seen" : "MISSING", call.src, call.dst, call.alias.c_str(), cc,
+                        call.errorRate, firstDmr, openReports, rmsDb, tail, r.realtime);
+            CHECK(seen && call.src == c.src && call.dst == c.dst && cc == 3, "%s %.0f dB: call not decoded",
+                  nbModeName(mode), snr);
+            // The alias needs two clean superframes in a row.
+            if (snr > 10) CHECK(call.alias == c.alias, "%s %.0f dB: alias '%s'", nbModeName(mode), snr, call.alias.c_str());
+            CHECK(firstDmr > 0 && firstDmr < 1.0, "%s %.0f dB: mode dmr at %.2f s", nbModeName(mode), snr, firstDmr);
+            CHECK(r.realtime > 1.5, "DMR only %.1fx realtime", r.realtime);
+#ifdef HRDAB_MBELIB
+            CHECK(openReports >= 5 && rmsDb > -40, "%s %.0f dB: voice %d reports, %.1f dBFS", nbModeName(mode), snr,
+                  openReports, rmsDb);
+            CHECK(tail == 0, "%s %.0f dB: audio after the call", nbModeName(mode), snr);
+            if (snr > 20) CHECK(call.errorRate < 0.05f, "bit errors %.2f per frame", call.errorRate);
+#endif
+        }
+    }
+    // An empty channel in DMR mode stays silent.
+    {
+        DmrTxConfig none = cfg;
+        none.calls.clear();
+        none.kind = DmrTxKind::Radio;  // no carrier at all
+        const auto iq = modulateDmr(none, buildDmr(none, 2.5));
+        NbRun r = runNb(iq, rate, freq, channels, freq, NbMode::Dmr, 10.f);
+        int maxAbs = 0;
+        for (int16_t v : r.pcm) maxAbs = std::max(maxAbs, std::abs(static_cast<int>(v)));
+        int syncs = 0;
+        for (const auto& st : r.dmr) syncs += st.sync;
+        std::printf("  empty channel: %d of %zu reports with sync, audio max %d\n", syncs, r.dmr.size(), maxAbs);
+        CHECK(syncs == 0 && maxAbs == 0, "empty channel taken for DMR");
+    }
+}
+
+void testDmr()
+{
+    testDmrFec();
+    testDmrDecoder();
+    testDmrReceiver();
+}
+
 } // namespace
 
 // Plays a raw rtl_tcp capture (u8 I/Q, 2.048 MS/s) through the whole
@@ -1353,6 +1798,11 @@ int main(int argc, char** argv)
     if (argc > 1 && std::strcmp(argv[1], "nb") == 0) {
         testFft();
         testNb();
+        std::printf("\n%s (%d failures)\n", g_failures ? "FAILED" : "ALL PASSED", g_failures);
+        return g_failures ? 1 : 0;
+    }
+    if (argc > 1 && std::strcmp(argv[1], "dmr") == 0) {
+        testDmr();
         std::printf("\n%s (%d failures)\n", g_failures ? "FAILED" : "ALL PASSED", g_failures);
         return g_failures ? 1 : 0;
     }
@@ -1415,6 +1865,7 @@ int main(int argc, char** argv)
     testReedSolomon();
     testFm(quick);
     testNb();
+    testDmr();
 
     TxConfig cfg;
     std::vector<uint8_t> slide(1500);

@@ -16,25 +16,31 @@
 //    and de-emphasised (50 us); no blanker, voice filter or AGC;
 //  - in "auto" mode the listened channel's signal is classified from its
 //    spectrum (carrier, sideband symmetry) and envelope (constant or not);
-//    it never picks wfm.
+//    it never picks wfm. While it hears NFM, the DMR decoder looks along
+//    and switches to "dmr" once it finds a valid DMR burst;
+//  - "dmr": the NFM channel's discriminator goes to DmrDecoder (dmr.h),
+//    its 8 kHz voice is interpolated to 48 kHz; no squelch - the voice
+//    decoder only outputs a confirmed call.
 #pragma once
 
 #include <atomic>
 #include <cstdint>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <vector>
 
 #include "common.h"
+#include "dmr.h"
 #include "fft.h"
 #include "fm_dsp.h"
 #include "ofdm.h"
 
 namespace hrdab {
 
-enum class NbMode { Auto = 0, Am = 1, Fm = 2, Usb = 3, Lsb = 4, Wfm = 5 };
+enum class NbMode { Auto = 0, Am = 1, Fm = 2, Usb = 3, Lsb = 4, Wfm = 5, Dmr = 6 };
 
-// "auto", "am", "fm", "usb", "lsb", "wfm"
+// "auto", "am", "fm", "usb", "lsb", "wfm", "dmr"
 const char* nbModeName(NbMode mode);
 
 enum class NbAgc { Auto = 0, Fast = 1, Slow = 2 };
@@ -97,6 +103,8 @@ public:
     // Waterfall spectrum, ~20 times a second: every FFT bin (dBFS) of the
     // usable span, across centerHz +- spanHz/2 (~1600 values at 2 MS/s).
     virtual void onNbSpectrum(uint32_t /*centerHz*/, uint32_t /*spanHz*/, const std::vector<float>& /*binsDbfs*/) {}
+    // DMR (mode dmr, or auto having found it): with every report.
+    virtual void onNbDmr(const DmrStatus& /*status*/) {}
 };
 
 struct NbConfig {
@@ -183,7 +191,9 @@ private:
     void levelAndSquelch(const float* m, int n, bool hold);
     void squelchBlock();
     void audioOut(int n);
-    void gateOut(const float* a48, int n48);
+    void gateOut(const float* a48, int n48, bool open);
+    void feedDmr(const float* disc, int n);
+    void dmrAudioOut(int n);
     void classifyAccumulate(const float* a, int n);
     void classify();
     void report();
@@ -295,6 +305,12 @@ private:
     int candidateVotes_ = 0;
     NbMode confirmed_ = NbMode::Auto;   // for the current channel
     NbMode fallback_ = NbMode::Auto;    // last confirmed on any channel
+
+    // DMR (created on first use)
+    std::unique_ptr<DmrDecoder> dmr_;
+    RationalResampler<1> dmrUp_;        // 8 -> 48 kHz
+    std::vector<float> dmrHz_, dmr8_, dmr48_;
+    int dmrOdd_ = 0;                    // 16 kHz sample not yet matched at 8 kHz
 };
 
 } // namespace hrdab

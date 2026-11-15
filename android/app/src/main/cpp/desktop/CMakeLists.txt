@@ -9,6 +9,8 @@
 #    frames with SBR and PS), fetched from its release tarball and linked in
 #    statically - decoder part only.
 #  - audio output: miniaudio (vendored in third_party/, public domain).
+#  - DMR voice (AMBE+2): mbelib, vendored in ../third_party/mbelib (ISC);
+#    -DHRDAB_MBELIB=OFF leaves it out (DMR without voice).
 #
 # Used by windows/CMakeLists.txt and linux/CMakeLists.txt via
 # add_subdirectory; sets HRDAB_BUNDLED_LIBRARIES in the parent scope for
@@ -114,6 +116,8 @@ endif()
 add_library(hrdab SHARED
   "${HRDAB_SRC}/charset.cpp"
   "${HRDAB_SRC}/dab_tables.cpp"
+  "${HRDAB_SRC}/dmr.cpp"
+  "${HRDAB_SRC}/dmr_fec.cpp"
   "${HRDAB_SRC}/fft.cpp"
   "${HRDAB_SRC}/fic.cpp"
   "${HRDAB_SRC}/fm_demod.cpp"
@@ -165,6 +169,25 @@ else()
   target_link_libraries(hrdab PRIVATE hrdab_fdkaac ${HRDAB_LIBUSB} Threads::Threads ${CMAKE_DL_LIBS} m)
   # Only the hrdab_* C API is exported; FDK's symbols stay private.
   target_link_options(hrdab PRIVATE "LINKER:--exclude-libs,ALL")
+endif()
+
+# --- mbelib (DMR voice) ---
+option(HRDAB_MBELIB "Decode DMR voice (AMBE+2) with the vendored mbelib" ON)
+if(HRDAB_MBELIB)
+  set(MBELIB_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/mbelib")
+  add_library(hrdab_mbelib STATIC "${MBELIB_DIR}/mbelib.c" "${MBELIB_DIR}/ecc.c" "${MBELIB_DIR}/ambe3600x2450.c")
+  target_include_directories(hrdab_mbelib PUBLIC "${MBELIB_DIR}")
+  set_target_properties(hrdab_mbelib PROPERTIES POSITION_INDEPENDENT_CODE ON C_VISIBILITY_PRESET hidden)
+  if(MSVC)
+    target_compile_options(hrdab_mbelib PRIVATE /O2 /W0)
+    target_compile_definitions(hrdab_mbelib PRIVATE _USE_MATH_DEFINES _CRT_SECURE_NO_WARNINGS)
+  else()
+    target_compile_options(hrdab_mbelib PRIVATE -O2 -w)
+  endif()
+  target_compile_definitions(hrdab PRIVATE HRDAB_MBELIB)
+  target_link_libraries(hrdab PRIVATE hrdab_mbelib)
+  configure_file("${MBELIB_DIR}/COPYRIGHT" "${CMAKE_CURRENT_BINARY_DIR}/licenses/mbelib.txt" COPYONLY)
+  list(APPEND HRDAB_LICENSES "${CMAKE_CURRENT_BINARY_DIR}/licenses/mbelib.txt")
 endif()
 
 option(HRDAB_BUILD_CLI "Build hrdab_cli, a command-line driver for tests against real hardware" OFF)

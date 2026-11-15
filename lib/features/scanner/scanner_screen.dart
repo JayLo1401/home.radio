@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/providers.dart';
 import '../../data/models/aprs.dart';
 import '../../data/models/band_plan.dart';
+import '../../data/models/dmr.dart';
 import '../../data/repositories/settings_repository.dart';
 import '../../data/services/dab_rtlsdr_service.dart' show DabRtlSdrService;
 import '../../core/popup_text_field.dart' show showTextInputDialog;
@@ -83,6 +84,12 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
   final _spectrumTick = ValueNotifier<int>(0);
   int _spectrumCenterHz = 0;
   int _spectrumSpanHz = 0;
+
+  // DMR (mode dmr, or auto having found it): slots and calls heard.
+  DmrStatus? _dmr;
+  String _dmrShownAs = '';
+  final List<_DmrCall> _dmrCalls = [];
+  bool get _dmrShown => _mode == 'dmr' || _detectedMode == 'dmr';
 
   // When each channel last had a signal - shown as a green that fades
   // over [_fadeTime]: voice traffic comes and goes, this shows where.
@@ -329,6 +336,45 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     });
   }
 
+  /// A DMR status: the new picture, and each call into the list of calls
+  /// heard (newest first; a call already at the top only gets its time).
+  void _onDmr(Map<String, dynamic> event) {
+    final status = DmrStatus.fromEvent(event);
+    if (status == null) return;
+    final now = DateTime.now();
+    for (final s in status.slots) {
+      if (!s.active || s.src == 0) continue;
+      final i = _dmrCalls.indexWhere((c) => c.slot.slot == s.slot);
+      if (i >= 0 && _dmrCalls[i].slot.src == s.src && _dmrCalls[i].slot.dst == s.dst) {
+        _dmrCalls[i] = _DmrCall(s, now);
+      } else {
+        _dmrCalls.insert(0, _DmrCall(s, now));
+        if (_dmrCalls.length > 20) _dmrCalls.removeLast();
+      }
+    }
+    // Five reports a second: the page is only rebuilt when what it shows
+    // changed ("vor 12 s" at most once a second).
+    final shown = [
+      status.sync,
+      status.source,
+      status.colorCode,
+      status.audioSlot,
+      for (final s in status.slots) ...[
+        s.active,
+        s.src,
+        s.dst,
+        s.alias,
+        s.encrypted,
+        s.emergency,
+        s.errorRate < 0.5 ? 0 : (s.errorRate < 2 ? 1 : 2),
+        s.secondsAgo.floor(),
+      ],
+    ].join('|');
+    if (shown == _dmrShownAs && _dmr != null) return;
+    _dmrShownAs = shown;
+    setState(() => _dmr = status);
+  }
+
   /// Modulations whose filter widths are of the same order: CW, SSB,
   /// wideband FM, the rest.
   String get _widthFamily => switch (_mode) {
@@ -424,6 +470,8 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
         if (gain != null && gain != _gainDb) setState(() => _gainDb = gain);
       case 'nbPacket':
         _onPacket(event);
+      case 'nbDmr':
+        _onDmr(event);
       case 'connectionMessage':
         final isError = event['isError'] as bool? ?? false;
         final message = (event['message'] as String?)?.trim() ?? '';
@@ -515,6 +563,8 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
       _index = index.clamp(0, _plan.channels.length - 1);
       _fineHz = fineHz;
       _detectedMode = null;
+      _dmr = null;
+      _dmrCalls.clear();
       if (_segment != oldSegment) _takeSegmentSettings(_segment);
     });
     _lastTuneAt = DateTime.now();
@@ -637,6 +687,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
       _mode = mode;
       _preferAuto = mode == 'auto';
       _detectedMode = null;
+      _dmr = null;
       if (!_fineTunable) _fineHz = 0;
     });
     await _rx.nbTune(freqHz: _tunedHz, mode: _nativeMode(mode));
@@ -698,6 +749,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     'usb' || 'lsb' => const Color(0xFF2E86DE),
     'am' => const Color(0xFFE67E22),
     'wfm' => const Color(0xFF16A085),
+    'dmr' => const Color(0xFFE84393),
     _ => const Color(0xFF27AE60),
   };
 
@@ -821,6 +873,11 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
                             ),
                           ],
                         ),
+                        // DMR: who is talking on which slot (display only, no focus).
+                        if (_dmrShown) ...[
+                          const SizedBox(height: 12),
+                          _DmrPanel(status: _dmr, calls: _dmrCalls),
+                        ],
                         const SizedBox(height: 16),
                         // Controls - left/right with the remote moves between them.
                         Wrap(
@@ -1265,6 +1322,129 @@ class _FilterDialogState extends State<_FilterDialog> {
       actions: [
         TextButton(autofocus: true, onPressed: () => Navigator.of(context).pop(), child: const Text('Schließen')),
       ],
+    );
+  }
+}
+
+/// A DMR call as heard: the slot's state then, and when.
+class _DmrCall {
+  final DmrSlot slot;
+  final DateTime at;
+
+  const _DmrCall(this.slot, this.at);
+}
+
+/// DMR: source (repeater/radio) and colour code, each time slot's call -
+/// talk group or called radio, speaker (radio ID, talker alias),
+/// encrypted, emergency, reception - and the calls heard lately.
+class _DmrPanel extends StatelessWidget {
+  final DmrStatus? status;
+  final List<_DmrCall> calls;
+
+  const _DmrPanel({required this.status, required this.calls});
+
+  static String _time(DateTime t) =>
+      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}:${t.second.toString().padLeft(2, '0')}';
+
+  static String _ago(double s) => s < 60 ? 'vor ${s.round()} s' : 'vor ${(s / 60).round()} min';
+
+  static String _call(DmrSlot s) => [if (s.target.isNotEmpty) s.target, if (s.speaker.isNotEmpty) s.speaker].join(' · ');
+
+  Widget _slotLine(DmrSlot s, bool playing) {
+    const muted = TextStyle(color: Colors.white54);
+    final String text;
+    final Color colour;
+    final IconData icon;
+    if (s.talking) {
+      final call = _call(s);
+      text = call.isEmpty ? 'Gespräch (Kennung folgt…)' : call;
+      colour = s.emergency ? Colors.redAccent : Colors.greenAccent;
+      icon = s.encrypted ? Icons.lock : (playing ? Icons.volume_up : Icons.record_voice_over);
+    } else {
+      final last = s.heard && s.secondsAgo < 600 && _call(s).isNotEmpty ? ' – zuletzt ${_call(s)} ${_ago(s.secondsAgo)}' : '';
+      text = 'frei$last';
+      colour = Colors.white38;
+      icon = Icons.radio_button_unchecked;
+    }
+    final quality = !s.talking || s.encrypted
+        ? ''
+        : s.errorRate < 0.5
+        ? 'Empfang gut'
+        : s.errorRate < 2
+        ? 'Empfang mäßig'
+        : 'Empfang schlecht';
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Row(
+        children: [
+          Icon(icon, color: colour, size: 22),
+          const SizedBox(width: 8),
+          Text('Zeitschlitz ${s.slot}: ', style: muted),
+          Expanded(
+            child: Text(
+              text,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 18, color: s.talking ? Colors.white : Colors.white54),
+            ),
+          ),
+          if (s.talking && s.emergency) const Text('NOTRUF  ', style: TextStyle(color: Colors.redAccent)),
+          if (s.talking && s.encrypted) const Text('verschlüsselt – kein Ton', style: muted),
+          if (quality.isNotEmpty) Text(quality, style: muted),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const muted = TextStyle(color: Colors.white54);
+    final st = status;
+    final head = st == null || !st.sync
+        ? 'DMR · kein DMR-Signal'
+        : [
+            'DMR',
+            if (st.sourceLabel.isNotEmpty) st.sourceLabel,
+            if (st.colorCode >= 0) 'Farbcode ${st.colorCode}',
+          ].join(' · ');
+    // A single radio uses one slot: the other is only shown once heard.
+    final slots = st == null
+        ? const <DmrSlot>[]
+        : [
+            for (final s in st.slots)
+              if (st.source == 'repeater' || s.active || s.heard || s.slot == 1) s,
+          ];
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(8)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.graphic_eq, color: st?.sync ?? false ? const Color(0xFFE84393) : Colors.white38),
+              const SizedBox(width: 8),
+              Text(head, style: Theme.of(context).textTheme.titleMedium),
+              if (st != null && !st.voiceDecoder) ...[
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text('ohne Sprachdecoder gebaut – nur Anzeige', style: muted, overflow: TextOverflow.ellipsis),
+                ),
+              ],
+            ],
+          ),
+          for (final s in slots) _slotLine(s, st!.audioSlot == s.slot),
+          if (calls.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            const Text('Zuletzt gehört', style: muted),
+            for (final c in calls.take(5))
+              Text(
+                '${_time(c.at)} · Zeitschlitz ${c.slot.slot} · ${_call(c.slot)}${c.slot.encrypted ? ' · verschlüsselt' : ''}',
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Colors.white70),
+              ),
+          ],
+        ],
+      ),
     );
   }
 }

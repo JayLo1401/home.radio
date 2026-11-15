@@ -27,7 +27,7 @@ JavaVM* g_jvm = nullptr;
 struct Methods {
     jmethodID onSync, onEnsembleLabel, onServiceDetected, onDynamicLabel, onSnr, onRsErrors, onAacErrors,
         onAudioFormat, onAudioConfig, onAccessUnit, onSlide, onStatus, onFmPcm, onFmStatus, onFmRds, onNbPcm,
-        onNbReport, onNbSpectrum, onNbPacket, onAdsbFrame, onIsmBurst, onAcarsFrame, onRxStatus;
+        onNbReport, onNbSpectrum, onNbPacket, onNbDmr, onAdsbFrame, onIsmBurst, onAcarsFrame, onRxStatus;
 };
 
 // ART aborts when a thread exits while still attached, so every thread we
@@ -118,6 +118,7 @@ public:
         m_.onNbReport = optional("onNativeNbReport", "(IFFFZLjava/lang/String;II[I[FF[FIZZLjava/lang/String;)V");
         m_.onNbSpectrum = optional("onNativeNbSpectrum", "(II[FF)V");
         m_.onNbPacket = optional("onNativeNbPacket", "(I[B)V");
+        m_.onNbDmr = optional("onNativeNbDmr", "(Ljava/lang/String;)V");
         m_.onAdsbFrame = optional("onNativeAdsbFrame", "([BIF)V");
         m_.onIsmBurst = optional("onNativeIsmBurst", "(Ljava/lang/String;[IFFF)V");
         m_.onAcarsFrame = optional("onNativeAcarsFrame", "(I[B)V");
@@ -316,6 +317,18 @@ public:
         jbyteArray a = byteArray(e, frame.data(), static_cast<int>(frame.size()));
         e->CallVoidMethod(target_, m_.onNbPacket, static_cast<jint>(kind), a);
         e->DeleteLocalRef(a);
+        clear(e);
+    }
+    void onNbDmr(const DmrStatus& status) override
+    {
+        // As JSON (dmrStatusJson): the plugin hands it to Dart unchanged.
+        JNIEnv* e = env();
+        if (!e || !m_.onNbDmr) return;
+        jstring json = e->NewStringUTF(dmrStatusJson(status).c_str());
+        if (json) {
+            e->CallVoidMethod(target_, m_.onNbDmr, json);
+            e->DeleteLocalRef(json);
+        }
         clear(e);
     }
     void onNbSpectrum(uint32_t centerHz, uint32_t spanHz, const std::vector<float>& bins, float gainDb) override
@@ -519,7 +532,7 @@ namespace {
 
 bool toNbMode(jint mode, NbMode& out)
 {
-    if (mode < 0 || mode > static_cast<jint>(NbMode::Wfm)) return false;
+    if (mode < 0 || mode > static_cast<jint>(NbMode::Dmr)) return false;
     out = static_cast<NbMode>(mode);
     return true;
 }

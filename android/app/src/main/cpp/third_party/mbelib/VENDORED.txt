@@ -1,0 +1,12 @@
+mbelib 1.3.0 - https://github.com/szechyjs/mbelib
+commit 9a04ed5c78176a9965f3d43f7aa1b1f5330e771f (2019-05-29)
+
+License: ISC style, see COPYRIGHT. Mind the patent notice in README.md.
+
+Taken unchanged: COPYRIGHT, README.md, CHANGELOG, mbelib.h, mbelib.c,
+mbelib_const.h, ecc.c, ecc_const.h, ambe3600x2450.c, ambe3600x2450_const.h.
+Left out: the IMBE (P25, ProVoice) and AMBE 3600x2400 (D-STAR) decoders,
+mbelib's build files, tests and Debian packaging.
+
+Used by hrdab/dmr.cpp for DMR's AMBE+2 voice frames when built with
+HRDAB_MBELIB (CMake option, on by default).

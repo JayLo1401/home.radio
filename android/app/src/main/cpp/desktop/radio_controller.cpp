@@ -78,6 +78,7 @@ int nbModeCode(const std::string& mode)
     if (mode == "usb") return 3;
     if (mode == "lsb") return 4;
     if (mode == "wfm") return 5;
+    if (mode == "dmr") return 6;
     return -1;
 }
 
@@ -574,7 +575,7 @@ bool RadioController::engineNbStart(int sampleRate, int centerHz, const std::vec
                                     int mode, float squelchDb)
 {
     std::lock_guard<std::mutex> lock(engineMutex_);
-    if (!rx_ || mode < 0 || mode > static_cast<int>(NbMode::Wfm) || sampleRate <= 0 || centerHz <= 0 || freqHz <= 0) {
+    if (!rx_ || mode < 0 || mode > static_cast<int>(NbMode::Dmr) || sampleRate <= 0 || centerHz <= 0 || freqHz <= 0) {
         return false;
     }
     return rx_->nbStart(static_cast<uint32_t>(sampleRate), static_cast<uint32_t>(centerHz), channels,
@@ -584,7 +585,7 @@ bool RadioController::engineNbStart(int sampleRate, int centerHz, const std::vec
 bool RadioController::engineNbTune(int freqHz, int mode)
 {
     std::lock_guard<std::mutex> lock(engineMutex_);
-    if (!rx_ || mode < 0 || mode > static_cast<int>(NbMode::Wfm) || freqHz <= 0) return false;
+    if (!rx_ || mode < 0 || mode > static_cast<int>(NbMode::Dmr) || freqHz <= 0) return false;
     return rx_->nbTune(static_cast<uint32_t>(freqHz), static_cast<NbMode>(mode));
 }
 
@@ -693,6 +694,13 @@ void RadioController::onNbPacket(int kind, const std::vector<uint8_t>& frame)
     Event e;
     e.beginObject().str("type", "nbPacket").num("kind", kind).str("hex", hex).endObject();
     emit(e.text());
+}
+
+void RadioController::onNbDmr(const DmrStatus& status)
+{
+    if (!nbActive_) return;
+    // The same object Android's plugin passes on as "json".
+    emit(dmrStatusJson(status));
 }
 
 float RadioController::engineNbSetGain(int gainIndex)

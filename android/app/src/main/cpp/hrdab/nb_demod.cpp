@@ -96,6 +96,7 @@ const char* nbModeName(NbMode mode)
         case NbMode::Usb: return "usb";
         case NbMode::Lsb: return "lsb";
         case NbMode::Wfm: return "wfm";
+        case NbMode::Dmr: return "dmr";
         default: return "auto";
     }
 }
@@ -348,6 +349,11 @@ NbDemod::NbDemod(IqReader& reader, NbSink& sink)
     audLp_.resize(maxChunk);
     aud48_.resize(3 * maxChunk + 8);
     pcm_.reserve(kPcmBlock + 3 * maxChunk);
+    // DMR voice: x6 (8 -> 48 kHz), passes the vocoder's 3.4 kHz.
+    dmrUp_.init(lowpass(3400, 4400, kAudioRate), 6, 1);
+    dmrHz_.resize(maxChunk);
+    dmr8_.resize(maxChunk);
+    dmr48_.resize(6 * maxChunk + 8);
 }
 
 void NbDemod::configure(const NbConfig& cfg)
@@ -500,8 +506,12 @@ void NbDemod::resetListen()
     candidateVotes_ = 0;
     confirmed_ = NbMode::Auto;
     // An explicit choice counts as "confirmed" for a later switch to auto -
-    // except WFM, which auto never uses.
-    if (cfg_.mode != NbMode::Auto && cfg_.mode != NbMode::Wfm) fallback_ = cfg_.mode;
+    // except WFM, which auto never uses, and DMR, which auto finds itself
+    // (falling back to it would mute an analog channel meanwhile).
+    if (cfg_.mode != NbMode::Auto && cfg_.mode != NbMode::Wfm) fallback_ = cfg_.mode == NbMode::Dmr ? NbMode::Fm : cfg_.mode;
+    if (dmr_) dmr_->reset();
+    dmrUp_.reset();
+    dmrOdd_ = 0;
 }
 
 NbMode NbDemod::activeMode() const
@@ -724,7 +734,7 @@ void NbDemod::demod16(int n, bool hold)
     const uint32_t ssbInc = static_cast<uint32_t>(static_cast<int64_t>(std::llround(ssbHz / kChannelRate * 4294967296.0)));
     if (mode == NbMode::Am) {
         amFilt_.process(z, n, m_.data());
-    } else if (mode == NbMode::Fm) {
+    } else if (mode == NbMode::Fm || mode == NbMode::Dmr) {
         fmFilt_.process(z, n, m_.data());
     } else if (ssb) {
         // Product detector: the sideband's centre to 0 Hz, +-1.35 kHz
@@ -743,7 +753,8 @@ void NbDemod::demod16(int n, bool hold)
 
     float* aud = aud16_.data();
     switch (mode) {
-        case NbMode::Fm: {
+        case NbMode::Fm:
+        case NbMode::Dmr: {
             constexpr float kToNorm = static_cast<float>(kChannelRate / (2.0 * M_PI) / kFmNormHz);
             float pi = prevI_, pq = prevQ_;
             for (int i = 0; i < n; i++) {
@@ -785,7 +796,39 @@ void NbDemod::demod16(int n, bool hold)
         }
     }
     if (ssb) ssbPhase_ += ssbInc * static_cast<uint32_t>(n);
+    // DMR: in its own mode, and looking along while auto hears NFM.
+    if (mode == NbMode::Dmr || (cfg_.mode == NbMode::Auto && mode == NbMode::Fm)) feedDmr(aud, n);
+    if (mode == NbMode::Dmr) {
+        dmrAudioOut(n);
+        return;
+    }
     audioOut(n);
+}
+
+void NbDemod::feedDmr(const float* disc, int n)
+{
+    if (!dmr_) dmr_ = std::make_unique<DmrDecoder>();
+    const float toHz = static_cast<float>(kFmNormHz);
+    for (int i = 0; i < n; i++) dmrHz_[static_cast<size_t>(i)] = disc[i] * toHz;
+    dmr_->process(dmrHz_.data(), n);
+    // Two bursts that passed their FEC (or a confirmed call): DMR for sure.
+    if (cfg_.mode == NbMode::Auto && confirmed_ != NbMode::Dmr && dmr_->recentlyValid(1000, 2)) {
+        HR_LOGI("NB auto: dmr");
+        confirmed_ = NbMode::Dmr;
+        candidate_ = NbMode::Auto;
+        candidateVotes_ = 0;
+    }
+}
+
+void NbDemod::dmrAudioOut(int n)
+{
+    // 16 kHz in, 8 kHz voice out: half as many samples.
+    dmrOdd_ += n;
+    const int n8 = dmrOdd_ / 2;
+    dmrOdd_ -= 2 * n8;
+    const bool voice = dmr_->pullAudio(dmr8_.data(), n8);
+    const int n48 = dmrUp_.process(dmr8_.data(), n8, dmr48_.data());
+    gateOut(dmr48_.data(), n48, voice);
 }
 
 void NbDemod::wfmChain(bool hold)
@@ -830,7 +873,7 @@ void NbDemod::wfmChain(bool hold)
     }
     wfmDc_ = dc;
     wfmDeemph_ = de;
-    gateOut(a, n48);
+    gateOut(a, n48, sqOpen_);
 }
 
 void NbDemod::levelAndSquelch(const float* m, int n, bool hold)
@@ -930,13 +973,13 @@ void NbDemod::audioOut(int n)
     agcHold_ = holdLeft;
 
     const int n48 = interp_.process(audLp_.data(), nl, aud48_.data());
-    gateOut(aud48_.data(), n48);
+    gateOut(aud48_.data(), n48, sqOpen_);
 }
 
-void NbDemod::gateOut(const float* a48, int n48)
+void NbDemod::gateOut(const float* a48, int n48, bool open)
 {
     // Squelch gate: 5 ms fade in, 10 ms fade out - no clicks.
-    const float target = sqOpen_ ? 1.f : 0.f;
+    const float target = open ? 1.f : 0.f;
     float g = gate_;
     for (int i = 0; i < n48; i++) {
         if (g < target) g = std::min(target, g + 1.f / 240);
@@ -990,6 +1033,8 @@ void NbDemod::classify()
     // Noise is subtracted using the window's measured floor; without a floor
     // or below ~5 dB SNR there is no verdict.
     if (n0_ <= 0 || envN_ == 0) return;
+    // DMR found: its 4FSK looks like NFM here - stay while it keeps coming.
+    if (confirmed_ == NbMode::Dmr && dmr_ && dmr_->recentlyValid(2000)) return;
     constexpr double binHz = static_cast<double>(kChannelRate) / kClsFft;
     const double norm = 1.0 / (static_cast<double>(clsFfts_) * kClsFft * clsWinPower_);
     auto bin = [&](int k) { return clsAcc_[static_cast<size_t>((k + kClsFft) % kClsFft)] * norm; };
@@ -1133,7 +1178,8 @@ void NbDemod::report()
     }
     statPow_ = 0;
     statN_ = 0;
-    rep.squelchOpen = listening_ && sqOpen_;
+    const bool dmr = mode == NbMode::Dmr && dmr_;
+    rep.squelchOpen = listening_ && (dmr ? dmr_->playing() : sqOpen_);
     rep.mode = cfg_.mode != NbMode::Auto ? cfg_.mode : confirmed_;
     rep.bandwidthHz = lastMode_ != NbMode::Auto ? bandwidthHz_ : effectiveBandwidth(mode, filters_.bandwidthHz);
     rep.noiseBlanker = filters_.noiseBlanker;
@@ -1143,6 +1189,7 @@ void NbDemod::report()
                   : (filters_.agc != NbAgc::Auto ? filters_.agc
                                                  : (mode == NbMode::Usb || mode == NbMode::Lsb ? NbAgc::Slow : NbAgc::Fast));
     sink_.onNbReport(rep);
+    if (dmr) sink_.onNbDmr(dmr_->status());
 }
 
 } // namespace hrdab

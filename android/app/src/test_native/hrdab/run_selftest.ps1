@@ -1,5 +1,5 @@
 # Builds the hrdab self test with the NDK and runs it on an adb device.
-#   .\run_selftest.ps1 [-Abi arm64-v8a|armeabi-v7a] [-Serial <adb serial>] [-Mode quick|full|fm|fmsep|demod|nb]
+#   .\run_selftest.ps1 [-Abi arm64-v8a|armeabi-v7a] [-Serial <adb serial>] [-Mode quick|full|fm|fmsep|demod|nb|dmr]
 param(
     [string]$Abi = "arm64-v8a",
     [string]$Serial = "",
@@ -15,11 +15,21 @@ $extra = if ($Abi -eq "armeabi-v7a") { @("-mfpu=neon", "-mfloat-abi=softfp") } e
 
 $here = $PSScriptRoot
 $src = Resolve-Path "$here\..\..\main\cpp\hrdab"
+$mbe = Resolve-Path "$here\..\..\main\cpp\third_party\mbelib"
 $sources = Get-ChildItem $src -Filter *.cpp | Where-Object { $_.Name -ne "hrdab_jni.cpp" } | ForEach-Object { $_.FullName }
-$sources += "$here\tx_sim.cpp", "$here\fm_tx_sim.cpp", "$here\nb_tx_sim.cpp", "$here\selftest.cpp"
+$sources += "$here\tx_sim.cpp", "$here\fm_tx_sim.cpp", "$here\nb_tx_sim.cpp", "$here\dmr_tx_sim.cpp", "$here\selftest.cpp"
 $out = "$env:TEMP\hrdab_selftest_$Abi"
 
-& "$bin\clang++.exe" --target=$target -std=c++17 -O2 -DHRDAB_STDERR_LOG -Wall -Wno-unused-variable @extra -I $src -I $here @sources -static-libstdc++ -llog -o $out
+# mbelib (DMR voice) is C: compiled on its own.
+$mbeObjs = @()
+foreach ($f in "mbelib.c", "ecc.c", "ambe3600x2450.c") {
+    $o = "$env:TEMP\hrdab_selftest_${Abi}_$f.o"
+    & "$bin\clang.exe" --target=$target -O2 -w @extra -c "$mbe\$f" -o $o
+    if ($LASTEXITCODE -ne 0) { throw "mbelib build failed" }
+    $mbeObjs += $o
+}
+
+& "$bin\clang++.exe" --target=$target -std=c++17 -O2 -DHRDAB_STDERR_LOG -DHRDAB_MBELIB -Wall -Wno-unused-variable @extra -I $src -I $here -I $mbe @sources @mbeObjs -static-libstdc++ -llog -o $out
 if ($LASTEXITCODE -ne 0) { throw "build failed" }
 
 $adbArgs = if ($Serial) { @("-s", $Serial) } else { @() }

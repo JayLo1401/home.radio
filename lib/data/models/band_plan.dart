@@ -165,7 +165,7 @@ final pmrBandPlan = BandPlan(
   channels: [
     for (var n = 1; n <= 16; n++) BandChannel('$n', 446006250 + (n - 1) * 12500),
   ],
-  modes: const ['fm', 'auto', 'am'],
+  modes: const ['fm', 'auto', 'am', 'dmr'],
   longLabel: (c) => 'Kanal ${c.label}',
   segments: [BandSegment(_mhz(446.0), _mhz(446.2), 'PMR446 (FM)', mode: 'fm', bandwidthHz: 12500)],
   defaultFreqHz: 446006250,
@@ -192,7 +192,7 @@ final milBandPlan = BandPlan(
   segments: [BandSegment(_mhz(225), _mhz(400), 'Militärischer Flugfunk (AM)', mode: 'am', bandwidthHz: 8330)],
 );
 
-const _hamModes = ['usb', 'lsb', 'cw', 'fm', 'am', 'auto'];
+const _hamModes = ['usb', 'lsb', 'cw', 'fm', 'am', 'auto', 'dmr'];
 
 BandPlan _hamPlan(String id, String title, int defaultHz, List<BandSegment> segments) => BandPlan(
   id: id,
@@ -213,6 +213,9 @@ BandSegment _ssb(double lo, double hi, String name, {int step = 2500, List<(Stri
     BandSegment(_mhz(lo), _mhz(hi), name, mode: 'usb', bandwidthHz: 2700, stepHz: step, marks: marks);
 BandSegment _nfm(double lo, double hi, String name, {int step = 12500, int bw = 12500, List<(String, int)> marks = const []}) =>
     BandSegment(_mhz(lo), _mhz(hi), name, mode: 'fm', bandwidthHz: bw, stepHz: step, marks: marks);
+// Analog FM and DMR side by side: auto tells them apart (and decodes DMR).
+BandSegment _fmOrDmr(double lo, double hi, String name) =>
+    BandSegment(_mhz(lo), _mhz(hi), name, mode: 'auto', stepHz: 12500);
 
 /// The amateur radio bands this stick (R820T2, from ~24 MHz) can receive -
 /// shortwave below would need direct sampling. Built from the IARU Region 1
@@ -268,9 +271,9 @@ final hamBandPlans = [
     _nfm(433.400, 433.600, 'FM-Direkt (433,500 Anruf), LPD', marks: [('Anruf', _mhz(433.500))]),
     _nfm(433.600, 435.000, 'LPD-Funkgeräte & ISM (433,920 Sensoren)', marks: [('Sensoren', _mhz(433.920))]),
     _nfm(435.000, 438.000, 'Satelliten'),
-    _nfm(438.000, 438.650, 'Digital (DMR, C4FM)'),
-    _nfm(438.650, 439.450, 'Relais-Ausgaben (auch DMR/C4FM)'),
-    _nfm(439.450, 440.000, 'Digital'),
+    _fmOrDmr(438.000, 438.650, 'Digital (DMR, C4FM)'),
+    _fmOrDmr(438.650, 439.450, 'Relais-Ausgaben (auch DMR/C4FM)'),
+    _fmOrDmr(439.450, 440.000, 'Digital'),
   ]),
   _hamPlan('ham23', 'Amateurfunk 23 cm', _mhz(1297.500), [
     _nfm(1240.000, 1243.250, 'Digital', step: 25000),
@@ -338,7 +341,7 @@ final List<BandSegment> _worldSegments = () {
     // Raster from channel 1 (446,00625).
     BandSegment(446006250, _mhz(446.2), 'PMR446', mode: 'fm', bandwidthHz: 12500, stepHz: 12500,
         marks: [for (var n = 1; n <= 16; n++) ('PMR $n', 446006250 + (n - 1) * 12500)]),
-    s(446.2, 470.0, 'Betriebsfunk / Bahnfunk (DMR)', 'fm', bw: 12500),
+    s(446.2, 470.0, 'Betriebsfunk / Bahnfunk (DMR)', 'auto'),
     s(470.0, 790.0, 'Fernsehen DVB-T2 (digital)', 'wfm', bw: 200000, step: 1000000),
     s(790.0, 862.0, 'Mobilfunk LTE (digital)', 'wfm', bw: 200000, step: 1000000),
     s(863.0, 870.0, 'Funksensoren / LoRa 868', 'fm', bw: 12500, step: 25000),
@@ -372,7 +375,7 @@ final BandPlan worldBandPlan = () {
     id: 'world',
     title: 'Freier Band-Scan',
     channels: _segmentChannels(segments),
-    modes: const ['fm', 'am', 'usb', 'lsb', 'cw', 'wfm', 'auto'],
+    modes: const ['fm', 'am', 'usb', 'lsb', 'cw', 'wfm', 'auto', 'dmr'],
     longLabel: _mhzLabel,
     segments: segments,
     defaultFreqHz: _mhz(145.500),
@@ -412,5 +415,6 @@ String modeLabel(String mode) => switch (mode) {
   'lsb' => 'LSB',
   'cw' => 'CW',
   'wfm' => 'WFM',
+  'dmr' => 'DMR',
   _ => mode.toUpperCase(),
 };

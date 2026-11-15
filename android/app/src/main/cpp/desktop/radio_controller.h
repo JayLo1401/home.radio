@@ -119,6 +119,7 @@ private:
     void onNbReport(const NbReport& report, float gainDb) override;
     void onNbSpectrum(uint32_t centerHz, uint32_t spanHz, const std::vector<float>& binsDbfs, float gainDb) override;
     void onNbPacket(int kind, const std::vector<uint8_t>& frame) override;
+    void onNbDmr(const DmrStatus& status) override;
     void onAdsbFrame(const uint8_t* bytes, int length, uint32_t icao, float signalDbfs) override;
     void onIsmBurst(const char* modulation, const std::vector<int>& durationsUs, float offsetHz, float levelDb,
                     float snrDb) override;

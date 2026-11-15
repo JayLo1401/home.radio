@@ -761,6 +761,11 @@ void Receiver::onNbReport(const NbReport& report)
     listener_.onNbReport(report, gainDb());
 }
 
+void Receiver::onNbDmr(const DmrStatus& status)
+{
+    listener_.onNbDmr(status);
+}
+
 void Receiver::onNbSpectrum(uint32_t centerHz, uint32_t spanHz, const std::vector<float>& binsDbfs)
 {
     listener_.onNbSpectrum(centerHz, spanHz, binsDbfs, gainDb());

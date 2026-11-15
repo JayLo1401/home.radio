@@ -58,6 +58,8 @@ public:
     // kind 1 = AX.25 frame (APRS, FCS checked and removed), 2 = ACARS message
     // (SOH .. ETX/ETB + BCS, CRC checked).
     virtual void onNbPacket(int /*kind*/, const std::vector<uint8_t>& /*frame*/) {}
+    // DMR state (see DmrStatus) with every NB report while DMR is decoded.
+    virtual void onNbDmr(const DmrStatus& /*status*/) {}
     // ADS-B / Mode S frame (see AdsbSink); called on the ADS-B thread.
     virtual void onAdsbFrame(const uint8_t* /*bytes*/, int /*length*/, uint32_t /*icao*/, float /*signalDbfs*/) {}
     // Data modes (ADS-B, ISM, ACARS), twice a second: samples per second
@@ -228,6 +230,7 @@ private:
     void onNbAudio(const int16_t* pcm, int frames) override;
     void onNbReport(const NbReport& report) override;
     void onNbSpectrum(uint32_t centerHz, uint32_t spanHz, const std::vector<float>& binsDbfs) override;
+    void onNbDmr(const DmrStatus& status) override;
     // AdsbSink
     void onAdsbFrame(const uint8_t* bytes, int length, uint32_t icao, float signalDbfs) override;
     void onAdsbLevel(float rms, float clipRatio) override;
