@@ -39,6 +39,10 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
+  /// The top bar's "Einstellungen" button - takes D-Pad focus at start when
+  /// nothing else has it (see [_ensureInitialFocus]).
+  final _settingsFocus = FocusNode(debugLabel: 'settings');
+
   PlayerState? _playerState;
   String? _icyTitle;
   String? _playbackError;
@@ -266,6 +270,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       await _initDabServer();
       await _autostart();
     });
+    _ensureInitialFocus();
+  }
+
+  /// Without a current station nothing claims focus (only the sidebar row of
+  /// the current station does, see _StationRow._claimFocus) - then neither
+  /// the D-Pad nor [_handleKey] react, e.g. on Fire TV. A little after start,
+  /// if focus is still nowhere (null or just a scope), the settings button
+  /// takes it; a current station's row has claimed it by then and keeps it.
+  void _ensureInitialFocus() {
+    Future<void>.delayed(const Duration(milliseconds: 600), () {
+      if (!mounted) return;
+      final primary = FocusManager.instance.primaryFocus;
+      if (primary == null || primary is FocusScopeNode) {
+        _settingsFocus.requestFocus();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _settingsFocus.dispose();
+    super.dispose();
   }
 
   /// Live DAB+ radiotext (DLS/dynamic label - the "now playing" style text
@@ -1031,8 +1057,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
   }
 
-  /// Physical remote-control keys - previous/next track and page/channel
-  /// up/down both step through the currently shown station list (whichever
+  /// Physical remote-control keys - previous/next track, rewind/fast-forward
+  /// (Fire TV remotes have only ⏪/⏩, no track or channel keys) and page/
+  /// channel up/down all step through the currently shown station list (whichever
   /// of the two really arrives depends on the remote/Android TV box, so both
   /// are mapped to the same action rather than guessing one); play/pause and
   /// stop control playback, including for internet radio. Attached to a
@@ -1047,12 +1074,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
     final key = event.logicalKey;
     if (key == LogicalKeyboardKey.mediaTrackPrevious ||
+        key == LogicalKeyboardKey.mediaRewind ||
         key == LogicalKeyboardKey.pageDown ||
         key == LogicalKeyboardKey.channelDown) {
       _stepStation(-1);
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.mediaTrackNext ||
+        key == LogicalKeyboardKey.mediaFastForward ||
         key == LogicalKeyboardKey.pageUp ||
         key == LogicalKeyboardKey.channelUp) {
       _stepStation(1);
@@ -1190,6 +1219,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     onOpenSettings: () => Navigator.of(context)
                         .push(MaterialPageRoute(builder: (_) => const SettingsScreen()))
                         .then((_) => _afterSettings()),
+                    settingsFocusNode: _settingsFocus,
                   ),
                   Expanded(
                     child: Row(
@@ -1431,6 +1461,9 @@ class _MenuBar extends StatelessWidget {
   final List<(IconData, String, VoidCallback)> listeningButtons;
   final VoidCallback onOpenInternetSearch;
   final VoidCallback onOpenSettings;
+  /// Focus of the settings button - HomeScreen hands it the initial focus
+  /// when no current station claims it.
+  final FocusNode? settingsFocusNode;
 
   const _MenuBar({
     required this.onOpenDabStations,
@@ -1439,6 +1472,7 @@ class _MenuBar extends StatelessWidget {
     this.listeningButtons = const [],
     required this.onOpenInternetSearch,
     required this.onOpenSettings,
+    this.settingsFocusNode,
   });
 
   @override
@@ -1554,6 +1588,7 @@ class _MenuBar extends StatelessWidget {
                     icon: Icons.settings,
                     label: 'Einstellungen',
                     onPressed: onOpenSettings,
+                    focusNode: settingsFocusNode,
                   ),
                 ],
               ),
@@ -1659,11 +1694,13 @@ class _MenuBarButton extends StatefulWidget {
   final IconData icon;
   final String label;
   final VoidCallback onPressed;
+  final FocusNode? focusNode;
 
   const _MenuBarButton({
     required this.icon,
     required this.label,
     required this.onPressed,
+    this.focusNode,
   });
 
   @override
@@ -1678,6 +1715,7 @@ class _MenuBarButtonState extends State<_MenuBarButton> {
     return TvFocusHighlight(
       focused: _focused,
       child: InkWell(
+        focusNode: widget.focusNode,
         borderRadius: BorderRadius.circular(8),
         focusColor: Colors.transparent,
         hoverColor: Colors.white.withValues(alpha: 0.08),
