@@ -1,8 +1,9 @@
 import 'dart:convert';
 
-/// What Home Media shows on start: the launcher, or straight Home Radio with
-/// the autostart station (as before the launcher existed).
-enum StartScreen { launcher, radio }
+/// What Home Media shows on start: the launcher, straight Home Radio with
+/// the autostart station (as before the launcher existed), or Home TV with
+/// its start channel - e.g. a TV set that should simply show TV.
+enum StartScreen { launcher, radio, tv }
 
 /// Where the launcher's background pictures come from.
 /// - [builtin]: colour gradients that come with the app (offline).

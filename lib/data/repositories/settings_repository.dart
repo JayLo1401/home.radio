@@ -577,8 +577,10 @@ class SettingsRepository {
 
   /// What shows on start (see [StartScreen]) - Home Radio by default, as
   /// before the launcher existed.
-  Future<StartScreen> getStartScreen() async =>
-      await _db.getSetting('start_screen') == 'launcher' ? StartScreen.launcher : StartScreen.radio;
+  Future<StartScreen> getStartScreen() async {
+    final v = await _db.getSetting('start_screen');
+    return StartScreen.values.firstWhere((s) => s.name == v, orElse: () => StartScreen.radio);
+  }
   Future<void> setStartScreen(StartScreen value) => _db.setSetting('start_screen', value.name);
 
   /// The launcher's row; null until it was first set up (see
@@ -590,6 +592,11 @@ class SettingsRepository {
 
   Future<void> setLauncherTiles(List<LauncherTile> tiles) =>
       _db.setSetting('launcher_tiles', encodeLauncherTiles(tiles));
+
+  /// Home TV's tile was put into an existing row once (rows from before
+  /// Home TV) - afterwards removing it stays removed.
+  Future<bool> getLauncherTvAdded() async => await _db.getSetting('launcher_tv_added') == 'true';
+  Future<void> setLauncherTvAdded() => _db.setSetting('launcher_tv_added', 'true');
 
   Future<LauncherBackgroundSource> getLauncherBackgroundSource() async {
     final v = await _db.getSetting('launcher_bg_source');
@@ -649,6 +656,36 @@ class SettingsRepository {
   /// The bouquet Home TV shows (service reference).
   Future<String?> getTvBouquet() => _db.getSetting('tv_bouquet');
   Future<void> setTvBouquet(String ref) => _db.setSetting('tv_bouquet', ref);
+
+  /// The channel Home TV always starts with (service reference); null = the
+  /// one last watched.
+  Future<String?> getTvStartChannel() async {
+    final v = await _db.getSetting('tv_start_channel');
+    return v == null || v.isEmpty ? null : v;
+  }
+
+  Future<void> setTvStartChannel(String? ref) => _db.setSetting('tv_start_channel', ref ?? '');
+
+  /// Home TV's "Als Nächstes" note: on/off, how many minutes before the next
+  /// programme, and for how many seconds it shows.
+  static const tvNextLeadChoices = [1, 2, 5, 10, 15];
+  static const tvNextShowChoices = [10, 20, 30, 60];
+
+  Future<({bool enabled, int leadMinutes, int showSeconds})> getTvNextUp() async {
+    final lead = int.tryParse(await _db.getSetting('tv_next_lead') ?? '');
+    final show = int.tryParse(await _db.getSetting('tv_next_show') ?? '');
+    return (
+      enabled: await _db.getSetting('tv_next_enabled') != 'false',
+      leadMinutes: tvNextLeadChoices.contains(lead) ? lead! : 5,
+      showSeconds: tvNextShowChoices.contains(show) ? show! : 30,
+    );
+  }
+
+  Future<void> setTvNextUp({required bool enabled, required int leadMinutes, required int showSeconds}) async {
+    await _db.setSetting('tv_next_enabled', '$enabled');
+    await _db.setSetting('tv_next_lead', '$leadMinutes');
+    await _db.setSetting('tv_next_show', '$showSeconds');
+  }
 
   /// The channel last watched (service reference) - Home TV starts with it.
   Future<String?> getTvLastChannel() => _db.getSetting('tv_last_channel');

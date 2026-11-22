@@ -9,6 +9,7 @@ import '../../data/services/launcher_service.dart';
 import '../home/home_screen.dart';
 import '../launcher/launcher_navigation.dart';
 import '../launcher/launcher_providers.dart';
+import '../tv/tv_screen.dart';
 
 /// Brief branded startup animation shown right after the native Android
 /// launch background (which already shows the app icon on black - see
@@ -55,16 +56,20 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
   /// over it when that's the start setting, or the Home key started the app.
   Future<void> _start() async {
     final started = DateTime.now();
-    var launcher = false;
+    var start = StartScreen.radio;
     if (LauncherService.supported) {
       final requested = await ref.read(launcherServiceProvider).takeLaunchRequest();
-      launcher = requested || await ref.read(settingsRepositoryProvider).getStartScreen() == StartScreen.launcher;
+      start = requested ? StartScreen.launcher : await ref.read(settingsRepositoryProvider).getStartScreen();
     }
     final rest = _popDuration - DateTime.now().difference(started);
     if (rest > Duration.zero) await Future<void>.delayed(rest);
     if (!mounted) return;
-    Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const HomeScreen()));
-    if (launcher) showLauncher(ref);
+    final nav = Navigator.of(context);
+    nav.pushReplacement(MaterialPageRoute(builder: (_) => const HomeScreen()));
+    if (start == StartScreen.radio) return;
+    showLauncher(ref);
+    // Home TV on top of the launcher - Back leads there.
+    if (start == StartScreen.tv) nav.push(MaterialPageRoute(builder: (_) => const TvScreen()));
   }
 
   @override

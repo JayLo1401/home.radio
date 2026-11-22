@@ -59,6 +59,7 @@ dependencies:
   window_manager: ^0.5.2
   screen_retriever: ^0.2.2
   flutter_secure_storage: ^11.2.0
+  video_player: ^2.14.1
 
 dev_dependencies:
   flutter_test:

@@ -49,6 +49,21 @@ void main() {
     });
   });
 
+  test('Bing archive: landscapes kept, people and events left out', () {
+    const body = '{"images": ['
+        '{"urlbase": "/th?id=OHR.Abraham", "copyright": "Abraham Lake in Alberta, Kanada (© Guang Cao/Getty Images)"},'
+        '{"urlbase": "/th?id=OHR.Mauer", "copyright": "Schüler spähen durch einen Spalt in der Berliner Mauer (© Sean Gallup)"},'
+        '{"urlbase": "/th?id=OHR.Eulen", "copyright": "Ein Schleiereulenpaar (© Zahoor Salmi/Getty Images)"},'
+        '{"urlbase": "", "copyright": "leer"}'
+        ']}';
+    final images = parseBingArchive(body);
+    expect(images.map((i) => i.url), [
+      'https://www.bing.com/th?id=OHR.Abraham_1920x1080.jpg',
+      'https://www.bing.com/th?id=OHR.Eulen_1920x1080.jpg',
+    ]);
+    expect(images.first.caption, startsWith('Abraham Lake'));
+  });
+
   group('launcher tiles', () {
     test('round trip keeps order, pictures and labels', () {
       const tiles = [

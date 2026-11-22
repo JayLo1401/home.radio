@@ -11,6 +11,7 @@ import '../../core/theme.dart';
 import '../../data/models/launcher_tile.dart';
 import '../../data/services/launcher_service.dart';
 import '../settings/settings_screen.dart';
+import '../tv/tv_screen.dart';
 import 'all_apps_screen.dart';
 import 'launcher_background.dart';
 import 'launcher_navigation.dart';
@@ -96,6 +97,12 @@ class _LauncherScreenState extends ConsumerState<LauncherScreen> {
     final service = ref.read(launcherServiceProvider);
     if (tile.isRadio) {
       hideLauncher(ref);
+      return;
+    }
+    if (tile.isTv) {
+      // TV takes the speakers; the radio plays on when opened again.
+      ref.read(radioCommandProvider.notifier).send(RadioCommand.pauseForApp);
+      await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const TvScreen()));
       return;
     }
     if (tile.isSystemSettings) {

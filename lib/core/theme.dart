@@ -34,8 +34,13 @@ ThemeData buildTvTheme() {
 
   return base.copyWith(
     focusColor: focusColor,
+    // A filled button is the focus colour itself - its frame is white.
     filledButtonTheme: FilledButtonThemeData(
-      style: ButtonStyle(side: focusBorder()),
+      style: ButtonStyle(
+        side: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.focused) ? const BorderSide(color: Colors.white, width: 3) : null,
+        ),
+      ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: ButtonStyle(side: focusBorder()),

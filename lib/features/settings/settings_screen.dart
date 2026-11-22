@@ -15,13 +15,23 @@ import '../../data/services/launcher_service.dart';
 import '../launcher/launcher_providers.dart';
 import '../rtlsdr/rtl_sdr_test_screen.dart';
 import 'backup_settings_screen.dart';
+import '../tv/tv_providers.dart';
 import 'launcher_settings_screens.dart';
+import 'tv_settings_screen.dart';
 import 'update_settings_screen.dart';
 import 'location_settings_screen.dart';
 import 'radar_source_settings_screen.dart';
 
+/// The settings' areas - one page each, reached from the overview.
+enum SettingsSection { launcher, radio, tv, general }
+
+/// Settings: without [section] the overview of the areas (Launcher, Home
+/// Radio, Home TV, Allgemein), with it that area's page - Home Radio's gear
+/// opens its own area right away.
 class SettingsScreen extends ConsumerStatefulWidget {
-  const SettingsScreen({super.key});
+  const SettingsScreen({super.key, this.section});
+
+  final SettingsSection? section;
 
   @override
   ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
@@ -30,6 +40,10 @@ class SettingsScreen extends ConsumerStatefulWidget {
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   AutostartMode _mode = AutostartMode.lastStation;
   int? _fixedProgramNumber;
+  // Home TV's start channel (null = last watched); "Festen Sender" picked
+  // but no channel yet.
+  String? _tvStartChannel;
+  bool _tvFixedChosen = false;
   bool _showClockDate = false;
   bool _weatherEnabled = true;
   bool _radarEnabled = true;
@@ -71,6 +85,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final fullscreen = await repo.getFullscreen();
     final monitor = await repo.getFullscreenMonitor();
     final monitors = await monitorCount();
+    final tvStartChannel = await repo.getTvStartChannel();
     final scale = ref.read(uiScaleProvider);
     if (!mounted) return;
     setState(() {
@@ -91,6 +106,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       _fullscreen = fullscreen;
       _monitor = monitor;
       _monitors = monitors;
+      _tvStartChannel = tvStartChannel;
       _loaded = true;
     });
   }
@@ -267,13 +283,24 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       );
     }
 
+    final section = widget.section;
+    if (section == null) return const _SettingsOverview();
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Einstellungen')),
+      appBar: AppBar(
+        title: Text(switch (section) {
+          SettingsSection.launcher => 'Einstellungen: Launcher',
+          SettingsSection.radio => 'Einstellungen: Home Radio',
+          SettingsSection.tv => 'Einstellungen: Home TV',
+          SettingsSection.general => 'Einstellungen: Allgemein',
+        }),
+      ),
       body: FocusTraversalGroup(
         policy: OrderedTraversalPolicy(),
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            if (section == SettingsSection.radio) ...[
             // First, since it decides whether DAB+ shows up anywhere at all.
             Text('Empfang', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 8),
@@ -309,11 +336,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ref.read(receiverSectionsProvider.notifier).setFunk(v);
               }),
             ],
-            if (LauncherService.supported) ...[
-              const Divider(height: 32),
-              Text('Home Media', style: Theme.of(context).textTheme.titleLarge),
+            ],
+            if (section == SettingsSection.launcher) ...[
+              Text('Beim Start der App', style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 8),
-              Text('Beim Start der App', style: Theme.of(context).textTheme.bodyLarge),
               FocusTraversalOrder(
                 order: NumericFocusOrder(nextOrder()),
                 child: _TvChoiceTile(
@@ -325,9 +351,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               FocusTraversalOrder(
                 order: NumericFocusOrder(nextOrder()),
                 child: _TvChoiceTile(
-                  label: 'Home Radio mit Sender starten (siehe Autostart)',
+                  label: 'Home Radio mit Sender starten (Home Radio → Autostart)',
                   selected: launcher.startScreen == StartScreen.radio,
                   onTap: () => ref.read(launcherSettingsProvider.notifier).setStartScreen(StartScreen.radio),
+                ),
+              ),
+              FocusTraversalOrder(
+                order: NumericFocusOrder(nextOrder()),
+                child: _TvChoiceTile(
+                  label: 'Home TV mit Sender starten (Home TV → Sender beim Start)',
+                  selected: launcher.startScreen == StartScreen.tv,
+                  onTap: () => ref.read(launcherSettingsProvider.notifier).setStartScreen(StartScreen.tv),
                 ),
               ),
               FocusTraversalOrder(
@@ -371,6 +405,129 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
               ),
             ],
+            if (section == SettingsSection.tv) ...[
+              Text('Receiver', style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 8),
+              FocusTraversalOrder(
+              order: NumericFocusOrder(nextOrder()),
+              child: _TvNavTile(
+                label: 'Sat-Receiver (Enigma2)',
+                value: (ref.watch(enigma2ConfigProvider)?.configured ?? false)
+                    ? ref.watch(enigma2ConfigProvider)!.host
+                    : 'nicht eingerichtet',
+                configured: ref.watch(enigma2ConfigProvider)?.configured ?? false,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const TvSettingsScreen()),
+                ),
+              ),
+            ),
+              const Divider(height: 32),
+              Text('Sender beim Start von Home TV', style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 8),
+              FocusTraversalOrder(
+                order: NumericFocusOrder(nextOrder()),
+                child: _TvChoiceTile(
+                  label: 'Zuletzt gesehenen Sender',
+                  selected: _tvStartChannel == null,
+                  onTap: () async {
+                    setState(() => _tvStartChannel = null);
+                    await repo.setTvStartChannel(null);
+                  },
+                ),
+              ),
+              FocusTraversalOrder(
+                order: NumericFocusOrder(nextOrder()),
+                child: _TvChoiceTile(
+                  label: 'Festen Sender',
+                  selected: _tvStartChannel != null || _tvFixedChosen,
+                  onTap: () => setState(() => _tvFixedChosen = true),
+                ),
+              ),
+              if (_tvStartChannel != null || _tvFixedChosen)
+                Padding(
+                  padding: const EdgeInsets.only(left: 16, top: 8),
+                  child: ref.watch(tvChannelsProvider).when(
+                        loading: () => const LinearProgressIndicator(),
+                        error: (e, _) => Text('Senderliste nicht erreichbar: $e', style: const TextStyle(color: Colors.amber)),
+                        data: (channels) => channels.isEmpty
+                            ? const Text('Erst den Receiver einrichten.', style: TextStyle(color: Colors.white60))
+                            : Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  for (final c in channels)
+                                    FocusTraversalOrder(
+                                      order: NumericFocusOrder(nextOrder()),
+                                      child: _TvChoiceTile(
+                                        compact: true,
+                                        label: '${c.number} · ${c.name}',
+                                        selected: _tvStartChannel == c.ref,
+                                        onTap: () async {
+                                          setState(() => _tvStartChannel = c.ref);
+                                          await repo.setTvStartChannel(c.ref);
+                                        },
+                                      ),
+                                    ),
+                                ],
+                              ),
+                      ),
+                ),
+              const Divider(height: 32),
+              Text('Als Nächstes', style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 4),
+              const Text(
+                'Kurz bevor auf dem laufenden Sender die nächste Sendung beginnt, zeigt Home TV, was als Nächstes kommt.',
+                style: TextStyle(color: Colors.white60),
+              ),
+              const SizedBox(height: 8),
+              tileToggle('Hinweis auf die nächste Sendung', ref.watch(tvNextUpProvider).enabled, (v) {
+                final s = ref.read(tvNextUpProvider);
+                ref.read(tvNextUpProvider.notifier).set((enabled: v, leadMinutes: s.leadMinutes, showSeconds: s.showSeconds));
+              }),
+              if (ref.watch(tvNextUpProvider).enabled) ...[
+                const SizedBox(height: 8),
+                Text('Wie lange vorher', style: Theme.of(context).textTheme.bodyLarge),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    for (final m in SettingsRepository.tvNextLeadChoices)
+                      FocusTraversalOrder(
+                        order: NumericFocusOrder(nextOrder()),
+                        child: _TvChoiceTile(
+                          compact: true,
+                          label: '$m Min.',
+                          selected: ref.watch(tvNextUpProvider).leadMinutes == m,
+                          onTap: () {
+                            final s = ref.read(tvNextUpProvider);
+                            ref.read(tvNextUpProvider.notifier).set((enabled: s.enabled, leadMinutes: m, showSeconds: s.showSeconds));
+                          },
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text('Wie lange anzeigen', style: Theme.of(context).textTheme.bodyLarge),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    for (final sec in SettingsRepository.tvNextShowChoices)
+                      FocusTraversalOrder(
+                        order: NumericFocusOrder(nextOrder()),
+                        child: _TvChoiceTile(
+                          compact: true,
+                          label: sec == 60 ? '1 Min.' : '$sec Sek.',
+                          selected: ref.watch(tvNextUpProvider).showSeconds == sec,
+                          onTap: () {
+                            final s = ref.read(tvNextUpProvider);
+                            ref.read(tvNextUpProvider.notifier).set((enabled: s.enabled, leadMinutes: s.leadMinutes, showSeconds: sec));
+                          },
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ],
+            if (section == SettingsSection.radio) ...[
             const Divider(height: 32),
             Text('Autostart', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 8),
@@ -425,6 +582,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               setState(() => _showClockDate = v);
               await ref.read(showClockDateProvider.notifier).set(v);
             }),
+            ],
+            if (section == SettingsSection.general) ...[
+            Text('Anzeige', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 8),
             tileToggle('Vollbild', _fullscreen, (v) => _setFullscreen(fullscreen: v)),
             if (Platform.isWindows && _fullscreen)
               scaleRow(
@@ -437,6 +598,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               valueLabel: '${(_uiScale * 100).round()} %',
               onChange: (d) => _changeUiScale(d * 0.1),
             ),
+            ],
+            if (section == SettingsSection.radio) ...[
             const Divider(height: 32),
             Text('Kacheln', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 8),
@@ -536,9 +699,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
               ],
             ),
+            // Home Radio's gear opens its own area; the others from here.
+            const Divider(height: 32),
+            FocusTraversalOrder(
+              order: NumericFocusOrder(nextOrder()),
+              child: _TvNavTile(
+                label: 'Weitere Einstellungen (Launcher, Home TV, Allgemein)',
+                icon: Icons.settings_outlined,
+                onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SettingsScreen())),
+              ),
+            ),
+            ],
             // Favorites are renamed/reordered/removed right in the home
             // screen's sidebar ("Bearbeiten"), the DAB+ station order is set
             // on the DAB+ stations screen - neither lives here anymore.
+            if (section == SettingsSection.general) ...[
             const Divider(height: 32),
             Text('Weiteres', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 8),
@@ -580,6 +755,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 onTap: _quitApp,
               ),
             ),
+            ],
             const SizedBox(height: 24),
           ],
         ),
@@ -616,6 +792,117 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
     // Also ends the media session's foreground service on Android.
     exit(0);
+  }
+}
+
+/// The settings' first page: one entry per area, each with its logo.
+class _SettingsOverview extends StatelessWidget {
+  const _SettingsOverview();
+
+  @override
+  Widget build(BuildContext context) {
+    void open(SettingsSection s) =>
+        Navigator.of(context).push(MaterialPageRoute(builder: (_) => SettingsScreen(section: s)));
+    return Scaffold(
+      appBar: AppBar(title: const Text('Einstellungen')),
+      body: ListView(
+        padding: const EdgeInsets.all(24),
+        children: [
+          if (LauncherService.supported)
+            _AreaTile(
+              logo: 'assets/icon/home_media_logo.png',
+              title: 'Launcher',
+              subtitle: 'Start der App, Hintergrund, Icon-Paket, Home-Taste',
+              autofocus: true,
+              onTap: () => open(SettingsSection.launcher),
+            ),
+          _AreaTile(
+            logo: 'assets/icon/home_radio_logo.png',
+            title: 'Home Radio',
+            subtitle: 'Empfänger (DAB+, UKW, Funk), Autostart-Sender, Wetter, Radar, Sonne & Mond',
+            autofocus: !LauncherService.supported,
+            onTap: () => open(SettingsSection.radio),
+          ),
+          _AreaTile(
+            logo: 'assets/icon/home_tv_logo.png',
+            title: 'Home TV',
+            subtitle: 'Sat-Receiver (Enigma2, z. B. GigaBlue)',
+            onTap: () => open(SettingsSection.tv),
+          ),
+          _AreaTile(
+            icon: Icons.tune,
+            title: 'Allgemein',
+            subtitle: 'Größe der Oberfläche, Vollbild, Backup, Updates, Über, Programm beenden',
+            onTap: () => open(SettingsSection.general),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AreaTile extends StatefulWidget {
+  const _AreaTile({this.logo, this.icon, required this.title, required this.subtitle, required this.onTap, this.autofocus = false});
+
+  final String? logo;
+  final IconData? icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+  final bool autofocus;
+
+  @override
+  State<_AreaTile> createState() => _AreaTileState();
+}
+
+class _AreaTileState extends State<_AreaTile> {
+  bool _focused = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: TvFocusHighlight(
+        focused: _focused,
+        child: InkWell(
+          autofocus: widget.autofocus,
+          borderRadius: BorderRadius.circular(12),
+          focusColor: Colors.transparent,
+          onFocusChange: (v) => setState(() => _focused = v),
+          onTap: widget.onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: widget.logo != null
+                      ? Image.asset(widget.logo!, width: 64, height: 64, filterQuality: FilterQuality.medium)
+                      : Container(
+                          width: 64,
+                          height: 64,
+                          color: const Color(0xFF1E2326),
+                          child: Icon(widget.icon, color: Colors.white, size: 34),
+                        ),
+                ),
+                const SizedBox(width: 18),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(widget.title, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 4),
+                      Text(widget.subtitle, style: const TextStyle(color: Colors.white60, fontSize: 15)),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right, color: Colors.white38),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

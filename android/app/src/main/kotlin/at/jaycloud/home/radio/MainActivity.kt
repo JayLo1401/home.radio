@@ -23,7 +23,10 @@ class MainActivity : AudioServiceActivity() {
         flutterEngine.plugins.add(launcher)
     }
 
+    private var createdAt = 0L
+
     override fun onCreate(savedInstanceState: Bundle?) {
+        createdAt = SystemClock.elapsedRealtime()
         super.onCreate(savedInstanceState)
         HomeButtonService.restoreAfterUpdate(this)
         // A cold start by the Home key opens the launcher; at boot (also a
@@ -42,7 +45,13 @@ class MainActivity : AudioServiceActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        if (isHomeIntent(intent)) launcher.requestShowLauncher()
+        // Right after the start the system's home screen can still flash up
+        // (boot, an update) and HomeButtonService sends us here again - that
+        // must not close what the start setting opened (e.g. Home TV).
+        val justStarted = SystemClock.elapsedRealtime() - createdAt < 5_000
+        if (isHomeIntent(intent) && !(justStarted && intent.getBooleanExtra(EXTRA_SHOW_LAUNCHER, false))) {
+            launcher.requestShowLauncher()
+        }
     }
 
     private fun isHomeIntent(intent: Intent?): Boolean =

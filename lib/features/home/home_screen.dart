@@ -1290,7 +1290,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     // The receiver settings may have changed the default
                     // rtl_tcp server or freed it for "Testen".
                     onOpenSettings: () => Navigator.of(context)
-                        .push(MaterialPageRoute(builder: (_) => const SettingsScreen()))
+                        .push(MaterialPageRoute(builder: (_) => const SettingsScreen(section: SettingsSection.radio)))
                         .then((_) => _afterSettings()),
                     settingsFocusNode: _settingsFocus,
                   ),

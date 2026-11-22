@@ -440,4 +440,5 @@ class _HomeButtonSettingsScreenState extends ConsumerState<HomeButtonSettingsScr
 String startScreenLabel(StartScreen s) => switch (s) {
       StartScreen.launcher => 'Launcher',
       StartScreen.radio => 'Home Radio',
+      StartScreen.tv => 'Home TV',
     };

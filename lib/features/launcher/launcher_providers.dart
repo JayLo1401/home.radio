@@ -143,11 +143,17 @@ class LauncherTilesNotifier extends Notifier<List<LauncherTile>> {
   Future<void> _load() async {
     final saved = await _repo.getLauncherTiles();
     if (saved != null) {
+      if (!saved.any((t) => t.isTv) && !await _repo.getLauncherTvAdded()) {
+        saved.insert(saved.indexWhere((t) => t.isRadio) + 1, const LauncherTile.tv());
+        await _repo.setLauncherTiles(saved);
+      }
+      await _repo.setLauncherTvAdded();
       state = saved;
       return;
     }
+    await _repo.setLauncherTvAdded();
     final apps = await ref.read(launcherServiceProvider).listApps();
-    final tiles = <LauncherTile>[const LauncherTile.radio()];
+    final tiles = <LauncherTile>[const LauncherTile.radio(), const LauncherTile.tv()];
     for (final package in defaultLauncherPackages) {
       final app = apps.where((a) => a.package == package).firstOrNull;
       if (app != null) tiles.add(LauncherTile.app(package: app.package, label: app.label));

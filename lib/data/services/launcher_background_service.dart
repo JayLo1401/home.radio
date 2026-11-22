@@ -74,8 +74,20 @@ class LauncherBackgroundService {
   }
 }
 
+/// Words in a Bing caption that mean the picture is about people, events or
+/// buildings rather than landscape or nature - those are left out.
+final _notLandscape = RegExp(
+  r'\b(schüler\w*|kinder\w*|kind|menschen|mensch|leute|frau\w*|mann|männer|familie\w*|besucher\w*|'
+  r'tänzer\w*|musiker\w*|sportler\w*|fest\w*|feier\w*|parade\w*|karneval\w*|markt\w*|mauer|denkmal\w*|'
+  r'statue\w*|museum\w*|stadion\w*|konzert\w*|festival\w*)\b',
+  caseSensitive: false,
+  unicode: true,
+);
+
+bool isLandscapeCaption(String caption) => !_notLandscape.hasMatch(caption.split('(©').first);
+
 /// Bing's picture-of-the-day archive (format=js): full-HD address and
-/// caption of each picture.
+/// caption of each landscape/nature picture.
 List<({String url, String caption})> parseBingArchive(String body) {
   try {
     final decoded = jsonDecode(body);
@@ -88,7 +100,7 @@ List<({String url, String caption})> parseBingArchive(String body) {
             url: 'https://www.bing.com${i['urlbase']}_1920x1080.jpg',
             caption: (i['copyright'] as String? ?? i['title'] as String? ?? '').trim(),
           ),
-    ];
+    ].where((i) => isLandscapeCaption(i.caption)).toList();
   } catch (_) {
     return const [];
   }

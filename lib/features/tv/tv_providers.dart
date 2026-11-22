@@ -25,6 +25,26 @@ class Enigma2ConfigNotifier extends Notifier<Enigma2Config?> {
 
 final enigma2ConfigProvider = NotifierProvider<Enigma2ConfigNotifier, Enigma2Config?>(Enigma2ConfigNotifier.new);
 
+typedef TvNextUp = ({bool enabled, int leadMinutes, int showSeconds});
+
+/// The "Als Nächstes" note (Einstellungen → Home TV).
+class TvNextUpNotifier extends Notifier<TvNextUp> {
+  @override
+  TvNextUp build() {
+    ref.read(settingsRepositoryProvider).getTvNextUp().then((v) => state = v);
+    return (enabled: true, leadMinutes: 5, showSeconds: 30);
+  }
+
+  Future<void> set(TvNextUp value) async {
+    state = value;
+    await ref
+        .read(settingsRepositoryProvider)
+        .setTvNextUp(enabled: value.enabled, leadMinutes: value.leadMinutes, showSeconds: value.showSeconds);
+  }
+}
+
+final tvNextUpProvider = NotifierProvider<TvNextUpNotifier, TvNextUp>(TvNextUpNotifier.new);
+
 final enigma2ServiceProvider = Provider<Enigma2Service?>((ref) {
   final config = ref.watch(enigma2ConfigProvider);
   return config == null || !config.configured ? null : Enigma2Service(config);

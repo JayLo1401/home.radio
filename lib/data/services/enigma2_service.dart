@@ -35,13 +35,9 @@ class Enigma2Config {
       ? const {}
       : {'Authorization': 'Basic ${base64Encode(utf8.encode('$user:$password'))}'};
 
-  /// The live stream of a channel - the box tunes a free tuner for it.
-  /// Login (if any) goes into the address, for players that can't send
-  /// headers.
-  String streamUrl(String serviceRef) {
-    final auth = user.isEmpty ? '' : '${Uri.encodeComponent(user)}:${Uri.encodeComponent(password)}@';
-    return 'http://$auth${host.trim()}:$streamPort/${Uri.encodeFull(serviceRef)}';
-  }
+  /// The live stream of a channel - the box tunes a free tuner for it. The
+  /// login (if any) goes along as [authHeaders].
+  Uri streamUri(String serviceRef) => Uri.parse('http://${host.trim()}:$streamPort/${Uri.encodeFull(serviceRef)}');
 
   /// OpenWebif's picon for a channel: the service reference with ':' as '_'
   /// and without the trailing separator ("1_0_19_283D_3FB_1_C00000_0_0_0").
