@@ -275,4 +275,4 @@ jobs:
           } > "$RUNNER_TEMP/notes.md"
           git tag "$TAG" "$GITHUB_SHA"
           git push origin "$TAG"
-          gh release create "$TAG" --title "Home Radio $VERSION" --notes-file "$RUNNER_TEMP/notes.md" --latest
+          gh release create "$TAG" --title "Home Media $VERSION" --notes-file "$RUNNER_TEMP/notes.md" --latest
