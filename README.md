@@ -1,10 +1,20 @@
-# Home Radio
+# Home Media
 
-Eine Flutter-App für Android-TV-Boxen: DAB+-Radio (über einen RTL-SDR-USB-Stick),
-Internetradio, Wetter, Wetterradar und eine Sonne-&-Mond-Kachel, bedienbar komplett
-per Fernbedienung (D-Pad) auf einem großen TV.
+Eine Flutter-App für Android-TV-Boxen, Fire TV und Fernseher, komplett per
+Fernbedienung (D-Pad) bedienbar. Sie besteht aus drei Teilen:
 
-![Startbildschirm](screenshots/01_startbildschirm.png)
+- **Launcher**: der Startbildschirm mit Home Radio, Home TV und den eigenen Apps
+  (Netflix, Disney+, Spotify, …), erreichbar über die Home-Taste.
+- **Home Radio**: DAB+-Radio (über einen RTL-SDR-USB-Stick), UKW, Internetradio,
+  Wetter, Wetterradar und eine Sonne-&-Mond-Kachel.
+- **Home TV**: Fernsehen vom eigenen Enigma2-Sat-Receiver (z. B. GigaBlue) mit
+  Senderliste, Senderlogos und Programmführer.
+
+Eine App für jedes Gerät: Beim Start zeigt sie wahlweise den Launcher, startet
+Home Radio mit einem Sender (z. B. draußen) oder Home TV mit einem Sender (z. B.
+am Fernseher).
+
+![Launcher](screenshots/launcher_raureif.png)
 
 ## Warum diese App?
 
@@ -17,16 +27,79 @@ jeweils besseren Weg, ohne zwischen Apps zu wechseln.
 
 ## Screenshots
 
+### Launcher und Home TV
+
 | | |
 |---|---|
+| ![Launcher](screenshots/launcher_kueste.png) | ![Launcher mit Home TV](screenshots/launcher_home_tv_fokus.png) |
+| ![Home TV: Senderliste](screenshots/home_tv_senderliste.png) | ![Home TV: Programmführer](screenshots/home_tv_programmfuehrer.png) |
+| ![Home TV: Als Nächstes](screenshots/home_tv_als_naechstes.png) | ![Einstellungen](screenshots/einstellungen_uebersicht.png) |
+| ![Einstellungen Home TV](screenshots/einstellungen_home_tv.png) | ![Logos](screenshots/logos_home_media_radio_tv.png) |
+
+### Home Radio
+
+| | |
+|---|---|
+| ![Home Radio](screenshots/home_radio.png) | ![Startbildschirm](screenshots/01_startbildschirm.png) |
 | ![Startbildschirm](screenshots/01_startbildschirm.png) | ![DAB+-Sender](screenshots/02_dab_sender.png) |
 | ![Einstellungen](screenshots/03_einstellungen.png) | ![Kacheln und Favoriten](screenshots/04_kacheln_und_favoriten.png) |
 | ![Über und Quellen](screenshots/05_ueber_und_quellen.png) | ![Standortsuche](screenshots/06_standortsuche.png) |
 
-Senderlogos sind in den Screenshots unkenntlich gemacht (Marken der jeweiligen
-Sender).
+Senderlogos und App-Logos sind in den Screenshots unkenntlich gemacht (Marken
+der jeweiligen Sender und Anbieter), die Hintergrundfotos des Launchers
+weichgezeichnet (Rechte bei den Fotografen). Die Home-TV-Screenshots stammen von
+einem Test-Receiver ohne Livebild.
 
 ## Funktionen
+
+### Launcher
+- **Favoriten-Leiste** mit Home Radio, Home TV und beliebigen installierten Apps;
+  die Kacheln zeigen die Original-Banner der Apps. Verschieben, Bild ändern oder
+  entfernen über ☰ (Menü-Taste) oder langes OK.
+- **Alle Apps** mit Suche; Apps per ☰ oder langem OK zu den Favoriten.
+- **Eigene Kachelbilder**: Icon-Pakete (ADW-/Nova-Format) oder ein Bild per
+  Adresse, z. B. vom eigenen Server.
+- **Hintergrund**: Farbverläufe (ohne Internet), Landschaftsfotos aus dem Internet
+  (Bing-Bilder des Tages, mit Bildnachweis) oder ein eigener Server (Bild,
+  JSON-Liste oder Ordneransicht von nginx/Apache/`python -m http.server`);
+  Wechselintervall und Deckkraft des Favoriten-Bands einstellbar.
+- Startet eine andere App, pausieren Radio und TV; Home Radio spielt beim
+  Zurückkommen weiter.
+- Oben die gleiche Leiste wie in Home Radio; das Zahnrad öffnet die
+  App-Einstellungen, die Android-Einstellungen oder „Alle Apps“.
+
+### Home-Taste
+- Home Media ist als Startbildschirm (HOME) registriert - auf Android-TV-Boxen
+  als Standard-Launcher wählbar.
+- Auf **Fire TV** und **Google TV**, die keinen anderen Launcher zulassen, holt die
+  Bedienungshilfe „Home Media: Home-Taste“ Home Media nach vorne, sobald der
+  Startbildschirm des Geräts erscheint (sieht nur, welche App vorne ist - keine
+  Inhalte, keine Eingaben). Einschalten unter Einstellungen → Launcher →
+  Home-Taste; bei Apps außerhalb eines App-Stores einmalig per adb freischalten:
+
+  ```bash
+  adb shell pm grant at.jaycloud.home.radio android.permission.WRITE_SECURE_SETTINGS
+  adb shell appops set at.jaycloud.home.radio ACCESS_RESTRICTED_SETTINGS allow
+  ```
+
+  Nach App-Updates schaltet Home Media den Dienst selbst wieder ein.
+
+### Home TV
+- Für Enigma2-Receiver mit **OpenWebif** (GigaBlue, VU+, Dreambox mit teamBlue,
+  OpenATV, OpenPLi): Senderlisten (Bouquets), Senderlogos (Picons) und der
+  Programmführer kommen vom Receiver, das Bild über seinen Streaming-Port.
+- Umschalten mit hoch/runter, Kanaltasten, ⏪/⏩ oder Ziffern; OK öffnet die
+  Senderliste (← / → wechseln die Liste), ☰ den Programmführer des Senders.
+- Info-Banner mit Jetzt/Danach und Fortschritt; **„Als Nächstes“**-Hinweis kurz vor
+  der nächsten Sendung (Vorlauf und Anzeigedauer einstellbar, Standard 5 Minuten
+  vorher, 30 Sekunden).
+- Start mit dem zuletzt gesehenen oder einem festen Sender.
+
+### Beim Start der App
+- Launcher anzeigen, Home Radio mit Sender starten (siehe Autostart) oder Home TV
+  mit Sender starten - einstellbar unter Einstellungen → Launcher.
+
+## Home Radio
 
 ### DAB+-Radio
 - Empfang über einen **RTL-SDR-USB-Stick** (RTL2832U-basiert, getestet mit einem
@@ -145,6 +218,10 @@ Sender).
   Favorit), konfigurierbar in den Einstellungen.
 
 ### Einstellungen
+Gegliedert in **Launcher**, **Home Radio**, **Home TV** und **Allgemein**
+(Oberflächengröße, Vollbild, Backup, Updates); das Zahnrad in Home Radio öffnet
+direkt dessen Bereich.
+
 - DAB+-Empfänger: kein Empfänger (nur Internetradio - DAB+-Suche und der Reiter
   „DAB-Sender“ werden ausgeblendet), RTL-SDR-Stick per USB oder über das Netzwerk
   (mehrere rtl_tcp-Server, einer davon als Standard; „Testen“ zeigt bei rtl_tcp
@@ -157,7 +234,8 @@ DAB+-Sendersuche und -verwaltung (Suchlauf, alle gefundenen Sender, Logos)
 erreicht man über das Radio-Symbol oben auf der Startseite.
 
 ## Zielhardware
-- Android-TV-Box (Leanback-Launcher, Querformat).
+- Android-TV-Box, Google TV oder Fire TV (Querformat).
+- Für Home TV: ein Enigma2-Sat-Receiver mit OpenWebif im Heimnetz.
 - RTL2832U-basierter RTL-SDR-USB-Stick mit R820T-, R820T2- oder R828D-Tuner
   (eigener Treiber, siehe `cpp/hrdab/rtl2832.cpp`). Über `rtl_tcp` geht jeder
   Stick, den der Server unterstützt.
@@ -199,6 +277,14 @@ konfigurieren.
   und einen `MethodChannel`/`EventChannel` nach Flutter. Ein Sender-Simulator
   mit Selbsttest liegt in `android/app/src/test_native/hrdab/`
   (`run_selftest.ps1`, läuft per adb auf einem Android-Gerät).
+- **Launcher** (`lib/features/launcher/`, `LauncherPlugin.kt`,
+  `HomeButtonService.kt`): App-Liste, Banner/Icons und Icon-Pakete über den
+  PackageManager, Home-Taste über HOME-Activity und Bedienungshilfe.
+- **Home TV** (`lib/features/tv/`, `enigma2_service.dart`): OpenWebif-JSON-API
+  (`/api/getservices`, `/api/epgnownext`, `/api/epgservice`, `/picon/…`), Bild
+  über `video_player` (ExoPlayer) vom Streaming-Port.
+- **Logos**: `tool/make_home_media_logo.py` erzeugt App-Symbol, Logos und
+  TV-Banner.
 - **Wetter/Radar/Sonne**: reine HTTP-Aufrufe (GeoSphere Austria, Open-Meteo,
   Radarbild von der eingetragenen Quelle) sowie lokal berechnete
   Sonnenstands-/Mondphasenformeln.
@@ -208,7 +294,7 @@ konfigurieren.
 [PolyForm Noncommercial 1.0.0](LICENSE.md). Der Quellcode ist offen einsehbar.
 Nutzung und Änderung sind für private und nicht-kommerzielle Zwecke frei, auch für
 Vereine, Schulen und gemeinnützige Organisationen. **Kommerzielle Nutzung ist nicht
-erlaubt**, z. B. Home Radio zu verkaufen, als bezahlten Dienst anzubieten oder in
+erlaubt**, z. B. Home Media zu verkaufen, als bezahlten Dienst anzubieten oder in
 kommerzielle Produkte einzubauen. Für eine kommerzielle Lizenz bitte über GitHub
 anfragen.
 
