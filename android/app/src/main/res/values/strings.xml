@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="home_button_service_label">Home Media: Home-Taste</string>
+    <string name="home_button_service_description">Öffnet mit der Home-Taste der Fernbedienung den Launcher von Home Media statt des Startbildschirms des Geräts. Sieht nur, welche App gerade im Vordergrund ist - keine Bildschirminhalte, keine Tasten und keine Eingaben.</string>
+</resources>

@@ -33,7 +33,7 @@ cp -a "$BUNDLE/." "$STAGE/$APPDIR/"
 cp linux/packaging/apply-update.sh "$STAGE/$APPDIR/apply-update.sh"
 cp linux/packaging/home-radio.desktop "$STAGE/usr/share/applications/"
 cp linux/packaging/at.jaycloud.home.radio.policy "$STAGE/usr/share/polkit-1/actions/"
-cp assets/icon/applogo1.png "$STAGE/usr/share/icons/hicolor/256x256/apps/home-radio.png"
+cp assets/icon/home_media_logo.png "$STAGE/usr/share/icons/hicolor/256x256/apps/home-radio.png"
 ln -s "/$APPDIR/home_radio" "$STAGE/usr/bin/home-radio"
 
 # Library dependencies from what the binaries actually link (package names

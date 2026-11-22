@@ -18,9 +18,12 @@ class SecretStore {
   static const _storage = FlutterSecureStorage();
   static const _fallbackPrefix = 'secret_fallback.';
 
-  /// Every secret the app keeps (for backups). Empty since the rtl_tcp login
-  /// is gone; older backups may still carry 'rtl_tcp_password' - ignored.
-  static const keys = <String>[];
+  /// Home TV's receiver login (Enigma2 / OpenWebif).
+  static const enigma2PasswordKey = 'enigma2_password';
+
+  /// Every secret the app keeps (for backups). Older backups may still carry
+  /// 'rtl_tcp_password' - ignored.
+  static const keys = <String>[enigma2PasswordKey];
 
   Future<String?> read(String key) async {
     try {

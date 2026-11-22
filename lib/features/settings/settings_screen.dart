@@ -8,10 +8,14 @@ import '../../core/display_mode.dart';
 import '../../core/providers.dart';
 import '../../core/theme.dart';
 import '../../data/models/favorite_channel.dart';
+import '../../data/models/launcher_tile.dart';
 import '../../data/repositories/settings_repository.dart';
 import '../../data/services/desktop/hrdab_desktop.dart';
+import '../../data/services/launcher_service.dart';
+import '../launcher/launcher_providers.dart';
 import '../rtlsdr/rtl_sdr_test_screen.dart';
 import 'backup_settings_screen.dart';
+import 'launcher_settings_screens.dart';
 import 'update_settings_screen.dart';
 import 'location_settings_screen.dart';
 import 'radar_source_settings_screen.dart';
@@ -159,6 +163,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ? 'nicht eingerichtet'
         : (radarSettings.radarIsWebPage ? 'Webseite' : 'Bild');
     final repo = ref.read(settingsRepositoryProvider);
+    final launcher = ref.watch(launcherSettingsProvider);
 
     if (!_loaded) {
       return Scaffold(
@@ -303,6 +308,68 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               tileToggle('Funk anzeigen', receiverSections.funk, (v) {
                 ref.read(receiverSectionsProvider.notifier).setFunk(v);
               }),
+            ],
+            if (LauncherService.supported) ...[
+              const Divider(height: 32),
+              Text('Home Media', style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 8),
+              Text('Beim Start der App', style: Theme.of(context).textTheme.bodyLarge),
+              FocusTraversalOrder(
+                order: NumericFocusOrder(nextOrder()),
+                child: _TvChoiceTile(
+                  label: 'Launcher anzeigen',
+                  selected: launcher.startScreen == StartScreen.launcher,
+                  onTap: () => ref.read(launcherSettingsProvider.notifier).setStartScreen(StartScreen.launcher),
+                ),
+              ),
+              FocusTraversalOrder(
+                order: NumericFocusOrder(nextOrder()),
+                child: _TvChoiceTile(
+                  label: 'Home Radio mit Sender starten (siehe Autostart)',
+                  selected: launcher.startScreen == StartScreen.radio,
+                  onTap: () => ref.read(launcherSettingsProvider.notifier).setStartScreen(StartScreen.radio),
+                ),
+              ),
+              FocusTraversalOrder(
+                order: NumericFocusOrder(nextOrder()),
+                child: _TvNavTile(
+                  label: 'Hintergrund',
+                  value: switch (launcher.backgroundSource) {
+                    LauncherBackgroundSource.builtin => 'Farbverläufe',
+                    LauncherBackgroundSource.photos => 'Landschaftsfotos',
+                    LauncherBackgroundSource.server => 'Eigener Server',
+                  },
+                  icon: Icons.wallpaper,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const LauncherBackgroundSettingsScreen()),
+                  ),
+                ),
+              ),
+              FocusTraversalOrder(
+                order: NumericFocusOrder(nextOrder()),
+                child: _TvNavTile(
+                  label: 'Icon-Paket',
+                  value: launcher.iconPack == null
+                      ? 'Original-Logos'
+                      : (ref.watch(iconPacksProvider).value ?? const [])
+                              .where((p) => p.package == launcher.iconPack)
+                              .firstOrNull
+                              ?.label ??
+                          launcher.iconPack,
+                  icon: Icons.palette_outlined,
+                  onTap: () => chooseIconPack(context, ref),
+                ),
+              ),
+              FocusTraversalOrder(
+                order: NumericFocusOrder(nextOrder()),
+                child: _TvNavTile(
+                  label: 'Home-Taste',
+                  icon: Icons.home_outlined,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const HomeButtonSettingsScreen()),
+                  ),
+                ),
+              ),
             ],
             const Divider(height: 32),
             Text('Autostart', style: Theme.of(context).textTheme.titleLarge),
@@ -591,7 +658,7 @@ class _AboutBlockState extends State<_AboutBlock> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             line(
-              'Home Radio',
+              'Home Media',
               'PolyForm Noncommercial 1.0.0 - frei für private und nicht-kommerzielle Nutzung. '
                   '© 2026 Jürgen Laschak, github.com/JayLo1401/home.radio',
             ),
@@ -610,6 +677,11 @@ class _AboutBlockState extends State<_AboutBlock> {
             line(
               'Ortssuche',
               '© OpenStreetMap-Mitwirkende, Daten unter der Open Database License (ODbL), über Nominatim.',
+            ),
+            line(
+              'Hintergrundfotos des Launchers',
+              'Bing-Bilder des Tages, © bei den jeweiligen Fotografen (nur wenn „Landschaftsfotos aus dem '
+                  'Internet“ gewählt ist).',
             ),
             line(
               'Wetterradar',

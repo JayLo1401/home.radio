@@ -534,7 +534,8 @@ class _StationRowState extends State<_StationRow> {
 
   void _claimFocus() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
+      // Not from underneath the launcher or another open screen.
+      if (!mounted || !(ModalRoute.of(context)?.isCurrent ?? true)) return;
       _focusNode.requestFocus();
       Scrollable.ensureVisible(context, alignment: 0.5);
     });
@@ -644,7 +645,8 @@ class _FavoriteRowState extends State<_FavoriteRow> {
 
   void _claimFocus() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
+      // Not from underneath the launcher or another open screen.
+      if (!mounted || !(ModalRoute.of(context)?.isCurrent ?? true)) return;
       _focusNode.requestFocus();
       Scrollable.ensureVisible(context, alignment: 0.5);
     });

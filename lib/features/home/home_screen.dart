@@ -20,7 +20,10 @@ import '../scanner/listening_hub_screen.dart';
 import '../scanner/scanner_screen.dart';
 import '../../data/models/band_plan.dart' show broadcastBandPlans;
 import '../search_internet/internet_radio_search_screen.dart';
+import '../../data/services/launcher_service.dart';
 import '../../data/services/update_service.dart';
+import '../launcher/launcher_navigation.dart';
+import '../launcher/launcher_providers.dart';
 import '../settings/settings_screen.dart';
 import '../settings/update_settings_screen.dart';
 import 'background_layer.dart';
@@ -42,6 +45,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   /// The top bar's "Einstellungen" button - takes D-Pad focus at start when
   /// nothing else has it (see [_ensureInitialFocus]).
   final _settingsFocus = FocusNode(debugLabel: 'settings');
+
+  /// The Home key (Home Media's launcher, see launcher_navigation.dart).
+  StreamSubscription<void>? _launcherRequests;
+
+  /// The app started into the launcher: the autostart station plays once
+  /// Home Radio is actually opened, like starting the radio app itself.
+  bool _autostartPending = false;
+
+  /// The launcher stopped the radio for another app (Netflix, Spotify, ...)
+  /// - it plays on when Home Radio is opened again.
+  bool _pausedForApp = false;
+
+  /// A screen that drives the receiver itself is open (listening bands,
+  /// band scan, FM tuning, DAB+ search) - the remote's play/pause keys then
+  /// must not start the radio station underneath (they reach the app through
+  /// Android's media session, whichever screen is open).
+  bool _receiverScreenOpen = false;
 
   PlayerState? _playerState;
   String? _icyTitle;
@@ -253,9 +273,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     // just reuse HomeScreen's in-app remote-key handling.
     ref.read(radioAudioHandlerProvider.future).then(
           (handler) => handler.bindControls(
-            onPlay: _resumeCurrentPlayback,
+            onPlay: () async {
+              if (!_receiverScreenOpen) await _resumeCurrentPlayback();
+            },
             // A real stop, as the remote's Play/Pause key (see _togglePlayPause).
-            onPause: _stopPlayback,
+            onPause: () async {
+              if (!_receiverScreenOpen) await _stopPlayback();
+            },
             onSkipNext: () => _stepStation(1),
             onSkipPrevious: () => _stepStation(-1),
           ),
@@ -270,6 +294,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       await _initDabServer();
       await _autostart();
     });
+    _launcherRequests = ref.read(launcherServiceProvider).showRequests.listen((_) {
+      if (mounted) showLauncher(ref);
+    });
     _ensureInitialFocus();
   }
 
@@ -280,7 +307,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   /// takes it; a current station's row has claimed it by then and keeps it.
   void _ensureInitialFocus() {
     Future<void>.delayed(const Duration(milliseconds: 600), () {
-      if (!mounted) return;
+      // Not while the launcher (or anything else) is open on top.
+      if (!mounted || !(ModalRoute.of(context)?.isCurrent ?? true)) return;
       final primary = FocusManager.instance.primaryFocus;
       if (primary == null || primary is FocusScopeNode) {
         _settingsFocus.requestFocus();
@@ -290,6 +318,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   void dispose() {
+    _launcherRequests?.cancel();
     _settingsFocus.dispose();
     super.dispose();
   }
@@ -496,6 +525,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Future<void> _autostart() async {
+    if (ref.read(launcherVisibleProvider)) {
+      _autostartPending = true;
+      return;
+    }
     final settings = ref.read(settingsRepositoryProvider);
     final mode = await settings.getAutostartMode();
 
@@ -682,6 +715,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   /// screen continues; with nothing for the receiver to do, its connection
   /// is closed (frees the rtl_tcp server / stick).
   Future<void> _afterReceiverScreen() async {
+    _receiverScreenOpen = false;
     if (!mounted) return;
     if (_netHaltedForReceiver) {
       _netHaltedForReceiver = false;
@@ -710,6 +744,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   ///   froze.
   /// - Internet radio: halted, it'd play over the receiver's audio.
   Future<void> _prepareReceiverScreen() async {
+    _receiverScreenOpen = true;
     if (_stopped) return;
     if (_isDabSelected) {
       _dabPlayGeneration++;
@@ -995,14 +1030,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   /// [_stopPlayback]) rather than a pause - and play again. Also stops a
   /// tune still in progress.
   Future<void> _togglePlayPause() async {
-    final active = !_stopped &&
-        (_isDabSelected
-            ? (_dabTuned || _receiverWanted)
-            : (_playerState?.playing ?? false) ||
-                _playerState?.processingState == ProcessingState.loading ||
-                _playerState?.processingState == ProcessingState.buffering);
-    await (active ? _stopPlayback() : _resumeCurrentPlayback());
+    await (_isActive ? _stopPlayback() : _resumeCurrentPlayback());
   }
+
+  /// Playing, or about to (tuning, buffering).
+  bool get _isActive =>
+      !_stopped &&
+      (_isDabSelected
+          ? (_dabTuned || _receiverWanted)
+          : (_playerState?.playing ?? false) ||
+              _playerState?.processingState == ProcessingState.loading ||
+              _playerState?.processingState == ProcessingState.buffering);
 
   /// Moves to the previous/next station in whichever list the sidebar is
   /// currently showing (see [effectiveSidebarCategoryProvider]) - the
@@ -1105,6 +1143,34 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     ref.listen(playRequestProvider, (_, request) => _onPlayRequest(request));
+    // Back from the launcher to Home Radio.
+    ref.listen(launcherVisibleProvider, (_, visible) {
+      if (visible) return;
+      if (_autostartPending) {
+        _autostartPending = false;
+        _autostart();
+      } else if (_pausedForApp) {
+        _pausedForApp = false;
+        _resumeCurrentPlayback();
+      }
+      _ensureInitialFocus();
+    });
+    ref.listen(radioCommandProvider, (_, command) {
+      switch (command?.$1) {
+        case RadioCommand.stop:
+          _pausedForApp = false;
+          _stopPlayback();
+        case RadioCommand.togglePlayPause:
+          _pausedForApp = false;
+          _togglePlayPause();
+        case RadioCommand.pauseForApp:
+          if (_isActive) {
+            _pausedForApp = true;
+            _stopPlayback();
+          }
+        case null:
+      }
+    });
     final favorites = ref.watch(favoritesStreamProvider).value ?? const [];
     final currentProgram = ref.watch(currentProgramNumberProvider);
     final currentChannel = currentProgram == null
@@ -1147,7 +1213,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     // Receiver parts: only with a receiver, and as shown in the settings.
     final shown = ref.watch(receiverSectionsShownProvider);
 
-    return Focus(
+    // Home Radio is one of Home Media's "apps": Back goes to the launcher
+    // (Android), it doesn't end the app.
+    return PopScope(
+      canPop: !LauncherService.supported,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) showLauncher(ref);
+      },
+      child: Focus(
       onKeyEvent: _handleKey,
       child: Scaffold(
         backgroundColor: const Color(0xFF05070A),
@@ -1300,6 +1373,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
           ],
         ),
+      ),
       ),
     );
   }
@@ -1504,7 +1578,7 @@ class _MenuBar extends StatelessWidget {
                   ClipRRect(
                     borderRadius: BorderRadius.circular(8),
                     child: Image.asset(
-                      'assets/icon/applogo1.png',
+                      'assets/icon/home_radio_logo.png',
                       width: 36,
                       height: 36,
                     ),

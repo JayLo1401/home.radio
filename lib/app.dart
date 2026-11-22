@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/providers.dart';
 import 'core/theme.dart';
+import 'features/launcher/launcher_providers.dart' show appNavigatorKey;
 import 'features/splash/splash_screen.dart';
 
+/// Home Media: the launcher (Android) with Home Radio as one of its tiles.
 class HomeRadioApp extends ConsumerWidget {
   const HomeRadioApp({super.key});
 
@@ -12,7 +14,8 @@ class HomeRadioApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final uiScale = ref.watch(uiScaleProvider);
     return MaterialApp(
-      title: 'Home Radio',
+      title: 'Home Media',
+      navigatorKey: appNavigatorKey,
       debugShowCheckedModeBanner: false,
       theme: buildTvTheme(),
       builder: (context, child) => _UiScaleWrapper(scale: uiScale, child: child!),

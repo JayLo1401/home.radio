@@ -18,13 +18,18 @@
         tools:ignore="ScopedStorage" />
     <!-- In-place updates from the update server (UpdatePlugin). -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- Only usable once granted over adb (pm grant ... WRITE_SECURE_SETTINGS):
+         lets "Home-Taste" in the settings switch HomeButtonService on by
+         itself instead of the user digging through the accessibility menu. -->
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS"
+        tools:ignore="ProtectedPermissions" />
 
     <!-- usesCleartextTraffic: many internet radio streams (e.g. Kronehit,
          http://onair.krone.at/kronehit.mp3) are only offered over plain
          http - without this Android blocks them outright and the station
          just never starts. -->
     <application
-        android:label="Home Radio"
+        android:label="Home Media"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:banner="@drawable/tv_banner"
@@ -33,8 +38,7 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:launchMode="singleTop"
-            android:taskAffinity=""
+            android:launchMode="singleTask"
             android:theme="@style/LaunchTheme"
             android:screenOrientation="landscape"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
@@ -54,7 +58,31 @@
                 <!-- Makes the app show up on the Android TV / Mi TV home launcher. -->
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER"/>
             </intent-filter>
+            <!-- Home Media's launcher: can be chosen as the device's home
+                 screen (singleTask above, so the Home key reaches the one
+                 running instance via onNewIntent). Fire TV ignores this -
+                 there HomeButtonService takes over. -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.HOME"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+            </intent-filter>
         </activity>
+
+        <!-- Home key -> Home Media where the system won't let another app be
+             the launcher (Fire TV), see HomeButtonService.kt. -->
+        <service
+            android:name=".HomeButtonService"
+            android:label="@string/home_button_service_label"
+            android:exported="true"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/home_button_service" />
+        </service>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
@@ -104,6 +132,33 @@
 
          In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
     <queries>
+        <!-- The launcher's app list and the other home screens (LauncherPlugin,
+             HomeButtonService). -->
+        <intent>
+            <action android:name="android.intent.action.MAIN"/>
+            <category android:name="android.intent.category.LAUNCHER"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.MAIN"/>
+            <category android:name="android.intent.category.LEANBACK_LAUNCHER"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.MAIN"/>
+            <category android:name="android.intent.category.HOME"/>
+        </intent>
+        <!-- Icon packs for the launcher's tiles (ADW/Nova/GO format). -->
+        <intent>
+            <action android:name="org.adw.launcher.THEMES"/>
+        </intent>
+        <intent>
+            <action android:name="com.novalauncher.THEME"/>
+        </intent>
+        <intent>
+            <action android:name="com.teslacoilsw.launcher.THEME"/>
+        </intent>
+        <intent>
+            <action android:name="com.gau.go.launcherex.theme"/>
+        </intent>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>

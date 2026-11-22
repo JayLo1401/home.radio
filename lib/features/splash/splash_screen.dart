@@ -4,7 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/display_mode.dart';
 import '../../core/providers.dart';
 
+import '../../data/models/launcher_tile.dart' show StartScreen;
+import '../../data/services/launcher_service.dart';
 import '../home/home_screen.dart';
+import '../launcher/launcher_navigation.dart';
+import '../launcher/launcher_providers.dart';
 
 /// Brief branded startup animation shown right after the native Android
 /// launch background (which already shows the app icon on black - see
@@ -44,11 +48,23 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
         monitor: await settings.getFullscreenMonitor(),
       );
     }();
-    Future.delayed(_popDuration, () {
-      if (mounted) {
-        Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const HomeScreen()));
-      }
-    });
+    _start();
+  }
+
+  /// Home Radio is always the base (it owns playback); the launcher opens
+  /// over it when that's the start setting, or the Home key started the app.
+  Future<void> _start() async {
+    final started = DateTime.now();
+    var launcher = false;
+    if (LauncherService.supported) {
+      final requested = await ref.read(launcherServiceProvider).takeLaunchRequest();
+      launcher = requested || await ref.read(settingsRepositoryProvider).getStartScreen() == StartScreen.launcher;
+    }
+    final rest = _popDuration - DateTime.now().difference(started);
+    if (rest > Duration.zero) await Future<void>.delayed(rest);
+    if (!mounted) return;
+    Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const HomeScreen()));
+    if (launcher) showLauncher(ref);
   }
 
   @override
@@ -59,7 +75,10 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    // Back during the start mustn't end Home Media (it's the home screen).
+    return PopScope(
+      canPop: !LauncherService.supported,
+      child: Scaffold(
       backgroundColor: Colors.black,
       body: Center(
         child: AnimatedBuilder(
@@ -70,11 +89,11 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(20),
-                child: Image.asset('assets/icon/applogo1.png', width: 140, height: 140),
+                child: Image.asset('assets/icon/home_media_logo.png', width: 140, height: 140),
               ),
               const SizedBox(height: 20),
               const Text(
-                'Home Radio',
+                'Home Media',
                 style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
@@ -85,6 +104,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
             ],
           ),
         ),
+      ),
       ),
     );
   }

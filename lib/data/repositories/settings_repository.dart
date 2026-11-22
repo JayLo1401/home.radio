@@ -1,6 +1,8 @@
 import 'dart:convert';
 
 import '../db/database.dart';
+import '../models/launcher_tile.dart';
+import '../services/enigma2_service.dart' show Enigma2Config;
 import '../services/secret_store.dart';
 
 /// One configured rtl_tcp server (Settings → Radio-Empfänger).
@@ -570,4 +572,85 @@ class SettingsRepository {
 
   Future<void> setNbLast(String band, {required int freqHz, required String mode, required double squelchDb}) =>
       _db.setSetting('$_keyNbPrefix$band', '$freqHz|$mode|$squelchDb');
+
+  // --- Home Media launcher ---
+
+  /// What shows on start (see [StartScreen]) - Home Radio by default, as
+  /// before the launcher existed.
+  Future<StartScreen> getStartScreen() async =>
+      await _db.getSetting('start_screen') == 'launcher' ? StartScreen.launcher : StartScreen.radio;
+  Future<void> setStartScreen(StartScreen value) => _db.setSetting('start_screen', value.name);
+
+  /// The launcher's row; null until it was first set up (see
+  /// LauncherTilesNotifier - then the installed streaming apps go in).
+  Future<List<LauncherTile>?> getLauncherTiles() async {
+    final raw = await _db.getSetting('launcher_tiles');
+    return raw == null ? null : decodeLauncherTiles(raw);
+  }
+
+  Future<void> setLauncherTiles(List<LauncherTile> tiles) =>
+      _db.setSetting('launcher_tiles', encodeLauncherTiles(tiles));
+
+  Future<LauncherBackgroundSource> getLauncherBackgroundSource() async {
+    final v = await _db.getSetting('launcher_bg_source');
+    return LauncherBackgroundSource.values.firstWhere((s) => s.name == v, orElse: () => LauncherBackgroundSource.builtin);
+  }
+
+  Future<void> setLauncherBackgroundSource(LauncherBackgroundSource value) =>
+      _db.setSetting('launcher_bg_source', value.name);
+
+  /// The own server's address (see LauncherBackgroundService).
+  Future<String> getLauncherBackgroundUrl() async => await _db.getSetting('launcher_bg_url') ?? '';
+  Future<void> setLauncherBackgroundUrl(String url) => _db.setSetting('launcher_bg_url', url);
+
+  /// Minutes until the next background picture.
+  static const launcherBackgroundIntervals = [1, 5, 10, 15, 30, 60];
+  static const defaultLauncherBackgroundInterval = 10;
+
+  Future<int> getLauncherBackgroundInterval() async {
+    final v = int.tryParse(await _db.getSetting('launcher_bg_interval') ?? '');
+    return v != null && launcherBackgroundIntervals.contains(v) ? v : defaultLauncherBackgroundInterval;
+  }
+
+  Future<void> setLauncherBackgroundInterval(int minutes) => _db.setSetting('launcher_bg_interval', '$minutes');
+
+  /// How solid the band behind the launcher's tiles is (0 = none).
+  static const launcherBandOpacities = [0.0, 0.2, 0.4, 0.6, 0.8];
+  static const defaultLauncherBandOpacity = 0.4;
+
+  Future<double> getLauncherBandOpacity() async =>
+      double.tryParse(await _db.getSetting('launcher_band_opacity') ?? '') ?? defaultLauncherBandOpacity;
+  Future<void> setLauncherBandOpacity(double value) => _db.setSetting('launcher_band_opacity', '$value');
+
+  /// The icon pack for app tiles (package), null = none.
+  Future<String?> getLauncherIconPack() async {
+    final v = await _db.getSetting('launcher_icon_pack');
+    return v == null || v.isEmpty ? null : v;
+  }
+
+  Future<void> setLauncherIconPack(String? package) => _db.setSetting('launcher_icon_pack', package ?? '');
+
+  // --- Home TV (Enigma2 receiver) ---
+
+  /// The receiver; its password is kept in the [SecretStore].
+  Future<Enigma2Config> getEnigma2Config() async {
+    Object? json;
+    try {
+      json = jsonDecode(await _db.getSetting('enigma2') ?? 'null');
+    } catch (_) {}
+    return Enigma2Config.fromJson(json, password: await _secrets.read(SecretStore.enigma2PasswordKey) ?? '');
+  }
+
+  Future<void> setEnigma2Config(Enigma2Config config) async {
+    await _db.setSetting('enigma2', jsonEncode(config.toJson()));
+    await _secrets.write(SecretStore.enigma2PasswordKey, config.password);
+  }
+
+  /// The bouquet Home TV shows (service reference).
+  Future<String?> getTvBouquet() => _db.getSetting('tv_bouquet');
+  Future<void> setTvBouquet(String ref) => _db.setSetting('tv_bouquet', ref);
+
+  /// The channel last watched (service reference) - Home TV starts with it.
+  Future<String?> getTvLastChannel() => _db.getSetting('tv_last_channel');
+  Future<void> setTvLastChannel(String ref) => _db.setSetting('tv_last_channel', ref);
 }
