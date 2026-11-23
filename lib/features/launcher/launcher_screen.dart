@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/ok_long_press.dart';
 import '../../core/popup_text_field.dart';
 import '../../core/providers.dart';
+import '../../core/remote_keys.dart';
 import '../../core/theme.dart';
 import '../../data/models/launcher_tile.dart';
 import '../../data/services/launcher_service.dart';
@@ -44,8 +45,12 @@ class _LauncherScreenState extends ConsumerState<LauncherScreen> {
   void _focusLastTile() => (_tileFocus[_lastTileId] ?? _tileFocus.values.firstOrNull ?? _appsFocus).requestFocus();
 
   /// The top bar's "Einstellungen": Home Media's own settings, the device's
-  /// (Android) settings, all apps.
+  /// (Android) settings, all apps - on the PC straight the app's settings.
   Future<void> _openMenu() async {
+    if (!LauncherService.supported) {
+      await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SettingsScreen()));
+      return;
+    }
     final choice = await showDialog<String>(
       context: context,
       builder: (context) => SimpleDialog(
@@ -139,7 +144,9 @@ class _LauncherScreenState extends ConsumerState<LauncherScreen> {
           if (index < tiles.length - 1)
             _option(context, 'right', Icons.arrow_forward, 'Nach rechts verschieben', autofocus: index == 0),
           _option(context, 'image', Icons.image_outlined, 'Bild ändern'),
-          if (!tile.isRadio) _option(context, 'remove', Icons.delete_outline, 'Aus der Startleiste entfernen'),
+          // Home TV comes back through "Alle Apps" - there is none on the PC.
+          if (!tile.isRadio && (LauncherService.supported || !tile.isBuiltIn))
+            _option(context, 'remove', Icons.delete_outline, 'Aus der Startleiste entfernen'),
         ],
       ),
     );
@@ -155,7 +162,8 @@ class _LauncherScreenState extends ConsumerState<LauncherScreen> {
       case 'remove':
         await notifier.remove(tile.id);
         _tileFocus.remove(tile.id)?.dispose();
-        _appsFocus.requestFocus();
+        _lastTileId = null;
+        _focusLastTile();
     }
   }
 
@@ -208,13 +216,18 @@ class _LauncherScreenState extends ConsumerState<LauncherScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Row(
+                          Row(
                             children: [
-                              Icon(Icons.favorite, color: brandGreen, size: 20),
-                              SizedBox(width: 8),
-                              Text('Favoriten', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600)),
-                              Spacer(),
-                              Text('☰  Optionen der Kachel', style: TextStyle(color: Colors.white38, fontSize: 13)),
+                              const Icon(Icons.favorite, color: brandGreen, size: 20),
+                              const SizedBox(width: 8),
+                              const Text('Favoriten',
+                                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600)),
+                              const Spacer(),
+                              Text(
+                                '${_keyHint(ref, RemoteAction.options)}'
+                                '${LauncherService.supported ? '' : ' oder Rechtsklick'}  Optionen der Kachel',
+                                style: const TextStyle(color: Colors.white38, fontSize: 13),
+                              ),
                             ],
                           ),
                           // Up from any tile goes to the top bar - by itself
@@ -230,7 +243,9 @@ class _LauncherScreenState extends ConsumerState<LauncherScreen> {
                               return KeyEventResult.ignored;
                             },
                             child: SizedBox(
-                              height: _TileView.height + 64,
+                              // Tile, gap and its name - with room for taller
+                              // fonts (Segoe UI on the PC).
+                              height: _TileView.height + 72,
                               child: ListView(
                                 controller: _scroll,
                                 scrollDirection: Axis.horizontal,
@@ -250,7 +265,7 @@ class _LauncherScreenState extends ConsumerState<LauncherScreen> {
                                         onFocused: () => _lastTileId = tile.id,
                                       ),
                                     ),
-                                  _AppsTile(focusNode: _appsFocus, onOpen: _openAllApps),
+                                  if (LauncherService.supported) _AppsTile(focusNode: _appsFocus, onOpen: _openAllApps),
                                 ],
                               ),
                             ),
@@ -267,6 +282,9 @@ class _LauncherScreenState extends ConsumerState<LauncherScreen> {
       ),
     );
   }
+
+  /// The (first) key assigned to [action], for the hints on screen.
+  static String _keyHint(WidgetRef ref, RemoteAction action) => remoteKeyHint(ref.watch(remoteKeysProvider), action);
 
   static Widget _option(BuildContext context, String value, IconData icon, String label, {bool autofocus = false}) {
     return SimpleDialogOption(
@@ -555,7 +573,7 @@ class _TileViewState extends ConsumerState<_TileView> {
   bool _focused = false;
 
   KeyEventResult _onKey(FocusNode node, KeyEvent event) {
-    if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.contextMenu) {
+    if (event is KeyDownEvent && ref.read(remoteKeysProvider).matches(RemoteAction.options, event.logicalKey)) {
       widget.onOptions();
       return KeyEventResult.handled;
     }
@@ -585,6 +603,8 @@ class _TileViewState extends ConsumerState<_TileView> {
             },
             onTap: widget.onOpen,
             onLongPress: widget.onOptions,
+            // The mouse on the PC.
+            onSecondaryTap: widget.onOptions,
             child: TileArt(tile: widget.tile),
           ),
         ),

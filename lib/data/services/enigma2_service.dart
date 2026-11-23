@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
@@ -95,7 +96,7 @@ class E2Bouquet {
 
 /// A TV channel.
 class E2Channel {
-  const E2Channel({required this.ref, required this.name, required this.number, this.piconPath});
+  const E2Channel({required this.ref, required this.name, required this.number, this.piconPath, this.hasPicon = true});
 
   final String ref;
   final String name;
@@ -105,6 +106,11 @@ class E2Channel {
 
   /// OpenWebif's own picon path for it, if it told us.
   final String? piconPath;
+
+  /// The receiver has a picon for it - without one, OpenWebif names its own
+  /// placeholder ("/images/default_picon.png", the OpenWebif logo), which
+  /// isn't the channel's logo.
+  final bool hasPicon;
 
   /// Radio channel (service type 2) rather than TV.
   bool get isRadio => ref.split(':').elementAtOrNull(2) == '2';
@@ -237,6 +243,18 @@ class Enigma2Service {
     return _events(j);
   }
 
+  /// The programmes of every channel of a bouquet from [from] (including
+  /// the ones running then) for [span] - the TV guide's grid. One query for
+  /// all channels (3 hours of a 100 channel bouquet: about 0.2 s).
+  Future<List<E2Event>> epgMulti(String bouquetRef, DateTime from, Duration span) async {
+    final j = await _get('/api/epgmulti', {
+      'bRef': bouquetRef,
+      'time': '${from.millisecondsSinceEpoch ~/ 1000}',
+      'endTime': '${span.inMinutes}',
+    });
+    return _events(j);
+  }
+
   /// The EPG of one channel (as far as the box has it, usually a week).
   Future<List<E2Event>> channelEpg(String serviceRef) async {
     final j = await _get('/api/epgservice', {'sRef': serviceRef});
@@ -246,6 +264,106 @@ class Enigma2Service {
   List<E2Event> _events(Map<String, dynamic> j) => [
         for (final e in (j['events'] as List? ?? const []).whereType<Map<String, dynamic>>()) ?E2Event.fromJson(e),
       ];
+
+  /// Switches the receiver itself to [serviceRef] (its live picture). A CI
+  /// module / card usually descrambles only that one channel - a stream of
+  /// any other encrypted channel stays scrambled.
+  Future<void> zap(String serviceRef) async {
+    final j = await _get('/api/zap', {'sRef': serviceRef});
+    if (j['result'] == false) throw Enigma2Exception('Receiver schaltet nicht um: ${j['message'] ?? ''}');
+  }
+
+  /// The channel the receiver shows itself, null if unknown.
+  Future<String?> currentServiceRef() async {
+    try {
+      final j = await _get('/api/statusinfo');
+      final ref = j['currservice_serviceref'];
+      return ref is String && ref.isNotEmpty ? ref : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Whether the receiver is in standby, and the channel it holds itself
+  /// (null: none - in standby it normally holds nothing; after a switch
+  /// over the network it keeps that channel's tuner, and with only one
+  /// satellite cable that blocks every other band).
+  Future<({bool standby, String? live})> state() async {
+    try {
+      final j = await _get('/api/statusinfo');
+      final ref = j['currservice_serviceref'];
+      final standby = j['inStandby'];
+      return (
+        standby: standby == true || standby == 'true',
+        live: ref is String && ref.isNotEmpty ? ref : null,
+      );
+    } catch (_) {
+      return (standby: false, live: null);
+    }
+  }
+
+  /// Lets go of the channel the receiver holds (in standby): switched to
+  /// an empty service, Enigma2 stops the running one and frees its tuner.
+  Future<void> release() async {
+    await _get('/api/zap', {'sRef': '1:0:0:0:0:0:0:0:0:0:'});
+  }
+}
+
+enum StreamScrambling { clear, scrambled, unknown }
+
+/// Reads MPEG-TS packets (188 bytes, sync byte 0x47) and tells when the
+/// main stream - the PID with the most packets, the picture - runs
+/// descrambled: [clearRun] packets in a row without the scrambling bits;
+/// or that it's scrambled: [scrambledAfter] of its packets and at least half
+/// of them scrambled.
+class TsScramblingProbe {
+  TsScramblingProbe({this.clearRun = 150, this.scrambledAfter = 300});
+
+  final int clearRun;
+  final int scrambledAfter;
+  final _count = <int, int>{};
+  final _clear = <int, int>{};
+  final _scrambled = <int, int>{};
+  var _rest = Uint8List(0);
+  bool sawScrambled = false;
+
+  /// MPEG-TS packets seen so far (an error text from the receiver has none).
+  int packets = 0;
+
+  StreamScrambling? add(List<int> chunk) {
+    final data = Uint8List(_rest.length + chunk.length)
+      ..setAll(0, _rest)
+      ..setAll(_rest.length, chunk);
+    var i = 0;
+    while (i + 188 <= data.length) {
+      if (data[i] != 0x47) {
+        i++;
+        continue;
+      }
+      packets++;
+      final pid = ((data[i + 1] & 0x1F) << 8) | data[i + 2];
+      // PSI tables and padding aren't the picture.
+      if (pid >= 0x20 && pid != 0x1FFF) {
+        _count[pid] = (_count[pid] ?? 0) + 1;
+        if (data[i + 3] >> 6 != 0) {
+          _clear[pid] = 0;
+          _scrambled[pid] = (_scrambled[pid] ?? 0) + 1;
+          sawScrambled = true;
+        } else {
+          _clear[pid] = (_clear[pid] ?? 0) + 1;
+        }
+      }
+      i += 188;
+    }
+    _rest = Uint8List.sublistView(data, i);
+    if (_count.isEmpty) return null;
+    final main = _count.entries.reduce((a, b) => a.value >= b.value ? a : b);
+    if ((_clear[main.key] ?? 0) >= clearRun) return StreamScrambling.clear;
+    // Half is enough: some packets of a scrambled picture come clear anyway
+    // (timing-only ones without picture data, e.g. on ORF's channels).
+    if (main.value >= scrambledAfter && (_scrambled[main.key] ?? 0) >= main.value * 0.5) return StreamScrambling.scrambled;
+    return null;
+  }
 }
 
 /// Channels from /api/getservices?sRef=... - markers (type 64) and
@@ -258,11 +376,14 @@ List<E2Channel> parseChannels(Map<String, dynamic> j) {
     if (ref.isEmpty || flags & 64 != 0 || flags & 512 != 0) continue;
     final name = (s['servicename'] as String? ?? '').trim();
     if (name.isEmpty || name == '<n/a>') continue;
+    final picon = s['picon'] is String ? (s['picon'] as String).trim() : '';
+    final placeholder = picon.contains('default_picon');
     channels.add(E2Channel(
       ref: ref,
       name: name,
       number: channels.length + 1,
-      piconPath: s['picon'] is String && (s['picon'] as String).isNotEmpty ? s['picon'] as String : null,
+      piconPath: picon.isEmpty || placeholder ? null : picon,
+      hasPicon: !placeholder,
     ));
   }
   return channels;

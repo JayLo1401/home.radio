@@ -687,6 +687,38 @@ class SettingsRepository {
     await _db.setSetting('tv_next_show', '$showSeconds');
   }
 
+  /// Encrypted channels: switch the receiver itself to them first (its CI
+  /// module / card descrambles only the channel it shows). On by default.
+  Future<bool> getTvZapEncrypted() async => await _db.getSetting('tv_zap_encrypted') != 'false';
+  Future<void> setTvZapEncrypted(bool value) => _db.setSetting('tv_zap_encrypted', '$value');
+
+  /// The remote's keys per action (see RemoteKeys): action name -> logical
+  /// key ids; an action not in there has its standard keys.
+  Future<Map<String, List<int>>> getRemoteKeys() async {
+    try {
+      final map = jsonDecode(await _db.getSetting('remote_keys') ?? '{}') as Map<String, dynamic>;
+      return {for (final e in map.entries) e.key: [for (final k in e.value as List) k as int]};
+    } catch (_) {
+      return {};
+    }
+  }
+
+  Future<void> setRemoteKeys(Map<String, List<int>> keys) => _db.setSetting('remote_keys', jsonEncode(keys));
+
+  /// Channels (service references) whose stream came scrambled - Home TV
+  /// switches the receiver to them right away.
+  Future<Set<String>> getTvEncryptedChannels() async {
+    try {
+      final list = jsonDecode(await _db.getSetting('tv_encrypted_channels') ?? '[]');
+      return {for (final e in list as List) '$e'};
+    } catch (_) {
+      return {};
+    }
+  }
+
+  Future<void> setTvEncryptedChannels(Set<String> refs) =>
+      _db.setSetting('tv_encrypted_channels', jsonEncode(refs.toList()));
+
   /// The channel last watched (service reference) - Home TV starts with it.
   Future<String?> getTvLastChannel() => _db.getSetting('tv_last_channel');
   Future<void> setTvLastChannel(String ref) => _db.setSetting('tv_last_channel', ref);

@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:home_radio/data/services/enigma2_service.dart';
 import 'package:home_radio/features/tv/tv_providers.dart' show nowNextFor;
+import 'package:home_radio/features/tv/tv_widgets.dart' show shortChannelName;
 
 void main() {
   test('picon names: fields with _, TV service types as 1, no trailing part', () {
@@ -62,5 +63,68 @@ void main() {
     expect(const Enigma2Config().authHeaders, isEmpty);
     expect(config.piconUri('1:0:19:132F:3EF:1:C00000:0:0:0:').toString(),
         'http://192.168.1.50/picon/1_0_1_132F_3EF_1_C00000_0_0_0.png');
+  });
+
+  group('stream probe (MPEG-TS scrambling bits)', () {
+    List<int> packet(int pid, {bool scrambled = false}) =>
+        [0x47, (pid >> 8) & 0x1F, pid & 0xFF, scrambled ? 0x90 : 0x10, ...List.filled(184, 0xAB)];
+    List<int> packets(int pid, int n, {bool scrambled = false}) =>
+        [for (var i = 0; i < n; i++) ...packet(pid, scrambled: scrambled)];
+
+    test('clear picture: clear, also when packets are split across chunks', () {
+      final probe = TsScramblingProbe();
+      final data = [...packets(0x12, 50), ...packets(5101, 200), ...packets(5102, 20)];
+      expect(probe.add(data.sublist(0, 1000)), isNull);
+      expect(probe.add(data.sublist(1000)), StreamScrambling.clear);
+      expect(probe.sawScrambled, isFalse);
+    });
+
+    test('scrambled picture with clear audio: scrambled as soon as enough picture packets came', () {
+      final probe = TsScramblingProbe();
+      expect(probe.add([...packets(1921, 100), ...packets(1920, 200, scrambled: true)]), isNull);
+      expect(probe.add(packets(1920, 200, scrambled: true)), StreamScrambling.scrambled);
+      expect(probe.sawScrambled, isTrue);
+    });
+
+    test('descrambling starts (after switching the receiver): clear once the picture runs clear', () {
+      final probe = TsScramblingProbe();
+      expect(probe.add(packets(511, 300, scrambled: true)), StreamScrambling.scrambled);
+      expect(probe.add(packets(511, 100)), isNot(StreamScrambling.clear));
+      expect(probe.add(packets(511, 100)), StreamScrambling.clear);
+    });
+
+    test('scrambled picture with some clear timing packets (ORF): still scrambled', () {
+      final probe = TsScramblingProbe();
+      final mixed = [
+        for (var i = 0; i < 400; i++) ...packet(1920, scrambled: i % 3 != 0),
+      ];
+      expect(probe.add(mixed), StreamScrambling.scrambled);
+    });
+
+    test('garbage before the first sync byte is skipped', () {
+      final probe = TsScramblingProbe();
+      expect(probe.add([1, 2, 3, ...packets(300, 160)]), StreamScrambling.clear);
+    });
+  });
+
+  test('OpenWebif placeholder (no picon on the receiver): no picon, not its logo', () {
+    final channels = parseChannels({
+      'services': [
+        {'servicereference': '1:0:19:14B7:407:1:C00000:0:0:0:', 'servicename': 'PULS 4 HD Austria', 'picon': '/images/default_picon.png'},
+        {'servicereference': '1:0:19:132F:3EF:1:C00000:0:0:0:', 'servicename': 'ORF1 HD', 'picon': '/picon/1_0_19_132F_3EF_1_C00000_0_0_0.png'},
+      ],
+    });
+    expect(channels[0].hasPicon, isFalse);
+    expect(channels[0].piconPath, isNull);
+    expect(channels[1].hasPicon, isTrue);
+    expect(channels[1].piconPath, '/picon/1_0_19_132F_3EF_1_C00000_0_0_0.png');
+  });
+
+  test('channel name for a missing picon: without HD/Austria, two lines', () {
+    expect(shortChannelName('PULS 4 HD Austria'), 'PULS 4');
+    expect(shortChannelName('Comedy Central HD Austria'), 'Comedy\nCentral');
+    expect(shortChannelName('RTL Super Austria'), 'RTL\nSuper');
+    expect(shortChannelName('ORF1 HD'), 'ORF1');
+    expect(shortChannelName('HD'), 'HD');
   });
 }

@@ -17,6 +17,7 @@ import '../rtlsdr/rtl_sdr_test_screen.dart';
 import 'backup_settings_screen.dart';
 import '../tv/tv_providers.dart';
 import 'launcher_settings_screens.dart';
+import 'remote_keys_settings_screen.dart';
 import 'tv_settings_screen.dart';
 import 'update_settings_screen.dart';
 import 'location_settings_screen.dart';
@@ -382,6 +383,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               FocusTraversalOrder(
                 order: NumericFocusOrder(nextOrder()),
                 child: _TvNavTile(
+                  label: 'Tasten der Fernbedienung',
+                  icon: Icons.keyboard_outlined,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const RemoteKeysSettingsScreen()),
+                  ),
+                ),
+              ),
+              // App tiles and the Home key exist on Android only.
+              if (LauncherService.supported) ...[
+              FocusTraversalOrder(
+                order: NumericFocusOrder(nextOrder()),
+                child: _TvNavTile(
                   label: 'Icon-Paket',
                   value: launcher.iconPack == null
                       ? 'Original-Logos'
@@ -404,6 +417,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                 ),
               ),
+              ],
             ],
             if (section == SettingsSection.tv) ...[
               Text('Receiver', style: Theme.of(context).textTheme.titleLarge),
@@ -421,6 +435,29 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
               ),
             ),
+              FocusTraversalOrder(
+                order: NumericFocusOrder(nextOrder()),
+                child: _TvNavTile(
+                  label: 'Tasten der Fernbedienung',
+                  value: 'Senderliste, Programmführer, Optionen, Tonspur',
+                  icon: Icons.keyboard_outlined,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const RemoteKeysSettingsScreen()),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              tileToggle('Receiver bei Bedarf umschalten', ref.watch(tvZapEncryptedProvider), (v) {
+                ref.read(tvZapEncryptedProvider.notifier).set(v);
+              }),
+              const Text(
+                'Nur wenn der Receiver eingeschaltet ist: Karte bzw. CI-Modul entschlüsseln dann nur den Sender, den er '
+                'selbst zeigt, und an einem Sat-Kabel empfangen alle Tuner nur dessen Band. Für einen verschlüsselten '
+                'Sender oder einen auf einem anderen Band schaltet Home TV den Receiver dann um (sein Bild wechselt mit).\n'
+                'Im Standby schaltet Home TV nie um - der Receiver entschlüsselt dort selbst und bleibt frei. Hält er '
+                'noch einen Sender fest, gibt Home TV ihn frei.',
+                style: TextStyle(color: Colors.white60),
+              ),
               const Divider(height: 32),
               Text('Sender beim Start von Home TV', style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 8),
@@ -808,19 +845,19 @@ class _SettingsOverview extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(24),
         children: [
-          if (LauncherService.supported)
-            _AreaTile(
-              logo: 'assets/icon/home_media_logo.png',
-              title: 'Launcher',
-              subtitle: 'Start der App, Hintergrund, Icon-Paket, Home-Taste',
-              autofocus: true,
-              onTap: () => open(SettingsSection.launcher),
-            ),
+          _AreaTile(
+            logo: 'assets/icon/home_media_logo.png',
+            title: 'Launcher',
+            subtitle: LauncherService.supported
+                ? 'Start der App, Hintergrund, Icon-Paket, Home-Taste'
+                : 'Start der App, Hintergrund',
+            autofocus: true,
+            onTap: () => open(SettingsSection.launcher),
+          ),
           _AreaTile(
             logo: 'assets/icon/home_radio_logo.png',
             title: 'Home Radio',
             subtitle: 'Empfänger (DAB+, UKW, Funk), Autostart-Sender, Wetter, Radar, Sonne & Mond',
-            autofocus: !LauncherService.supported,
             onTap: () => open(SettingsSection.radio),
           ),
           _AreaTile(

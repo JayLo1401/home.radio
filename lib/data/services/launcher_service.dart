@@ -37,9 +37,10 @@ class HomeButtonStatus {
   final bool redirect;
 }
 
-/// Home Media's launcher on Android (LauncherPlugin.kt): installed apps,
-/// starting them, and the Home key. Elsewhere [supported] is false and
-/// everything answers "nothing".
+/// The device side of Home Media's launcher on Android (LauncherPlugin.kt):
+/// installed apps, starting them, icon packs and the Home key. The launcher
+/// itself (Home Radio, Home TV) is there on every platform; elsewhere
+/// [supported] is false and everything here answers "nothing".
 class LauncherService {
   LauncherService() {
     if (supported) _channel.setMethodCallHandler(_onCall);
@@ -47,6 +48,7 @@ class LauncherService {
 
   static const _channel = MethodChannel('home_radio/launcher');
 
+  /// Installed apps, the Home key, the device's settings - Android only.
   static bool get supported => !kIsWeb && Platform.isAndroid;
 
   final _showRequests = StreamController<void>.broadcast();

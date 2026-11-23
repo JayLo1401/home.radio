@@ -1,12 +1,19 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart' show kBackMouseButton;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/providers.dart';
 import 'core/theme.dart';
+import 'features/launcher/launcher_navigation.dart';
 import 'features/launcher/launcher_providers.dart' show appNavigatorKey;
 import 'features/splash/splash_screen.dart';
 
-/// Home Media: the launcher (Android) with Home Radio as one of its tiles.
+/// Home Media: the launcher with Home Radio and Home TV as its parts (and
+/// the device's apps on Android).
 class HomeRadioApp extends ConsumerWidget {
   const HomeRadioApp({super.key});
 
@@ -18,8 +25,53 @@ class HomeRadioApp extends ConsumerWidget {
       navigatorKey: appNavigatorKey,
       debugShowCheckedModeBanner: false,
       theme: buildTvTheme(),
-      builder: (context, child) => _UiScaleWrapper(scale: uiScale, child: child!),
+      builder: (context, child) => _PcKeys(child: _UiScaleWrapper(scale: uiScale, child: child!)),
       home: const SplashScreen(),
+    );
+  }
+}
+
+/// The remote's Back and Home keys on the PC (Windows/Linux): Esc (and the
+/// mouse's back button) goes back - from Home Radio and Home TV to the
+/// launcher -, Pos1 opens the launcher. On Android the remote's own keys do
+/// it.
+class _PcKeys extends ConsumerWidget {
+  const _PcKeys({required this.child});
+
+  final Widget child;
+
+  static final bool _pc = !kIsWeb && (Platform.isWindows || Platform.isLinux);
+
+  /// Typing in a text field: Pos1 moves the cursor there.
+  static bool get _typing =>
+      FocusManager.instance.primaryFocus?.context?.findAncestorStateOfType<EditableTextState>() != null;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (!_pc) return child;
+    // Key events bubble up from the focused widget: whatever handles Esc or
+    // Pos1 itself gets it first.
+    return Listener(
+      onPointerDown: (event) {
+        if (event.buttons & kBackMouseButton != 0) appNavigatorKey.currentState?.maybePop();
+      },
+      child: Focus(
+        canRequestFocus: false,
+        skipTraversal: true,
+        onKeyEvent: (node, event) {
+          if (event is! KeyDownEvent) return KeyEventResult.ignored;
+          if (event.logicalKey == LogicalKeyboardKey.escape) {
+            appNavigatorKey.currentState?.maybePop();
+            return KeyEventResult.handled;
+          }
+          if (event.logicalKey == LogicalKeyboardKey.home && !_typing) {
+            showLauncher(ref);
+            return KeyEventResult.handled;
+          }
+          return KeyEventResult.ignored;
+        },
+        child: child,
+      ),
     );
   }
 }

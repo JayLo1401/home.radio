@@ -18,7 +18,7 @@ class LauncherBackground extends ConsumerStatefulWidget {
   ConsumerState<LauncherBackground> createState() => _LauncherBackgroundState();
 }
 
-class _LauncherBackgroundState extends ConsumerState<LauncherBackground> {
+class _LauncherBackgroundState extends ConsumerState<LauncherBackground> with WidgetsBindingObserver {
   Timer? _timer;
   int _gradient = DateTime.now().minute % builtinBackdrops.length;
   ImageProvider? _image;
@@ -27,17 +27,54 @@ class _LauncherBackgroundState extends ConsumerState<LauncherBackground> {
   String? _caption;
   int _generation = 0;
 
+  /// A change fell due while nobody saw the launcher - another app in front
+  /// (Spotify, ...), Home TV or Home Radio over it. Fetching and decoding
+  /// photos then only costs memory and CPU; the change follows once it's
+  /// visible again.
+  bool _due = false;
+  bool _foreground = true;
+  bool _onScreen = true;
+  Timer? _catchUp;
+
+  bool get _visible => _foreground && _onScreen;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) => _restart());
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
+    _catchUp?.cancel();
     _evict(_image);
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _foreground = state == AppLifecycleState.resumed;
+    _visibilityChanged();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Covered by another screen: its route is offstage, tickers off.
+    _onScreen = TickerMode.valuesOf(context).enabled;
+    _visibilityChanged();
+  }
+
+  void _visibilityChanged() {
+    _catchUp?.cancel();
+    if (!_visible || !_due) return;
+    // Not right away: the first moments back belong to the remote.
+    _catchUp = Timer(const Duration(seconds: 8), () {
+      if (_visible && _due) _next();
+    });
   }
 
   void _restart() {
@@ -45,11 +82,19 @@ class _LauncherBackgroundState extends ConsumerState<LauncherBackground> {
     final settings = ref.read(launcherSettingsProvider);
     if (!settings.loaded) return;
     _timer?.cancel();
-    _timer = Timer.periodic(Duration(minutes: settings.backgroundInterval), (_) => _next());
+    _timer = Timer.periodic(Duration(minutes: settings.backgroundInterval), (_) {
+      if (_visible) {
+        _next();
+      } else {
+        _due = true;
+      }
+    });
     _next();
   }
 
   Future<void> _next() async {
+    if (!mounted) return;
+    _due = false;
     final settings = ref.read(launcherSettingsProvider);
     final generation = ++_generation;
     if (settings.backgroundSource == LauncherBackgroundSource.builtin) {

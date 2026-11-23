@@ -21,10 +21,15 @@ class Picon extends StatelessWidget {
   Widget build(BuildContext context) {
     final path = channel.piconPath;
     final uri = path != null ? config.webUri(path) : config.piconUri(channel.ref);
-    final initials = Center(
-      child: Text(
-        channel.name.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).take(2).map((w) => w[0]).join().toUpperCase(),
-        style: TextStyle(color: Colors.white70, fontSize: height * 0.35, fontWeight: FontWeight.bold),
+    final name = Center(
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(
+          shortChannelName(channel.name),
+          textAlign: TextAlign.center,
+          maxLines: 2,
+          style: TextStyle(color: Colors.white70, fontSize: height * 0.3, fontWeight: FontWeight.bold, height: 1.1),
+        ),
       ),
     );
     return Container(
@@ -32,15 +37,31 @@ class Picon extends StatelessWidget {
       height: height,
       decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(8)),
       padding: const EdgeInsets.all(4),
-      child: Image.network(
-        uri.toString(),
-        headers: config.authHeaders,
-        fit: BoxFit.contain,
-        errorBuilder: (_, _, _) => initials,
-        loadingBuilder: (_, child, progress) => progress == null ? child : initials,
-      ),
+      // No picon on the receiver: the name instead of OpenWebif's logo.
+      child: !channel.hasPicon
+          ? name
+          : Image.network(
+              uri.toString(),
+              headers: config.authHeaders,
+              fit: BoxFit.contain,
+              errorBuilder: (_, _, _) => name,
+              loadingBuilder: (_, child, progress) => progress == null ? child : name,
+            ),
     );
   }
+}
+
+/// A channel's name without what every second one has ("HD", "Austria",
+/// "Oesterreich", ...), in two lines at most - in place of a picon.
+String shortChannelName(String name) {
+  const noise = {'HD', 'UHD', 'AUSTRIA', 'ÖSTERREICH', 'OESTERREICH', 'AT', 'A', 'DEUTSCHLAND', 'SCHWEIZ', 'CH'};
+  final words = name.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+  final kept = words.where((w) => !noise.contains(w.toUpperCase())).toList();
+  final parts = kept.isEmpty ? words : kept;
+  final oneLine = parts.join(' ');
+  if (parts.length <= 1 || oneLine.length <= 8) return oneLine;
+  // Two lines: the first word, then the rest.
+  return '${parts.first}\n${parts.skip(1).join(' ')}';
 }
 
 /// How far a programme has got, in Home Radio's green.

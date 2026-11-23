@@ -20,7 +20,6 @@ import '../scanner/listening_hub_screen.dart';
 import '../scanner/scanner_screen.dart';
 import '../../data/models/band_plan.dart' show broadcastBandPlans;
 import '../search_internet/internet_radio_search_screen.dart';
-import '../../data/services/launcher_service.dart';
 import '../../data/services/update_service.dart';
 import '../launcher/launcher_navigation.dart';
 import '../launcher/launcher_providers.dart';
@@ -1213,10 +1212,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     // Receiver parts: only with a receiver, and as shown in the settings.
     final shown = ref.watch(receiverSectionsShownProvider);
 
-    // Home Radio is one of Home Media's "apps": Back goes to the launcher
-    // (Android), it doesn't end the app.
+    // Home Radio is one of Home Media's "apps": Back (Esc on the PC) goes
+    // to the launcher, it doesn't end the app.
     return PopScope(
-      canPop: !LauncherService.supported,
+      canPop: false,
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) showLauncher(ref);
       },

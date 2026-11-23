@@ -141,7 +141,10 @@ class LauncherTilesNotifier extends Notifier<List<LauncherTile>> {
   SettingsRepository get _repo => ref.read(settingsRepositoryProvider);
 
   Future<void> _load() async {
-    final saved = await _repo.getLauncherTiles();
+    var saved = await _repo.getLauncherTiles();
+    // Without the device's apps (PC): only Home Media's own parts - app
+    // tiles could come along with a backup from the TV box.
+    if (saved != null && !LauncherService.supported) saved = saved.where((t) => t.isBuiltIn).toList();
     if (saved != null) {
       if (!saved.any((t) => t.isTv) && !await _repo.getLauncherTvAdded()) {
         saved.insert(saved.indexWhere((t) => t.isRadio) + 1, const LauncherTile.tv());

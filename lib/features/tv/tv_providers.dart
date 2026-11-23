@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers.dart';
+import '../../data/repositories/settings_repository.dart';
 import '../../data/services/enigma2_service.dart';
 
 /// The Enigma2 receiver Home TV uses (Einstellungen → Home TV).
@@ -44,6 +45,44 @@ class TvNextUpNotifier extends Notifier<TvNextUp> {
 }
 
 final tvNextUpProvider = NotifierProvider<TvNextUpNotifier, TvNextUp>(TvNextUpNotifier.new);
+
+/// "Verschlüsselte Sender: Receiver umschalten" (Einstellungen → Home TV).
+class TvZapEncryptedNotifier extends Notifier<bool> {
+  @override
+  bool build() {
+    ref.read(settingsRepositoryProvider).getTvZapEncrypted().then((v) => state = v);
+    return true;
+  }
+
+  Future<void> set(bool value) async {
+    state = value;
+    await ref.read(settingsRepositoryProvider).setTvZapEncrypted(value);
+  }
+}
+
+final tvZapEncryptedProvider = NotifierProvider<TvZapEncryptedNotifier, bool>(TvZapEncryptedNotifier.new);
+
+/// The channels (service references) whose stream came scrambled - the
+/// receiver is switched to them right away next time, without waiting for
+/// the stream to show it. Kept in the settings.
+class TvStreamKnowledge {
+  TvStreamKnowledge(this._repo) {
+    _repo.getTvEncryptedChannels().then(_encrypted.addAll);
+  }
+
+  final SettingsRepository _repo;
+  final _encrypted = <String>{};
+
+  bool isEncrypted(String serviceRef) => _encrypted.contains(serviceRef);
+
+  void markEncrypted(String serviceRef) {
+    if (_encrypted.add(serviceRef)) _repo.setTvEncryptedChannels(_encrypted);
+  }
+}
+
+final tvStreamKnowledgeProvider = Provider<TvStreamKnowledge>(
+  (ref) => TvStreamKnowledge(ref.read(settingsRepositoryProvider)),
+);
 
 final enigma2ServiceProvider = Provider<Enigma2Service?>((ref) {
   final config = ref.watch(enigma2ConfigProvider);
@@ -101,7 +140,7 @@ final tvNowNextProvider = FutureProvider<Map<String, List<E2Event>>>((ref) async
   final events = await service.nowNext(bouquet.ref);
   final map = <String, List<E2Event>>{};
   for (final e in events) {
-    (map[_key(e.serviceRef)] ??= []).add(e);
+    (map[serviceKey(e.serviceRef)] ??= []).add(e);
   }
   for (final list in map.values) {
     list.sort((a, b) => a.begin.compareTo(b.begin));
@@ -117,11 +156,11 @@ final tvChannelEpgProvider = FutureProvider.family<List<E2Event>, String>((ref, 
 });
 
 /// Service references compared without the trailing ':' and case.
-String _key(String serviceRef) => serviceRef.replaceAll(RegExp(r':+$'), '').toUpperCase();
+String serviceKey(String serviceRef) => serviceRef.replaceAll(RegExp(r':+$'), '').toUpperCase();
 
 /// Now and next for [channel] from [tvNowNextProvider]'s map.
 ({E2Event? now, E2Event? next}) nowNextFor(Map<String, List<E2Event>> map, E2Channel channel, DateTime t) {
-  final events = map[_key(channel.ref)] ?? const [];
+  final events = map[serviceKey(channel.ref)] ?? const [];
   final now = events.where((e) => e.runsAt(t)).firstOrNull;
   final next = events.where((e) => e.begin.isAfter(t) || (now != null && !e.begin.isBefore(now.end))).firstOrNull;
   return (now: now, next: next);

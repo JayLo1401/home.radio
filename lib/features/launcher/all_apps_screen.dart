@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/ok_long_press.dart';
 import '../../core/popup_text_field.dart';
+import '../../core/remote_keys.dart';
 import '../../core/theme.dart';
 import '../../data/models/launcher_tile.dart';
 import '../../data/services/launcher_service.dart';
@@ -177,7 +178,10 @@ class _AppCellState extends State<_AppCell> {
   bool _focused = false;
 
   KeyEventResult _onKey(FocusNode node, KeyEvent event) {
-    if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.contextMenu) {
+    if (event is KeyDownEvent &&
+        ProviderScope.containerOf(context, listen: false)
+            .read(remoteKeysProvider)
+            .matches(RemoteAction.options, event.logicalKey)) {
       widget.onToggleFavorite();
       return KeyEventResult.handled;
     }

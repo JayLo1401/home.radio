@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio_media_kit/just_audio_media_kit.dart';
+import 'package:media_kit/media_kit.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'app.dart';
@@ -16,6 +17,8 @@ Future<void> main() async {
   // the streams there.
   if (Platform.isWindows || Platform.isLinux) {
     JustAudioMediaKit.ensureInitialized(windows: true, linux: true);
+    // ... and Home TV's picture (video_player has no player of its own here).
+    MediaKit.ensureInitialized();
     // Full screen and monitor choice (applyDisplayMode).
     await windowManager.ensureInitialized();
   }

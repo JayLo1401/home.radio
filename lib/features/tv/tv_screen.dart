@@ -3,13 +3,17 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:video_player/video_player.dart';
 
 import '../../core/providers.dart';
+import '../../core/remote_keys.dart';
 import '../../core/theme.dart';
 import '../../data/services/enigma2_service.dart';
+import '../../data/services/tv_stream_session.dart';
+import '../home/connection_chain.dart' show ConnectionChain, LinkState, LinkView;
 import '../settings/tv_settings_screen.dart';
 import 'tv_epg_screen.dart';
+import 'tv_guide_screen.dart';
+import 'tv_player.dart';
 import 'tv_providers.dart';
 import 'tv_widgets.dart';
 
@@ -30,7 +34,7 @@ class TvScreen extends ConsumerStatefulWidget {
 
 class _TvScreenState extends ConsumerState<TvScreen> {
   final _focus = FocusNode(debugLabel: 'tv');
-  VideoPlayerController? _player;
+  TvPlayer? _player;
   E2Channel? _current;
   String? _error;
   bool _loading = false;
@@ -61,6 +65,7 @@ class _TvScreenState extends ConsumerState<TvScreen> {
   void dispose() {
     _generation++;
     _player?.dispose();
+    _session?.close();
     _infoTimer?.cancel();
     _digitTimer?.cancel();
     _nextUpCheck?.cancel();
@@ -92,43 +97,207 @@ class _TvScreenState extends ConsumerState<TvScreen> {
     await _tune(channel);
   }
 
+  /// The connection setup in the banner (App — Receiver — Sender), like
+  /// Home Radio's; null once the picture runs.
+  LinkView? _link;
+
+  void _setLink(LinkState receiver, LinkState station, String message) =>
+      setState(() => _link = LinkView.tv(receiver: receiver, station: station, message: message));
+
+  /// The stream of the channel on air, through [TvStreamSession].
+  TvStreamSession? _session;
+
+  /// Switching channels as fast as the receiver allows - one connection to
+  /// it per channel ([TvStreamSession]): the player gets the stream as soon
+  /// as the picture comes descrambled. In standby the receiver descrambles
+  /// encrypted channels itself and is never switched (it would keep the
+  /// tuner); while it's on, it's switched to an encrypted channel (or one on
+  /// another band) if Einstellungen → Home TV allow it.
   Future<void> _tune(E2Channel channel) async {
     final config = _config;
-    if (config == null) return;
+    final service = ref.read(enigma2ServiceProvider);
+    if (config == null || service == null) return;
     final generation = ++_generation;
-    final old = _player;
+    bool stale() => !mounted || generation != _generation;
+    final clock = Stopwatch()..start();
+    void mark(String what) => debugPrint('Home TV ${channel.name}: $what nach ${clock.elapsedMilliseconds} ms');
+    final oldPlayer = _player, oldSession = _session;
     setState(() {
       _current = channel;
       _player = null;
+      _session = null;
       _loading = true;
       _error = null;
       _stopped = false;
+      _link = const LinkView.tv(receiver: LinkState.active, station: LinkState.pending, message: 'Verbinde mit dem Receiver…');
     });
     _showInfo();
     _checkNextUp();
-    await old?.dispose();
+    // The old picture goes in the background - it mustn't hold up the new one.
+    if (oldPlayer != null) unawaited(oldPlayer.dispose());
+    if (oldSession != null) unawaited(oldSession.close());
     unawaited(ref.read(settingsRepositoryProvider).setTvLastChannel(channel.ref));
-    final player = VideoPlayerController.networkUrl(config.streamUri(channel.ref), httpHeaders: config.authHeaders);
+
+    final known = ref.read(tvStreamKnowledgeProvider);
+    // Standby or on decides whether the receiver may be switched - asked
+    // while the stream connects.
+    final boxState = service.state();
+    final session = await TvStreamSession.open(config.streamUri(channel.ref), config.authHeaders);
+    if (stale()) {
+      unawaited(session.close());
+      return;
+    }
+    _session = session;
+    final player = TvPlayer(session.uri, const {});
+    final starting = player.start(timeout: const Duration(seconds: 25));
+    Future<void> giveUp(String message, {required bool atReceiver}) async {
+      starting.ignore();
+      unawaited(player.dispose());
+      if (stale()) return;
+      _fail(message, atReceiver: atReceiver);
+    }
+
+    final box = await boxState;
+    if (stale()) return giveUp('', atReceiver: false);
+    // In standby the receiver holds no channel - unless it was switched over
+    // the network: then it keeps that channel's tuner, and with one satellite
+    // cable every other band stays blocked. Let go of it.
+    if (box.standby && box.live != null && _refKey(box.live) != _refKey(channel.ref)) {
+      mark('Receiver hält ${box.live} - freigeben');
+      try {
+        await service.release();
+      } catch (_) {}
+      if (stale()) return giveUp('', atReceiver: false);
+      session.reopen();
+    }
+    // Switching the receiver only while it's on (its own picture changes
+    // with it) and Einstellungen → Home TV allow it - never in standby, it
+    // would keep the tuner afterwards.
+    final mayZap = !box.standby && ref.read(tvZapEncryptedProvider);
+    var switched = false;
+    Future<String?> zap(String why) async {
+      switched = true;
+      _setLink(LinkState.active, LinkState.pending, '$why - Receiver schaltet um…');
+      if (_refKey(box.live) == _refKey(channel.ref)) return null;
+      try {
+        await service.zap(channel.ref);
+        mark('Receiver umgeschaltet');
+        return null;
+      } catch (e) {
+        return '$e';
+      }
+    }
+
+    // Known to be encrypted: switched right away, while the stream connects.
+    if (mayZap && known.isEncrypted(channel.ref)) {
+      final problem = await zap('Verschlüsselt');
+      if (stale()) return giveUp('', atReceiver: false);
+      if (problem != null) return giveUp(problem, atReceiver: true);
+    } else {
+      _setLink(LinkState.done, LinkState.active, 'Bild wird geladen…');
+    }
+    // No stream at all - no tuner free for its band: the receiver to it (it
+    // shows another band itself), the session keeps asking meanwhile.
+    unawaited(session.refused.then((_) async {
+      if (stale() || switched || !mayZap) return;
+      await zap('Kein freier Tuner');
+      if (!stale()) session.reopen();
+    }));
+
+    final verdict = await session.verdict;
+    mark('Stream: ${verdict.name}');
+    if (stale()) return giveUp('', atReceiver: false);
+    if (verdict == StreamScrambling.scrambled) {
+      known.markEncrypted(channel.ref);
+      if (mayZap && !switched) {
+        final problem = await zap('Verschlüsselt');
+        if (stale()) return giveUp('', atReceiver: false);
+        if (problem != null) return giveUp(problem, atReceiver: true);
+      } else if (!switched) {
+        // In standby the receiver's card / CI module is free and descrambles
+        // the stream itself, a moment later.
+        _setLink(LinkState.active, LinkState.pending, 'Verschlüsselt - Receiver entschlüsselt…');
+      }
+      // On this connection, or on a new one if the receiver keeps serving
+      // the old one scrambled.
+      var clear = await _clearWithin(session, Duration(milliseconds: box.standby ? 6000 : 2500));
+      if (!clear && !stale()) {
+        mark('neu verbinden');
+        session.reopen();
+        clear = await _clearWithin(session, const Duration(seconds: 6));
+      }
+      if (stale()) return giveUp('', atReceiver: false);
+      if (!clear) {
+        return giveUp(
+          !box.standby && !mayZap
+              ? '„${channel.name}“ ist verschlüsselt und der Receiver zeigt selbst einen anderen Sender - '
+                  'Einstellungen → Home TV → „Receiver bei Bedarf umschalten“.'
+              : '„${channel.name}“ bleibt verschlüsselt - Karte bzw. CI-Modul für diesen Sender freigeschaltet?',
+          atReceiver: true,
+        );
+      }
+      mark('entschlüsselt');
+    } else if (verdict == StreamScrambling.unknown) {
+      return giveUp(
+        box.standby || mayZap
+            ? 'Kein freier Tuner für „${channel.name}“ - das Sat-Kabel ist gerade auf einem anderen Band belegt '
+                '(Aufnahme oder ein anderes Gerät).'
+            : 'Kein freier Tuner für „${channel.name}“ - der Receiver zeigt selbst einen Sender auf einem anderen '
+                'Band (Einstellungen → Home TV → „Receiver bei Bedarf umschalten“).',
+        atReceiver: true,
+      );
+    }
+    _setLink(LinkState.done, LinkState.active, 'Bild wird geladen…');
     try {
-      await player.initialize();
-      if (!mounted || generation != _generation) {
-        await player.dispose();
+      await starting;
+      mark('Bild');
+      if (stale()) {
+        unawaited(player.dispose());
         return;
       }
-      await player.play();
       setState(() {
         _player = player;
         _loading = false;
       });
-    } catch (e) {
-      await player.dispose();
-      if (!mounted || generation != _generation) return;
-      setState(() {
-        _loading = false;
-        _error = 'Kein Bild von „${channel.name}“ - ist der Receiver an und ein Tuner frei?';
+      _setLink(LinkState.done, LinkState.done, 'Sender läuft');
+      // All green for a moment, then the programme info again.
+      Future.delayed(const Duration(milliseconds: 1200), () {
+        if (stale()) return;
+        setState(() => _link = null);
+        _showInfo();
       });
+    } catch (e) {
+      mark('kein Bild: $e');
+      unawaited(player.dispose());
+      if (stale()) return;
+      _fail('Kein Bild von „${channel.name}“ - ist der Receiver an und ein Tuner frei?', atReceiver: false);
     }
   }
+
+  static Future<bool> _clearWithin(TvStreamSession session, Duration limit) async {
+    try {
+      await session.clear.timeout(limit);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  void _fail(String message, {required bool atReceiver}) {
+    _infoTimer?.cancel();
+    setState(() {
+      _loading = false;
+      _error = message;
+      _infoVisible = true;
+      _link = LinkView.tv(
+        receiver: atReceiver ? LinkState.failed : LinkState.done,
+        station: atReceiver ? LinkState.pending : LinkState.failed,
+        message: message,
+      );
+    });
+  }
+
+  static String _refKey(String? serviceRef) => (serviceRef ?? '').replaceAll(RegExp(r':+$'), '').toUpperCase();
 
   Future<void> _step(int direction) async {
     final channels = ref.read(tvChannelsProvider).value ?? const [];
@@ -145,11 +314,107 @@ class _TvScreenState extends ConsumerState<TvScreen> {
       return;
     }
     _generation++;
+    final session = _session;
     setState(() {
       _player = null;
+      _session = null;
       _stopped = true;
     });
     await player.dispose();
+    await session?.close();
+  }
+
+  /// The channel's sound tracks to choose from (☰ → Tonspur, the remote's
+  /// audio key, A on the keyboard).
+  Future<void> _chooseAudio() async {
+    final player = _player;
+    if (player == null) return;
+    final tracks = player.info.value.audio;
+    if (tracks.isEmpty) return;
+    final id = await showDialog<String>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('Tonspur'),
+        children: [
+          for (final t in tracks)
+            TvRow(
+              autofocus: t.selected,
+              selected: t.selected,
+              onTap: () => Navigator.of(context).pop(t.id),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                child: Row(
+                  children: [
+                    Icon(t.selected ? Icons.radio_button_checked : Icons.radio_button_off,
+                        color: t.selected ? brandGreen : Colors.white54),
+                    const SizedBox(width: 14),
+                    Text(t.label, style: const TextStyle(fontSize: 18)),
+                    if (t.details != null) ...[
+                      const SizedBox(width: 12),
+                      Text(t.details!, style: const TextStyle(color: Colors.white54, fontSize: 15)),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+    if (id == null || !mounted || _player != player) return;
+    await player.selectAudio(id);
+    _showInfo();
+  }
+
+  /// The options key: programme guide, the channel's programmes, sound track.
+  Future<void> _openOptions() async {
+    final hasTracks = (_player?.info.value.audio.length ?? 0) > 1;
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: Text(_current?.name ?? 'Home TV'),
+        children: [
+          TvRow(
+            autofocus: true,
+            onTap: () => Navigator.of(context).pop('guide'),
+            child: const ListTile(leading: Icon(Icons.view_timeline_outlined), title: Text('Programmführer')),
+          ),
+          TvRow(
+            onTap: () => Navigator.of(context).pop('epg'),
+            child: ListTile(
+              leading: const Icon(Icons.event_note),
+              title: Text('Alle Sendungen von ${_current?.name ?? 'diesem Sender'}'),
+            ),
+          ),
+          if (hasTracks)
+            TvRow(
+              onTap: () => Navigator.of(context).pop('audio'),
+              child: ListTile(
+                leading: const Icon(Icons.audiotrack),
+                title: const Text('Tonspur'),
+                subtitle: Text(_player?.info.value.selectedAudio?.label ?? ''),
+              ),
+            ),
+        ],
+      ),
+    );
+    if (!mounted) return;
+    if (choice == 'guide') await _openGuide(_current);
+    if (choice == 'epg') _openEpg();
+    if (choice == 'audio') await _chooseAudio();
+  }
+
+  /// The programme guide (all channels, time across) - starting on [start];
+  /// the channel picked there goes on air.
+  Future<void> _openGuide(E2Channel? start) async {
+    final picked = await Navigator.of(context).push<E2Channel>(
+      MaterialPageRoute(builder: (_) => TvGuideScreen(start: start)),
+    );
+    if (!mounted || picked == null) return;
+    if (_listVisible) {
+      setState(() => _listVisible = false);
+      _focus.requestFocus();
+    }
+    if (picked.ref != _current?.ref) unawaited(_tune(picked));
   }
 
   /// Shortly before the next programme on this channel starts (Einstellungen
@@ -214,6 +479,9 @@ class _TvScreenState extends ConsumerState<TvScreen> {
   KeyEventResult _onKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
     final key = event.logicalKey;
+    // The channel list is open but hasn't got the focus yet: the keys
+    // mustn't switch channels behind it (Back/Esc still closes it).
+    if (_listVisible) return key == LogicalKeyboardKey.escape ? KeyEventResult.ignored : KeyEventResult.handled;
     if (key == LogicalKeyboardKey.arrowUp ||
         key == LogicalKeyboardKey.channelUp ||
         key == LogicalKeyboardKey.pageUp ||
@@ -231,13 +499,21 @@ class _TvScreenState extends ConsumerState<TvScreen> {
       return KeyEventResult.handled;
     }
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
-    if (key == LogicalKeyboardKey.select || key == LogicalKeyboardKey.enter || key == LogicalKeyboardKey.gameButtonA) {
-      setState(() => _listVisible = true);
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.contextMenu || key == LogicalKeyboardKey.info || key == LogicalKeyboardKey.guide) {
-      _openEpg();
-      return KeyEventResult.handled;
+    // The assignable keys (Einstellungen → Tasten der Fernbedienung).
+    switch (ref.read(remoteKeysProvider).actionOf(key)) {
+      case RemoteAction.channelList:
+        setState(() => _listVisible = true);
+        return KeyEventResult.handled;
+      case RemoteAction.options:
+        _openOptions();
+        return KeyEventResult.handled;
+      case RemoteAction.guide:
+        _openGuide(_current);
+        return KeyEventResult.handled;
+      case RemoteAction.audio:
+        _chooseAudio();
+        return KeyEventResult.handled;
+      case null:
     }
     if (key == LogicalKeyboardKey.arrowLeft || key == LogicalKeyboardKey.arrowRight) {
       _showInfo();
@@ -298,14 +574,19 @@ class _TvScreenState extends ConsumerState<TvScreen> {
                         focusNode: _focus,
                         autofocus: true,
                         onKeyEvent: _onKey,
-                        child: Center(
-                          child: player != null && player.value.isInitialized
-                              ? AspectRatio(aspectRatio: player.value.aspectRatio, child: VideoPlayer(player))
-                              : const SizedBox.shrink(),
+                        // The mouse on the PC: click = channel list, right
+                        // click = programme / sound track.
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => setState(() => _listVisible = true),
+                          onSecondaryTap: _openOptions,
+                          child: player != null ? player.view() : const SizedBox.expand(),
                         ),
                       ),
-                      if (_loading) const Center(child: CircularProgressIndicator()),
-                      if ((_error != null || _stopped) && !_listVisible)
+                      // Tuning and its errors show in the banner (the
+                      // connection setup) - without a channel in the middle.
+                      if (_loading && _current == null) const Center(child: CircularProgressIndicator()),
+                      if ((_stopped || (_error != null && _current == null)) && !_listVisible)
                         Center(
                           child: _Message(
                             icon: _stopped ? Icons.pause_circle_outline : Icons.signal_wifi_bad,
@@ -321,8 +602,18 @@ class _TvScreenState extends ConsumerState<TvScreen> {
                         ),
                       if (_nextUp != null && !_listVisible)
                         Positioned(top: 32, right: 40, child: _NextUpNote(event: _nextUp!)),
-                      if ((_infoVisible || _error != null) && _current != null && !_listVisible)
-                        Positioned(left: 0, right: 0, bottom: 0, child: _InfoBanner(config: config, channel: _current!)),
+                      if ((_infoVisible || _error != null || _link != null) && _current != null && !_listVisible)
+                        Positioned(
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          child: _InfoBanner(
+                            config: config,
+                            channel: _current!,
+                            link: _stopped ? null : _link,
+                            player: player,
+                          ),
+                        ),
                       if (_listVisible)
                         Positioned(
                           top: 0,
@@ -337,7 +628,7 @@ class _TvScreenState extends ConsumerState<TvScreen> {
                               _focus.requestFocus();
                               if (c.ref != _current?.ref) _tune(c);
                             },
-                            onEpg: (c) => Navigator.of(context).push(MaterialPageRoute(builder: (_) => TvEpgScreen(channel: c))),
+                            onEpg: _openGuide,
                           ),
                         ),
                     ],
@@ -449,13 +740,84 @@ class _NotSetUp extends StatelessWidget {
   }
 }
 
+/// What's coming in: picture (resolution, rate, codec), sound track, and
+/// whether it's the receiver's original stream or transcoded.
+class _StreamFacts extends StatelessWidget {
+  const _StreamFacts({required this.info, required this.transcoded});
+
+  final TvPlayerInfo info;
+  final bool transcoded;
+
+  @override
+  Widget build(BuildContext context) {
+    final picture = [?info.grade, ?info.resolution, ?info.aspectLabel, ?info.rate, ?info.videoCodec].join(' · ');
+    final sound = info.selectedAudio;
+    final soundText = sound == null ? null : [sound.label, ?sound.details].join(' · ');
+    final more = info.audio.length > 1 ? '  (${info.audio.length} Tonspuren)' : '';
+    return Wrap(
+      spacing: 8,
+      runSpacing: 6,
+      children: [
+        if (picture.isNotEmpty) _Chip(icon: Icons.hd_outlined, text: picture),
+        if (soundText != null) _Chip(icon: Icons.audiotrack, text: '$soundText$more'),
+        _Chip(
+          icon: transcoded ? Icons.compress : Icons.verified_outlined,
+          text: transcoded ? 'Transkodiert' : 'Original',
+          color: transcoded ? Colors.orangeAccent : brandGreen,
+        ),
+      ],
+    );
+  }
+}
+
+class _Chip extends StatelessWidget {
+  const _Chip({required this.icon, required this.text, this.color = Colors.white70});
+
+  final IconData icon;
+  final String text;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        border: Border.all(color: color.withValues(alpha: 0.5)),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 6),
+          Text(text, style: TextStyle(color: color, fontSize: 14)),
+        ],
+      ),
+    );
+  }
+}
+
 /// Channel, now and next - shown on every channel change, like Home Radio's
 /// "now playing" banner at the bottom.
 class _InfoBanner extends ConsumerWidget {
-  const _InfoBanner({required this.config, required this.channel});
+  const _InfoBanner({required this.config, required this.channel, this.link, this.player});
 
   final Enigma2Config config;
   final E2Channel channel;
+
+  /// While the channel connects: the setup instead of now and next.
+  final LinkView? link;
+
+  /// Its picture and sound - resolution, format, sound track.
+  final TvPlayer? player;
+
+  /// The keys as assigned (Einstellungen → Tasten der Fernbedienung).
+  static String _hint(WidgetRef ref) {
+    final keys = ref.watch(remoteKeysProvider);
+    String k(RemoteAction a) => remoteKeyHint(keys, a);
+    return '${k(RemoteAction.channelList)} Senderliste  ·  ${k(RemoteAction.guide)} Programm  ·  '
+        '${k(RemoteAction.options)} Optionen';
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -478,17 +840,27 @@ class _InfoBanner extends ConsumerWidget {
                 Text('${channel.number} · ${channel.name}',
                     style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 6),
-                if (now != null) ...[
+                if (link case final link?) ...[
+                  const SizedBox(height: 4),
+                  ConnectionChain(view: link),
+                ] else if (now != null) ...[
                   Text('${hhmm(now.begin)} – ${hhmm(now.end)}   ${now.title}',
                       maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 20)),
                   const SizedBox(height: 8),
                   EventProgress(event: now, width: 520),
                 ] else
                   const Text('Keine Programminformation', style: TextStyle(color: Colors.white54, fontSize: 18)),
-                if (next != null) ...[
+                if (next != null && link == null) ...[
                   const SizedBox(height: 8),
                   Text('Danach ${hhmm(next.begin)}   ${next.title}',
                       maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white60, fontSize: 17)),
+                ],
+                if (player case final player? when link == null) ...[
+                  const SizedBox(height: 10),
+                  ValueListenableBuilder(
+                    valueListenable: player.info,
+                    builder: (context, info, _) => _StreamFacts(info: info, transcoded: config.streamPort == 8002),
+                  ),
                 ],
               ],
             ),
@@ -499,7 +871,8 @@ class _InfoBanner extends ConsumerWidget {
             children: [
               const TvClock(style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w700)),
               const SizedBox(height: 8),
-              Text('OK Senderliste  ·  ☰ Programm', style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 14)),
+              Text(_hint(ref),
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 14)),
             ],
           ),
         ],
@@ -529,6 +902,12 @@ class _ChannelListState extends ConsumerState<_ChannelList> {
   /// The tuned channel's row - takes the focus when the list opens (the
   /// player had it, so the rows' autofocus wouldn't).
   final _startNode = FocusNode(debugLabel: 'channel list');
+  final _scroll = ScrollController();
+
+  /// Every row is this high - so the list can jump straight to the tuned
+  /// channel (only rows on screen are built, one further down has no
+  /// widget to take the focus).
+  static const _rowExtent = 92.0;
 
   @override
   void initState() {
@@ -539,17 +918,33 @@ class _ChannelListState extends ConsumerState<_ChannelList> {
   @override
   void dispose() {
     _startNode.dispose();
+    _scroll.dispose();
     super.dispose();
   }
 
-  void _focusStart() {
-    if (!mounted) return;
-    if (_startNode.context != null) {
-      _startNode.requestFocus();
-    } else {
+  void _focusStart([int attempt = 0]) {
+    if (!mounted || attempt > 50) return;
+    final list = ref.read(tvChannelsProvider).value;
+    if (list == null || !_scroll.hasClients) {
       // Channels still loading - once they're there.
-      Future.delayed(const Duration(milliseconds: 200), _focusStart);
+      Future.delayed(const Duration(milliseconds: 100), () => _focusStart(attempt + 1));
+      return;
     }
+    // The tuned channel's row in the middle - not in this bouquet: the first.
+    final i = list.indexWhere((c) => c.ref == widget.current?.ref);
+    final position = _scroll.position;
+    final centred = i * _rowExtent - (position.viewportDimension - _rowExtent) / 2;
+    _scroll.jumpTo(i <= 0 ? 0.0 : centred.clamp(0.0, position.maxScrollExtent));
+    // Its row is built with the next frame.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (_startNode.context != null) {
+        _startNode.requestFocus();
+      } else {
+        Future.delayed(const Duration(milliseconds: 100), () => _focusStart(attempt + 1));
+      }
+    });
+    WidgetsBinding.instance.scheduleFrame();
   }
 
   Future<void> _switchBouquet(int direction) async {
@@ -571,7 +966,8 @@ class _ChannelListState extends ConsumerState<_ChannelList> {
       _switchBouquet(key == LogicalKeyboardKey.arrowRight ? 1 : -1);
       return KeyEventResult.handled;
     }
-    if (key == LogicalKeyboardKey.contextMenu || key == LogicalKeyboardKey.info || key == LogicalKeyboardKey.guide) {
+    final keys = ref.read(remoteKeysProvider);
+    if (keys.matches(RemoteAction.guide, key) || keys.matches(RemoteAction.options, key)) {
       final c = _focused ?? widget.current;
       if (c != null) widget.onEpg(c);
       return KeyEventResult.handled;
@@ -635,7 +1031,9 @@ class _ChannelListState extends ConsumerState<_ChannelList> {
                 data: (list) => list.isEmpty
                     ? const Center(child: Text('Keine Sender in dieser Liste', style: TextStyle(color: Colors.white70)))
                     : ListView.builder(
+                        controller: _scroll,
                         itemCount: list.length,
+                        itemExtent: _rowExtent,
                         padding: const EdgeInsets.only(bottom: 20),
                         itemBuilder: (context, i) {
                           final c = list[i];
@@ -661,6 +1059,7 @@ class _ChannelListState extends ConsumerState<_ChannelList> {
                                     const SizedBox(width: 14),
                                     Expanded(
                                       child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
                                           Text(c.name,

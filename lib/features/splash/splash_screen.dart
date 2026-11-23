@@ -5,7 +5,6 @@ import '../../core/display_mode.dart';
 import '../../core/providers.dart';
 
 import '../../data/models/launcher_tile.dart' show StartScreen;
-import '../../data/services/launcher_service.dart';
 import '../home/home_screen.dart';
 import '../launcher/launcher_navigation.dart';
 import '../launcher/launcher_providers.dart';
@@ -56,11 +55,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
   /// over it when that's the start setting, or the Home key started the app.
   Future<void> _start() async {
     final started = DateTime.now();
-    var start = StartScreen.radio;
-    if (LauncherService.supported) {
-      final requested = await ref.read(launcherServiceProvider).takeLaunchRequest();
-      start = requested ? StartScreen.launcher : await ref.read(settingsRepositoryProvider).getStartScreen();
-    }
+    // The Home key (Android) asks for the launcher, whatever the setting.
+    final requested = await ref.read(launcherServiceProvider).takeLaunchRequest();
+    final start = requested ? StartScreen.launcher : await ref.read(settingsRepositoryProvider).getStartScreen();
     final rest = _popDuration - DateTime.now().difference(started);
     if (rest > Duration.zero) await Future<void>.delayed(rest);
     if (!mounted) return;
@@ -82,7 +79,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
   Widget build(BuildContext context) {
     // Back during the start mustn't end Home Media (it's the home screen).
     return PopScope(
-      canPop: !LauncherService.supported,
+      canPop: false,
       child: Scaffold(
       backgroundColor: Colors.black,
       body: Center(

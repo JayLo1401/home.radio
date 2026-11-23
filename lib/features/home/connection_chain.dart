@@ -240,7 +240,7 @@ class LinkView {
     required this.station,
     required this.message,
     this.internet = false,
-  });
+  }) : tv = false;
 
   /// Internet radio: "App — Internet — Sender", [server] standing for the
   /// connection to the stream (no stick).
@@ -248,9 +248,21 @@ class LinkView {
     : viaServer = false,
       server = connection,
       stick = LinkState.done,
-      internet = true;
+      internet = true,
+      tv = false;
+
+  /// Home TV: "App — Receiver — Sender", [server] standing for the Sat
+  /// receiver (reached, switched to an encrypted channel), [station] for
+  /// the picture.
+  const LinkView.tv({required LinkState receiver, required this.station, required this.message})
+    : viaServer = false,
+      server = receiver,
+      stick = LinkState.done,
+      internet = false,
+      tv = true;
 
   final bool internet;
+  final bool tv;
   final bool viaServer;
   final LinkState server;
   final LinkState stick;
@@ -263,6 +275,7 @@ class LinkView {
   bool operator ==(Object other) =>
       other is LinkView &&
       other.internet == internet &&
+      other.tv == tv &&
       other.viaServer == viaServer &&
       other.server == server &&
       other.stick == stick &&
@@ -270,7 +283,7 @@ class LinkView {
       other.message == message;
 
   @override
-  int get hashCode => Object.hash(internet, viaServer, server, stick, station, message);
+  int get hashCode => Object.hash(internet, tv, viaServer, server, stick, station, message);
 }
 
 /// "App — RTL-Server — Stick — Sender" in the Now Playing banner while the
@@ -390,6 +403,10 @@ class _ConnectionChainState extends State<ConnectionChain> with SingleTickerProv
             // Internet radio: the stream comes over the internet.
             _segment(view.server),
             _node(Icons.public, 'Internet', view.server),
+          ] else if (view.tv) ...[
+            // Home TV: the picture comes from the Sat receiver.
+            _segment(view.server),
+            _node(Icons.settings_input_antenna, 'Receiver', view.server),
           ] else ...[
             if (view.viaServer) ...[
               _segment(view.server),
@@ -399,7 +416,7 @@ class _ConnectionChainState extends State<ConnectionChain> with SingleTickerProv
             _node(Icons.usb, view.viaServer ? 'Stick' : 'USB-Stick', view.stick),
           ],
           _segment(view.station),
-          _node(view.internet ? Icons.radio : Icons.cell_tower, 'Sender', view.station),
+          _node(view.tv ? Icons.live_tv : (view.internet ? Icons.radio : Icons.cell_tower), 'Sender', view.station),
           const SizedBox(width: 18),
           Expanded(
             child: SizedBox(
