@@ -62,8 +62,10 @@ class TvPlayerInfo {
 
   /// "1920×1080i", "1280×720p" - or null before the first picture.
   String? get resolution {
-    if (width == null || height == null || width == 0) return null;
+    if (height == null || height == 0) return null;
     final scan = interlaced == null ? '' : (interlaced! ? 'i' : 'p');
+    // Without the width as sent (Android): the lines.
+    if (width == null || width == 0) return scan.isEmpty ? '$height Zeilen' : '$height$scan';
     return '$width×$height$scan';
   }
 
@@ -288,9 +290,9 @@ class _ExoTvPlayer implements TvPlayer {
   void _publish() {
     if (_disposed) return;
     final size = _controller.value.size;
-    // ExoPlayer reports the display size (pixel aspect already applied).
+    // ExoPlayer reports the display size (pixel aspect already applied: SD
+    // 720×576 comes as 1047×576) - so only the lines count.
     _info.value = TvPlayerInfo(
-      width: size.width > 0 ? size.width.round() : null,
       height: size.height > 0 ? size.height.round() : null,
       aspect: size.height > 0 ? size.width / size.height : null,
       audio: _audio,

@@ -6,6 +6,18 @@ import 'package:http/http.dart' as http;
 
 import 'enigma2_service.dart' show StreamScrambling, TsScramblingProbe;
 
+/// [chunk] from its first MPEG-TS packet on: the first sync byte (0x47)
+/// followed by two more 188 bytes apart (as far as the chunk goes).
+List<int> alignToTsPacket(List<int> chunk) {
+  for (var i = 0; i < 188 && i < chunk.length; i++) {
+    if (chunk[i] != 0x47) continue;
+    if (i + 188 < chunk.length && chunk[i + 188] != 0x47) continue;
+    if (i + 376 < chunk.length && chunk[i + 376] != 0x47) continue;
+    return i == 0 ? chunk : chunk.sublist(i);
+  }
+  return chunk;
+}
+
 /// One channel's stream from the receiver, passed through a little HTTP
 /// server on this device (127.0.0.1) to the player - a single connection to
 /// the receiver, looked at on the way:
@@ -122,8 +134,12 @@ class TvStreamSession {
           if (result == StreamScrambling.clear) {
             if (!_verdict.isCompleted) _verdict.complete(StreamScrambling.clear);
             _clear.complete();
-            // From here on everything goes to the player.
-            _data.add(chunk);
+            // From here on everything goes to the player - starting at a
+            // packet: a chunk can begin in the middle of one, and ExoPlayer
+            // recognises MPEG-TS only by sync bytes every 188 bytes from the
+            // start ("None of the available extractors could read the
+            // stream").
+            _data.add(alignToTsPacket(chunk));
           } else if (result == StreamScrambling.scrambled && !_verdict.isCompleted) {
             _verdict.complete(StreamScrambling.scrambled);
           }

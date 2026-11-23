@@ -142,6 +142,7 @@ String remoteKeyLabel(LogicalKeyboardKey key) {
   if (key == LogicalKeyboardKey.info) return 'Info';
   if (key == LogicalKeyboardKey.guide) return 'Guide/EPG';
   if (key == LogicalKeyboardKey.mediaAudioTrack) return 'Audio';
+  if (key == LogicalKeyboardKey.browserSearch) return 'Suche';
   if (key == LogicalKeyboardKey.gameButtonA) return 'A (Gamepad)';
   if (key == LogicalKeyboardKey.colorF0Red) return 'Rot';
   if (key == LogicalKeyboardKey.colorF1Green) return 'Grün';
