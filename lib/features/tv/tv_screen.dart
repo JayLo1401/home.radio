@@ -21,10 +21,11 @@ import 'tv_widgets.dart';
 /// One of Home Media's parts, opened from the launcher - Back or Home leave
 /// it, which stops the picture.
 ///
-/// Remote, as on a TV set: up/down (and channel keys, ⏪/⏩) change the
-/// channel, digits pick one by number, OK opens the channel list (left/
-/// right there switch the bouquet), ☰ or Info opens the programme guide of
-/// the channel, play/pause stops and resumes.
+/// Remote: up/down or OK open the channel list (OK there plays the marked
+/// channel, right opens the programme guide at it, left switches the
+/// bouquet), the channel keys and ⏪/⏩ switch straight away, digits pick a
+/// channel by number, Info the programme guide, the options key a menu,
+/// play/pause stops and resumes. All assignable keys: RemoteKeys.
 class TvScreen extends ConsumerStatefulWidget {
   const TvScreen({super.key});
 
@@ -482,16 +483,20 @@ class _TvScreenState extends ConsumerState<TvScreen> {
     // The channel list is open but hasn't got the focus yet: the keys
     // mustn't switch channels behind it (Back/Esc still closes it).
     if (_listVisible) return key == LogicalKeyboardKey.escape ? KeyEventResult.ignored : KeyEventResult.handled;
-    if (key == LogicalKeyboardKey.arrowUp ||
-        key == LogicalKeyboardKey.channelUp ||
+    // Up/down open the channel list - OK there plays the marked channel.
+    if (key == LogicalKeyboardKey.arrowUp || key == LogicalKeyboardKey.arrowDown) {
+      if (event is KeyDownEvent) setState(() => _listVisible = true);
+      return KeyEventResult.handled;
+    }
+    // The remote's channel keys (and ⏪/⏩) still switch straight away.
+    if (key == LogicalKeyboardKey.channelUp ||
         key == LogicalKeyboardKey.pageUp ||
         key == LogicalKeyboardKey.mediaFastForward ||
         key == LogicalKeyboardKey.mediaTrackNext) {
       _step(1);
       return KeyEventResult.handled;
     }
-    if (key == LogicalKeyboardKey.arrowDown ||
-        key == LogicalKeyboardKey.channelDown ||
+    if (key == LogicalKeyboardKey.channelDown ||
         key == LogicalKeyboardKey.pageDown ||
         key == LogicalKeyboardKey.mediaRewind ||
         key == LogicalKeyboardKey.mediaTrackPrevious) {
@@ -629,6 +634,10 @@ class _TvScreenState extends ConsumerState<TvScreen> {
                               if (c.ref != _current?.ref) _tune(c);
                             },
                             onEpg: _openGuide,
+                            onClose: () {
+                              setState(() => _listVisible = false);
+                              _focus.requestFocus();
+                            },
                           ),
                         ),
                     ],
@@ -885,7 +894,16 @@ class _InfoBanner extends ConsumerWidget {
 /// number, name, what's on now. Left/right switch the bouquet, OK tunes,
 /// ☰ opens the channel's programme guide.
 class _ChannelList extends ConsumerStatefulWidget {
-  const _ChannelList({required this.config, required this.current, required this.onPick, required this.onEpg});
+  const _ChannelList({
+    required this.config,
+    required this.current,
+    required this.onPick,
+    required this.onEpg,
+    required this.onClose,
+  });
+
+  /// Left: back to the picture.
+  final VoidCallback onClose;
 
   final Enigma2Config config;
   final E2Channel? current;
@@ -947,23 +965,40 @@ class _ChannelListState extends ConsumerState<_ChannelList> {
     WidgetsBinding.instance.scheduleFrame();
   }
 
-  Future<void> _switchBouquet(int direction) async {
-    final bouquets = ref.read(tvBouquetsProvider).value ?? const [];
-    final current = ref.read(tvCurrentBouquetProvider).value;
-    if (bouquets.length < 2 || current == null) return;
-    final i = bouquets.indexWhere((b) => b.ref == current.ref);
-    // The focused row goes with the old list - keep the focus in the list.
-    _startNode.requestFocus();
-    await ref.read(tvBouquetProvider.notifier).set(bouquets[(i + direction) % bouquets.length].ref);
+  /// Another of the receiver's channel lists (bouquets), from the choice at
+  /// the top of the list.
+  Future<void> _switchBouquet(String bouquetRef) async {
+    if (bouquetRef == ref.read(tvCurrentBouquetProvider).value?.ref) {
+      _focusStart();
+      return;
+    }
+    await ref.read(tvBouquetProvider.notifier).set(bouquetRef);
     await ref.read(tvChannelsProvider.future);
     WidgetsBinding.instance.addPostFrameCallback((_) => _focusStart());
+  }
+
+  /// What's on [c] now (and next), in full.
+  Future<void> _showProgrammeInfo(E2Channel c) async {
+    final epg = ref.read(tvNowNextProvider).value ?? const {};
+    final nn = nowNextFor(epg, c, DateTime.now());
+    await showDialog<void>(
+      context: context,
+      builder: (context) => _ProgrammeInfo(config: widget.config, channel: c, now: nn.now, next: nn.next),
+    );
   }
 
   KeyEventResult _onKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
     final key = event.logicalKey;
-    if (key == LogicalKeyboardKey.arrowLeft || key == LogicalKeyboardKey.arrowRight) {
-      _switchBouquet(key == LogicalKeyboardKey.arrowRight ? 1 : -1);
+    // Right: the programme guide at the marked channel (no extra key needed).
+    if (key == LogicalKeyboardKey.arrowRight) {
+      final c = _focused ?? widget.current;
+      if (c != null) widget.onEpg(c);
+      return KeyEventResult.handled;
+    }
+    // Left: closes the list again.
+    if (key == LogicalKeyboardKey.arrowLeft) {
+      widget.onClose();
       return KeyEventResult.handled;
     }
     final keys = ref.read(remoteKeysProvider);
@@ -1010,19 +1045,16 @@ class _ChannelListState extends ConsumerState<_ChannelList> {
               ],
             ),
             const SizedBox(height: 14),
-            Row(
-              children: [
-                const Icon(Icons.chevron_left, color: Colors.white38),
-                Expanded(
-                  child: Text(
-                    bouquet?.name ?? 'Senderliste',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: brandGreen, fontSize: 18, fontWeight: FontWeight.w600),
-                  ),
-                ),
-                const Icon(Icons.chevron_right, color: Colors.white38),
-              ],
+            // The receiver's channel lists - up from the first channel.
+            _BouquetChoice(
+              bouquets: ref.watch(tvBouquetsProvider).value ?? const [],
+              current: bouquet,
+              onPick: (b) => _switchBouquet(b.ref),
             ),
+            const SizedBox(height: 8),
+            // Plain arrows - Android draws ▶/◀ as coloured emoji.
+            Text('OK abspielen (laufender Sender: Info)  ·  → Programm  ·  ← schließen',
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 14)),
             const SizedBox(height: 10),
             Expanded(
               child: channels.when(
@@ -1046,7 +1078,9 @@ class _ChannelListState extends ConsumerState<_ChannelList> {
                               focusNode: start ? _startNode : null,
                               selected: isCurrent,
                               onFocused: () => _focused = c,
-                              onTap: () => widget.onPick(c),
+                              // OK on the channel on air: its programme info;
+                              // on another: play it.
+                              onTap: () => isCurrent ? _showProgrammeInfo(c) : widget.onPick(c),
                               child: Padding(
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                                 child: Row(
@@ -1078,6 +1112,14 @@ class _ChannelListState extends ConsumerState<_ChannelList> {
                                         ],
                                       ),
                                     ),
+                                    // ▶ (or a click on it): the programme guide.
+                                    GestureDetector(
+                                      onTap: () => widget.onEpg(c),
+                                      child: const Padding(
+                                        padding: EdgeInsets.only(left: 8),
+                                        child: Icon(Icons.chevron_right, color: Colors.white54, size: 30),
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ),
@@ -1090,6 +1132,169 @@ class _ChannelListState extends ConsumerState<_ChannelList> {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// The receiver's channel lists (bouquets) side by side at the top of the
+/// channel list - up from the first channel, OK picks one.
+class _BouquetChoice extends StatelessWidget {
+  const _BouquetChoice({required this.bouquets, required this.current, required this.onPick});
+
+  final List<E2Bouquet> bouquets;
+  final E2Bouquet? current;
+  final ValueChanged<E2Bouquet> onPick;
+
+  /// The receiver's English names in German, without "(TV)".
+  static String label(String name) {
+    final n = name.replaceAll(RegExp(r'\s*\(TV\)\s*$', caseSensitive: false), '').trim();
+    return switch (n.toLowerCase()) {
+      'favourites' || 'favorites' => 'Favoriten',
+      'last scanned' => 'Zuletzt gescannt',
+      _ => n,
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (bouquets.length < 2) {
+      return Text(current == null ? 'Senderliste' : label(current!.name),
+          style: const TextStyle(color: brandGreen, fontSize: 18, fontWeight: FontWeight.w600));
+    }
+    // Left/right move between the lists here (the channel rows below use
+    // them for info and the programme guide).
+    return Focus(
+      canRequestFocus: false,
+      skipTraversal: true,
+      onKeyEvent: (node, event) {
+        if (event is! KeyDownEvent) return KeyEventResult.ignored;
+        final key = event.logicalKey;
+        if (key == LogicalKeyboardKey.arrowLeft || key == LogicalKeyboardKey.arrowRight) {
+          FocusScope.of(context).focusInDirection(
+            key == LogicalKeyboardKey.arrowLeft ? TraversalDirection.left : TraversalDirection.right,
+          );
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          for (final b in bouquets)
+            _BouquetChip(
+              label: label(b.name),
+              selected: b.ref == current?.ref,
+              onTap: () => onPick(b),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BouquetChip extends StatefulWidget {
+  const _BouquetChip({required this.label, required this.selected, required this.onTap});
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  State<_BouquetChip> createState() => _BouquetChipState();
+}
+
+class _BouquetChipState extends State<_BouquetChip> {
+  bool _focused = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return TvFocusHighlight(
+      focused: _focused,
+      borderRadius: BorderRadius.circular(18),
+      child: Material(
+        color: widget.selected ? brandGreen.withValues(alpha: 0.85) : Colors.white.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(18),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          focusColor: Colors.transparent,
+          onFocusChange: (v) => setState(() => _focused = v),
+          onTap: widget.onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+            child: Text(
+              widget.label,
+              style: TextStyle(
+                color: widget.selected ? Colors.black : Colors.white,
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// OK on the channel on air in the channel list: what's on now, in full,
+/// and what's next. Back or OK close it.
+class _ProgrammeInfo extends StatelessWidget {
+  const _ProgrammeInfo({required this.config, required this.channel, required this.now, required this.next});
+
+  final Enigma2Config config;
+  final E2Channel channel;
+  final E2Event? now;
+  final E2Event? next;
+
+  @override
+  Widget build(BuildContext context) {
+    final e = now;
+    return AlertDialog(
+      backgroundColor: const Color(0xFF0E151A),
+      titlePadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+      title: Row(
+        children: [
+          Picon(config: config, channel: channel, width: 76, height: 46),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Text('${channel.number} · ${channel.name}',
+                style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 760),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (e == null)
+                const Text('Keine Programminformation.', style: TextStyle(color: Colors.white70, fontSize: 18))
+              else ...[
+                Text(e.title, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 6),
+                Text('${hhmm(e.begin)} – ${hhmm(e.end)}  ·  ${e.duration.inMinutes} Min.',
+                    style: const TextStyle(color: brandGreen, fontSize: 16)),
+                const SizedBox(height: 8),
+                EventProgress(event: e, width: 400),
+                const SizedBox(height: 14),
+                Text(e.description.isEmpty ? 'Keine Beschreibung.' : e.description,
+                    style: const TextStyle(color: Colors.white70, fontSize: 17, height: 1.4)),
+              ],
+              if (next != null) ...[
+                const SizedBox(height: 18),
+                Text('Danach ${hhmm(next!.begin)}  ${next!.title}',
+                    style: const TextStyle(color: Colors.white60, fontSize: 16)),
+              ],
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(autofocus: true, onPressed: () => Navigator.of(context).pop(), child: const Text('Schließen')),
+      ],
     );
   }
 }

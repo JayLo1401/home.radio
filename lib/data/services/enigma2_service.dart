@@ -154,7 +154,7 @@ class E2Event {
   }
 
   static E2Event? fromJson(Map<String, dynamic> j) {
-    final title = (j['title'] as String?)?.trim() ?? '';
+    final title = htmlUnescape((j['title'] as String?)?.trim() ?? '');
     final begin = _int(j['begin_timestamp']);
     final duration = _int(j['duration_sec']);
     if (title.isEmpty || begin == null || duration == null) return null;
@@ -163,8 +163,8 @@ class E2Event {
       title: title,
       begin: DateTime.fromMillisecondsSinceEpoch(begin * 1000),
       duration: Duration(seconds: duration),
-      shortDescription: j['shortdesc'] as String? ?? '',
-      longDescription: j['longdesc'] as String? ?? '',
+      shortDescription: htmlUnescape(j['shortdesc'] as String? ?? ''),
+      longDescription: htmlUnescape(j['longdesc'] as String? ?? ''),
       id: _int(j['id']),
     );
   }
@@ -227,7 +227,7 @@ class Enigma2Service {
     return [
       for (final s in (j['services'] as List? ?? const []).whereType<Map>())
         if ((s['servicereference'] as String?)?.isNotEmpty ?? false)
-          E2Bouquet(ref: s['servicereference'] as String, name: (s['servicename'] as String? ?? '').trim()),
+          E2Bouquet(ref: s['servicereference'] as String, name: htmlUnescape((s['servicename'] as String? ?? '').trim())),
     ];
   }
 
@@ -374,7 +374,7 @@ List<E2Channel> parseChannels(Map<String, dynamic> j) {
     final ref = s['servicereference'] as String? ?? '';
     final flags = int.tryParse(ref.split(':').elementAtOrNull(1) ?? '') ?? 0;
     if (ref.isEmpty || flags & 64 != 0 || flags & 512 != 0) continue;
-    final name = (s['servicename'] as String? ?? '').trim();
+    final name = htmlUnescape((s['servicename'] as String? ?? '').trim());
     if (name.isEmpty || name == '<n/a>') continue;
     final picon = s['picon'] is String ? (s['picon'] as String).trim() : '';
     final placeholder = picon.contains('default_picon');
@@ -387,4 +387,22 @@ List<E2Channel> parseChannels(Map<String, dynamic> j) {
     ));
   }
   return channels;
+}
+
+/// OpenWebif sends some texts HTML-escaped ("Lilo &amp; Stitch").
+String htmlUnescape(String s) {
+  if (!s.contains('&')) return s;
+  return s.replaceAllMapped(RegExp(r'&(#x[0-9a-fA-F]+|#[0-9]+|amp|lt|gt|quot|apos|nbsp);'), (m) {
+    final e = m[1]!;
+    if (e.startsWith('#x')) return String.fromCharCode(int.parse(e.substring(2), radix: 16));
+    if (e.startsWith('#')) return String.fromCharCode(int.parse(e.substring(1)));
+    return switch (e) {
+      'amp' => '&',
+      'lt' => '<',
+      'gt' => '>',
+      'quot' => '"',
+      'apos' => "'",
+      _ => ' ',
+    };
+  });
 }

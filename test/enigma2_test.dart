@@ -127,4 +127,10 @@ void main() {
     expect(shortChannelName('ORF1 HD'), 'ORF1');
     expect(shortChannelName('HD'), 'HD');
   });
+
+  test('HTML-escaped texts from OpenWebif', () {
+    expect(htmlUnescape('Disneys Lilo &amp; Stitch'), 'Disneys Lilo & Stitch');
+    expect(htmlUnescape('&quot;Tatort&quot; &#228;rgert &#x2013; sch&ouml;n'), '"Tatort" ärgert – sch&ouml;n');
+    expect(htmlUnescape('ohne'), 'ohne');
+  });
 }

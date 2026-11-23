@@ -364,7 +364,8 @@ class _TopBar extends ConsumerWidget {
             Text(title, style: const TextStyle(color: brandGreen, fontSize: 16, fontWeight: FontWeight.w600)),
             const Spacer(),
             Text(
-              'OK umschalten  ·  ${remoteKeyHint(keys, RemoteAction.options)} alle Sendungen  ·  ⏪⏩ ±3 Std.',
+              // ‹‹ ›› rather than ⏪⏩, which Android draws as coloured emoji.
+              'OK umschalten  ·  ${remoteKeyHint(keys, RemoteAction.options)} alle Sendungen  ·  ‹‹ ›› ±3 Std.',
               style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 14),
             ),
             const SizedBox(width: 20),
