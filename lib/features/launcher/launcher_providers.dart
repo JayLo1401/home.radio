@@ -11,11 +11,11 @@ final launcherServiceProvider = Provider<LauncherService>((ref) => LauncherServi
 
 final launcherBackgroundServiceProvider = Provider<LauncherBackgroundService>((ref) => LauncherBackgroundService());
 
-/// The app's navigator - the launcher is pushed over Home Radio from
+/// The app's navigator - the launcher is pushed over Radio from
 /// anywhere (Home key, start, Back on the radio screen).
 final appNavigatorKey = GlobalKey<NavigatorState>();
 
-/// Whether the launcher is open (on top of Home Radio, which stays mounted
+/// Whether the launcher is open (on top of Radio, which stays mounted
 /// underneath and keeps playing).
 class LauncherVisible extends Notifier<bool> {
   @override
@@ -26,9 +26,9 @@ class LauncherVisible extends Notifier<bool> {
 
 final launcherVisibleProvider = NotifierProvider<LauncherVisible, bool>(LauncherVisible.new);
 
-/// Commands for Home Radio's playback from outside its screen - the
+/// Commands for Radio's playback from outside its screen - the
 /// launcher pauses the radio before another app takes over the screen
-/// ([pauseForApp]: it plays on once Home Radio is opened again), and passes
+/// ([pauseForApp]: it plays on once Radio is opened again), and passes
 /// the remote's play/pause key on. The counter makes the same command twice
 /// in a row still a change.
 enum RadioCommand { stop, togglePlayPause, pauseForApp }
@@ -129,7 +129,7 @@ class LauncherSettingsNotifier extends Notifier<LauncherSettings> {
 final launcherSettingsProvider =
     NotifierProvider<LauncherSettingsNotifier, LauncherSettings>(LauncherSettingsNotifier.new);
 
-/// The launcher's row. On the very first start: Home Radio and the installed
+/// The launcher's row. On the very first start: Radio and the installed
 /// streaming apps of [defaultLauncherPackages].
 class LauncherTilesNotifier extends Notifier<List<LauncherTile>> {
   @override
@@ -142,7 +142,7 @@ class LauncherTilesNotifier extends Notifier<List<LauncherTile>> {
 
   Future<void> _load() async {
     var saved = await _repo.getLauncherTiles();
-    // Without the device's apps (PC): only Home Media's own parts - app
+    // Without the device's apps (PC): only Home System's own parts - app
     // tiles could come along with a backup from the TV box.
     if (saved != null && !LauncherService.supported) saved = saved.where((t) => t.isBuiltIn).toList();
     if (saved != null) {

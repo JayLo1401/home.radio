@@ -247,8 +247,8 @@ final radioAudioHandlerProvider = FutureProvider<RadioAudioHandler>((ref) async 
   return AudioService.init(
     builder: () => RadioAudioHandler(player),
     config: AudioServiceConfig(
-      androidNotificationChannelId: 'at.jaycloud.home.radio.audio',
-      androidNotificationChannelName: 'Home Radio Wiedergabe',
+      androidNotificationChannelId: 'at.jaycloud.home.system.audio',
+      androidNotificationChannelName: 'Radio-Wiedergabe',
       androidNotificationOngoing: true,
     ),
   );
@@ -362,7 +362,7 @@ final currentDabStationProvider = NotifierProvider<CurrentDabStation, ({int freq
 );
 
 /// Global UI scale factor (1.0 = 100%), persisted and applied app-wide via a
-/// MediaQuery/Transform wrapper in [HomeRadioApp] so every screen respects
+/// MediaQuery/Transform wrapper in [HomeSystemApp] so every screen respects
 /// the user's chosen size without each widget needing its own scaling logic.
 class UiScale extends Notifier<double> {
   @override
@@ -479,7 +479,7 @@ class WeatherDisplaySettings {
 /// [SettingsScreen] changes show up on [HomeScreen] immediately without
 /// needing an app restart. Tile sizes are a scale factor on top of a base
 /// size (see WeatherPanel/RadarPanel) - combined with the app-wide UI scale
-/// (see HomeRadioApp), this is what keeps the tiles reasonable from a 22"
+/// (see HomeSystemApp), this is what keeps the tiles reasonable from a 22"
 /// to a 65" screen: the base size assumes a typical TV viewing distance,
 /// the two scale factors are for the user's own fine-tuning on top of that.
 class WeatherDisplaySettingsNotifier extends Notifier<WeatherDisplaySettings> {

@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:home_radio/data/services/tv_stream_session.dart';
+import 'package:home_system/data/services/tv_stream_session.dart';
 
 void main() {
   List<int> packets(int n) => [

@@ -17,10 +17,10 @@ Future<void> main() async {
   // the streams there.
   if (Platform.isWindows || Platform.isLinux) {
     JustAudioMediaKit.ensureInitialized(windows: true, linux: true);
-    // ... and Home TV's picture (video_player has no player of its own here).
+    // ... and TV's picture (video_player has no player of its own here).
     MediaKit.ensureInitialized();
     // Full screen and monitor choice (applyDisplayMode).
     await windowManager.ensureInitialized();
   }
-  runApp(const ProviderScope(child: HomeRadioApp()));
+  runApp(const ProviderScope(child: HomeSystemApp()));
 }

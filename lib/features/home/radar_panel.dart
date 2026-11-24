@@ -136,7 +136,7 @@ class _RadarPanelState extends State<RadarPanel> {
       final token = widget.token;
       final response = await http
           .get(Uri.parse(url), headers: {
-            'User-Agent': 'home_radio/1.0',
+            'User-Agent': 'home_system/1.0',
             if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
           })
           // Generous: a radar server may need 20-30 s to gather the data
@@ -355,7 +355,7 @@ class _RadarWebViewState extends State<_RadarWebView> {
   /// Puts [_RadarWebView.css] into a style element of its own (replacing
   /// the previous one), like a user stylesheet in a browser.
   void _applyCss() {
-    const id = 'home-radio-user-css';
+    const id = 'home-system-user-css';
     unawaited(_controller
         .runJavaScript('(function(){var s=document.getElementById("$id");'
             'if(!s){s=document.createElement("style");s.id="$id";'

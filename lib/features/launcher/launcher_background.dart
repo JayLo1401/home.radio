@@ -28,7 +28,7 @@ class _LauncherBackgroundState extends ConsumerState<LauncherBackground> with Wi
   int _generation = 0;
 
   /// A change fell due while nobody saw the launcher - another app in front
-  /// (Spotify, ...), Home TV or Home Radio over it. Fetching and decoding
+  /// (Spotify, ...), TV or Radio over it. Fetching and decoding
   /// photos then only costs memory and CPU; the change follows once it's
   /// visible again.
   bool _due = false;

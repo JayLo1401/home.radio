@@ -1,17 +1,17 @@
-# Home Media
+# Home System
 
 Eine Flutter-App für Android-TV-Boxen, Fire TV und Fernseher, komplett per
 Fernbedienung (D-Pad) bedienbar. Sie besteht aus drei Teilen:
 
-- **Launcher**: der Startbildschirm mit Home Radio, Home TV und den eigenen Apps
+- **Launcher**: der Startbildschirm mit Radio, TV und den eigenen Apps
   (Netflix, Disney+, Spotify, …), erreichbar über die Home-Taste.
-- **Home Radio**: DAB+-Radio (über einen RTL-SDR-USB-Stick), UKW, Internetradio,
+- **Radio**: DAB+-Radio (über einen RTL-SDR-USB-Stick), UKW, Internetradio,
   Wetter, Wetterradar und eine Sonne-&-Mond-Kachel.
-- **Home TV**: Fernsehen vom eigenen Enigma2-Sat-Receiver (z. B. GigaBlue) mit
+- **TV**: Fernsehen vom eigenen Enigma2-Sat-Receiver (z. B. GigaBlue) mit
   Senderliste, Senderlogos und Programmführer.
 
 Eine App für jedes Gerät: Beim Start zeigt sie wahlweise den Launcher, startet
-Home Radio mit einem Sender (z. B. draußen) oder Home TV mit einem Sender (z. B.
+Radio mit einem Sender (z. B. draußen) oder TV mit einem Sender (z. B.
 am Fernseher).
 
 ![Launcher](screenshots/launcher_raureif.png)
@@ -20,27 +20,27 @@ am Fernseher).
 
 DAB+ und Internetradio haben jeweils ihre Lücken: Manche Sender gibt es über DAB+
 gar nicht, und manche Internetstreams klingen deutlich schlechter als der gleiche
-Sender über DAB+. Home Radio führt beides in **einer gemeinsamen Senderliste**
+Sender über DAB+. Radio führt beides in **einer gemeinsamen Senderliste**
 zusammen. Jeder Favorit bekommt eine Programmnummer wie ein klassischer Kanalplatz,
 egal ob er über DAB+ oder das Internet kommt. So hört man jeden Sender über den
 jeweils besseren Weg, ohne zwischen Apps zu wechseln.
 
 ## Screenshots
 
-### Launcher und Home TV
+### Launcher und TV
 
 | | |
 |---|---|
-| ![Launcher](screenshots/launcher_kueste.png) | ![Launcher mit Home TV](screenshots/launcher_home_tv_fokus.png) |
-| ![Home TV: Senderliste](screenshots/home_tv_senderliste.png) | ![Home TV: Programmführer](screenshots/home_tv_programmfuehrer.png) |
-| ![Home TV: Als Nächstes](screenshots/home_tv_als_naechstes.png) | ![Einstellungen](screenshots/einstellungen_uebersicht.png) |
-| ![Einstellungen Home TV](screenshots/einstellungen_home_tv.png) | ![Logos](screenshots/logos_home_media_radio_tv.png) |
+| ![Launcher](screenshots/launcher_kueste.png) | ![Launcher mit TV](screenshots/launcher_home_tv_fokus.png) |
+| ![TV: Senderliste](screenshots/home_tv_senderliste.png) | ![TV: Programmführer](screenshots/home_tv_programmfuehrer.png) |
+| ![TV: Als Nächstes](screenshots/home_tv_als_naechstes.png) | ![Einstellungen](screenshots/einstellungen_uebersicht.png) |
+| ![Einstellungen TV](screenshots/einstellungen_home_tv.png) | ![Logos](screenshots/logos_home_system_radio_tv.png) |
 
-### Home Radio
+### Radio
 
 | | |
 |---|---|
-| ![Home Radio](screenshots/home_radio.png) | ![Startbildschirm](screenshots/01_startbildschirm.png) |
+| ![Radio](screenshots/home_system.png) | ![Startbildschirm](screenshots/01_startbildschirm.png) |
 | ![Startbildschirm](screenshots/01_startbildschirm.png) | ![DAB+-Sender](screenshots/02_dab_sender.png) |
 | ![Einstellungen](screenshots/03_einstellungen.png) | ![Kacheln und Favoriten](screenshots/04_kacheln_und_favoriten.png) |
 | ![Über und Quellen](screenshots/05_ueber_und_quellen.png) | ![Standortsuche](screenshots/06_standortsuche.png) |
@@ -53,7 +53,7 @@ einem Test-Receiver ohne Livebild.
 ## Funktionen
 
 ### Launcher
-- **Favoriten-Leiste** mit Home Radio, Home TV und beliebigen installierten Apps;
+- **Favoriten-Leiste** mit Radio, TV und beliebigen installierten Apps;
   die Kacheln zeigen die Original-Banner der Apps. Verschieben, Bild ändern oder
   entfernen über ☰ (Menü-Taste) oder langes OK.
 - **Alle Apps** mit Suche; Apps per ☰ oder langem OK zu den Favoriten.
@@ -63,28 +63,32 @@ einem Test-Receiver ohne Livebild.
   (Bing-Bilder des Tages, mit Bildnachweis) oder ein eigener Server (Bild,
   JSON-Liste oder Ordneransicht von nginx/Apache/`python -m http.server`);
   Wechselintervall und Deckkraft des Favoriten-Bands einstellbar.
-- Startet eine andere App, pausieren Radio und TV; Home Radio spielt beim
+- Startet eine andere App, pausieren Radio und TV; Radio spielt beim
   Zurückkommen weiter.
-- Oben die gleiche Leiste wie in Home Radio; das Zahnrad öffnet die
+- Oben die gleiche Leiste wie in Radio; das Zahnrad öffnet die
   App-Einstellungen, die Android-Einstellungen oder „Alle Apps“.
 
 ### Home-Taste
-- Home Media ist als Startbildschirm (HOME) registriert - auf Android-TV-Boxen
+- Home System ist als Startbildschirm (HOME) registriert - auf Android-TV-Boxen
   als Standard-Launcher wählbar.
 - Auf **Fire TV** und **Google TV**, die keinen anderen Launcher zulassen, holt die
-  Bedienungshilfe „Home Media: Home-Taste“ Home Media nach vorne, sobald der
+  Bedienungshilfe „Home System: Home-Taste“ Home System nach vorne, sobald der
   Startbildschirm des Geräts erscheint (sieht nur, welche App vorne ist - keine
-  Inhalte, keine Eingaben). Einschalten unter Einstellungen → Launcher →
+  Inhalte, keine Eingaben). Auf Fire TV fängt sie zusätzlich die Home-Taste
+  selbst ab: Fire OS lässt nach Home 5 Sekunden lang keine andere App nach vorne,
+  so öffnet Home System sofort statt nach Amazons Startbildschirm; lang drücken
+  öffnet weiter Amazons Schnellmenü, alle anderen Tasten bleiben unberührt.
+  Einschalten unter Einstellungen → Launcher →
   Home-Taste; bei Apps außerhalb eines App-Stores einmalig per adb freischalten:
 
   ```bash
-  adb shell pm grant at.jaycloud.home.radio android.permission.WRITE_SECURE_SETTINGS
-  adb shell appops set at.jaycloud.home.radio ACCESS_RESTRICTED_SETTINGS allow
+  adb shell pm grant at.jaycloud.home.system android.permission.WRITE_SECURE_SETTINGS
+  adb shell appops set at.jaycloud.home.system ACCESS_RESTRICTED_SETTINGS allow
   ```
 
-  Nach App-Updates schaltet Home Media den Dienst selbst wieder ein.
+  Nach App-Updates schaltet Home System den Dienst selbst wieder ein.
 
-### Home TV
+### TV
 - Für Enigma2-Receiver mit **OpenWebif** (GigaBlue, VU+, Dreambox mit teamBlue,
   OpenATV, OpenPLi): Senderlisten (Bouquets), Senderlogos (Picons) und der
   Programmführer kommen vom Receiver, das Bild über seinen Streaming-Port.
@@ -96,10 +100,10 @@ einem Test-Receiver ohne Livebild.
 - Start mit dem zuletzt gesehenen oder einem festen Sender.
 
 ### Beim Start der App
-- Launcher anzeigen, Home Radio mit Sender starten (siehe Autostart) oder Home TV
+- Launcher anzeigen, Radio mit Sender starten (siehe Autostart) oder TV
   mit Sender starten - einstellbar unter Einstellungen → Launcher.
 
-## Home Radio
+## Radio
 
 ### DAB+-Radio
 - Empfang über einen **RTL-SDR-USB-Stick** (RTL2832U-basiert, getestet mit einem
@@ -218,8 +222,8 @@ einem Test-Receiver ohne Livebild.
   Favorit), konfigurierbar in den Einstellungen.
 
 ### Einstellungen
-Gegliedert in **Launcher**, **Home Radio**, **Home TV** und **Allgemein**
-(Oberflächengröße, Vollbild, Backup, Updates); das Zahnrad in Home Radio öffnet
+Gegliedert in **Launcher**, **Radio**, **TV** und **Allgemein**
+(Oberflächengröße, Vollbild, Backup, Updates); das Zahnrad in Radio öffnet
 direkt dessen Bereich.
 
 - DAB+-Empfänger: kein Empfänger (nur Internetradio - DAB+-Suche und der Reiter
@@ -235,7 +239,7 @@ erreicht man über das Radio-Symbol oben auf der Startseite.
 
 ## Zielhardware
 - Android-TV-Box, Google TV oder Fire TV (Querformat).
-- Für Home TV: ein Enigma2-Sat-Receiver mit OpenWebif im Heimnetz.
+- Für TV: ein Enigma2-Sat-Receiver mit OpenWebif im Heimnetz.
 - RTL2832U-basierter RTL-SDR-USB-Stick mit R820T-, R820T2- oder R828D-Tuner
   (eigener Treiber, siehe `cpp/hrdab/rtl2832.cpp`). Über `rtl_tcp` geht jeder
   Stick, den der Server unterstützt.
@@ -280,10 +284,15 @@ konfigurieren.
 - **Launcher** (`lib/features/launcher/`, `LauncherPlugin.kt`,
   `HomeButtonService.kt`): App-Liste, Banner/Icons und Icon-Pakete über den
   PackageManager, Home-Taste über HOME-Activity und Bedienungshilfe.
-- **Home TV** (`lib/features/tv/`, `enigma2_service.dart`): OpenWebif-JSON-API
+- **TV** (`lib/features/tv/`, `enigma2_service.dart`): OpenWebif-JSON-API
   (`/api/getservices`, `/api/epgnownext`, `/api/epgservice`, `/picon/…`), Bild
-  über `video_player` (ExoPlayer) vom Streaming-Port.
-- **Logos**: `tool/make_home_media_logo.py` erzeugt App-Symbol, Logos und
+  über `video_player` (ExoPlayer) vom Streaming-Port - als SurfaceView
+  (Platform View), die Textur fror auf Amlogic-Boxen ein. Android-Seite des
+  Plugins als Kopie in `packages/video_player_android` mit einem
+  Software-MP2-Decoder (JLayer) für Geräte ohne eigenen, z. B. Fire TV - dort
+  blieben die meisten Sat-Sender sonst stumm. Receiver-Suche im Heimnetz:
+  `enigma2_discovery.dart`.
+- **Logos**: `tool/make_home_system_logo.py` erzeugt App-Symbol, Logos und
   TV-Banner.
 - **Wetter/Radar/Sonne**: reine HTTP-Aufrufe (GeoSphere Austria, Open-Meteo,
   Radarbild von der eingetragenen Quelle) sowie lokal berechnete
@@ -294,7 +303,7 @@ konfigurieren.
 [PolyForm Noncommercial 1.0.0](LICENSE.md). Der Quellcode ist offen einsehbar.
 Nutzung und Änderung sind für private und nicht-kommerzielle Zwecke frei, auch für
 Vereine, Schulen und gemeinnützige Organisationen. **Kommerzielle Nutzung ist nicht
-erlaubt**, z. B. Home Media zu verkaufen, als bezahlten Dienst anzubieten oder in
+erlaubt**, z. B. Home System zu verkaufen, als bezahlten Dienst anzubieten oder in
 kommerzielle Produkte einzubauen. Für eine kommerzielle Lizenz bitte über GitHub
 anfragen.
 

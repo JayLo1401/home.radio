@@ -2,11 +2,11 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:home_radio/app.dart';
+import 'package:home_system/app.dart';
 
 void main() {
   testWidgets('Home screen shows without crashing', (WidgetTester tester) async {
-    await tester.pumpWidget(const ProviderScope(child: HomeRadioApp()));
+    await tester.pumpWidget(const ProviderScope(child: HomeSystemApp()));
     await tester.pump();
     expect(find.text('Kein Sender ausgewählt'), findsOneWidget);
 

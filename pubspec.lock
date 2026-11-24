@@ -1267,12 +1267,11 @@ packages:
     source: hosted
     version: "2.14.1"
   video_player_android:
-    dependency: transitive
+    dependency: "direct overridden"
     description:
-      name: video_player_android
-      sha256: dbae03b7d74b30f2265f0d0c97849b26d2763811bbe6440b93ccd2281041c03a
-      url: "https://pub.dev"
-    source: hosted
+      path: "packages/video_player_android"
+      relative: true
+    source: path
     version: "2.13.0"
   video_player_avfoundation:
     dependency: transitive

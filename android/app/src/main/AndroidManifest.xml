@@ -8,7 +8,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
 
-    <!-- Backups in Download/HomeRadio (see BackupPlugin.kt): legacy storage
+    <!-- Backups in Download/HomeSystem (see BackupPlugin.kt): legacy storage
          permissions for Android 9/10, and "All files access" so that from
          Android 11 on a reinstalled app can read the backups its previous
          installation wrote (only on the user's explicit request). -->
@@ -29,7 +29,7 @@
          http - without this Android blocks them outright and the station
          just never starts. -->
     <application
-        android:label="Home Media"
+        android:label="Home System"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:banner="@drawable/tv_banner"
@@ -58,7 +58,7 @@
                 <!-- Makes the app show up on the Android TV / Mi TV home launcher. -->
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER"/>
             </intent-filter>
-            <!-- Home Media's launcher: can be chosen as the device's home
+            <!-- Home System's launcher: can be chosen as the device's home
                  screen (singleTask above, so the Home key reaches the one
                  running instance via onNewIntent). Fire TV ignores this -
                  there HomeButtonService takes over. -->
@@ -69,7 +69,7 @@
             </intent-filter>
         </activity>
 
-        <!-- Home key -> Home Media where the system won't let another app be
+        <!-- Home key -> Home System where the system won't let another app be
              the launcher (Fire TV), see HomeButtonService.kt. -->
         <service
             android:name=".HomeButtonService"

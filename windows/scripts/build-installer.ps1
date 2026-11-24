@@ -12,13 +12,13 @@
 
 .PARAMETER UpdateBaseUrl
     Update server the app checks, e.g.
-    https://repository.jaycloud.at/repository/home.radio - empty = the app
+    https://repository.jaycloud.at/repository/home.system - empty = the app
     never updates itself.
 
 .EXAMPLE
     ./windows/scripts/build-installer.ps1
 .EXAMPLE
-    ./windows/scripts/build-installer.ps1 -Version 1.3.0 -UpdateBaseUrl https://repository.jaycloud.at/repository/home.radio
+    ./windows/scripts/build-installer.ps1 -Version 1.3.0 -UpdateBaseUrl https://repository.jaycloud.at/repository/home.system
 #>
 param(
     [string]$Version,
@@ -56,7 +56,7 @@ try {
     $hash = (Get-FileHash -Algorithm SHA256 $setup).Hash.ToLower()
     $manifest = [ordered]@{
         version = $Version
-        url     = if ($UpdateBaseUrl) { "$UpdateBaseUrl/windows/release/$Version/home_radio-setup-$Version.exe" } else { '' }
+        url     = if ($UpdateBaseUrl) { "$UpdateBaseUrl/windows/release/$Version/home_system-setup-$Version.exe" } else { '' }
         sha256  = $hash
     }
     $manifest | ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $installer 'output\version.json')

@@ -33,20 +33,20 @@ class HomeButtonStatus {
   /// service on by itself.
   final bool canEnable;
 
-  /// "Home-Taste öffnet Home Media" - the service only acts while this is on.
+  /// "Home-Taste öffnet Home System" - the service only acts while this is on.
   final bool redirect;
 }
 
-/// The device side of Home Media's launcher on Android (LauncherPlugin.kt):
+/// The device side of Home System's launcher on Android (LauncherPlugin.kt):
 /// installed apps, starting them, icon packs and the Home key. The launcher
-/// itself (Home Radio, Home TV) is there on every platform; elsewhere
+/// itself (Radio, TV) is there on every platform; elsewhere
 /// [supported] is false and everything here answers "nothing".
 class LauncherService {
   LauncherService() {
     if (supported) _channel.setMethodCallHandler(_onCall);
   }
 
-  static const _channel = MethodChannel('home_radio/launcher');
+  static const _channel = MethodChannel('home_system/launcher');
 
   /// Installed apps, the Home key, the device's settings - Android only.
   static bool get supported => !kIsWeb && Platform.isAndroid;
@@ -115,6 +115,9 @@ class LauncherService {
   Future<bool> launchApp(String package) async => await _invoke<bool>('launchApp', {'package': package}) ?? false;
 
   Future<bool> openSystemSettings() async => await _invoke<bool>('openSystemSettings') ?? false;
+
+  /// The system's page for [package]: force stop, uninstall, storage.
+  Future<bool> openAppInfo(String package) async => await _invoke<bool>('openAppInfo', {'package': package}) ?? false;
 
   Future<bool> isFireTv() async => await _invoke<bool>('isFireTv') ?? false;
 

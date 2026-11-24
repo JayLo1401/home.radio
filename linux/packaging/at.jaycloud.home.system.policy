@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+  "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<!-- Lets the logged-in user install Home System updates via the app
+     (apply-update.sh, which only installs /tmp/home-system-update.deb). -->
+<policyconfig>
+  <vendor>jaycloud</vendor>
+  <action id="at.jaycloud.home.system.update">
+    <description>Home System aktualisieren</description>
+    <message>Home System möchte ein Update installieren.</message>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>yes</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/opt/home-system/apply-update.sh</annotate>
+  </action>
+</policyconfig>

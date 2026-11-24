@@ -6,7 +6,7 @@ import 'launcher_screen.dart';
 
 const _launcherRouteName = '/launcher';
 
-/// Opens the launcher over Home Radio (closing whatever else is open on top
+/// Opens the launcher over Radio (closing whatever else is open on top
 /// of it) - or, when it's already open, goes back to it.
 void showLauncher(WidgetRef ref) {
   final nav = appNavigatorKey.currentState;
@@ -31,7 +31,7 @@ void showLauncher(WidgetRef ref) {
       .whenComplete(() => visible.set(false));
 }
 
-/// Back to Home Radio (the launcher's "Home Radio" tile).
+/// Back to Radio (the launcher's "Radio" tile).
 void hideLauncher(WidgetRef ref) {
   final nav = appNavigatorKey.currentState;
   if (nav == null || !ref.read(launcherVisibleProvider)) return;

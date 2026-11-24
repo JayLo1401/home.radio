@@ -56,7 +56,7 @@ class MapTiles {
       final res = await _client
           .get(
             Uri.parse('https://tile.openstreetmap.org/$z/$x/$y.png'),
-            headers: {'User-Agent': 'HomeRadio/1.2 (private home radio app; ADS-B map)'},
+            headers: {'User-Agent': 'HomeSystem/1.2 (private home radio app; ADS-B map)'},
           )
           .timeout(const Duration(seconds: 15));
       if (res.statusCode != 200) throw Exception('HTTP ${res.statusCode}');

@@ -145,7 +145,7 @@ class TvStreamSession {
           }
         }
       } catch (e) {
-        if (!_closed && !_reopen) debugPrint('Home TV stream: $e');
+        if (!_closed && !_reopen) debugPrint('TV stream: $e');
       } finally {
         client.close();
       }

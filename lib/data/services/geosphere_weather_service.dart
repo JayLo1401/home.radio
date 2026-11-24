@@ -37,7 +37,7 @@ class GeoSphereWeatherService {
 
   Future<List<HourlyForecast>> getHourlyForecast({required double lat, required double lon}) async {
     final uri = Uri.parse('$_baseUrl?parameters=$_parameters&lat_lon=$lat,$lon');
-    final response = await http.get(uri, headers: {'User-Agent': 'home_radio/1.0'});
+    final response = await http.get(uri, headers: {'User-Agent': 'home_system/1.0'});
     if (response.statusCode != 200) {
       throw Exception('GeoSphere Austria request failed: HTTP ${response.statusCode}');
     }

@@ -1,4 +1,4 @@
-// home_radio's own DAB+ receiver ("Integrierte DAB Verbindung").
+// home_system's own DAB+ receiver ("Integrierte DAB Verbindung").
 //
 // Everything under cpp/hrdab/ is written for this project from the public
 // standards (ETSI EN 300 401 for DAB, ETSI TS 102 563 for DAB+, ETSI

@@ -10,18 +10,18 @@ import 'providers.dart';
 /// Einstellungen → Tasten der Fernbedienung, e.g. when ☰ does something else
 /// on the remote.
 enum RemoteAction {
-  /// Home TV: the channel list.
-  channelList('Senderliste (Home TV)'),
+  /// TV: the channel list.
+  channelList('Senderliste (TV)'),
 
-  /// Home TV: the programme guide of the channel (also in the channel list).
-  guide('Programmführer (Home TV)'),
+  /// TV: the programme guide of the channel (also in the channel list).
+  guide('Programmführer (TV)'),
 
-  /// The options: of a launcher tile or app, Home TV's menu (programme
+  /// The options: of a launcher tile or app, TV's menu (programme
   /// guide, sound track).
-  options('Optionen (Launcher-Kachel, Home TV)'),
+  options('Optionen (Launcher-Kachel, TV)'),
 
-  /// Home TV: choosing the sound track.
-  audio('Tonspur (Home TV)');
+  /// TV: choosing the sound track.
+  audio('Tonspur (TV)');
 
   const RemoteAction(this.label);
 

@@ -33,7 +33,7 @@ class RadioBrowserApiService {
   }
 
   Map<String, String> get _headers => const {
-        'User-Agent': 'HomeRadioFlutterApp/1.0',
+        'User-Agent': 'HomeSystemFlutterApp/1.0',
         'Content-Type': 'application/json',
       };
 

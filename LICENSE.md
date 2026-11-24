@@ -2,7 +2,7 @@
 
 <https://polyformproject.org/licenses/noncommercial/1.0.0>
 
-Required Notice: Copyright (c) 2026 Jürgen Laschak (https://github.com/JayLo1401/home.radio)
+Required Notice: Copyright (c) 2026 Jürgen Laschak (https://github.com/JayLo1401/home.system)
 
 ## Acceptance
 

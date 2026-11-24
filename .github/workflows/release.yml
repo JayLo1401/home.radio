@@ -24,7 +24,7 @@ name: Release
 # apps - Android only updates in place with the same signature),
 # NEXUS_USER, NEXUS_PASS.
 # Variables: NEXUS_URL (e.g. https://repository.jaycloud.at), NEXUS_REPO
-# (e.g. home.radio); the repository must be readable anonymously for the
+# (e.g. home.system); the repository must be readable anonymously for the
 # updater.
 
 on:
@@ -116,10 +116,10 @@ jobs:
           ARGS=(--release --build-name="$VERSION" --build-number="$BUILD_NUMBER" --dart-define=UPDATE_BASE_URL="$UPDATE_BASE_URL")
           mkdir -p dist
           flutter build apk "${ARGS[@]}"
-          cp build/app/outputs/flutter-apk/app-release.apk "dist/home_radio-$VERSION-universal.apk"
+          cp build/app/outputs/flutter-apk/app-release.apk "dist/home_system-$VERSION-universal.apk"
           flutter build apk "${ARGS[@]}" --split-per-abi
           for ABI in arm64-v8a armeabi-v7a x86_64; do
-            cp "build/app/outputs/flutter-apk/app-$ABI-release.apk" "dist/home_radio-$VERSION-$ABI.apk"
+            cp "build/app/outputs/flutter-apk/app-$ABI-release.apk" "dist/home_system-$VERSION-$ABI.apk"
           done
       - name: Verify signature
         run: |
@@ -139,7 +139,7 @@ jobs:
             echo "  \"apks\": {"
             SEP=""
             for ABI in arm64-v8a armeabi-v7a x86_64 universal; do
-              FILE="home_radio-$VERSION-$ABI.apk"
+              FILE="home_system-$VERSION-$ABI.apk"
               SHA=$(sha256sum "dist/$FILE" | cut -d' ' -f1)
               echo "sha_${ABI//-/_}=$SHA" >> "$GITHUB_OUTPUT"
               printf '%s    "%s": {"url": "%s", "sha256": "%s"}' "$SEP" "$ABI" "$BASE/$VERSION/$FILE" "$SHA"
@@ -149,8 +149,8 @@ jobs:
           } > dist/version.json
           cat dist/version.json
           for ABI in arm64-v8a armeabi-v7a x86_64 universal; do
-            upload "dist/home_radio-$VERSION-$ABI.apk" "$BASE/$VERSION/home_radio-$VERSION-$ABI.apk"
-            upload "dist/home_radio-$VERSION-$ABI.apk" "$BASE/latest/home_radio-$ABI.apk"
+            upload "dist/home_system-$VERSION-$ABI.apk" "$BASE/$VERSION/home_system-$VERSION-$ABI.apk"
+            upload "dist/home_system-$VERSION-$ABI.apk" "$BASE/latest/home_system-$ABI.apk"
           done
           upload dist/version.json "$BASE/$VERSION/version.json"
           upload dist/version.json "$BASE/latest/version.json"
@@ -187,8 +187,8 @@ jobs:
           OUT=windows/installer/output
           echo "sha=$(sha256sum "$OUT/setup.exe" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
           cat "$OUT/version.json"
-          upload "$OUT/setup.exe" "$BASE/$VERSION/home_radio-setup-$VERSION.exe"
-          upload "$OUT/setup.exe" "$BASE/latest/home_radio-setup.exe"
+          upload "$OUT/setup.exe" "$BASE/$VERSION/home_system-setup-$VERSION.exe"
+          upload "$OUT/setup.exe" "$BASE/latest/home_system-setup.exe"
           upload "$OUT/version.json" "$BASE/$VERSION/version.json"
           upload "$OUT/version.json" "$BASE/latest/version.json"
 
@@ -224,12 +224,12 @@ jobs:
           source .github/scripts/nexus_upload.sh
           BASE="$UPDATE_BASE_URL/linux/release"
           OUT=build/linux-deb-output
-          DEB="home-radio_${VERSION}_amd64.deb"
+          DEB="home-system_${VERSION}_amd64.deb"
           echo "sha=$(sha256sum "$OUT/$DEB" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
           sed "s#__UPDATE_BASE_URL__#$UPDATE_BASE_URL#" linux/scripts/install-latest.sh > "$OUT/install.sh"
           cat "$OUT/version.json"
           upload "$OUT/$DEB" "$BASE/$VERSION/$DEB"
-          upload "$OUT/$DEB" "$BASE/latest/home-radio-latest.deb"
+          upload "$OUT/$DEB" "$BASE/latest/home-system-latest.deb"
           upload "$OUT/version.json" "$BASE/$VERSION/version.json"
           upload "$OUT/version.json" "$BASE/latest/version.json"
           upload "$OUT/install.sh" "$BASE/latest/install.sh"
@@ -263,11 +263,11 @@ jobs:
             echo
             echo "| Datei | Für | SHA-256 |"
             echo "|---|---|---|"
-            echo "| [home_radio-$VERSION-arm64-v8a.apk]($A/home_radio-$VERSION-arm64-v8a.apk) | die meisten Android-TV-Boxen (64-bit ARM) | \`$SHA_ARM64\` |"
-            echo "| [home_radio-$VERSION-armeabi-v7a.apk]($A/home_radio-$VERSION-armeabi-v7a.apk) | ältere bzw. 32-bit-Geräte, z. B. manche Fernseher | \`$SHA_ARMV7\` |"
-            echo "| [home_radio-$VERSION-universal.apk]($A/home_radio-$VERSION-universal.apk) | alle Android-Geräte, falls unklar (größer) | \`$SHA_UNIVERSAL\` |"
-            echo "| [home_radio-setup-$VERSION.exe]($W/home_radio-setup-$VERSION.exe) | Windows 10/11 (64-bit) | \`$SHA_WINDOWS\` |"
-            echo "| [home-radio_${VERSION}_amd64.deb]($L/home-radio_${VERSION}_amd64.deb) | Debian/Ubuntu (64-bit) | \`$SHA_LINUX\` |"
+            echo "| [home_system-$VERSION-arm64-v8a.apk]($A/home_system-$VERSION-arm64-v8a.apk) | die meisten Android-TV-Boxen (64-bit ARM) | \`$SHA_ARM64\` |"
+            echo "| [home_system-$VERSION-armeabi-v7a.apk]($A/home_system-$VERSION-armeabi-v7a.apk) | ältere bzw. 32-bit-Geräte, z. B. manche Fernseher | \`$SHA_ARMV7\` |"
+            echo "| [home_system-$VERSION-universal.apk]($A/home_system-$VERSION-universal.apk) | alle Android-Geräte, falls unklar (größer) | \`$SHA_UNIVERSAL\` |"
+            echo "| [home_system-setup-$VERSION.exe]($W/home_system-setup-$VERSION.exe) | Windows 10/11 (64-bit) | \`$SHA_WINDOWS\` |"
+            echo "| [home-system_${VERSION}_amd64.deb]($L/home-system_${VERSION}_amd64.deb) | Debian/Ubuntu (64-bit) | \`$SHA_LINUX\` |"
             echo
             echo "Linux in einem Schritt: \`curl -fsSL $UPDATE_BASE_URL/linux/release/latest/install.sh | bash\`"
             echo
@@ -275,4 +275,4 @@ jobs:
           } > "$RUNNER_TEMP/notes.md"
           git tag "$TAG" "$GITHUB_SHA"
           git push origin "$TAG"
-          gh release create "$TAG" --title "Home Media $VERSION" --notes-file "$RUNNER_TEMP/notes.md" --latest
+          gh release create "$TAG" --title "Home System $VERSION" --notes-file "$RUNNER_TEMP/notes.md" --latest

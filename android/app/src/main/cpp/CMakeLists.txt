@@ -9,7 +9,7 @@ endif()
 
 find_library(log-lib log)
 
-# hrdab: home_radio's own DAB+ receiver (see hrdab/common.h) - OFDM, FIC/MSC,
+# hrdab: home_system's own DAB+ receiver (see hrdab/common.h) - OFDM, FIC/MSC,
 # DAB+ super frames, PAD and an RTL2832U/R820T driver over usbfs. No
 # third-party code; AAC is decoded by Android's MediaCodec on the Kotlin side
 # (DabAacPlayer). Also the FM (UKW) receiver with stereo decoder and RDS

@@ -3,9 +3,9 @@
 #
 #   linux/scripts/build-deb.sh <version> [build-number] [update-base-url]
 #
-# Output in build/linux-deb-output/: home-radio_<version>_amd64.deb and
+# Output in build/linux-deb-output/: home-system_<version>_amd64.deb and
 # version.json (the update manifest, see lib/data/services/update_service.dart).
-# Installs to /opt/home-radio; apply-update.sh + the polkit policy let the
+# Installs to /opt/home-system; apply-update.sh + the polkit policy let the
 # in-app updater install a downloaded .deb (fixed path) after pkexec.
 set -euo pipefail
 
@@ -25,31 +25,31 @@ BUNDLE="build/linux/x64/release/bundle"
 OUT="build/linux-deb-output"
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
-APPDIR="opt/home-radio"
+APPDIR="opt/home-system"
 
 mkdir -p "$STAGE/$APPDIR" "$STAGE/DEBIAN" "$STAGE/usr/share/applications" \
   "$STAGE/usr/share/icons/hicolor/256x256/apps" "$STAGE/usr/share/polkit-1/actions" "$STAGE/usr/bin"
 cp -a "$BUNDLE/." "$STAGE/$APPDIR/"
 cp linux/packaging/apply-update.sh "$STAGE/$APPDIR/apply-update.sh"
-cp linux/packaging/home-radio.desktop "$STAGE/usr/share/applications/"
-cp linux/packaging/at.jaycloud.home.radio.policy "$STAGE/usr/share/polkit-1/actions/"
-cp assets/icon/home_media_logo.png "$STAGE/usr/share/icons/hicolor/256x256/apps/home-radio.png"
-ln -s "/$APPDIR/home_radio" "$STAGE/usr/bin/home-radio"
+cp linux/packaging/home-system.desktop "$STAGE/usr/share/applications/"
+cp linux/packaging/at.jaycloud.home.system.policy "$STAGE/usr/share/polkit-1/actions/"
+cp assets/icon/home_system_logo.png "$STAGE/usr/share/icons/hicolor/256x256/apps/home-system.png"
+ln -s "/$APPDIR/home_system" "$STAGE/usr/bin/home-system"
 
 # Library dependencies from what the binaries actually link (package names
 # differ between Ubuntu releases, e.g. the t64 renames). dpkg-shlibdeps
 # needs a debian/control in the working directory.
 mkdir -p "$STAGE/debian"
-printf 'Source: home-radio\n\nPackage: home-radio\nArchitecture: amd64\n' > "$STAGE/debian/control"
+printf 'Source: home-system\n\nPackage: home-system\nArchitecture: amd64\n' > "$STAGE/debian/control"
 DEPENDS="$(cd "$STAGE" && dpkg-shlibdeps -O --ignore-missing-info \
-  -l"$APPDIR/lib" "$APPDIR/home_radio" "$APPDIR"/lib/*.so* | sed -n 's/^shlibs:Depends=//p')"
+  -l"$APPDIR/lib" "$APPDIR/home_system" "$APPDIR"/lib/*.so* | sed -n 's/^shlibs:Depends=//p')"
 rm -rf "$STAGE/debian"
 [ -n "$DEPENDS" ] || { echo "dpkg-shlibdeps found no dependencies" >&2; exit 1; }
 # miniaudio loads ALSA/PulseAudio at runtime - shlibdeps can't see that.
 DEPENDS="$DEPENDS, libasound2t64 | libasound2 | libpulse0, pkexec | policykit-1"
 
 cat > "$STAGE/DEBIAN/control" <<EOF
-Package: home-radio
+Package: home-system
 Version: $VERSION
 Section: sound
 Priority: optional
@@ -57,22 +57,22 @@ Architecture: amd64
 Depends: $DEPENDS
 Recommends: rtl-sdr
 Maintainer: jaycloud <noreply@jaycloud.at>
-Description: Home Radio
+Description: Home System
  DAB+, UKW und Internetradio in einer Senderliste, mit Wetter und Radar;
  Mithören auf CB-, Amateur-, Flug- und Militärfunk mit einem RTL-SDR-Stick.
 EOF
 
 chmod -R go-w "$STAGE"
-chmod 755 "$STAGE/$APPDIR/home_radio" "$STAGE/$APPDIR/apply-update.sh"
-chmod 644 "$STAGE/usr/share/polkit-1/actions/at.jaycloud.home.radio.policy"
+chmod 755 "$STAGE/$APPDIR/home_system" "$STAGE/$APPDIR/apply-update.sh"
+chmod 644 "$STAGE/usr/share/polkit-1/actions/at.jaycloud.home.system.policy"
 
 mkdir -p "$OUT"
-DEB="$OUT/home-radio_${VERSION}_amd64.deb"
+DEB="$OUT/home-system_${VERSION}_amd64.deb"
 dpkg-deb --build --root-owner-group "$STAGE" "$DEB"
 
 SHA="$(sha256sum "$DEB" | cut -d' ' -f1)"
 URL=""
-[ -n "$UPDATE_BASE_URL" ] && URL="$UPDATE_BASE_URL/linux/release/$VERSION/home-radio_${VERSION}_amd64.deb"
+[ -n "$UPDATE_BASE_URL" ] && URL="$UPDATE_BASE_URL/linux/release/$VERSION/home-system_${VERSION}_amd64.deb"
 cat > "$OUT/version.json" <<EOF
 {
   "version": "$VERSION",

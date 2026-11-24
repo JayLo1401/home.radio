@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Home System
+Comment=DAB+, UKW und Internetradio
+Exec=/opt/home-system/home_system
+Icon=home-system
+Categories=AudioVideo;Audio;Player;
+StartupWMClass=at.jaycloud.home.system
+Terminal=false

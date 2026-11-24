@@ -4,7 +4,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:home_radio/data/services/rtl_sdr_service.dart';
+import 'package:home_system/data/services/rtl_sdr_service.dart';
 
 const _hello = [0xF2, 0x52, 0x54, 0x4C, 0x32];
 const _helloInfo = [0xF2, 0x52, 0x54, 0x4C, 0x49];

@@ -64,7 +64,7 @@ String shortChannelName(String name) {
   return '${parts.first}\n${parts.skip(1).join(' ')}';
 }
 
-/// How far a programme has got, in Home Radio's green.
+/// How far a programme has got, in Radio's green.
 class EventProgress extends StatelessWidget {
   const EventProgress({super.key, required this.event, this.width});
 

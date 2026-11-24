@@ -14,8 +14,8 @@ import 'desktop/hrdab_desktop.dart';
 /// opened (WinUSB driver via Zadig, or a udev rule) - and no attach/detach
 /// events.
 class RtlSdrUsbService {
-  static const _methodChannel = MethodChannel('home_radio/rtlsdr_usb');
-  static const _eventChannel = EventChannel('home_radio/rtlsdr_usb/events');
+  static const _methodChannel = MethodChannel('home_system/rtlsdr_usb');
+  static const _eventChannel = EventChannel('home_system/rtlsdr_usb/events');
 
   static final bool _desktop = Platform.isWindows || Platform.isLinux;
 

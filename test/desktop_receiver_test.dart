@@ -13,7 +13,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:home_radio/data/services/dab_rtlsdr_service.dart';
+import 'package:home_system/data/services/dab_rtlsdr_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

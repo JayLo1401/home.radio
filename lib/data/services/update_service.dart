@@ -35,7 +35,7 @@ class AvailableUpdate {
 /// the system installer, which asks the user to confirm.
 class UpdateService {
   static const baseUrl = String.fromEnvironment('UPDATE_BASE_URL');
-  static const _channel = MethodChannel('home_radio/update');
+  static const _channel = MethodChannel('home_system/update');
 
   static bool get supported => baseUrl != '' && (Platform.isAndroid || Platform.isWindows || Platform.isLinux);
 
@@ -85,7 +85,7 @@ class UpdateService {
         // and starts the update again.
         await _channel.invokeMethod('openInstallPermission');
         throw const UpdateException(
-          'Bitte „Unbekannte Apps installieren“ für Home Radio erlauben und das Update erneut starten.',
+          'Bitte „Unbekannte Apps installieren“ für Home System erlauben und das Update erneut starten.',
         );
       }
       await _channel.invokeMethod('install', {'path': file.path});
@@ -112,8 +112,8 @@ class UpdateService {
     exit(0);
   }
 
-  static const _linuxDeb = '/tmp/home-radio-update.deb';
-  static const _linuxApplyScript = '/opt/home-radio/apply-update.sh';
+  static const _linuxDeb = '/tmp/home-system-update.deb';
+  static const _linuxApplyScript = '/opt/home-system/apply-update.sh';
 
   Future<File> _download(AvailableUpdate update, void Function(double progress)? onProgress) async {
     final String path;
@@ -121,7 +121,7 @@ class UpdateService {
       path = _linuxDeb;
     } else {
       final dir = await getTemporaryDirectory();
-      path = p.join(dir.path, Platform.isWindows ? 'HomeRadioSetup.exe' : 'home_radio_update.apk');
+      path = p.join(dir.path, Platform.isWindows ? 'HomeSystemSetup.exe' : 'home_system_update.apk');
     }
     final client = http.Client();
     try {

@@ -18,13 +18,13 @@ import 'launcher_background.dart';
 import 'launcher_navigation.dart';
 import 'launcher_providers.dart';
 
-/// Home Media's launcher: a background picture, the clock, and one row of
-/// tiles - Home Radio, the user's apps (Netflix, Disney+, ...) and "Alle
-/// Apps". Opened over Home Radio (see launcher_navigation.dart), so the radio
+/// Home System's launcher: a background picture, the clock, and one row of
+/// tiles - Radio, the user's apps (Netflix, Disney+, ...) and "Alle
+/// Apps". Opened over Radio (see launcher_navigation.dart), so the radio
 /// keeps playing while it's open.
 ///
 /// Remote: D-Pad through the tiles, OK opens, ☰ (menu) or holding OK
-/// gives the tile's options (move, picture, remove), up reaches the
+/// gives the tile's options (move, picture, app info, remove), up reaches the
 /// settings. Back does nothing - this is the home screen.
 class LauncherScreen extends ConsumerStatefulWidget {
   const LauncherScreen({super.key});
@@ -44,7 +44,7 @@ class _LauncherScreenState extends ConsumerState<LauncherScreen> {
 
   void _focusLastTile() => (_tileFocus[_lastTileId] ?? _tileFocus.values.firstOrNull ?? _appsFocus).requestFocus();
 
-  /// The top bar's "Einstellungen": Home Media's own settings, the device's
+  /// The top bar's "Einstellungen": Home System's own settings, the device's
   /// (Android) settings, all apps - on the PC straight the app's settings.
   Future<void> _openMenu() async {
     if (!LauncherService.supported) {
@@ -56,7 +56,7 @@ class _LauncherScreenState extends ConsumerState<LauncherScreen> {
       builder: (context) => SimpleDialog(
         title: const Text('Einstellungen'),
         children: [
-          _option(context, 'app', Icons.tune, 'Home Media (App-Einstellungen)', autofocus: true),
+          _option(context, 'app', Icons.tune, 'Home System (App-Einstellungen)', autofocus: true),
           _option(context, 'android', Icons.settings_applications_outlined, 'Android-Einstellungen'),
           _option(context, 'apps', Icons.apps, 'Alle Apps'),
         ],
@@ -144,7 +144,9 @@ class _LauncherScreenState extends ConsumerState<LauncherScreen> {
           if (index < tiles.length - 1)
             _option(context, 'right', Icons.arrow_forward, 'Nach rechts verschieben', autofocus: index == 0),
           _option(context, 'image', Icons.image_outlined, 'Bild ändern'),
-          // Home TV comes back through "Alle Apps" - there is none on the PC.
+          if (tile.isApp && LauncherService.supported)
+            _option(context, 'info', Icons.info_outline, 'App-Info (beenden, deinstallieren …)'),
+          // TV comes back through "Alle Apps" - there is none on the PC.
           if (!tile.isRadio && (LauncherService.supported || !tile.isBuiltIn))
             _option(context, 'remove', Icons.delete_outline, 'Aus der Startleiste entfernen'),
         ],
@@ -159,6 +161,8 @@ class _LauncherScreenState extends ConsumerState<LauncherScreen> {
         _keepVisible(tile.id);
       case 'image':
         if (mounted) await chooseTileImage(context, ref, tile);
+      case 'info':
+        if (mounted) await openAppInfo(context, ref, tile.package!, tile.displayLabel);
       case 'remove':
         await notifier.remove(tile.id);
         _tileFocus.remove(tile.id)?.dispose();
@@ -207,7 +211,7 @@ class _LauncherScreenState extends ConsumerState<LauncherScreen> {
                   children: [
                     _MenuBar(menuFocus: _menuFocus, onMenu: _openMenu, onDown: _focusLastTile),
                     const Spacer(),
-                    // A band across the whole width, like Home Radio's
+                    // A band across the whole width, like Radio's
                     // "now playing" banner - top bar and band frame the
                     // picture.
                     Container(
@@ -286,10 +290,24 @@ class _LauncherScreenState extends ConsumerState<LauncherScreen> {
   /// The (first) key assigned to [action], for the hints on screen.
   static String _keyHint(WidgetRef ref, RemoteAction action) => remoteKeyHint(ref.watch(remoteKeysProvider), action);
 
-  static Widget _option(BuildContext context, String value, IconData icon, String label, {bool autofocus = false}) {
-    return SimpleDialogOption(
-      onPressed: () => Navigator.of(context).pop(value),
-      child: _DialogRow(icon: icon, label: label, autofocus: autofocus, onTap: () => Navigator.of(context).pop(value)),
+  static Widget _option(BuildContext context, String value, IconData icon, String label, {bool autofocus = false}) =>
+      launcherMenuOption(context, value, icon, label, autofocus: autofocus);
+}
+
+/// One row of the launcher's popups (SimpleDialog): pops [value] on OK.
+Widget launcherMenuOption(BuildContext context, String value, IconData icon, String label, {bool autofocus = false}) {
+  return SimpleDialogOption(
+    onPressed: () => Navigator.of(context).pop(value),
+    child: _DialogRow(icon: icon, label: label, autofocus: autofocus, onTap: () => Navigator.of(context).pop(value)),
+  );
+}
+
+/// "App-Info": the system's page for the app - force stop, uninstall.
+Future<void> openAppInfo(BuildContext context, WidgetRef ref, String package, String label) async {
+  final ok = await ref.read(launcherServiceProvider).openAppInfo(package);
+  if (!ok && context.mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Die App-Info von „$label“ lässt sich nicht öffnen.')),
     );
   }
 }
@@ -380,9 +398,9 @@ Future<void> chooseTileImage(BuildContext context, WidgetRef ref, LauncherTile t
   }
 }
 
-/// The same top bar as Home Radio's (translucent black, logo and name left,
+/// The same top bar as Radio's (translucent black, logo and name left,
 /// date and time centred, icon buttons right that show their label when
-/// focused) - Home Media's launcher and Home Radio read as one app.
+/// focused) - Home System's launcher and Radio read as one app.
 class _MenuBar extends StatelessWidget {
   const _MenuBar({required this.menuFocus, required this.onMenu, required this.onDown});
 
@@ -407,15 +425,15 @@ class _MenuBar extends StatelessWidget {
                 children: [
                   ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: Image.asset('assets/icon/home_media_logo.png', width: 36, height: 36),
+                    child: Image.asset('assets/icon/home_system_logo.png', width: 36, height: 36),
                   ),
                   const SizedBox(width: 10),
                   const Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Home Media', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                      Text('Powered by Jay', style: TextStyle(color: Colors.green, fontSize: 11, fontWeight: FontWeight.w600)),
+                      Text('Home System', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                      Text('Powered by jaycloud.at', style: TextStyle(color: Colors.green, fontSize: 11, fontWeight: FontWeight.w600)),
                     ],
                   ),
                 ],
@@ -444,7 +462,7 @@ class _MenuBar extends StatelessWidget {
   }
 }
 
-/// Like Home Radio's top-bar buttons: the icon, plus its label while focused.
+/// Like Radio's top-bar buttons: the icon, plus its label while focused.
 class _BarButton extends StatefulWidget {
   const _BarButton({required this.icon, required this.label, required this.onTap, this.focusNode});
 
@@ -494,7 +512,7 @@ class _BarButtonState extends State<_BarButton> {
   }
 }
 
-/// Weekday, date and time in one line - as Home Radio's clock.
+/// Weekday, date and time in one line - as Radio's clock.
 class _LauncherClock extends StatefulWidget {
   const _LauncherClock();
 
@@ -697,7 +715,7 @@ class _AppsTileState extends State<_AppsTile> {
   }
 }
 
-/// A tile's picture: Home Radio's own design, an app's banner/icon (or the
+/// A tile's picture: Radio's own design, an app's banner/icon (or the
 /// icon pack's, or the tile's own picture from an address).
 class TileArt extends ConsumerWidget {
   const TileArt({super.key, required this.tile});
@@ -721,7 +739,7 @@ class TileArt extends ConsumerWidget {
 
   Widget _builtInArt(BuildContext context, WidgetRef ref) {
     if (tile.isRadio) return const _RadioArt();
-    if (tile.isTv) return const _PartArt(logo: 'assets/icon/home_tv_logo.png', title: 'Home TV');
+    if (tile.isTv) return const _PartArt(logo: 'assets/icon/tv_logo.png', title: 'TV');
     if (tile.isSystemSettings) return const _BrandArt(icon: Icons.settings_outlined, title: 'Einstellungen');
     final package = tile.package!;
     final pack = ref.watch(launcherSettingsProvider).iconPack;
@@ -797,7 +815,7 @@ class _NameArt extends StatelessWidget {
   }
 }
 
-/// A Home Media part's tile (Home Radio, Home TV): its logo on the logos'
+/// A Home System part's tile (Radio, TV): its logo on the logos'
 /// own dark graphite with a green glow, name and a line underneath.
 class _PartArt extends StatelessWidget {
   const _PartArt({required this.logo, required this.title, this.subtitle});
@@ -847,13 +865,13 @@ class _PartArt extends StatelessWidget {
   }
 }
 
-/// Home Radio's tile, with what's tuned.
+/// Radio's tile, with what's tuned.
 class _RadioArt extends ConsumerWidget {
   const _RadioArt();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) =>
-      _PartArt(logo: 'assets/icon/home_radio_logo.png', title: 'Home Radio', subtitle: _currentStation(ref));
+      _PartArt(logo: 'assets/icon/radio_logo.png', title: 'Radio', subtitle: _currentStation(ref));
 
   String? _currentStation(WidgetRef ref) {
     final program = ref.watch(currentProgramNumberProvider);

@@ -17,8 +17,8 @@ import 'tv_player.dart';
 import 'tv_providers.dart';
 import 'tv_widgets.dart';
 
-/// Home TV: live TV from the Enigma2 receiver (GigaBlue etc.), full screen.
-/// One of Home Media's parts, opened from the launcher - Back or Home leave
+/// TV: live TV from the Enigma2 receiver (GigaBlue etc.), full screen.
+/// One of Home System's parts, opened from the launcher - Back or Home leave
 /// it, which stops the picture.
 ///
 /// Remote: up/down or OK open the channel list (OK there plays the marked
@@ -89,7 +89,7 @@ class _TvScreenState extends ConsumerState<TvScreen> {
     }
     if (!mounted || channels.isEmpty) return;
     final repo = ref.read(settingsRepositoryProvider);
-    // A fixed start channel (Einstellungen → Home TV), else the last one.
+    // A fixed start channel (Einstellungen → TV), else the last one.
     final fixed = await repo.getTvStartChannel();
     final last = await repo.getTvLastChannel();
     final channel = channels.where((c) => c.ref == fixed).firstOrNull ??
@@ -99,7 +99,7 @@ class _TvScreenState extends ConsumerState<TvScreen> {
   }
 
   /// The connection setup in the banner (App — Receiver — Sender), like
-  /// Home Radio's; null once the picture runs.
+  /// Radio's; null once the picture runs.
   LinkView? _link;
 
   void _setLink(LinkState receiver, LinkState station, String message) =>
@@ -113,7 +113,7 @@ class _TvScreenState extends ConsumerState<TvScreen> {
   /// as the picture comes descrambled. In standby the receiver descrambles
   /// encrypted channels itself and is never switched (it would keep the
   /// tuner); while it's on, it's switched to an encrypted channel (or one on
-  /// another band) if Einstellungen → Home TV allow it.
+  /// another band) if Einstellungen → TV allow it.
   Future<void> _tune(E2Channel channel) async {
     final config = _config;
     final service = ref.read(enigma2ServiceProvider);
@@ -121,7 +121,7 @@ class _TvScreenState extends ConsumerState<TvScreen> {
     final generation = ++_generation;
     bool stale() => !mounted || generation != _generation;
     final clock = Stopwatch()..start();
-    void mark(String what) => debugPrint('Home TV ${channel.name}: $what nach ${clock.elapsedMilliseconds} ms');
+    void mark(String what) => debugPrint('TV ${channel.name}: $what nach ${clock.elapsedMilliseconds} ms');
     final oldPlayer = _player, oldSession = _session;
     setState(() {
       _current = channel;
@@ -172,7 +172,7 @@ class _TvScreenState extends ConsumerState<TvScreen> {
       session.reopen();
     }
     // Switching the receiver only while it's on (its own picture changes
-    // with it) and Einstellungen → Home TV allow it - never in standby, it
+    // with it) and Einstellungen → TV allow it - never in standby, it
     // would keep the tuner afterwards.
     final mayZap = !box.standby && ref.read(tvZapEncryptedProvider);
     var switched = false;
@@ -232,7 +232,7 @@ class _TvScreenState extends ConsumerState<TvScreen> {
         return giveUp(
           !box.standby && !mayZap
               ? '„${channel.name}“ ist verschlüsselt und der Receiver zeigt selbst einen anderen Sender - '
-                  'Einstellungen → Home TV → „Receiver bei Bedarf umschalten“.'
+                  'Einstellungen → TV → „Receiver bei Bedarf umschalten“.'
               : '„${channel.name}“ bleibt verschlüsselt - Karte bzw. CI-Modul für diesen Sender freigeschaltet?',
           atReceiver: true,
         );
@@ -244,7 +244,7 @@ class _TvScreenState extends ConsumerState<TvScreen> {
             ? 'Kein freier Tuner für „${channel.name}“ - das Sat-Kabel ist gerade auf einem anderen Band belegt '
                 '(Aufnahme oder ein anderes Gerät).'
             : 'Kein freier Tuner für „${channel.name}“ - der Receiver zeigt selbst einen Sender auf einem anderen '
-                'Band (Einstellungen → Home TV → „Receiver bei Bedarf umschalten“).',
+                'Band (Einstellungen → TV → „Receiver bei Bedarf umschalten“).',
         atReceiver: true,
       );
     }
@@ -372,7 +372,7 @@ class _TvScreenState extends ConsumerState<TvScreen> {
     final choice = await showDialog<String>(
       context: context,
       builder: (context) => SimpleDialog(
-        title: Text(_current?.name ?? 'Home TV'),
+        title: Text(_current?.name ?? 'TV'),
         children: [
           TvRow(
             autofocus: true,
@@ -419,7 +419,7 @@ class _TvScreenState extends ConsumerState<TvScreen> {
   }
 
   /// Shortly before the next programme on this channel starts (Einstellungen
-  /// → Home TV → "Als Nächstes"), a note says what's coming - once per
+  /// → TV → "Als Nächstes"), a note says what's coming - once per
   /// programme, for the set time.
   void _checkNextUp() {
     final settings = ref.read(tvNextUpProvider);
@@ -550,7 +550,7 @@ class _TvScreenState extends ConsumerState<TvScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Set up (or changed) while Home TV is open: start with it.
+    // Set up (or changed) while TV is open: start with it.
     ref.listen(enigma2ConfigProvider, (previous, next) {
       if (next == null || !next.configured) return;
       if (previous?.host != next.host || previous?.webPort != next.webPort || previous?.streamPort != next.streamPort) {
@@ -710,7 +710,7 @@ class _NextUpNote extends StatelessWidget {
   }
 }
 
-/// Without a receiver: what Home TV is and the way to set it up.
+/// Without a receiver: what TV is and the way to set it up.
 class _NotSetUp extends StatelessWidget {
   const _NotSetUp();
 
@@ -724,10 +724,10 @@ class _NotSetUp extends StatelessWidget {
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(24),
-              child: Image.asset('assets/icon/home_tv_logo.png', width: 140, height: 140),
+              child: Image.asset('assets/icon/tv_logo.png', width: 140, height: 140),
             ),
             const SizedBox(height: 24),
-            const Text('Home TV', style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold)),
+            const Text('TV', style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
             const Text(
               'Fernsehen vom eigenen Sat-Receiver: Senderlisten, Senderlogos und Programmführer kommen direkt vom '
@@ -806,7 +806,7 @@ class _Chip extends StatelessWidget {
   }
 }
 
-/// Channel, now and next - shown on every channel change, like Home Radio's
+/// Channel, now and next - shown on every channel change, like Radio's
 /// "now playing" banner at the bottom.
 class _InfoBanner extends ConsumerWidget {
   const _InfoBanner({required this.config, required this.channel, this.link, this.player});
@@ -890,7 +890,7 @@ class _InfoBanner extends ConsumerWidget {
   }
 }
 
-/// The bouquet's channels on the right, as Home Radio's station list: picon,
+/// The bouquet's channels on the right, as Radio's station list: picon,
 /// number, name, what's on now. Left/right switch the bouquet, OK tunes,
 /// ☰ opens the channel's programme guide.
 class _ChannelList extends ConsumerStatefulWidget {
@@ -1030,14 +1030,14 @@ class _ChannelListState extends ConsumerState<_ChannelList> {
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
-                  child: Image.asset('assets/icon/home_tv_logo.png', width: 36, height: 36),
+                  child: Image.asset('assets/icon/tv_logo.png', width: 36, height: 36),
                 ),
                 const SizedBox(width: 10),
                 const Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Home TV', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                    Text('Powered by Jay', style: TextStyle(color: Colors.green, fontSize: 11, fontWeight: FontWeight.w600)),
+                    Text('Home System', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                    Text('Powered by jaycloud.at', style: TextStyle(color: Colors.green, fontSize: 11, fontWeight: FontWeight.w600)),
                   ],
                 ),
                 const Spacer(),

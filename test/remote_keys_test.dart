@@ -1,6 +1,6 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:home_radio/core/remote_keys.dart';
+import 'package:home_system/core/remote_keys.dart';
 
 void main() {
   test('standard keys: OK opens the channel list, ☰ the options, Info the guide', () {

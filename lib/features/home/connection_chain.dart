@@ -251,7 +251,7 @@ class LinkView {
       internet = true,
       tv = false;
 
-  /// Home TV: "App — Receiver — Sender", [server] standing for the Sat
+  /// TV: "App — Receiver — Sender", [server] standing for the Sat
   /// receiver (reached, switched to an encrypted channel), [station] for
   /// the picture.
   const LinkView.tv({required LinkState receiver, required this.station, required this.message})
@@ -404,7 +404,7 @@ class _ConnectionChainState extends State<ConnectionChain> with SingleTickerProv
             _segment(view.server),
             _node(Icons.public, 'Internet', view.server),
           ] else if (view.tv) ...[
-            // Home TV: the picture comes from the Sat receiver.
+            // TV: the picture comes from the Sat receiver.
             _segment(view.server),
             _node(Icons.settings_input_antenna, 'Receiver', view.server),
           ] else ...[

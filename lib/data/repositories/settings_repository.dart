@@ -573,9 +573,9 @@ class SettingsRepository {
   Future<void> setNbLast(String band, {required int freqHz, required String mode, required double squelchDb}) =>
       _db.setSetting('$_keyNbPrefix$band', '$freqHz|$mode|$squelchDb');
 
-  // --- Home Media launcher ---
+  // --- Home System launcher ---
 
-  /// What shows on start (see [StartScreen]) - Home Radio by default, as
+  /// What shows on start (see [StartScreen]) - Radio by default, as
   /// before the launcher existed.
   Future<StartScreen> getStartScreen() async {
     final v = await _db.getSetting('start_screen');
@@ -593,8 +593,8 @@ class SettingsRepository {
   Future<void> setLauncherTiles(List<LauncherTile> tiles) =>
       _db.setSetting('launcher_tiles', encodeLauncherTiles(tiles));
 
-  /// Home TV's tile was put into an existing row once (rows from before
-  /// Home TV) - afterwards removing it stays removed.
+  /// TV's tile was put into an existing row once (rows from before
+  /// TV) - afterwards removing it stays removed.
   Future<bool> getLauncherTvAdded() async => await _db.getSetting('launcher_tv_added') == 'true';
   Future<void> setLauncherTvAdded() => _db.setSetting('launcher_tv_added', 'true');
 
@@ -637,7 +637,7 @@ class SettingsRepository {
 
   Future<void> setLauncherIconPack(String? package) => _db.setSetting('launcher_icon_pack', package ?? '');
 
-  // --- Home TV (Enigma2 receiver) ---
+  // --- TV (Enigma2 receiver) ---
 
   /// The receiver; its password is kept in the [SecretStore].
   Future<Enigma2Config> getEnigma2Config() async {
@@ -653,11 +653,11 @@ class SettingsRepository {
     await _secrets.write(SecretStore.enigma2PasswordKey, config.password);
   }
 
-  /// The bouquet Home TV shows (service reference).
+  /// The bouquet TV shows (service reference).
   Future<String?> getTvBouquet() => _db.getSetting('tv_bouquet');
   Future<void> setTvBouquet(String ref) => _db.setSetting('tv_bouquet', ref);
 
-  /// The channel Home TV always starts with (service reference); null = the
+  /// The channel TV always starts with (service reference); null = the
   /// one last watched.
   Future<String?> getTvStartChannel() async {
     final v = await _db.getSetting('tv_start_channel');
@@ -666,7 +666,7 @@ class SettingsRepository {
 
   Future<void> setTvStartChannel(String? ref) => _db.setSetting('tv_start_channel', ref ?? '');
 
-  /// Home TV's "Als Nächstes" note: on/off, how many minutes before the next
+  /// TV's "Als Nächstes" note: on/off, how many minutes before the next
   /// programme, and for how many seconds it shows.
   static const tvNextLeadChoices = [1, 2, 5, 10, 15];
   static const tvNextShowChoices = [10, 20, 30, 60];
@@ -705,7 +705,7 @@ class SettingsRepository {
 
   Future<void> setRemoteKeys(Map<String, List<int>> keys) => _db.setSetting('remote_keys', jsonEncode(keys));
 
-  /// Channels (service references) whose stream came scrambled - Home TV
+  /// Channels (service references) whose stream came scrambled - TV
   /// switches the receiver to them right away.
   Future<Set<String>> getTvEncryptedChannels() async {
     try {
@@ -719,7 +719,7 @@ class SettingsRepository {
   Future<void> setTvEncryptedChannels(Set<String> refs) =>
       _db.setSetting('tv_encrypted_channels', jsonEncode(refs.toList()));
 
-  /// The channel last watched (service reference) - Home TV starts with it.
+  /// The channel last watched (service reference) - TV starts with it.
   Future<String?> getTvLastChannel() => _db.getSetting('tv_last_channel');
   Future<void> setTvLastChannel(String ref) => _db.setSetting('tv_last_channel', ref);
 }

@@ -10,7 +10,7 @@ import '../db/database.dart';
 import 'desktop/hrdab_desktop.dart';
 import 'secret_store.dart';
 
-/// One backup file found in Download/HomeRadio (see BackupPlugin.kt).
+/// One backup file found in Download/HomeSystem (see BackupPlugin.kt).
 class BackupFile {
   final String id; // file path or content:// URI - only meaningful to BackupPlugin
   final String name;
@@ -30,23 +30,25 @@ class BackupFormatException implements Exception {
 /// Full backup of everything the app stores - favorites, the DAB+ station
 /// list and all settings (the whole `settings` table, so new settings are
 /// covered without touching this) - as one JSON file in the public
-/// Download/HomeRadio folder, which survives uninstalling the app.
+/// Download/HomeSystem folder, which survives uninstalling the app.
 ///
 /// Restoring replaces the current data completely and then restarts the
 /// app, since lots of settings are only read once at startup.
 ///
-/// On Windows/Linux the files live in Documents/HomeRadio instead (no
+/// On Windows/Linux the files live in Documents/HomeSystem instead (no
 /// BackupPlugin there).
 class BackupService {
   BackupService(this._db);
 
-  static const _channel = MethodChannel('home_radio/backup');
+  static const _channel = MethodChannel('home_system/backup');
+  // The app's former name - kept, so backups of Home Radio
+  // (at.jaycloud.home.radio) and Home System restore into each other.
   static const _app = 'home_radio';
   static const _format = 1;
 
   final AppDatabase _db;
 
-  /// Returns where the backup was written, e.g. "Download/HomeRadio/...".
+  /// Returns where the backup was written, e.g. "Download/HomeSystem/...".
   Future<String> createBackup() async {
     final now = DateTime.now();
     final data = {
@@ -63,7 +65,7 @@ class BackupService {
       'secrets': await SecretStore(_db).exportAll(),
     };
     final content = const JsonEncoder.withIndent('  ').convert(data);
-    final name = 'home_radio_backup_${_timestamp(now)}.json';
+    final name = 'home_system_backup_${_timestamp(now)}.json';
     if (!Platform.isAndroid) {
       final dir = await _desktopDir();
       await File(p.join(dir.path, name)).writeAsString(content, flush: true);
@@ -78,7 +80,12 @@ class BackupService {
 
   Future<List<BackupFile>> listBackups() async {
     if (!Platform.isAndroid) {
-      final files = (await _desktopDir()).listSync().whereType<File>().where((f) => f.path.endsWith('.json')).toList();
+      final docs = (await getApplicationDocumentsDirectory()).path;
+      // Also the folder of the app's former name (HomeRadio).
+      final files = [
+        for (final dir in [await _desktopDir(), Directory(p.join(docs, 'HomeRadio'))])
+          if (dir.existsSync()) ...dir.listSync().whereType<File>().where((f) => f.path.endsWith('.json')),
+      ];
       final list = [
         for (final f in files) BackupFile(id: f.path, name: p.basename(f.path), modified: f.lastModifiedSync()),
       ]..sort((a, b) => b.modified.compareTo(a.modified));
@@ -131,7 +138,7 @@ class BackupService {
   }
 
   static Future<Directory> _desktopDir() async {
-    final dir = Directory(p.join((await getApplicationDocumentsDirectory()).path, 'HomeRadio'));
+    final dir = Directory(p.join((await getApplicationDocumentsDirectory()).path, 'HomeSystem'));
     await dir.create(recursive: true);
     return dir;
   }
@@ -144,7 +151,7 @@ class BackupService {
       throw const BackupFormatException('Die Datei ist kein gültiges Backup.');
     }
     if (decoded is! Map<String, dynamic> || decoded['app'] != _app) {
-      throw const BackupFormatException('Die Datei ist kein Home-Radio-Backup.');
+      throw const BackupFormatException('Die Datei ist kein Home-System-Backup.');
     }
     if ((decoded['format'] as num? ?? 0) > _format) {
       throw const BackupFormatException('Das Backup stammt von einer neueren App-Version.');

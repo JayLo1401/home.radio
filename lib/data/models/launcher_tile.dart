@@ -1,7 +1,7 @@
 import 'dart:convert';
 
-/// What Home Media shows on start: the launcher, straight Home Radio with
-/// the autostart station (as before the launcher existed), or Home TV with
+/// What Home System shows on start: the launcher, straight Radio with
+/// the autostart station (as before the launcher existed), or TV with
 /// its start channel - e.g. a TV set that should simply show TV.
 enum StartScreen { launcher, radio, tv }
 
@@ -44,7 +44,7 @@ class LauncherTile {
   bool get isApp => type == appType;
   bool get isSystemSettings => type == settingsType;
 
-  /// A built-in part of Home Media (Home Radio, Home TV) - can be moved, but
+  /// A built-in part of Home System (Radio, TV) - can be moved, but
   /// not removed.
   bool get isBuiltIn => isRadio || isTv;
 
@@ -54,8 +54,8 @@ class LauncherTile {
   String get id => isApp ? 'app:$package' : type;
 
   String get displayLabel => switch (type) {
-        radioType => 'Home Radio',
-        tvType => 'Home TV',
+        radioType => 'Radio',
+        tvType => 'TV',
         settingsType => 'Einstellungen (TV)',
         _ => label ?? package ?? '',
       };
@@ -95,7 +95,7 @@ class LauncherTile {
   int get hashCode => Object.hash(id, image);
 }
 
-/// The row as stored in the settings (JSON). Home Radio is always in it -
+/// The row as stored in the settings (JSON). Radio is always in it -
 /// it's the way into the radio - and every tile only once.
 List<LauncherTile> decodeLauncherTiles(String? raw) {
   final tiles = <LauncherTile>[];

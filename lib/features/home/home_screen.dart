@@ -45,15 +45,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   /// nothing else has it (see [_ensureInitialFocus]).
   final _settingsFocus = FocusNode(debugLabel: 'settings');
 
-  /// The Home key (Home Media's launcher, see launcher_navigation.dart).
+  /// The Home key (Home System's launcher, see launcher_navigation.dart).
   StreamSubscription<void>? _launcherRequests;
 
   /// The app started into the launcher: the autostart station plays once
-  /// Home Radio is actually opened, like starting the radio app itself.
+  /// Radio is actually opened, like starting the radio app itself.
   bool _autostartPending = false;
 
   /// The launcher stopped the radio for another app (Netflix, Spotify, ...)
-  /// - it plays on when Home Radio is opened again.
+  /// - it plays on when Radio is opened again.
   bool _pausedForApp = false;
 
   /// A screen that drives the receiver itself is open (listening bands,
@@ -1142,7 +1142,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     ref.listen(playRequestProvider, (_, request) => _onPlayRequest(request));
-    // Back from the launcher to Home Radio.
+    // Back from the launcher to Radio.
     ref.listen(launcherVisibleProvider, (_, visible) {
       if (visible) return;
       if (_autostartPending) {
@@ -1212,7 +1212,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     // Receiver parts: only with a receiver, and as shown in the settings.
     final shown = ref.watch(receiverSectionsShownProvider);
 
-    // Home Radio is one of Home Media's "apps": Back (Esc on the PC) goes
+    // Radio is one of Home System's "apps": Back (Esc on the PC) goes
     // to the launcher, it doesn't end the app.
     return PopScope(
       canPop: false,
@@ -1562,8 +1562,8 @@ class _MenuBar extends StatelessWidget {
       // clock centered on the whole bar gets a true center regardless of
       // how wide either side group is.
       child: SizedBox(
-        // Tall enough for the two-line logo/title group ("Home Radio" +
-        // "Powered by Jay") - was 36 (just the logo's own height) before
+        // Tall enough for the two-line logo/title group ("Home System" +
+        // "Powered by jaycloud.at") - was 36 (just the logo's own height) before
         // that second line existed.
         height: 44,
         child: Stack(
@@ -1577,7 +1577,7 @@ class _MenuBar extends StatelessWidget {
                   ClipRRect(
                     borderRadius: BorderRadius.circular(8),
                     child: Image.asset(
-                      'assets/icon/home_radio_logo.png',
+                      'assets/icon/radio_logo.png',
                       width: 36,
                       height: 36,
                     ),
@@ -1588,7 +1588,7 @@ class _MenuBar extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Home Radio',
+                        'Home System',
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 18,
@@ -1596,7 +1596,7 @@ class _MenuBar extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        'Powered by Jay',
+                        'Powered by jaycloud.at',
                         style: TextStyle(
                           color: Colors.green,
                           fontSize: 11,

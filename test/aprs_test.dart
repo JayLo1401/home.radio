@@ -1,7 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:home_radio/data/models/aprs.dart';
+import 'package:home_system/data/models/aprs.dart';
 
 /// AX.25 UI frame as the receiver's packet decoder delivers it (no FCS).
 Uint8List frame(String dest, String src, List<String> path, String info) {

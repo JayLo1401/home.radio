@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:home_radio/data/services/enigma2_service.dart';
-import 'package:home_radio/features/tv/tv_providers.dart' show nowNextFor;
-import 'package:home_radio/features/tv/tv_widgets.dart' show shortChannelName;
+import 'package:home_system/data/services/enigma2_service.dart';
+import 'package:home_system/features/tv/tv_providers.dart' show nowNextFor;
+import 'package:home_system/features/tv/tv_widgets.dart' show shortChannelName;
 
 void main() {
   test('picon names: fields with _, TV service types as 1, no trailing part', () {

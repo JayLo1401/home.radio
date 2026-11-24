@@ -12,16 +12,16 @@ import 'features/launcher/launcher_navigation.dart';
 import 'features/launcher/launcher_providers.dart' show appNavigatorKey;
 import 'features/splash/splash_screen.dart';
 
-/// Home Media: the launcher with Home Radio and Home TV as its parts (and
+/// Home System: the launcher with Radio and TV as its parts (and
 /// the device's apps on Android).
-class HomeRadioApp extends ConsumerWidget {
-  const HomeRadioApp({super.key});
+class HomeSystemApp extends ConsumerWidget {
+  const HomeSystemApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final uiScale = ref.watch(uiScaleProvider);
     return MaterialApp(
-      title: 'Home Media',
+      title: 'Home System',
       navigatorKey: appNavigatorKey,
       debugShowCheckedModeBanner: false,
       theme: buildTvTheme(),
@@ -32,7 +32,7 @@ class HomeRadioApp extends ConsumerWidget {
 }
 
 /// The remote's Back and Home keys on the PC (Windows/Linux): Esc (and the
-/// mouse's back button) goes back - from Home Radio and Home TV to the
+/// mouse's back button) goes back - from Radio and TV to the
 /// launcher -, Pos1 opens the launcher. On Android the remote's own keys do
 /// it.
 class _PcKeys extends ConsumerWidget {

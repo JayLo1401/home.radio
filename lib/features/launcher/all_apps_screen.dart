@@ -9,11 +9,11 @@ import '../../core/theme.dart';
 import '../../data/models/launcher_tile.dart';
 import '../../data/services/launcher_service.dart';
 import 'launcher_providers.dart';
-import 'launcher_screen.dart' show TileArt;
+import 'launcher_screen.dart' show TileArt, launcherMenuOption, openAppInfo;
 
-/// Every installed app, searchable: OK opens it, ☰ (menu) or holding OK adds
-/// it to the launcher's favourites (or takes it out again). The star marks
-/// the ones already in the row.
+/// Every installed app, searchable: OK opens it, ☰ (menu) or holding OK
+/// gives its options - favourite on/off, app info (force stop, uninstall).
+/// The star marks the ones already in the row.
 class AllAppsScreen extends ConsumerStatefulWidget {
   const AllAppsScreen({super.key});
 
@@ -21,17 +21,19 @@ class AllAppsScreen extends ConsumerStatefulWidget {
   ConsumerState<AllAppsScreen> createState() => _AllAppsScreenState();
 }
 
-class _AllAppsScreenState extends ConsumerState<AllAppsScreen> {
+class _AllAppsScreenState extends ConsumerState<AllAppsScreen> with WidgetsBindingObserver {
   final _search = TextEditingController();
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _search.addListener(() => setState(() {}));
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _search.dispose();
     super.dispose();
   }
@@ -39,6 +41,42 @@ class _AllAppsScreenState extends ConsumerState<AllAppsScreen> {
   Future<void> _launch(InstalledApp app) async {
     ref.read(radioCommandProvider.notifier).send(RadioCommand.pauseForApp);
     await ref.read(launcherServiceProvider).launchApp(app.package);
+  }
+
+  /// ☰ or holding OK: favourite on/off, app info (force stop, uninstall).
+  Future<void> _options(InstalledApp app) async {
+    final inRow = ref.read(launcherTilesProvider.notifier).contains(LauncherTile.app(package: app.package, label: app.label).id);
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: Text(app.label),
+        children: [
+          launcherMenuOption(context, 'open', Icons.open_in_new, 'Öffnen', autofocus: true),
+          launcherMenuOption(
+            context,
+            'favorite',
+            inRow ? Icons.star : Icons.star_border,
+            inRow ? 'Aus den Favoriten entfernen' : 'Zu den Favoriten hinzufügen',
+          ),
+          launcherMenuOption(context, 'info', Icons.info_outline, 'App-Info (beenden, deinstallieren …)'),
+        ],
+      ),
+    );
+    if (!mounted) return;
+    switch (choice) {
+      case 'open':
+        await _launch(app);
+      case 'favorite':
+        await _toggleFavorite(app);
+      case 'info':
+        await openAppInfo(context, ref, app.package, app.label);
+    }
+  }
+
+  // Back from the app info (maybe uninstalled there): read the list again.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) ref.invalidate(installedAppsProvider);
   }
 
   Future<void> _toggleFavorite(InstalledApp app) async {
@@ -104,7 +142,7 @@ class _AllAppsScreenState extends ConsumerState<AllAppsScreen> {
             ),
             const SizedBox(height: 8),
             const Text(
-              'OK: App öffnen  ·  ☰ oder OK lange drücken: zu den Favoriten hinzufügen / entfernen',
+              'OK: App öffnen  ·  ☰ oder OK lange drücken: Favorit, App-Info (beenden, deinstallieren)',
               style: TextStyle(color: Colors.white54, fontSize: 13),
             ),
             const SizedBox(height: 12),
@@ -139,7 +177,7 @@ class _AllAppsScreenState extends ConsumerState<AllAppsScreen> {
                         favorite: tiles.any((t) => t.id == tile.id),
                         autofocus: i == 0,
                         onOpen: () => _launch(app),
-                        onToggleFavorite: () => _toggleFavorite(app),
+                        onOptions: () => _options(app),
                       );
                     },
                   );
@@ -159,7 +197,7 @@ class _AppCell extends StatefulWidget {
     required this.tile,
     required this.favorite,
     required this.onOpen,
-    required this.onToggleFavorite,
+    required this.onOptions,
     this.autofocus = false,
   });
 
@@ -167,7 +205,7 @@ class _AppCell extends StatefulWidget {
   final LauncherTile tile;
   final bool favorite;
   final VoidCallback onOpen;
-  final VoidCallback onToggleFavorite;
+  final VoidCallback onOptions;
   final bool autofocus;
 
   @override
@@ -182,7 +220,7 @@ class _AppCellState extends State<_AppCell> {
         ProviderScope.containerOf(context, listen: false)
             .read(remoteKeysProvider)
             .matches(RemoteAction.options, event.logicalKey)) {
-      widget.onToggleFavorite();
+      widget.onOptions();
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
@@ -196,7 +234,7 @@ class _AppCellState extends State<_AppCell> {
       onKeyEvent: _onKey,
       child: OkLongPress(
         onTap: widget.onOpen,
-        onLongPress: widget.onToggleFavorite,
+        onLongPress: widget.onOptions,
         child: Column(
           children: [
             Expanded(
@@ -212,7 +250,7 @@ class _AppCellState extends State<_AppCell> {
                     if (v) Scrollable.ensureVisible(context, alignment: 0.5, duration: const Duration(milliseconds: 150));
                   },
                   onTap: widget.onOpen,
-                  onLongPress: widget.onToggleFavorite,
+                  onLongPress: widget.onOptions,
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(12),
                     child: Stack(

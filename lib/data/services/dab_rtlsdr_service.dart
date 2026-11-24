@@ -15,8 +15,8 @@ import 'desktop/hrdab_desktop.dart';
 /// ([HrdabDesktop], the desktop port of DabRtlSdrPlugin) - same methods,
 /// same events.
 class DabRtlSdrService {
-  static const _methodChannel = MethodChannel('home_radio/dab_rtlsdr');
-  static const _eventChannel = EventChannel('home_radio/dab_rtlsdr/events');
+  static const _methodChannel = MethodChannel('home_system/dab_rtlsdr');
+  static const _eventChannel = EventChannel('home_system/dab_rtlsdr/events');
 
   static final bool _desktop = Platform.isWindows || Platform.isLinux;
 

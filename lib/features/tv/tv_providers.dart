@@ -6,7 +6,7 @@ import '../../core/providers.dart';
 import '../../data/repositories/settings_repository.dart';
 import '../../data/services/enigma2_service.dart';
 
-/// The Enigma2 receiver Home TV uses (Einstellungen → Home TV).
+/// The Enigma2 receiver TV uses (Einstellungen → TV).
 class Enigma2ConfigNotifier extends Notifier<Enigma2Config?> {
   @override
   Enigma2Config? build() {
@@ -28,7 +28,7 @@ final enigma2ConfigProvider = NotifierProvider<Enigma2ConfigNotifier, Enigma2Con
 
 typedef TvNextUp = ({bool enabled, int leadMinutes, int showSeconds});
 
-/// The "Als Nächstes" note (Einstellungen → Home TV).
+/// The "Als Nächstes" note (Einstellungen → TV).
 class TvNextUpNotifier extends Notifier<TvNextUp> {
   @override
   TvNextUp build() {
@@ -46,7 +46,7 @@ class TvNextUpNotifier extends Notifier<TvNextUp> {
 
 final tvNextUpProvider = NotifierProvider<TvNextUpNotifier, TvNextUp>(TvNextUpNotifier.new);
 
-/// "Verschlüsselte Sender: Receiver umschalten" (Einstellungen → Home TV).
+/// "Verschlüsselte Sender: Receiver umschalten" (Einstellungen → TV).
 class TvZapEncryptedNotifier extends Notifier<bool> {
   @override
   bool build() {
@@ -95,7 +95,7 @@ final tvBouquetsProvider = FutureProvider<List<E2Bouquet>>((ref) async {
   return service.bouquets();
 });
 
-/// The bouquet Home TV shows (its reference), stored; null = the first one.
+/// The bouquet TV shows (its reference), stored; null = the first one.
 class TvBouquetNotifier extends Notifier<String?> {
   @override
   String? build() {

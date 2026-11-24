@@ -27,7 +27,7 @@ import 'radar_source_settings_screen.dart';
 enum SettingsSection { launcher, radio, tv, general }
 
 /// Settings: without [section] the overview of the areas (Launcher, Home
-/// Radio, Home TV, Allgemein), with it that area's page - Home Radio's gear
+/// Radio, TV, Allgemein), with it that area's page - Radio's gear
 /// opens its own area right away.
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key, this.section});
@@ -41,7 +41,7 @@ class SettingsScreen extends ConsumerStatefulWidget {
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   AutostartMode _mode = AutostartMode.lastStation;
   int? _fixedProgramNumber;
-  // Home TV's start channel (null = last watched); "Festen Sender" picked
+  // TV's start channel (null = last watched); "Festen Sender" picked
   // but no channel yet.
   String? _tvStartChannel;
   bool _tvFixedChosen = false;
@@ -291,8 +291,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       appBar: AppBar(
         title: Text(switch (section) {
           SettingsSection.launcher => 'Einstellungen: Launcher',
-          SettingsSection.radio => 'Einstellungen: Home Radio',
-          SettingsSection.tv => 'Einstellungen: Home TV',
+          SettingsSection.radio => 'Einstellungen: Radio',
+          SettingsSection.tv => 'Einstellungen: TV',
           SettingsSection.general => 'Einstellungen: Allgemein',
         }),
       ),
@@ -352,7 +352,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               FocusTraversalOrder(
                 order: NumericFocusOrder(nextOrder()),
                 child: _TvChoiceTile(
-                  label: 'Home Radio mit Sender starten (Home Radio → Autostart)',
+                  label: 'Radio mit Sender starten (Radio → Autostart)',
                   selected: launcher.startScreen == StartScreen.radio,
                   onTap: () => ref.read(launcherSettingsProvider.notifier).setStartScreen(StartScreen.radio),
                 ),
@@ -360,7 +360,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               FocusTraversalOrder(
                 order: NumericFocusOrder(nextOrder()),
                 child: _TvChoiceTile(
-                  label: 'Home TV mit Sender starten (Home TV → Sender beim Start)',
+                  label: 'TV mit Sender starten (TV → Sender beim Start)',
                   selected: launcher.startScreen == StartScreen.tv,
                   onTap: () => ref.read(launcherSettingsProvider.notifier).setStartScreen(StartScreen.tv),
                 ),
@@ -453,13 +453,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               const Text(
                 'Nur wenn der Receiver eingeschaltet ist: Karte bzw. CI-Modul entschlüsseln dann nur den Sender, den er '
                 'selbst zeigt, und an einem Sat-Kabel empfangen alle Tuner nur dessen Band. Für einen verschlüsselten '
-                'Sender oder einen auf einem anderen Band schaltet Home TV den Receiver dann um (sein Bild wechselt mit).\n'
-                'Im Standby schaltet Home TV nie um - der Receiver entschlüsselt dort selbst und bleibt frei. Hält er '
-                'noch einen Sender fest, gibt Home TV ihn frei.',
+                'Sender oder einen auf einem anderen Band schaltet die App den Receiver dann um (sein Bild wechselt mit).\n'
+                'Im Standby schaltet die App nie um - der Receiver entschlüsselt dort selbst und bleibt frei. Hält er '
+                'noch einen Sender fest, gibt die App ihn frei.',
                 style: TextStyle(color: Colors.white60),
               ),
               const Divider(height: 32),
-              Text('Sender beim Start von Home TV', style: Theme.of(context).textTheme.titleLarge),
+              Text('Sender beim Start', style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 8),
               FocusTraversalOrder(
                 order: NumericFocusOrder(nextOrder()),
@@ -513,7 +513,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               Text('Als Nächstes', style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 4),
               const Text(
-                'Kurz bevor auf dem laufenden Sender die nächste Sendung beginnt, zeigt Home TV, was als Nächstes kommt.',
+                'Kurz bevor auf dem laufenden Sender die nächste Sendung beginnt, erscheint ein Hinweis, was als Nächstes kommt.',
                 style: TextStyle(color: Colors.white60),
               ),
               const SizedBox(height: 8),
@@ -736,12 +736,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
               ],
             ),
-            // Home Radio's gear opens its own area; the others from here.
+            // Radio's gear opens its own area; the others from here.
             const Divider(height: 32),
             FocusTraversalOrder(
               order: NumericFocusOrder(nextOrder()),
               child: _TvNavTile(
-                label: 'Weitere Einstellungen (Launcher, Home TV, Allgemein)',
+                label: 'Weitere Einstellungen (Launcher, TV, Allgemein)',
                 icon: Icons.settings_outlined,
                 onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SettingsScreen())),
               ),
@@ -846,7 +846,7 @@ class _SettingsOverview extends StatelessWidget {
         padding: const EdgeInsets.all(24),
         children: [
           _AreaTile(
-            logo: 'assets/icon/home_media_logo.png',
+            logo: 'assets/icon/home_system_logo.png',
             title: 'Launcher',
             subtitle: LauncherService.supported
                 ? 'Start der App, Hintergrund, Icon-Paket, Home-Taste'
@@ -855,14 +855,14 @@ class _SettingsOverview extends StatelessWidget {
             onTap: () => open(SettingsSection.launcher),
           ),
           _AreaTile(
-            logo: 'assets/icon/home_radio_logo.png',
-            title: 'Home Radio',
+            logo: 'assets/icon/radio_logo.png',
+            title: 'Radio',
             subtitle: 'Empfänger (DAB+, UKW, Funk), Autostart-Sender, Wetter, Radar, Sonne & Mond',
             onTap: () => open(SettingsSection.radio),
           ),
           _AreaTile(
-            logo: 'assets/icon/home_tv_logo.png',
-            title: 'Home TV',
+            logo: 'assets/icon/tv_logo.png',
+            title: 'TV',
             subtitle: 'Sat-Receiver (Enigma2, z. B. GigaBlue)',
             onTap: () => open(SettingsSection.tv),
           ),
@@ -982,9 +982,9 @@ class _AboutBlockState extends State<_AboutBlock> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             line(
-              'Home Media',
+              'Home System',
               'PolyForm Noncommercial 1.0.0 - frei für private und nicht-kommerzielle Nutzung. '
-                  '© 2026 Jürgen Laschak, github.com/JayLo1401/home.radio',
+                  '© 2026 Jürgen Laschak, github.com/JayLo1401/home.system',
             ),
             line(
               'Wetterprognose',

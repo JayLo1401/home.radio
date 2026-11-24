@@ -207,7 +207,7 @@ class UvIndexService {
 
   Future<double?> getCurrentUvIndex({required double lat, required double lon}) async {
     final uri = Uri.parse('$_baseUrl?latitude=$lat&longitude=$lon&hourly=uv_index&timezone=auto&forecast_days=1');
-    final response = await http.get(uri, headers: {'User-Agent': 'home_radio/1.0'});
+    final response = await http.get(uri, headers: {'User-Agent': 'home_system/1.0'});
     if (response.statusCode != 200) {
       throw Exception('Open-Meteo UV request failed: HTTP ${response.statusCode}');
     }

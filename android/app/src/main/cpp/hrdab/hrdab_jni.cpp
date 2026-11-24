@@ -1,5 +1,5 @@
-// JNI bridge for home_radio's own DAB+ receiver (cpp/hrdab), used by
-// at.jaycloud.home.radio.dab.IntegratedDabEngine.
+// JNI bridge for home_system's own DAB+ receiver (cpp/hrdab), used by
+// at.jaycloud.home.system.dab.IntegratedDabEngine.
 //
 // One global session, like the rest of the app's DAB code: one stick, one
 // ensemble at a time. Callbacks arrive on the receiver's own threads, which
@@ -407,7 +407,7 @@ extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*)
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
-Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeCreateUsb(JNIEnv* e, jobject thiz, jint fd)
+Java_at_jaycloud_home_system_dab_IntegratedDabEngine_nativeCreateUsb(JNIEnv* e, jobject thiz, jint fd)
 {
     std::lock_guard<std::mutex> lock(g_mutex);
     if (g_session) return JNI_TRUE;
@@ -417,7 +417,7 @@ Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeCreateUsb(JNIEnv* e, j
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
-Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeCreateTcp(JNIEnv* e, jobject thiz, jstring jHost, jint port)
+Java_at_jaycloud_home_system_dab_IntegratedDabEngine_nativeCreateTcp(JNIEnv* e, jobject thiz, jstring jHost, jint port)
 {
     std::lock_guard<std::mutex> lock(g_mutex);
     if (g_session) return JNI_TRUE;
@@ -432,7 +432,7 @@ Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeCreateTcp(JNIEnv* e, j
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeDestroy(JNIEnv* e, jobject)
+Java_at_jaycloud_home_system_dab_IntegratedDabEngine_nativeDestroy(JNIEnv* e, jobject)
 {
     std::unique_ptr<Session> session;
     {
@@ -445,7 +445,7 @@ Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeDestroy(JNIEnv* e, job
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
-Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeTune(JNIEnv*, jobject, jint hz)
+Java_at_jaycloud_home_system_dab_IntegratedDabEngine_nativeTune(JNIEnv*, jobject, jint hz)
 {
     std::lock_guard<std::mutex> lock(g_mutex);
     if (!g_session) return JNI_FALSE;
@@ -453,7 +453,7 @@ Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeTune(JNIEnv*, jobject,
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
-Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeTuneKeep(JNIEnv*, jobject, jint hz)
+Java_at_jaycloud_home_system_dab_IntegratedDabEngine_nativeTuneKeep(JNIEnv*, jobject, jint hz)
 {
     std::lock_guard<std::mutex> lock(g_mutex);
     if (!g_session) return JNI_FALSE;
@@ -461,28 +461,28 @@ Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeTuneKeep(JNIEnv*, jobj
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeHalt(JNIEnv*, jobject)
+Java_at_jaycloud_home_system_dab_IntegratedDabEngine_nativeHalt(JNIEnv*, jobject)
 {
     std::lock_guard<std::mutex> lock(g_mutex);
     if (g_session) g_session->receiver->halt();
 }
 
 extern "C" JNIEXPORT jstring JNICALL
-Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeGetEnsembleLabel(JNIEnv* e, jobject)
+Java_at_jaycloud_home_system_dab_IntegratedDabEngine_nativeGetEnsembleLabel(JNIEnv* e, jobject)
 {
     std::lock_guard<std::mutex> lock(g_mutex);
     return utf8(e, g_session ? g_session->receiver->ensembleLabel() : std::string());
 }
 
 extern "C" JNIEXPORT jstring JNICALL
-Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeGetServiceListJson(JNIEnv* e, jobject)
+Java_at_jaycloud_home_system_dab_IntegratedDabEngine_nativeGetServiceListJson(JNIEnv* e, jobject)
 {
     std::lock_guard<std::mutex> lock(g_mutex);
     return utf8(e, g_session ? g_session->receiver->serviceListJson() : std::string("[]"));
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
-Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativePlayService(JNIEnv*, jobject, jint sid)
+Java_at_jaycloud_home_system_dab_IntegratedDabEngine_nativePlayService(JNIEnv*, jobject, jint sid)
 {
     std::lock_guard<std::mutex> lock(g_mutex);
     if (!g_session) return JNI_FALSE;
@@ -490,7 +490,7 @@ Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativePlayService(JNIEnv*, j
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeStopService(JNIEnv*, jobject)
+Java_at_jaycloud_home_system_dab_IntegratedDabEngine_nativeStopService(JNIEnv*, jobject)
 {
     std::lock_guard<std::mutex> lock(g_mutex);
     if (g_session) g_session->receiver->stopService();
@@ -499,7 +499,7 @@ Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeStopService(JNIEnv*, j
 // --- FM ---
 
 extern "C" JNIEXPORT jboolean JNICALL
-Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeFmTune(JNIEnv*, jobject, jint hz)
+Java_at_jaycloud_home_system_dab_IntegratedDabEngine_nativeFmTune(JNIEnv*, jobject, jint hz)
 {
     std::lock_guard<std::mutex> lock(g_mutex);
     if (!g_session) return JNI_FALSE;
@@ -507,7 +507,7 @@ Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeFmTune(JNIEnv*, jobjec
 }
 
 extern "C" JNIEXPORT jstring JNICALL
-Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeFmSurvey(JNIEnv* e, jobject, jint centerHz, jint lowHz,
+Java_at_jaycloud_home_system_dab_IntegratedDabEngine_nativeFmSurvey(JNIEnv* e, jobject, jint centerHz, jint lowHz,
                                                                     jint highHz)
 {
     std::lock_guard<std::mutex> lock(g_mutex);
@@ -521,7 +521,7 @@ Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeFmSurvey(JNIEnv* e, jo
 }
 
 extern "C" JNIEXPORT jstring JNICALL
-Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeFmInfoJson(JNIEnv* e, jobject)
+Java_at_jaycloud_home_system_dab_IntegratedDabEngine_nativeFmInfoJson(JNIEnv* e, jobject)
 {
     std::lock_guard<std::mutex> lock(g_mutex);
     return utf8(e, g_session ? g_session->receiver->fmInfoJson() : std::string("{\"valid\":false}"));
@@ -554,7 +554,7 @@ std::vector<uint32_t> toFreqs(JNIEnv* e, jintArray a)
 } // namespace
 
 extern "C" JNIEXPORT jboolean JNICALL
-Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeNbStart(JNIEnv* e, jobject, jint sampleRate, jint centerHz,
+Java_at_jaycloud_home_system_dab_IntegratedDabEngine_nativeNbStart(JNIEnv* e, jobject, jint sampleRate, jint centerHz,
                                                                    jintArray channels, jint freqHz, jint mode,
                                                                    jfloat squelchDb)
 {
@@ -568,7 +568,7 @@ Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeNbStart(JNIEnv* e, job
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
-Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeNbTune(JNIEnv*, jobject, jint freqHz, jint mode)
+Java_at_jaycloud_home_system_dab_IntegratedDabEngine_nativeNbTune(JNIEnv*, jobject, jint freqHz, jint mode)
 {
     std::lock_guard<std::mutex> lock(g_mutex);
     NbMode m;
@@ -577,14 +577,14 @@ Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeNbTune(JNIEnv*, jobjec
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeNbSetSquelch(JNIEnv*, jobject, jfloat squelchDb)
+Java_at_jaycloud_home_system_dab_IntegratedDabEngine_nativeNbSetSquelch(JNIEnv*, jobject, jfloat squelchDb)
 {
     std::lock_guard<std::mutex> lock(g_mutex);
     if (g_session) g_session->receiver->nbSetSquelch(squelchDb);
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
-Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeAcarsStart(JNIEnv* e, jobject, jint centerHz,
+Java_at_jaycloud_home_system_dab_IntegratedDabEngine_nativeAcarsStart(JNIEnv* e, jobject, jint centerHz,
                                                                     jintArray channelsHz)
 {
     const jsize n = channelsHz ? e->GetArrayLength(channelsHz) : 0;
@@ -597,41 +597,41 @@ Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeAcarsStart(JNIEnv* e, 
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
-Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeIsmStart(JNIEnv*, jobject, jint freqHz)
+Java_at_jaycloud_home_system_dab_IntegratedDabEngine_nativeIsmStart(JNIEnv*, jobject, jint freqHz)
 {
     std::lock_guard<std::mutex> lock(g_mutex);
     return g_session && g_session->receiver->ismStart(static_cast<uint32_t>(freqHz)) ? JNI_TRUE : JNI_FALSE;
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
-Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeAdsbStart(JNIEnv*, jobject)
+Java_at_jaycloud_home_system_dab_IntegratedDabEngine_nativeAdsbStart(JNIEnv*, jobject)
 {
     std::lock_guard<std::mutex> lock(g_mutex);
     return g_session && g_session->receiver->adsbStart() ? JNI_TRUE : JNI_FALSE;
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_00024Companion_nativeSetUpconverter(JNIEnv*, jobject, jint hz)
+Java_at_jaycloud_home_system_dab_IntegratedDabEngine_00024Companion_nativeSetUpconverter(JNIEnv*, jobject, jint hz)
 {
     externalUpconverterHz() = hz > 0 ? static_cast<uint32_t>(hz) : 0u;
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeNbSetPacketDecoder(JNIEnv*, jobject, jint kind)
+Java_at_jaycloud_home_system_dab_IntegratedDabEngine_nativeNbSetPacketDecoder(JNIEnv*, jobject, jint kind)
 {
     std::lock_guard<std::mutex> lock(g_mutex);
     if (g_session) g_session->receiver->nbSetPacketDecoder(kind);
 }
 
 extern "C" JNIEXPORT jfloat JNICALL
-Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeNbSetGain(JNIEnv*, jobject, jint gainIndex)
+Java_at_jaycloud_home_system_dab_IntegratedDabEngine_nativeNbSetGain(JNIEnv*, jobject, jint gainIndex)
 {
     std::lock_guard<std::mutex> lock(g_mutex);
     return g_session ? g_session->receiver->nbSetGain(gainIndex) : 0.f;
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeNbSetFilters(JNIEnv*, jobject, jint bandwidthHz,
+Java_at_jaycloud_home_system_dab_IntegratedDabEngine_nativeNbSetFilters(JNIEnv*, jobject, jint bandwidthHz,
                                                                         jboolean noiseBlanker, jboolean voiceFilter,
                                                                         jint agc)
 {
@@ -646,7 +646,7 @@ Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeNbSetFilters(JNIEnv*, 
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
-Java_at_jaycloud_home_radio_dab_IntegratedDabEngine_nativeNbSetChannels(JNIEnv* e, jobject, jint centerHz,
+Java_at_jaycloud_home_system_dab_IntegratedDabEngine_nativeNbSetChannels(JNIEnv* e, jobject, jint centerHz,
                                                                          jintArray channels)
 {
     std::lock_guard<std::mutex> lock(g_mutex);

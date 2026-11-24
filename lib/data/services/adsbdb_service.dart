@@ -133,7 +133,7 @@ class AdsbdbService {
       final uri = Uri.https('api.adsbdb.com', '/v0/aircraft/$icaoHex', {
         if (cs != null && cs.isNotEmpty) 'callsign': cs,
       });
-      final r = await http.get(uri, headers: {'User-Agent': 'home_radio/1.0'}).timeout(const Duration(seconds: 10));
+      final r = await http.get(uri, headers: {'User-Agent': 'home_system/1.0'}).timeout(const Duration(seconds: 10));
       // 404 with "unknown aircraft": the callsign alone may still be known.
       if (r.statusCode == 404 && cs != null && cs.isNotEmpty) return _routeOnly(cs);
       if (r.statusCode != 200) return null;
@@ -149,7 +149,7 @@ class AdsbdbService {
 
   static Future<FlightInfo?> _routeOnly(String callsign) async {
     final r = await http
-        .get(Uri.https('api.adsbdb.com', '/v0/callsign/$callsign'), headers: {'User-Agent': 'home_radio/1.0'})
+        .get(Uri.https('api.adsbdb.com', '/v0/callsign/$callsign'), headers: {'User-Agent': 'home_system/1.0'})
         .timeout(const Duration(seconds: 10));
     if (r.statusCode != 200) return null;
     final response = (jsonDecode(r.body) as Map<String, dynamic>)['response'];

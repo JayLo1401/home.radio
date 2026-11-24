@@ -51,7 +51,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
     _start();
   }
 
-  /// Home Radio is always the base (it owns playback); the launcher opens
+  /// Radio is always the base (it owns playback); the launcher opens
   /// over it when that's the start setting, or the Home key started the app.
   Future<void> _start() async {
     final started = DateTime.now();
@@ -65,7 +65,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
     nav.pushReplacement(MaterialPageRoute(builder: (_) => const HomeScreen()));
     if (start == StartScreen.radio) return;
     showLauncher(ref);
-    // Home TV on top of the launcher - Back leads there.
+    // TV on top of the launcher - Back leads there.
     if (start == StartScreen.tv) nav.push(MaterialPageRoute(builder: (_) => const TvScreen()));
   }
 
@@ -77,7 +77,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
 
   @override
   Widget build(BuildContext context) {
-    // Back during the start mustn't end Home Media (it's the home screen).
+    // Back during the start mustn't end Home System (it's the home screen).
     return PopScope(
       canPop: false,
       child: Scaffold(
@@ -91,16 +91,16 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(20),
-                child: Image.asset('assets/icon/home_media_logo.png', width: 140, height: 140),
+                child: Image.asset('assets/icon/home_system_logo.png', width: 140, height: 140),
               ),
               const SizedBox(height: 20),
               const Text(
-                'Home Media',
+                'Home System',
                 style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
               const Text(
-                'Powered by Jay',
+                'Powered by jaycloud.at',
                 style: TextStyle(color: Colors.green, fontSize: 15, fontWeight: FontWeight.w600),
               ),
             ],

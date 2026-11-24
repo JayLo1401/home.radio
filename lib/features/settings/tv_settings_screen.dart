@@ -4,10 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/popup_text_field.dart';
 import '../../data/services/enigma2_service.dart';
 import '../tv/tv_providers.dart';
+import 'receiver_search_dialog.dart';
 
-/// Home TV's receiver: an Enigma2 box with OpenWebif (GigaBlue, VU+,
+/// TV's receiver: an Enigma2 box with OpenWebif (GigaBlue, VU+,
 /// Dreambox, ...) in the home network - address, ports, login, and which
-/// channel list (bouquet) Home TV shows.
+/// channel list (bouquet) TV shows.
 class TvSettingsScreen extends ConsumerStatefulWidget {
   const TvSettingsScreen({super.key});
 
@@ -86,6 +87,16 @@ class _TvSettingsScreenState extends ConsumerState<TvSettingsScreen> {
     }
   }
 
+  /// Finds the receiver in the network, takes its address and tests it.
+  Future<void> _search() async {
+    final found = await showReceiverSearch(context);
+    if (found == null || !mounted) return;
+    _host.text = found.host;
+    _webPort.text = '${found.port}';
+    setState(() => _https = false);
+    await _test();
+  }
+
   Future<void> _save() async {
     await ref.read(enigma2ConfigProvider.notifier).set(_config);
     final bouquet = _bouquet;
@@ -98,7 +109,7 @@ class _TvSettingsScreenState extends ConsumerState<TvSettingsScreen> {
   Widget build(BuildContext context) {
     const help = TextStyle(color: Colors.white54, fontSize: 13);
     return Scaffold(
-      appBar: AppBar(title: const Text('Home TV: Receiver')),
+      appBar: AppBar(title: const Text('TV: Receiver')),
       body: FocusTraversalGroup(
         child: ListView(
           padding: const EdgeInsets.all(16),
@@ -110,12 +121,24 @@ class _TvSettingsScreenState extends ConsumerState<TvSettingsScreen> {
               style: help,
             ),
             const SizedBox(height: 16),
-            PopupTextField(
-              controller: _host,
-              label: 'Adresse des Receivers (IP oder Name)',
-              hint: '192.168.1.50',
-              keyboardType: TextInputType.url,
-              autofocus: _initial.host.isEmpty,
+            Row(
+              children: [
+                Expanded(
+                  child: PopupTextField(
+                    controller: _host,
+                    label: 'Adresse des Receivers (IP oder Name)',
+                    hint: '192.168.1.50',
+                    keyboardType: TextInputType.url,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                OutlinedButton.icon(
+                  autofocus: _initial.host.isEmpty,
+                  onPressed: _search,
+                  icon: const Icon(Icons.search),
+                  label: const Text('Receiver suchen'),
+                ),
+              ],
             ),
             const SizedBox(height: 12),
             Row(
@@ -169,7 +192,7 @@ class _TvSettingsScreenState extends ConsumerState<TvSettingsScreen> {
             ),
             if (_bouquets.isNotEmpty) ...[
               const SizedBox(height: 20),
-              Text('Senderliste für Home TV', style: Theme.of(context).textTheme.titleMedium),
+              Text('Senderliste für TV', style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 6),
               Wrap(
                 spacing: 8,
@@ -184,7 +207,7 @@ class _TvSettingsScreenState extends ConsumerState<TvSettingsScreen> {
                 ],
               ),
               const SizedBox(height: 6),
-              const Text('In Home TV wechseln ← / → in der Senderliste zwischen den Listen.', style: help),
+              const Text('Im TV wechseln ← / → in der Senderliste zwischen den Listen.', style: help),
             ],
             const SizedBox(height: 24),
             Align(

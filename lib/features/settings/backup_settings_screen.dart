@@ -8,7 +8,7 @@ import '../../core/providers.dart';
 import '../../core/theme.dart';
 import '../../data/services/backup_service.dart';
 
-/// Create a backup into Download/HomeRadio or restore one (see
+/// Create a backup into Download/HomeSystem or restore one (see
 /// BackupService). The backup list is reloaded whenever the app comes back
 /// to the foreground, so it picks up "All files access" right after the user
 /// granted it in the system settings.
@@ -167,7 +167,7 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> wit
           children: [
             Text(
               'Backups enthalten Favoriten, DAB+ Senderliste und alle Einstellungen (inkl. Zugangsdaten). '
-              'Sie werden im Ordner „${Platform.isAndroid ? 'Download' : 'Dokumente'}/HomeRadio“ gespeichert '
+              'Sie werden im Ordner „${Platform.isAndroid ? 'Download' : 'Dokumente'}/HomeSystem“ gespeichert '
               'und bleiben auch erhalten, wenn die App deinstalliert wird.',
               style: hintStyle,
             ),

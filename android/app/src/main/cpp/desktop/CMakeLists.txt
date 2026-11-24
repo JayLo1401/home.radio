@@ -1,4 +1,4 @@
-# hrdab for the desktop: home_radio's own receiver (../hrdab, the same
+# hrdab for the desktop: home_system's own receiver (../hrdab, the same
 # sources as the Android build minus the JNI glue and usbfs) as
 # hrdab.dll / libhrdab.so with a plain-C API for dart:ffi (hrdab_desktop.h),
 # plus what Android's framework provides there:

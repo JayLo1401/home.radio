@@ -46,7 +46,7 @@ class _TvEpgScreenState extends ConsumerState<TvEpgScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Home Radio's top bar.
+            // Radio's top bar.
             Container(
               color: Colors.black.withValues(alpha: 0.7),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

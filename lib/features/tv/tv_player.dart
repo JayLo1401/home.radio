@@ -88,7 +88,7 @@ class TvPlayerInfo {
   }
 }
 
-/// Home TV's player: the receiver's stream as it is (no transcoding), its
+/// TV's player: the receiver's stream as it is (no transcoding), its
 /// sound tracks and what the picture is. On Android ExoPlayer (video_player),
 /// on the PC libmpv (media_kit) - with deinterlacing for 1080i.
 abstract class TvPlayer {
@@ -116,7 +116,7 @@ class _MpvTvPlayer implements TvPlayer {
 
   final Uri _uri;
   final Map<String, String> _headers;
-  final _player = mk.Player(configuration: const mk.PlayerConfiguration(title: 'Home TV'));
+  final _player = mk.Player(configuration: const mk.PlayerConfiguration(title: 'TV'));
   late final _video = mkv.VideoController(_player);
   final _info = ValueNotifier(const TvPlayerInfo());
   final _subscriptions = <StreamSubscription<Object?>>[];
@@ -252,7 +252,15 @@ class _MpvTvPlayer implements TvPlayer {
 /// Android: ExoPlayer (video_player) - its sound tracks, the picture size.
 class _ExoTvPlayer implements TvPlayer {
   _ExoTvPlayer(Uri uri, Map<String, String> headers)
-      : _controller = VideoPlayerController.networkUrl(uri, httpHeaders: headers);
+      : _controller = VideoPlayerController.networkUrl(
+          uri,
+          httpHeaders: headers,
+          // ExoPlayer straight into a SurfaceView. The default texture
+          // (ImageReader) froze the picture on the Xiaomi box (Amlogic) when
+          // the channel list or the guide opened: Flutter stopped taking its
+          // frames, the decoder ran out of buffers - the sound played on.
+          viewType: VideoViewType.platformView,
+        );
 
   final VideoPlayerController _controller;
   final _info = ValueNotifier(const TvPlayerInfo());

@@ -1,5 +1,5 @@
 // Plain-C API of hrdab.dll / libhrdab.so, the desktop (Windows/Linux) build
-// of home_radio's own receiver. Dart binds it with dart:ffi
+// of home_system's own receiver. Dart binds it with dart:ffi
 // (lib/data/services/desktop/hrdab_ffi.dart).
 //
 // One process-wide controller, the desktop port of DabRtlSdrPlugin.kt. All
@@ -42,7 +42,7 @@ HRDAB_API void hrdab_init(hrdab_event_callback callback, const char* dataDir);
 // callback. hrdab_init may be called again afterwards.
 HRDAB_API void hrdab_shutdown(void);
 
-// A method of the "home_radio/dab_rtlsdr" channel ("setServer", "scanBand3",
+// A method of the "home_system/dab_rtlsdr" channel ("setServer", "scanBand3",
 // "fmPlay", "nbStart", ...) with its arguments as a JSON object; the result
 // arrives as a "__reply" event with the same id.
 HRDAB_API void hrdab_call(int64_t id, const char* method, const char* argsJson);

@@ -12,7 +12,7 @@ import 'tv_epg_screen.dart';
 import 'tv_providers.dart';
 import 'tv_widgets.dart';
 
-/// Home TV's programme guide as on a TV set: time across, the channels of
+/// TV's programme guide as on a TV set: time across, the channels of
 /// the list down - around the one on air -, a box per programme.
 ///
 /// Remote: left/right the previous/next programme, up/down the channel
@@ -356,7 +356,7 @@ class _TopBar extends ConsumerWidget {
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
-              child: Image.asset('assets/icon/home_tv_logo.png', width: 36, height: 36),
+              child: Image.asset('assets/icon/tv_logo.png', width: 36, height: 36),
             ),
             const SizedBox(width: 10),
             const Text('Programmführer', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),

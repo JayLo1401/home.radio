@@ -30,7 +30,7 @@ class PlaceSearchService {
       'limit': '8',
       'accept-language': 'de',
     });
-    final r = await http.get(uri, headers: {'User-Agent': 'HomeRadio/1.0 (github.com/JayLo1401/home.radio)'});
+    final r = await http.get(uri, headers: {'User-Agent': 'HomeSystem/1.0 (github.com/JayLo1401/home.system)'});
     if (r.statusCode != 200) throw Exception('Ortssuche: HTTP ${r.statusCode}');
     final list = jsonDecode(utf8.decode(r.bodyBytes)) as List;
     final results = <PlaceResult>[];

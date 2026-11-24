@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:home_radio/features/home/radar_panel.dart';
+import 'package:home_system/features/home/radar_panel.dart';
 
 void main() {
   test('fills in all radar URL placeholders', () {

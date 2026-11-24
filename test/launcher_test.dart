@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:home_radio/data/models/launcher_tile.dart';
-import 'package:home_radio/data/services/launcher_background_service.dart';
+import 'package:home_system/data/models/launcher_tile.dart';
+import 'package:home_system/data/services/launcher_background_service.dart';
 
 void main() {
   group('extractImageUrls', () {
@@ -78,7 +78,7 @@ void main() {
       expect(decoded[0].displayLabel, 'Netflix');
     });
 
-    test('Home Radio is always there, duplicates and junk dropped', () {
+    test('Radio is always there, duplicates and junk dropped', () {
       final decoded = decodeLauncherTiles(
         '[{"type":"app","package":"a.b","label":"A"},{"type":"app","package":"a.b"},{"type":"x"},{"type":"app"}]',
       );

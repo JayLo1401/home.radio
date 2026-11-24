@@ -12,7 +12,7 @@ typedef _EventCallbackNative = Void Function(Pointer<Utf8> json);
 
 /// dart:ffi binding of hrdab.dll / libhrdab.so - the Windows/Linux build of
 /// the app's own receiver (android/app/src/main/cpp/desktop, see
-/// hrdab_desktop.h). It stands in for the "home_radio/dab_rtlsdr" method and
+/// hrdab_desktop.h). It stands in for the "home_system/dab_rtlsdr" method and
 /// event channels of DabRtlSdrPlugin.kt: [invoke] takes the same method
 /// names and arguments, [events] carries the same event maps.
 ///
@@ -137,7 +137,7 @@ class HrdabDesktop {
     _events.add(event);
   }
 
-  /// A "home_radio/dab_rtlsdr" method call, like MethodChannel.invokeMethod.
+  /// A "home_system/dab_rtlsdr" method call, like MethodChannel.invokeMethod.
   /// Without the native library every call yields null (bool results then
   /// read as false through the service's `?? false`).
   Future<T?> invoke<T>(String method, [Map<String, dynamic>? arguments]) async {

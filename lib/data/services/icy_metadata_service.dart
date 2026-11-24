@@ -115,7 +115,7 @@ class IcyMetadataService {
   Future<HttpClientResponse> _get(HttpClient client, Uri uri, {bool icy = false}) async {
     final request = await client.getUrl(uri).timeout(_timeout);
     if (icy) request.headers.set('Icy-MetaData', '1');
-    request.headers.set(HttpHeaders.userAgentHeader, 'home_radio/1.0');
+    request.headers.set(HttpHeaders.userAgentHeader, 'home_system/1.0');
     return request.close().timeout(_timeout);
   }
 

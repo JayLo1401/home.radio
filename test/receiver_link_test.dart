@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:home_radio/features/home/connection_chain.dart';
+import 'package:home_system/features/home/connection_chain.dart';
 
 void main() {
   for (final width in [500.0, 1100.0]) {

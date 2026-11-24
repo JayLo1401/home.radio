@@ -342,16 +342,16 @@ class _HomeButtonSettingsScreenState extends ConsumerState<HomeButtonSettingsScr
                 padding: const EdgeInsets.all(16),
                 children: [
                   Text(
-                    'Mit der Home-Taste der Fernbedienung öffnet sich der Launcher von Home Media.',
+                    'Mit der Home-Taste der Fernbedienung öffnet sich der Launcher von Home System.',
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   const SizedBox(height: 16),
                   if (!_fireTv) ...[
-                    state(_defaultHome, 'Home Media ist der Standard-Launcher.', 'Home Media ist noch nicht der Standard-Launcher.'),
+                    state(_defaultHome, 'Home System ist der Standard-Launcher.', 'Home System ist noch nicht der Standard-Launcher.'),
                     const SizedBox(height: 8),
                     const Text(
-                      'Auf Android-TV-Boxen Home Media als Startbildschirm („Home-App“) wählen. Fragt das Gerät '
-                      'beim Drücken der Home-Taste nach, „Home Media“ und „Immer“ wählen.',
+                      'Auf Android-TV-Boxen Home System als Startbildschirm („Home-App“) wählen. Fragt das Gerät '
+                      'beim Drücken der Home-Taste nach, „Home System“ und „Immer“ wählen.',
                       style: help,
                     ),
                     const SizedBox(height: 8),
@@ -375,16 +375,16 @@ class _HomeButtonSettingsScreenState extends ConsumerState<HomeButtonSettingsScr
                   ],
                   state(
                     _status.serviceEnabled,
-                    'Dienst „Home Media: Home-Taste“ ist eingeschaltet.',
-                    'Dienst „Home Media: Home-Taste“ ist ausgeschaltet.',
+                    'Dienst „Home System: Home-Taste“ ist eingeschaltet.',
+                    'Dienst „Home System: Home-Taste“ ist ausgeschaltet.',
                   ),
                   const SizedBox(height: 8),
                   Text(
                     _fireTv
                         ? 'Der Fire TV zeigt mit der Home-Taste immer den Amazon-Startbildschirm. Der Dienst (eine '
-                            'Bedienungshilfe) holt Home Media dann sofort nach vorne. Er sieht nur, welche App im '
+                            'Bedienungshilfe) holt Home System dann sofort nach vorne. Er sieht nur, welche App im '
                             'Vordergrund ist - keine Inhalte, keine Tasten und keine Eingaben.'
-                        : 'Der Dienst (eine Bedienungshilfe) holt Home Media nach vorne, sobald der Startbildschirm '
+                        : 'Der Dienst (eine Bedienungshilfe) holt Home System nach vorne, sobald der Startbildschirm '
                             'des Geräts erscheint. Er sieht nur, welche App im Vordergrund ist.',
                     style: help,
                   ),
@@ -406,23 +406,23 @@ class _HomeButtonSettingsScreenState extends ConsumerState<HomeButtonSettingsScr
                           ? 'Android hat den Dienst gesperrt („eingeschränkte Einstellungen“ - ab Android 13 bei '
                               'Apps, die nicht aus einem App-Store kommen). Einmalig vom Computer aus per adb erlauben, '
                               'dann noch einmal „Dienst einschalten“:'
-                          : 'Dort „Home Media: Home-Taste“ einschalten. Zeigt das Gerät den Dienst nicht an oder ist er '
+                          : 'Dort „Home System: Home-Taste“ einschalten. Zeigt das Gerät den Dienst nicht an oder ist er '
                               'ausgegraut, einmalig vom Computer aus per adb freischalten - danach schaltet ihn dieser '
                               'Knopf selbst ein:',
                       style: help,
                     ),
                     const SizedBox(height: 6),
                     const SelectableText(
-                      'adb shell pm grant at.jaycloud.home.radio android.permission.WRITE_SECURE_SETTINGS\n'
-                      'adb shell appops set at.jaycloud.home.radio ACCESS_RESTRICTED_SETTINGS allow',
+                      'adb shell pm grant at.jaycloud.home.system android.permission.WRITE_SECURE_SETTINGS\n'
+                      'adb shell appops set at.jaycloud.home.system ACCESS_RESTRICTED_SETTINGS allow',
                       style: mono,
                     ),
                   ],
                   if (_status.serviceEnabled)
                     SwitchListTile(
                       autofocus: _fireTv,
-                      title: const Text('Home-Taste öffnet Home Media'),
-                      subtitle: const Text('Aus: der Startbildschirm des Geräts bleibt, Home Media öffnet man wie jede App.'),
+                      title: const Text('Home-Taste öffnet Home System'),
+                      subtitle: const Text('Aus: der Startbildschirm des Geräts bleibt, Home System öffnet man wie jede App.'),
                       value: _status.redirect,
                       onChanged: (v) async {
                         await _service.setHomeRedirect(v);
@@ -439,6 +439,6 @@ class _HomeButtonSettingsScreenState extends ConsumerState<HomeButtonSettingsScr
 /// Labels for the settings list.
 String startScreenLabel(StartScreen s) => switch (s) {
       StartScreen.launcher => 'Launcher',
-      StartScreen.radio => 'Home Radio',
-      StartScreen.tv => 'Home TV',
+      StartScreen.radio => 'Radio',
+      StartScreen.tv => 'TV',
     };

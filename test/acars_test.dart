@@ -1,7 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:home_radio/data/models/acars.dart';
+import 'package:home_system/data/models/acars.dart';
 
 Uint8List frame(String s) => Uint8List.fromList([...s.codeUnits, 0x12, 0x34]); // + BCS
 

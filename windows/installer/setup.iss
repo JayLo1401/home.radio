@@ -1,4 +1,4 @@
-; Inno Setup script for Home Radio (Windows). Built by
+; Inno Setup script for Home System (Windows). Built by
 ; windows/scripts/build-installer.ps1, in CI by .github/workflows/release.yml.
 ;
 ; The in-app updater (lib/data/services/update_service.dart) runs the setup
@@ -12,10 +12,10 @@
 #ifndef AppVersion
   #define AppVersion "0.0.0"
 #endif
-#define AppName "Home Radio"
+#define AppName "Home System"
 #define AppPublisher "jaycloud"
-#define AppExeName "home_radio.exe"
-#define AppId "{{48294707-83FF-4493-B528-3BF21CBCDED4}"
+#define AppExeName "home_system.exe"
+#define AppId "{{033921F1-4F1F-4887-9D5D-ED9ADB442146}"
 
 [Setup]
 AppId={#AppId}
@@ -23,7 +23,7 @@ AppName={#AppName}
 AppVersion={#AppVersion}
 AppVerName={#AppName} {#AppVersion}
 AppPublisher={#AppPublisher}
-DefaultDirName={autopf}\Home Radio
+DefaultDirName={autopf}\Home System
 DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
 OutputDir=.\output
