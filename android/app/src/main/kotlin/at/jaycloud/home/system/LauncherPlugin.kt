@@ -82,6 +82,12 @@ class LauncherPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                 result.success(start(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", pkg, null))))
             }
             "isFireTv" -> result.success(isFireTv(appContext))
+            // The device's own name from its settings ("Jürgens FireTVStick") -
+            // the admin page's host name when the network has none.
+            "deviceName" -> result.success(
+                Settings.Global.getString(appContext.contentResolver, Settings.Global.DEVICE_NAME)
+                    ?.takeIf { it.isNotBlank() } ?: android.os.Build.MODEL,
+            )
             "isDefaultHome" -> result.success(isDefaultHome())
             "openHomeSettings" -> result.success(
                 openDeviceSettings(Intent(Settings.ACTION_HOME_SETTINGS)) ||

@@ -573,10 +573,40 @@ class SettingsRepository {
   Future<void> setNbLast(String band, {required int freqHz, required String mode, required double squelchDb}) =>
       _db.setSetting('$_keyNbPrefix$band', '$freqHz|$mode|$squelchDb');
 
-  // --- Home System launcher ---
+  // --- Device and setup ---
+
+  /// The device's own name ("Terrassen-Media", "Wohnzimmer-TV") - shown on
+  /// the admin page (`http://<ip>:1401/`) and in the backup's file name.
+  Future<String> getDeviceName() async => (await _db.getSetting('device_name'))?.trim() ?? '';
+  Future<void> setDeviceName(String name) => _db.setSetting('device_name', name.trim());
+
+  /// The setup wizard ran (or a backup was restored). Installations from
+  /// before the wizard count as set up as soon as they have any settings -
+  /// see [isConfigured].
+  Future<void> setSetupDone() => _db.setSetting('setup_done', 'true');
+
+  /// Whether the app is set up - false only on a fresh installation (no
+  /// settings and no favorites yet), which then gets the setup wizard.
+  Future<bool> isConfigured() async {
+    if (await _db.getSetting('setup_done') == 'true') return true;
+    final anySetting = await (_db.select(_db.settings)..limit(1)).getSingleOrNull();
+    final anyFavorite = await (_db.select(_db.favorites)..limit(1)).getSingleOrNull();
+    if (anySetting == null && anyFavorite == null) return false;
+    await setSetupDone();
+    return true;
+  }
+
+  /// Home System's parts Radio and TV can be switched off (System
+  /// settings) - their tiles, start options and settings are gone then.
+  Future<bool> getRadioEnabled() async => await _db.getSetting('part_radio_enabled') != 'false';
+  Future<void> setRadioEnabled(bool value) => _db.setSetting('part_radio_enabled', '$value');
+  Future<bool> getTvEnabled() async => await _db.getSetting('part_tv_enabled') != 'false';
+  Future<void> setTvEnabled(bool value) => _db.setSetting('part_tv_enabled', '$value');
+
+  // --- Home (the launcher) ---
 
   /// What shows on start (see [StartScreen]) - Radio by default, as
-  /// before the launcher existed.
+  /// before the launcher existed (new setups get Home, see the wizard).
   Future<StartScreen> getStartScreen() async {
     final v = await _db.getSetting('start_screen');
     return StartScreen.values.firstWhere((s) => s.name == v, orElse: () => StartScreen.radio);

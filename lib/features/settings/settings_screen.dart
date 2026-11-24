@@ -6,7 +6,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/display_mode.dart';
 import '../../core/providers.dart';
+import '../../core/system_providers.dart';
 import '../../core/theme.dart';
+import '../../data/services/admin_server.dart';
+import '../setup/setup_wizard_screen.dart' show deviceNameSuggestions;
 import '../../data/models/favorite_channel.dart';
 import '../../data/models/launcher_tile.dart';
 import '../../data/repositories/settings_repository.dart';
@@ -14,7 +17,7 @@ import '../../data/services/desktop/hrdab_desktop.dart';
 import '../../data/services/launcher_service.dart';
 import '../launcher/launcher_providers.dart';
 import '../rtlsdr/rtl_sdr_test_screen.dart';
-import 'backup_settings_screen.dart';
+import 'restore_backup_screen.dart';
 import '../tv/tv_providers.dart';
 import 'launcher_settings_screens.dart';
 import 'remote_keys_settings_screen.dart';
@@ -24,11 +27,13 @@ import 'location_settings_screen.dart';
 import 'radar_source_settings_screen.dart';
 
 /// The settings' areas - one page each, reached from the overview.
-enum SettingsSection { launcher, radio, tv, general }
+/// [system]: the device itself - which parts are on, its name, start, Home
+/// (the launcher), display, backup, updates.
+enum SettingsSection { system, radio, tv }
 
-/// Settings: without [section] the overview of the areas (Launcher, Home
-/// Radio, TV, Allgemein), with it that area's page - Radio's gear
-/// opens its own area right away.
+/// Settings: without [section] the overview of the areas (System, Radio,
+/// TV), with it that area's page - Radio's gear opens its own area right
+/// away.
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key, this.section});
 
@@ -60,6 +65,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _fullscreen = false;
   int _monitor = 1;
   int _monitors = 1;
+  String? _adminUrl;
   bool _loaded = false;
 
   @override
@@ -87,9 +93,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final monitor = await repo.getFullscreenMonitor();
     final monitors = await monitorCount();
     final tvStartChannel = await repo.getTvStartChannel();
+    final adminUrls = await AdminServer.urls();
+    final adminUrl = adminUrls.isEmpty ? null : adminUrls.join(' oder ');
     final scale = ref.read(uiScaleProvider);
     if (!mounted) return;
     setState(() {
+      _adminUrl = adminUrl;
       _mode = mode;
       _fixedProgramNumber = fixed;
       _showClockDate = showClockDate;
@@ -110,6 +119,70 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       _tvStartChannel = tvStartChannel;
       _loaded = true;
     });
+  }
+
+  /// Switches Radio or TV on/off. Off: the radio stops, and a start into
+  /// that part becomes a start into Home.
+  Future<void> _setPart({bool? radio, bool? tv}) async {
+    final parts = ref.read(systemPartsProvider.notifier);
+    final launcher = ref.read(launcherSettingsProvider);
+    final launcherNotifier = ref.read(launcherSettingsProvider.notifier);
+    if (radio != null) {
+      await parts.setRadio(radio);
+      if (!radio) {
+        ref.read(radioCommandProvider.notifier).send(RadioCommand.stop);
+        if (launcher.startScreen == StartScreen.radio) await launcherNotifier.setStartScreen(StartScreen.launcher);
+      }
+    }
+    if (tv != null) {
+      await parts.setTv(tv);
+      if (!tv && launcher.startScreen == StartScreen.tv) await launcherNotifier.setStartScreen(StartScreen.launcher);
+    }
+  }
+
+  Future<void> _editDeviceName() async {
+    final controller = TextEditingController(text: ref.read(deviceNameProvider));
+    final name = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Gerätename'),
+        content: SizedBox(
+          width: 520,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Eindeutig im Heimnetz - erscheint auf der Verwaltungsseite und im Namen der Backups.',
+                  style: TextStyle(color: Colors.white60)),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final (i, s) in deviceNameSuggestions.indexed)
+                    // The remote starts on the first suggestion.
+                    OutlinedButton(autofocus: i == 0, onPressed: () => Navigator.of(context).pop(s), child: Text(s)),
+                ],
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: controller,
+                textInputAction: TextInputAction.done,
+                decoration: const InputDecoration(labelText: 'Eigener Name', border: OutlineInputBorder()),
+                onSubmitted: (v) => Navigator.of(context).pop(v),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Abbrechen')),
+          FilledButton(onPressed: () => Navigator.of(context).pop(controller.text), child: const Text('Übernehmen')),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (name == null || name.trim().isEmpty) return;
+    await ref.read(deviceNameProvider.notifier).set(name);
   }
 
   Future<void> _setFullscreen({bool? fullscreen, int? monitor}) async {
@@ -181,6 +254,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         : (radarSettings.radarIsWebPage ? 'Webseite' : 'Bild');
     final repo = ref.read(settingsRepositoryProvider);
     final launcher = ref.watch(launcherSettingsProvider);
+    final parts = ref.watch(systemPartsProvider);
+    final deviceName = ref.watch(deviceNameProvider);
 
     if (!_loaded) {
       return Scaffold(
@@ -290,10 +365,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(switch (section) {
-          SettingsSection.launcher => 'Einstellungen: Launcher',
+          SettingsSection.system => 'Einstellungen: System',
           SettingsSection.radio => 'Einstellungen: Radio',
           SettingsSection.tv => 'Einstellungen: TV',
-          SettingsSection.general => 'Einstellungen: Allgemein',
         }),
       ),
       body: FocusTraversalGroup(
@@ -338,33 +412,72 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               }),
             ],
             ],
-            if (section == SettingsSection.launcher) ...[
+            if (section == SettingsSection.system) ...[
+              // First: which parts there are decides about everything else.
+              Text('Teile von Home System', style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 4),
+              const Text(
+                'Ausgeschaltete Teile haben keine Kachel unter Home, und ihre Einstellungen sind ausgegraut.',
+                style: TextStyle(color: Colors.white60),
+              ),
+              const SizedBox(height: 8),
+              tileToggle('Radio', parts.radio, (v) => _setPart(radio: v)),
+              tileToggle('TV', parts.tv, (v) => _setPart(tv: v)),
+              const Divider(height: 32),
+              Text('Gerät', style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 8),
+              FocusTraversalOrder(
+                order: NumericFocusOrder(nextOrder()),
+                child: _TvNavTile(
+                  label: 'Gerätename',
+                  value: deviceName.isEmpty ? 'nicht vergeben' : deviceName,
+                  configured: deviceName.isNotEmpty,
+                  onTap: _editDeviceName,
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
+                child: Text(
+                  _adminUrl == null
+                      ? 'Verwaltungsseite (Backups): ohne Netzwerkverbindung nicht erreichbar'
+                      : 'Verwaltungsseite (Backups) im Browser: $_adminUrl',
+                  style: const TextStyle(color: Colors.white60),
+                ),
+              ),
+              const Divider(height: 32),
               Text('Beim Start der App', style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 8),
               FocusTraversalOrder(
                 order: NumericFocusOrder(nextOrder()),
                 child: _TvChoiceTile(
-                  label: 'Launcher anzeigen',
-                  selected: launcher.startScreen == StartScreen.launcher,
+                  label: 'Home anzeigen',
+                  selected: launcher.startScreen == StartScreen.launcher ||
+                      (launcher.startScreen == StartScreen.radio && !parts.radio) ||
+                      (launcher.startScreen == StartScreen.tv && !parts.tv),
                   onTap: () => ref.read(launcherSettingsProvider.notifier).setStartScreen(StartScreen.launcher),
                 ),
               ),
-              FocusTraversalOrder(
-                order: NumericFocusOrder(nextOrder()),
-                child: _TvChoiceTile(
-                  label: 'Radio mit Sender starten (Radio → Autostart)',
-                  selected: launcher.startScreen == StartScreen.radio,
-                  onTap: () => ref.read(launcherSettingsProvider.notifier).setStartScreen(StartScreen.radio),
+              if (parts.radio)
+                FocusTraversalOrder(
+                  order: NumericFocusOrder(nextOrder()),
+                  child: _TvChoiceTile(
+                    label: 'Radio mit Sender starten (Radio → Autostart)',
+                    selected: launcher.startScreen == StartScreen.radio,
+                    onTap: () => ref.read(launcherSettingsProvider.notifier).setStartScreen(StartScreen.radio),
+                  ),
                 ),
-              ),
-              FocusTraversalOrder(
-                order: NumericFocusOrder(nextOrder()),
-                child: _TvChoiceTile(
-                  label: 'TV mit Sender starten (TV → Sender beim Start)',
-                  selected: launcher.startScreen == StartScreen.tv,
-                  onTap: () => ref.read(launcherSettingsProvider.notifier).setStartScreen(StartScreen.tv),
+              if (parts.tv)
+                FocusTraversalOrder(
+                  order: NumericFocusOrder(nextOrder()),
+                  child: _TvChoiceTile(
+                    label: 'TV mit Sender starten (TV → Sender beim Start)',
+                    selected: launcher.startScreen == StartScreen.tv,
+                    onTap: () => ref.read(launcherSettingsProvider.notifier).setStartScreen(StartScreen.tv),
+                  ),
                 ),
-              ),
+              const Divider(height: 32),
+              Text('Home', style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 8),
               FocusTraversalOrder(
                 order: NumericFocusOrder(nextOrder()),
                 child: _TvNavTile(
@@ -620,7 +733,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               await ref.read(showClockDateProvider.notifier).set(v);
             }),
             ],
-            if (section == SettingsSection.general) ...[
+            if (section == SettingsSection.system) ...[
+            const Divider(height: 32),
             Text('Anzeige', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 8),
             tileToggle('Vollbild', _fullscreen, (v) => _setFullscreen(fullscreen: v)),
@@ -741,7 +855,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             FocusTraversalOrder(
               order: NumericFocusOrder(nextOrder()),
               child: _TvNavTile(
-                label: 'Weitere Einstellungen (Launcher, TV, Allgemein)',
+                label: 'Weitere Einstellungen (System, TV)',
                 icon: Icons.settings_outlined,
                 onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SettingsScreen())),
               ),
@@ -750,17 +864,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             // Favorites are renamed/reordered/removed right in the home
             // screen's sidebar ("Bearbeiten"), the DAB+ station order is set
             // on the DAB+ stations screen - neither lives here anymore.
-            if (section == SettingsSection.general) ...[
+            if (section == SettingsSection.system) ...[
             const Divider(height: 32),
             Text('Weiteres', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 8),
             FocusTraversalOrder(
               order: NumericFocusOrder(nextOrder()),
               child: _TvNavTile(
-                label: 'Backup & Wiederherstellung',
-                icon: Icons.backup_outlined,
+                label: 'Backup erstellen',
+                icon: Icons.save_outlined,
+                onTap: () => createBackupWithFeedback(context, ref),
+              ),
+            ),
+            FocusTraversalOrder(
+              order: NumericFocusOrder(nextOrder()),
+              child: _TvNavTile(
+                label: 'Backup wiederherstellen',
+                value: 'auch über die Verwaltungsseite',
+                icon: Icons.restore,
                 onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const BackupSettingsScreen()),
+                  MaterialPageRoute(builder: (_) => const RestoreBackupScreen()),
                 ),
               ),
             ),
@@ -833,13 +956,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 }
 
 /// The settings' first page: one entry per area, each with its logo.
-class _SettingsOverview extends StatelessWidget {
+class _SettingsOverview extends ConsumerWidget {
   const _SettingsOverview();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final parts = ref.watch(systemPartsProvider);
     void open(SettingsSection s) =>
         Navigator.of(context).push(MaterialPageRoute(builder: (_) => SettingsScreen(section: s)));
+    // A switched-off part stays in the list (greyed) - OK says where it's
+    // switched on.
+    void off(String part) => ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$part ist ausgeschaltet - unter System → Teile von Home System einschalten.')),
+        );
     return Scaffold(
       appBar: AppBar(title: const Text('Einstellungen')),
       body: ListView(
@@ -847,30 +976,26 @@ class _SettingsOverview extends StatelessWidget {
         children: [
           _AreaTile(
             logo: 'assets/icon/home_system_logo.png',
-            title: 'Launcher',
+            title: 'System',
             subtitle: LauncherService.supported
-                ? 'Start der App, Hintergrund, Icon-Paket, Home-Taste'
-                : 'Start der App, Hintergrund',
+                ? 'Radio & TV ein/aus, Gerätename, Start, Home, Home-Taste, Anzeige, Backup, Updates'
+                : 'Radio & TV ein/aus, Gerätename, Start, Home, Anzeige, Backup, Updates',
             autofocus: true,
-            onTap: () => open(SettingsSection.launcher),
+            onTap: () => open(SettingsSection.system),
           ),
           _AreaTile(
             logo: 'assets/icon/radio_logo.png',
             title: 'Radio',
             subtitle: 'Empfänger (DAB+, UKW, Funk), Autostart-Sender, Wetter, Radar, Sonne & Mond',
-            onTap: () => open(SettingsSection.radio),
+            enabled: parts.radio,
+            onTap: () => parts.radio ? open(SettingsSection.radio) : off('Radio'),
           ),
           _AreaTile(
             logo: 'assets/icon/tv_logo.png',
             title: 'TV',
             subtitle: 'Sat-Receiver (Enigma2, z. B. GigaBlue)',
-            onTap: () => open(SettingsSection.tv),
-          ),
-          _AreaTile(
-            icon: Icons.tune,
-            title: 'Allgemein',
-            subtitle: 'Größe der Oberfläche, Vollbild, Backup, Updates, Über, Programm beenden',
-            onTap: () => open(SettingsSection.general),
+            enabled: parts.tv,
+            onTap: () => parts.tv ? open(SettingsSection.tv) : off('TV'),
           ),
         ],
       ),
@@ -879,14 +1004,23 @@ class _SettingsOverview extends StatelessWidget {
 }
 
 class _AreaTile extends StatefulWidget {
-  const _AreaTile({this.logo, this.icon, required this.title, required this.subtitle, required this.onTap, this.autofocus = false});
+  const _AreaTile({
+    required this.logo,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+    this.autofocus = false,
+    this.enabled = true,
+  });
 
-  final String? logo;
-  final IconData? icon;
+  final String logo;
   final String title;
   final String subtitle;
   final VoidCallback onTap;
   final bool autofocus;
+
+  /// False: greyed out, "ausgeschaltet" instead of the subtitle.
+  final bool enabled;
 
   @override
   State<_AreaTile> createState() => _AreaTileState();
@@ -907,20 +1041,15 @@ class _AreaTileState extends State<_AreaTile> {
           focusColor: Colors.transparent,
           onFocusChange: (v) => setState(() => _focused = v),
           onTap: widget.onTap,
-          child: Padding(
+          child: Opacity(
+            opacity: widget.enabled ? 1 : 0.4,
+            child: Padding(
             padding: const EdgeInsets.all(14),
             child: Row(
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(14),
-                  child: widget.logo != null
-                      ? Image.asset(widget.logo!, width: 64, height: 64, filterQuality: FilterQuality.medium)
-                      : Container(
-                          width: 64,
-                          height: 64,
-                          color: const Color(0xFF1E2326),
-                          child: Icon(widget.icon, color: Colors.white, size: 34),
-                        ),
+                  child: Image.asset(widget.logo, width: 64, height: 64, filterQuality: FilterQuality.medium),
                 ),
                 const SizedBox(width: 18),
                 Expanded(
@@ -929,13 +1058,17 @@ class _AreaTileState extends State<_AreaTile> {
                     children: [
                       Text(widget.title, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 4),
-                      Text(widget.subtitle, style: const TextStyle(color: Colors.white60, fontSize: 15)),
+                      Text(
+                        widget.enabled ? widget.subtitle : 'Ausgeschaltet - unter System einschalten',
+                        style: const TextStyle(color: Colors.white60, fontSize: 15),
+                      ),
                     ],
                   ),
                 ),
                 const Icon(Icons.chevron_right, color: Colors.white38),
               ],
             ),
+          ),
           ),
         ),
       ),
@@ -1003,7 +1136,7 @@ class _AboutBlockState extends State<_AboutBlock> {
               '© OpenStreetMap-Mitwirkende, Daten unter der Open Database License (ODbL), über Nominatim.',
             ),
             line(
-              'Hintergrundfotos des Launchers',
+              'Hintergrundfotos von Home',
               'Bing-Bilder des Tages, © bei den jeweiligen Fotografen (nur wenn „Landschaftsfotos aus dem '
                   'Internet“ gewählt ist).',
             ),

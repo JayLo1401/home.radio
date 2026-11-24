@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 
 import '../../core/providers.dart';
+import '../../core/system_providers.dart';
 import '../../core/theme.dart';
 import '../../data/db/database.dart' show DabStation, FmStation;
 import '../../data/models/audio_quality.dart';
@@ -273,7 +274,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     ref.read(radioAudioHandlerProvider.future).then(
           (handler) => handler.bindControls(
             onPlay: () async {
-              if (!_receiverScreenOpen) await _resumeCurrentPlayback();
+              if (!_receiverScreenOpen && ref.read(systemPartsProvider).radio) await _resumeCurrentPlayback();
             },
             // A real stop, as the remote's Play/Pause key (see _togglePlayPause).
             onPause: () async {
@@ -529,6 +530,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       return;
     }
     final settings = ref.read(settingsRepositoryProvider);
+    // Radio switched off (Settings → System): nothing plays by itself.
+    if (!await settings.getRadioEnabled()) return;
     final mode = await settings.getAutostartMode();
 
     if (mode == AutostartMode.fixedStation) {

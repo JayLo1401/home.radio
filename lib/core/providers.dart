@@ -11,6 +11,7 @@ import '../data/repositories/dab_stations_repository.dart';
 import '../data/repositories/favorites_repository.dart';
 import '../data/repositories/fm_stations_repository.dart';
 import '../data/repositories/settings_repository.dart' show DabSortMode, ReceiverMode, SettingsRepository;
+import '../data/services/admin_server.dart';
 import '../data/services/audio_player_service.dart';
 import '../data/services/backup_service.dart';
 import '../data/services/dab_rtlsdr_service.dart';
@@ -19,6 +20,20 @@ import '../data/services/radio_browser_api_service.dart';
 import '../data/services/rtl_sdr_service.dart';
 import '../data/services/rtl_sdr_usb_service.dart';
 import '../data/services/update_service.dart';
+
+/// The admin page `http://<ip>:1401/` (see AdminServer) - started with the
+/// app, runs as long as it does.
+final adminServerProvider = Provider<AdminServer>((ref) {
+  final settings = ref.read(settingsRepositoryProvider);
+  final server = AdminServer(
+    backup: ref.read(backupServiceProvider),
+    deviceName: settings.getDeviceName,
+    version: ref.read(updateServiceProvider).currentVersion,
+  );
+  server.start();
+  ref.onDispose(server.stop);
+  return server;
+});
 
 final databaseProvider = Provider<AppDatabase>((ref) {
   final db = AppDatabase();

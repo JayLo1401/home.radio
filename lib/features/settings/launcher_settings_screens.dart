@@ -88,7 +88,7 @@ class _LauncherBackgroundSettingsScreenState extends ConsumerState<LauncherBackg
   Widget build(BuildContext context) {
     const help = TextStyle(color: Colors.white54, fontSize: 13);
     return Scaffold(
-      appBar: AppBar(title: const Text('Hintergrund des Launchers')),
+      appBar: AppBar(title: const Text('Hintergrund von Home')),
       body: FocusTraversalGroup(
         child: ListView(
           padding: const EdgeInsets.all(16),
@@ -342,7 +342,7 @@ class _HomeButtonSettingsScreenState extends ConsumerState<HomeButtonSettingsScr
                 padding: const EdgeInsets.all(16),
                 children: [
                   Text(
-                    'Mit der Home-Taste der Fernbedienung öffnet sich der Launcher von Home System.',
+                    'Mit der Home-Taste der Fernbedienung öffnet sich Home System mit Home (den Kacheln).',
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   const SizedBox(height: 16),
@@ -438,7 +438,7 @@ class _HomeButtonSettingsScreenState extends ConsumerState<HomeButtonSettingsScr
 
 /// Labels for the settings list.
 String startScreenLabel(StartScreen s) => switch (s) {
-      StartScreen.launcher => 'Launcher',
+      StartScreen.launcher => 'Home',
       StartScreen.radio => 'Radio',
       StartScreen.tv => 'TV',
     };

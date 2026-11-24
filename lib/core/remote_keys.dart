@@ -18,7 +18,7 @@ enum RemoteAction {
 
   /// The options: of a launcher tile or app, TV's menu (programme
   /// guide, sound track).
-  options('Optionen (Launcher-Kachel, TV)'),
+  options('Optionen (Kachel unter Home, TV)'),
 
   /// TV: choosing the sound track.
   audio('Tonspur (TV)');

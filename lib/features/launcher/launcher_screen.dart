@@ -8,6 +8,7 @@ import '../../core/ok_long_press.dart';
 import '../../core/popup_text_field.dart';
 import '../../core/providers.dart';
 import '../../core/remote_keys.dart';
+import '../../core/system_providers.dart';
 import '../../core/theme.dart';
 import '../../data/models/launcher_tile.dart';
 import '../../data/services/launcher_service.dart';
@@ -87,6 +88,7 @@ class _LauncherScreenState extends ConsumerState<LauncherScreen> {
   KeyEventResult _onKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
     final key = event.logicalKey;
+    if (!ref.read(systemPartsProvider).radio) return KeyEventResult.ignored;
     if (key == LogicalKeyboardKey.mediaPlayPause) {
       ref.read(radioCommandProvider.notifier).send(RadioCommand.togglePlayPause);
       return KeyEventResult.handled;
@@ -183,7 +185,13 @@ class _LauncherScreenState extends ConsumerState<LauncherScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final tiles = ref.watch(launcherTilesProvider);
+    // Switched-off parts (Settings → System) keep their place in the row,
+    // they're just not shown.
+    final parts = ref.watch(systemPartsProvider);
+    final tiles = [
+      for (final t in ref.watch(launcherTilesProvider))
+        if (!(t.isRadio && !parts.radio) && !(t.isTv && !parts.tv)) t,
+    ];
     return PopScope(
       canPop: false,
       child: Focus(

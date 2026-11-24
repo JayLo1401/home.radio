@@ -6,35 +6,70 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers.dart';
 import '../../core/theme.dart';
+import '../../data/services/admin_server.dart';
 import '../../data/services/backup_service.dart';
 
-/// Create a backup into Download/HomeSystem or restore one (see
-/// BackupService). The backup list is reloaded whenever the app comes back
-/// to the foreground, so it picks up "All files access" right after the user
-/// granted it in the system settings.
-class BackupSettingsScreen extends ConsumerStatefulWidget {
-  const BackupSettingsScreen({super.key});
-
-  @override
-  ConsumerState<BackupSettingsScreen> createState() => _BackupSettingsScreenState();
+/// Saves a backup into Download/HomeSystem (Documents/HomeSystem on the PC)
+/// and says where it went - Settings → System → "Backup erstellen".
+Future<void> createBackupWithFeedback(BuildContext context, WidgetRef ref) async {
+  final messenger = ScaffoldMessenger.of(context);
+  try {
+    final location = await ref.read(backupServiceProvider).createBackup();
+    final urls = await AdminServer.urls();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          'Backup gespeichert: $location${urls.isEmpty ? '' : '\nZum Herunterladen auch unter ${urls.join(' oder ')}'}',
+        ),
+      ),
+    );
+  } on PlatformException catch (e) {
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          e.code == 'PERMISSION_DENIED'
+              ? 'Ohne Speicher-Berechtigung kann kein Backup gespeichert werden.'
+              : 'Backup fehlgeschlagen: ${e.message}',
+        ),
+      ),
+    );
+  }
 }
 
-class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> with WidgetsBindingObserver {
+/// "Backup wiederherstellen": while this screen is open, the admin page
+/// (`http://<ip>:1401/`) accepts an uploaded backup; the backups on the
+/// device itself are listed below. Reached from Settings → System and from
+/// the setup wizard. The backup list is reloaded whenever the app comes back
+/// to the foreground, so it picks up "All files access" right after the user
+/// granted it in the system settings.
+class RestoreBackupScreen extends ConsumerStatefulWidget {
+  const RestoreBackupScreen({super.key});
+
+  @override
+  ConsumerState<RestoreBackupScreen> createState() => _RestoreBackupScreenState();
+}
+
+class _RestoreBackupScreenState extends ConsumerState<RestoreBackupScreen> with WidgetsBindingObserver {
   List<BackupFile> _backups = const [];
+  List<String> _urls = const [];
+  String? _hostname;
   bool _canRequestAllFilesAccess = false;
   bool _loading = true;
   bool _busy = false;
   String? _loadError;
+  late final AdminServer _server = ref.read(adminServerProvider);
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _server.restoreHandler = _restoreFromWeb;
     _reload();
   }
 
   @override
   void dispose() {
+    if (_server.restoreHandler == _restoreFromWeb) _server.restoreHandler = null;
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -46,11 +81,15 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> wit
 
   Future<void> _reload() async {
     final service = ref.read(backupServiceProvider);
+    final urls = await AdminServer.urls();
+    final hostname = await AdminServer.hostname();
+    if (mounted) setState(() => _hostname = hostname);
     try {
       final backups = await service.listBackups();
       final canRequest = await service.canRequestAllFilesAccess();
       if (!mounted) return;
       setState(() {
+        _urls = urls;
         _backups = backups;
         _canRequestAllFilesAccess = canRequest;
         _loadError = null;
@@ -59,6 +98,7 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> wit
     } on PlatformException catch (e) {
       if (!mounted) return;
       setState(() {
+        _urls = urls;
         _backups = const [];
         _loadError = e.code == 'PERMISSION_DENIED'
             ? 'Ohne Speicher-Berechtigung können keine Backups gelesen werden.'
@@ -73,19 +113,19 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> wit
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
-  Future<void> _createBackup() async {
+  /// An upload from the admin page - the confirmation happened there.
+  Future<void> _restoreFromWeb(String content) async {
+    if (_busy) throw const BackupFormatException('Das Gerät spielt gerade schon ein Backup ein.');
     setState(() => _busy = true);
     try {
-      final location = await ref.read(backupServiceProvider).createBackup();
-      _snack('Backup gespeichert: $location');
-    } on PlatformException catch (e) {
-      _snack(e.code == 'PERMISSION_DENIED'
-          ? 'Ohne Speicher-Berechtigung kann kein Backup gespeichert werden.'
-          : 'Backup fehlgeschlagen: ${e.message}');
-    } finally {
+      await ref.read(backupServiceProvider).restoreJson(content);
+    } catch (_) {
       if (mounted) setState(() => _busy = false);
+      rethrow;
     }
-    await _reload();
+    _snack('Backup von der Verwaltungsseite eingespielt - App startet neu …');
+    // Lets the page's answer go out first.
+    Future<void>.delayed(const Duration(milliseconds: 1500), () => ref.read(backupServiceProvider).restartApp());
   }
 
   Future<bool> _confirmRestore(String what) async {
@@ -120,9 +160,11 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> wit
     } on BackupFormatException catch (e) {
       _snack(e.message);
     } on PlatformException catch (e) {
-      _snack(e.code == 'NO_PICKER'
-          ? 'Dieses Gerät hat keine Dateiauswahl. Bitte stattdessen „Zugriff auf alle Dateien“ erlauben.'
-          : 'Wiederherstellen fehlgeschlagen: ${e.message}');
+      _snack(
+        e.code == 'NO_PICKER'
+            ? 'Dieses Gerät hat keine Dateiauswahl. Bitte stattdessen „Zugriff auf alle Dateien“ erlauben.'
+            : 'Wiederherstellen fehlgeschlagen: ${e.message}',
+      );
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -157,43 +199,69 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> wit
   Widget build(BuildContext context) {
     final titleStyle = Theme.of(context).textTheme.titleLarge;
     const hintStyle = TextStyle(color: Colors.white54, fontSize: 13);
+    final primary = Theme.of(context).colorScheme.primary;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Backup & Wiederherstellung')),
+      appBar: AppBar(title: const Text('Backup wiederherstellen')),
       body: AbsorbPointer(
         absorbing: _busy,
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            Text(
-              'Backups enthalten Favoriten, DAB+ Senderliste und alle Einstellungen (inkl. Zugangsdaten). '
-              'Sie werden im Ordner „${Platform.isAndroid ? 'Download' : 'Dokumente'}/HomeSystem“ gespeichert '
-              'und bleiben auch erhalten, wenn die App deinstalliert wird.',
-              style: hintStyle,
-            ),
-            const SizedBox(height: 12),
-            _ActionTile(
-              icon: Icons.save_outlined,
-              label: 'Jetzt Backup erstellen',
-              autofocus: true,
-              onTap: _createBackup,
-            ),
-            if (_busy) const Padding(padding: EdgeInsets.only(top: 8), child: LinearProgressIndicator()),
-            const Divider(height: 32),
-            Text('Wiederherstellen', style: titleStyle),
+            Text('Über die Verwaltungsseite', style: titleStyle),
             const SizedBox(height: 8),
             if (_loading)
-              const Padding(padding: EdgeInsets.all(16), child: Center(child: CircularProgressIndicator()))
+              const SizedBox.shrink()
+            else if (_urls.isEmpty)
+              const Text('Keine Netzwerkverbindung - die Verwaltungsseite ist nicht erreichbar.', style: hintStyle)
+            else ...[
+              const Text(
+                'Auf einem Computer oder Handy im selben Netz im Browser öffnen:',
+                style: TextStyle(fontSize: 16),
+              ),
+              const SizedBox(height: 6),
+              for (final u in _urls)
+                Text(
+                  u,
+                  style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: primary),
+                ),
+              if (_hostname != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text('Hostname dieses Geräts: $_hostname', style: const TextStyle(fontSize: 16)),
+                ),
+              const SizedBox(height: 6),
+              const Text(
+                'Dort die Backup-Datei auswählen und einspielen. Solange diese Seite hier offen ist, nimmt das Gerät '
+                'ein Backup an. Danach startet die App neu.',
+                style: hintStyle,
+              ),
+            ],
+            if (_busy) const Padding(padding: EdgeInsets.only(top: 12), child: LinearProgressIndicator()),
+            const Divider(height: 32),
+            Text('Backups auf diesem Gerät', style: titleStyle),
+            const SizedBox(height: 4),
+            Text(
+              'Aus dem Ordner „${Platform.isAndroid ? 'Download' : 'Dokumente'}/HomeSystem“ (und HomeRadio der früheren App).',
+              style: hintStyle,
+            ),
+            const SizedBox(height: 8),
+            if (_loading)
+              const Padding(
+                padding: EdgeInsets.all(16),
+                child: Center(child: CircularProgressIndicator()),
+              )
             else if (_loadError != null)
               Text(_loadError!, style: hintStyle)
             else if (_backups.isEmpty)
               const Text('Keine Backups gefunden.', style: hintStyle)
             else
-              for (final b in _backups)
-                _ActionTile(
+              for (final (i, b) in _backups.indexed)
+                ActionTile(
                   icon: Icons.restore,
                   label: _formatDate(b.modified),
                   subtitle: b.name,
+                  autofocus: i == 0,
                   onTap: () => _restore(b),
                 ),
             if (_canRequestAllFilesAccess) ...[
@@ -204,16 +272,18 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> wit
                 style: hintStyle,
               ),
               const SizedBox(height: 8),
-              _ActionTile(
+              ActionTile(
                 icon: Icons.folder_open,
                 label: 'Zugriff auf alle Dateien erlauben',
+                autofocus: _backups.isEmpty,
                 onTap: _requestAllFilesAccess,
               ),
             ],
             const SizedBox(height: 8),
-            _ActionTile(
+            ActionTile(
               icon: Icons.file_open_outlined,
               label: 'Backup-Datei auswählen … (z. B. vom USB-Stick)',
+              autofocus: _backups.isEmpty && !_canRequestAllFilesAccess,
               onTap: _restoreFromPicker,
             ),
           ],
@@ -223,14 +293,17 @@ class _BackupSettingsScreenState extends ConsumerState<BackupSettingsScreen> wit
   }
 }
 
-class _ActionTile extends StatefulWidget {
+/// A focusable row with an icon (and optional second line) that runs
+/// [onTap] - used by the backup screens and the setup wizard.
+class ActionTile extends StatefulWidget {
   final IconData icon;
   final String label;
   final String? subtitle;
   final bool autofocus;
   final VoidCallback onTap;
 
-  const _ActionTile({
+  const ActionTile({
+    super.key,
     required this.icon,
     required this.label,
     required this.onTap,
@@ -239,10 +312,10 @@ class _ActionTile extends StatefulWidget {
   });
 
   @override
-  State<_ActionTile> createState() => _ActionTileState();
+  State<ActionTile> createState() => _ActionTileState();
 }
 
-class _ActionTileState extends State<_ActionTile> {
+class _ActionTileState extends State<ActionTile> {
   bool _focused = false;
 
   @override
@@ -268,8 +341,7 @@ class _ActionTileState extends State<_ActionTile> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(widget.label, style: const TextStyle(fontSize: 16, color: Colors.white)),
-                    if (subtitle != null)
-                      Text(subtitle, style: const TextStyle(fontSize: 12, color: Colors.white54)),
+                    if (subtitle != null) Text(subtitle, style: const TextStyle(fontSize: 12, color: Colors.white54)),
                   ],
                 ),
               ),

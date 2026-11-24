@@ -48,8 +48,10 @@ class BackupService {
 
   final AppDatabase _db;
 
-  /// Returns where the backup was written, e.g. "Download/HomeSystem/...".
-  Future<String> createBackup() async {
+  /// The whole backup as JSON text and the file name it should get, e.g.
+  /// "home_system_backup_Terrassen-Media_2026-11-24_121500.json" - for the
+  /// file in Download/HomeSystem and the admin page's download.
+  Future<({String name, String content})> export() async {
     final now = DateTime.now();
     final data = {
       'app': _app,
@@ -64,8 +66,29 @@ class BackupService {
       // backups carry all credentials, see the backup screen.
       'secrets': await SecretStore(_db).exportAll(),
     };
-    final content = const JsonEncoder.withIndent('  ').convert(data);
-    final name = 'home_system_backup_${_timestamp(now)}.json';
+    final device = fileNamePart(await _db.getSetting('device_name') ?? '');
+    return (
+      name: 'home_system_backup_${device.isEmpty ? '' : '${device}_'}${_timestamp(now)}.json',
+      content: const JsonEncoder.withIndent('  ').convert(data),
+    );
+  }
+
+  /// [text] reduced to what's safe in a file name (letters, digits, - and _).
+  static String fileNamePart(String text) => text
+      .trim()
+      .replaceAll(RegExp(r'\s+'), '-')
+      .replaceAll(RegExp(r'[^A-Za-z0-9ÄÖÜäöüß_-]'), '')
+      .replaceAll('Ä', 'Ae')
+      .replaceAll('Ö', 'Oe')
+      .replaceAll('Ü', 'Ue')
+      .replaceAll('ä', 'ae')
+      .replaceAll('ö', 'oe')
+      .replaceAll('ü', 'ue')
+      .replaceAll('ß', 'ss');
+
+  /// Returns where the backup was written, e.g. "Download/HomeSystem/...".
+  Future<String> createBackup() async {
+    final (:name, :content) = await export();
     if (!Platform.isAndroid) {
       final dir = await _desktopDir();
       await File(p.join(dir.path, name)).writeAsString(content, flush: true);
@@ -102,9 +125,9 @@ class BackupService {
   }
 
   Future<void> restore(BackupFile file) async {
-    if (!Platform.isAndroid) return _restoreJson(await File(file.id).readAsString());
+    if (!Platform.isAndroid) return restoreJson(await File(file.id).readAsString());
     final content = await _channel.invokeMethod<String>('read', {'id': file.id});
-    await _restoreJson(content!);
+    await restoreJson(content!);
   }
 
   /// Lets the user pick a backup file via the system document picker (also
@@ -115,7 +138,7 @@ class BackupService {
     if (!Platform.isAndroid) throw PlatformException(code: 'NO_PICKER');
     final content = await _channel.invokeMethod<String>('pick');
     if (content == null) return false;
-    await _restoreJson(content);
+    await restoreJson(content);
     return true;
   }
 
@@ -143,7 +166,9 @@ class BackupService {
     return dir;
   }
 
-  Future<void> _restoreJson(String content) async {
+  /// Replaces all data with the backup [content] (checked first - throws
+  /// [BackupFormatException]). The app must be restarted afterwards.
+  Future<void> restoreJson(String content) async {
     final Object? decoded;
     try {
       decoded = jsonDecode(content);
@@ -194,6 +219,9 @@ class BackupService {
         b.insertAll(_db.fmStations, fmStations);
         b.insertAll(_db.settings, settings);
       });
+      // A restored device is set up - also with backups from before the
+      // setup wizard.
+      await _db.setSetting('setup_done', 'true');
     });
     // Missing in backups from before secure storage - the passwords stay.
     final secrets = decoded['secrets'];

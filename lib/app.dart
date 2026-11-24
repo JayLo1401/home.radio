@@ -20,6 +20,8 @@ class HomeSystemApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final uiScale = ref.watch(uiScaleProvider);
+    // The admin page http://<ip>:1401/ runs as long as the app does.
+    ref.watch(adminServerProvider);
     return MaterialApp(
       title: 'Home System',
       navigatorKey: appNavigatorKey,

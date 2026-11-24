@@ -8,6 +8,7 @@ import '../../data/models/launcher_tile.dart' show StartScreen;
 import '../home/home_screen.dart';
 import '../launcher/launcher_navigation.dart';
 import '../launcher/launcher_providers.dart';
+import '../setup/setup_wizard_screen.dart';
 import '../tv/tv_screen.dart';
 
 /// Brief branded startup animation shown right after the native Android
@@ -55,13 +56,31 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
   /// over it when that's the start setting, or the Home key started the app.
   Future<void> _start() async {
     final started = DateTime.now();
+    final settings = ref.read(settingsRepositoryProvider);
+    // A fresh installation gets the setup wizard first.
+    final configured = await settings.isConfigured();
     // The Home key (Android) asks for the launcher, whatever the setting.
     final requested = await ref.read(launcherServiceProvider).takeLaunchRequest();
-    final start = requested ? StartScreen.launcher : await ref.read(settingsRepositoryProvider).getStartScreen();
+    var start = requested ? StartScreen.launcher : await settings.getStartScreen();
+    // A part that is switched off can't be the start.
+    if (start == StartScreen.radio && !await settings.getRadioEnabled()) start = StartScreen.launcher;
+    if (start == StartScreen.tv && !await settings.getTvEnabled()) start = StartScreen.launcher;
     final rest = _popDuration - DateTime.now().difference(started);
     if (rest > Duration.zero) await Future<void>.delayed(rest);
     if (!mounted) return;
     final nav = Navigator.of(context);
+    if (!configured) {
+      nav.pushReplacement(MaterialPageRoute(
+        // The wizard's own ref - this screen is gone by then.
+        builder: (_) => SetupWizardScreen(onFinished: (wizardRef) => _openApp(nav, wizardRef, StartScreen.launcher)),
+      ));
+      return;
+    }
+    _openApp(nav, ref, start);
+  }
+
+  /// Radio's screen as the base, Home (and TV) over it as [start] says.
+  static void _openApp(NavigatorState nav, WidgetRef ref, StartScreen start) {
     nav.pushReplacement(MaterialPageRoute(builder: (_) => const HomeScreen()));
     if (start == StartScreen.radio) return;
     showLauncher(ref);
