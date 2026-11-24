@@ -44,6 +44,11 @@ class _MusicVisualizerScreenState extends ConsumerState<MusicVisualizerScreen> {
   bool _overlay = true;
   Timer? _overlayTimer;
 
+  /// Shows "simulated" in the corner while the picture doesn't follow the
+  /// real music (no permission, option off, or no spectrum coming in).
+  final _simulated = ValueNotifier(false);
+  final _openedAt = DateTime.now();
+
   @override
   void initState() {
     super.initState();
@@ -59,6 +64,7 @@ class _MusicVisualizerScreenState extends ConsumerState<MusicVisualizerScreen> {
     _bands?.cancel();
     _sessionIds?.cancel();
     _focus.dispose();
+    _simulated.dispose();
     super.dispose();
   }
 
@@ -88,7 +94,15 @@ class _MusicVisualizerScreenState extends ConsumerState<MusicVisualizerScreen> {
 
   MusicLevels _levels(double t) {
     final playing = ref.read(musicStateProvider).playing;
-    if (DateTime.now().difference(_realAt) < const Duration(milliseconds: 400)) return _real;
+    final now = DateTime.now();
+    final fresh = now.difference(_realAt) < const Duration(milliseconds: 400);
+    // Simulated: no spectrum attached at all, or none coming in for a while
+    // although the music plays (paused, it simply has nothing to show).
+    _simulated.value = _bands == null ||
+        (playing &&
+            now.difference(_realAt) > const Duration(seconds: 2) &&
+            now.difference(_openedAt) > const Duration(seconds: 2));
+    if (fresh) return _real;
     return _pulse.at(t, playing: playing);
   }
 
@@ -158,6 +172,40 @@ class _MusicVisualizerScreenState extends ConsumerState<MusicVisualizerScreen> {
                 levels: _levels,
                 interval: interval,
                 controller: _controller,
+              ),
+              // In the corner: this is not the music's real spectrum.
+              Positioned(
+                top: 28,
+                right: 36,
+                child: ValueListenableBuilder<bool>(
+                  valueListenable: _simulated,
+                  builder: (context, simulated, _) => AnimatedOpacity(
+                    opacity: simulated ? 1 : 0,
+                    duration: const Duration(milliseconds: 600),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.black54,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.white24),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            context.l10n.musicVisualizerSimulated,
+                            style: const TextStyle(color: Colors.white70, fontSize: 15, fontWeight: FontWeight.w600),
+                          ),
+                          Text(
+                            context.l10n.musicVisualizerSimulatedHint,
+                            style: const TextStyle(color: Colors.white38, fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               ),
               Positioned(
                 left: 48,

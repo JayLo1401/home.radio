@@ -532,6 +532,8 @@
   "musicIntervalSeconds": "Every {seconds} s",
   "musicIntervalManual": "Only with ↑",
   "musicVisualizerHint": "↑ next visualisation · ←/→ track · ↓ back",
+  "musicVisualizerSimulated": "Simulated",
+  "musicVisualizerSimulatedHint": "Not following the music - music settings → \"Follows the music\"",
   "nasTitle": "NAS (network storage)",
   "nasIntro": "The network storage in your home network: backups before every update, background pictures for Home - and later music, videos and movies from the server.",
   "nasServerSection": "Server",

@@ -1730,6 +1730,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get musicVisualizerHint => '↑ next visualisation · ←/→ track · ↓ back';
 
   @override
+  String get musicVisualizerSimulated => 'Simulated';
+
+  @override
+  String get musicVisualizerSimulatedHint =>
+      'Not following the music - music settings → \"Follows the music\"';
+
+  @override
   String get nasTitle => 'NAS (network storage)';
 
   @override

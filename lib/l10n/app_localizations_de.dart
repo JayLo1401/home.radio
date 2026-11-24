@@ -1734,6 +1734,13 @@ class AppLocalizationsDe extends AppLocalizations {
       '↑ nächste Visualisierung · ←/→ Titel · ↓ zurück';
 
   @override
+  String get musicVisualizerSimulated => 'Simuliert';
+
+  @override
+  String get musicVisualizerSimulatedHint =>
+      'Nicht zur Musik - Musik-Einstellungen → „Folgt der Musik“';
+
+  @override
   String get nasTitle => 'NAS (Netzwerkspeicher)';
 
   @override

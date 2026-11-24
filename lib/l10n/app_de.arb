@@ -1037,6 +1037,8 @@
   },
   "musicIntervalManual": "Nur mit ↑",
   "musicVisualizerHint": "↑ nächste Visualisierung · ←/→ Titel · ↓ zurück",
+  "musicVisualizerSimulated": "Simuliert",
+  "musicVisualizerSimulatedHint": "Nicht zur Musik - Musik-Einstellungen → „Folgt der Musik“",
   "nasTitle": "NAS (Netzwerkspeicher)",
   "nasIntro": "Der Netzwerkspeicher im eigenen Netz: Backups vor jedem Update, Hintergrundbilder für Home - und später Musik, Videos und Filme vom Server.",
   "nasServerSection": "Server",

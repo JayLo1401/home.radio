@@ -82,5 +82,7 @@
   "musicSettingsInterval": "Change to the next visualisation",
   "musicIntervalSeconds": "Every {seconds} s",
   "musicIntervalManual": "Only with ↑",
-  "musicVisualizerHint": "↑ next visualisation · ←/→ track · ↓ back"
+  "musicVisualizerHint": "↑ next visualisation · ←/→ track · ↓ back",
+  "musicVisualizerSimulated": "Simulated",
+  "musicVisualizerSimulatedHint": "Not following the music - music settings → \"Follows the music\""
 }

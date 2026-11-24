@@ -3052,6 +3052,18 @@ abstract class AppLocalizations {
   /// **'↑ nächste Visualisierung · ←/→ Titel · ↓ zurück'**
   String get musicVisualizerHint;
 
+  /// No description provided for @musicVisualizerSimulated.
+  ///
+  /// In de, this message translates to:
+  /// **'Simuliert'**
+  String get musicVisualizerSimulated;
+
+  /// No description provided for @musicVisualizerSimulatedHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Nicht zur Musik - Musik-Einstellungen → „Folgt der Musik“'**
+  String get musicVisualizerSimulatedHint;
+
   /// No description provided for @nasTitle.
   ///
   /// In de, this message translates to:

@@ -184,5 +184,7 @@
     }
   },
   "musicIntervalManual": "Nur mit ↑",
-  "musicVisualizerHint": "↑ nächste Visualisierung · ←/→ Titel · ↓ zurück"
+  "musicVisualizerHint": "↑ nächste Visualisierung · ←/→ Titel · ↓ zurück",
+  "musicVisualizerSimulated": "Simuliert",
+  "musicVisualizerSimulatedHint": "Nicht zur Musik - Musik-Einstellungen → „Folgt der Musik“"
 }
