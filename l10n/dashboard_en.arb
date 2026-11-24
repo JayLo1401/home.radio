@@ -28,5 +28,18 @@
   "dashboardWebhookHint": "http://homeassistant.local:8123/api/webhook/hallway-tablet",
   "dashboardWebhookHelp": "On motion Home System sends \"motion\": true, after a minute without motion \"motion\": false - a trigger for automations (trigger \"Webhook\").",
   "dashboardRemoteHelp": "Home Assistant can switch the display and reload the dashboard: {url}/api/display/on, …/off, …/api/dashboard/reload (POST, e.g. with rest_command).",
-  "dashboardTestOff": "Switch the display off now (test)"
+  "dashboardTestOff": "Switch the display off now (test)",
+  "dashboardDimOnly": "Only darken the display instead of switching it off",
+  "dashboardDimOnlyHelp": "The display goes black and fully dark but doesn't switch off - so Android doesn't lock and no lock screen appears when it comes back (Fire tablets). Motion, a touch or a key bring it back at once.",
+  "dashboardBrightnessHeading": "Brightness",
+  "dashboardBrightnessSystem": "As set in the system",
+  "dashboardBrightnessFixed": "Fixed brightness",
+  "dashboardBrightnessAdaptive": "Adaptive (light sensor)",
+  "dashboardBrightnessLevel": "Brightness",
+  "dashboardBrightnessMin": "In the dark",
+  "dashboardBrightnessMax": "In a bright room",
+  "dashboardBrightnessLuxForMax": "Full brightness from",
+  "dashboardBrightnessHelp": "The light sensor sits behind the glass and often reads low: set \"Full brightness from\" to what it shows in a bright room (see below).",
+  "dashboardBrightnessLux": "Light sensor now: {lux} lx",
+  "dashboardBrightnessNoSensor": "This device has no light sensor."
 }

@@ -63,5 +63,25 @@
       }
     }
   },
-  "dashboardTestOff": "Display jetzt ausschalten (Test)"
+  "dashboardTestOff": "Display jetzt ausschalten (Test)",
+  "dashboardDimOnly": "Display nur abdunkeln statt ausschalten",
+  "dashboardDimOnlyHelp": "Das Display wird schwarz und ganz dunkel, schaltet aber nicht ab - so sperrt Android nicht, und beim Zurückkommen erscheint kein Sperrbildschirm (Fire-Tablets). Bewegung, Tippen oder eine Taste holen es sofort zurück.",
+  "dashboardBrightnessHeading": "Helligkeit",
+  "dashboardBrightnessSystem": "Wie im System eingestellt",
+  "dashboardBrightnessFixed": "Feste Helligkeit",
+  "dashboardBrightnessAdaptive": "Adaptiv (Lichtsensor)",
+  "dashboardBrightnessLevel": "Helligkeit",
+  "dashboardBrightnessMin": "Bei Dunkelheit",
+  "dashboardBrightnessMax": "Bei hellem Raum",
+  "dashboardBrightnessLuxForMax": "Volle Helligkeit ab",
+  "dashboardBrightnessHelp": "Der Lichtsensor sitzt hinter dem Glas und misst oft wenig: „Volle Helligkeit ab“ auf den Wert stellen, den er bei hellem Raum anzeigt (siehe unten).",
+  "dashboardBrightnessLux": "Lichtsensor jetzt: {lux} lx",
+  "@dashboardBrightnessLux": {
+    "placeholders": {
+      "lux": {
+        "type": "String"
+      }
+    }
+  },
+  "dashboardBrightnessNoSensor": "Dieses Gerät hat keinen Lichtsensor."
 }

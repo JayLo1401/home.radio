@@ -692,6 +692,84 @@ abstract class AppLocalizations {
   /// **'Display jetzt ausschalten (Test)'**
   String get dashboardTestOff;
 
+  /// No description provided for @dashboardDimOnly.
+  ///
+  /// In de, this message translates to:
+  /// **'Display nur abdunkeln statt ausschalten'**
+  String get dashboardDimOnly;
+
+  /// No description provided for @dashboardDimOnlyHelp.
+  ///
+  /// In de, this message translates to:
+  /// **'Das Display wird schwarz und ganz dunkel, schaltet aber nicht ab - so sperrt Android nicht, und beim Zurückkommen erscheint kein Sperrbildschirm (Fire-Tablets). Bewegung, Tippen oder eine Taste holen es sofort zurück.'**
+  String get dashboardDimOnlyHelp;
+
+  /// No description provided for @dashboardBrightnessHeading.
+  ///
+  /// In de, this message translates to:
+  /// **'Helligkeit'**
+  String get dashboardBrightnessHeading;
+
+  /// No description provided for @dashboardBrightnessSystem.
+  ///
+  /// In de, this message translates to:
+  /// **'Wie im System eingestellt'**
+  String get dashboardBrightnessSystem;
+
+  /// No description provided for @dashboardBrightnessFixed.
+  ///
+  /// In de, this message translates to:
+  /// **'Feste Helligkeit'**
+  String get dashboardBrightnessFixed;
+
+  /// No description provided for @dashboardBrightnessAdaptive.
+  ///
+  /// In de, this message translates to:
+  /// **'Adaptiv (Lichtsensor)'**
+  String get dashboardBrightnessAdaptive;
+
+  /// No description provided for @dashboardBrightnessLevel.
+  ///
+  /// In de, this message translates to:
+  /// **'Helligkeit'**
+  String get dashboardBrightnessLevel;
+
+  /// No description provided for @dashboardBrightnessMin.
+  ///
+  /// In de, this message translates to:
+  /// **'Bei Dunkelheit'**
+  String get dashboardBrightnessMin;
+
+  /// No description provided for @dashboardBrightnessMax.
+  ///
+  /// In de, this message translates to:
+  /// **'Bei hellem Raum'**
+  String get dashboardBrightnessMax;
+
+  /// No description provided for @dashboardBrightnessLuxForMax.
+  ///
+  /// In de, this message translates to:
+  /// **'Volle Helligkeit ab'**
+  String get dashboardBrightnessLuxForMax;
+
+  /// No description provided for @dashboardBrightnessHelp.
+  ///
+  /// In de, this message translates to:
+  /// **'Der Lichtsensor sitzt hinter dem Glas und misst oft wenig: „Volle Helligkeit ab“ auf den Wert stellen, den er bei hellem Raum anzeigt (siehe unten).'**
+  String get dashboardBrightnessHelp;
+
+  /// No description provided for @dashboardBrightnessLux.
+  ///
+  /// In de, this message translates to:
+  /// **'Lichtsensor jetzt: {lux} lx'**
+  String dashboardBrightnessLux(String lux);
+
+  /// No description provided for @dashboardBrightnessNoSensor.
+  ///
+  /// In de, this message translates to:
+  /// **'Dieses Gerät hat keinen Lichtsensor.'**
+  String get dashboardBrightnessNoSensor;
+
   /// No description provided for @iptvListName.
   ///
   /// In de, this message translates to:
@@ -2119,7 +2197,7 @@ abstract class AppLocalizations {
   /// No description provided for @nasBgFromNas.
   ///
   /// In de, this message translates to:
-  /// **'Bilderordner vom NAS'**
+  /// **'Hintergrundbilder vom NAS'**
   String get nasBgFromNas;
 
   /// No description provided for @nasBgFromNasHint.
@@ -2131,7 +2209,7 @@ abstract class AppLocalizations {
   /// No description provided for @nasBgNoFolder.
   ///
   /// In de, this message translates to:
-  /// **'Zuerst unter Einstellungen → System → NAS einen Bilderordner wählen.'**
+  /// **'Zuerst unter Einstellungen → System → NAS-Server einen Ordner für Hintergrundbilder wählen.'**
   String get nasBgNoFolder;
 
   /// No description provided for @nasBgFromUrl.
@@ -2175,6 +2253,12 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'Abgleich fehlgeschlagen: {message}'**
   String nasBgSyncError(String message);
+
+  /// No description provided for @nasFolderBackgrounds.
+  ///
+  /// In de, this message translates to:
+  /// **'Hintergrundbilder (Home)'**
+  String get nasFolderBackgrounds;
 
   /// No description provided for @radioErrorConnectionLost.
   ///

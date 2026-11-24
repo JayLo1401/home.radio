@@ -9,7 +9,19 @@ import 'package:flutter/services.dart';
 /// switch it off/on, and the camera watching for motion. Elsewhere (PC) all
 /// of it does nothing.
 class DisplayService {
+  DisplayService() {
+    if (supported) {
+      _channel.setMethodCallHandler((call) async {
+        if (call.method == 'dimmed') dimmed.value = call.arguments == true;
+      });
+    }
+  }
+
   static const _channel = MethodChannel('home_system/display');
+
+  /// The display is darkened ("off" without locking, see startMotion's
+  /// dimOnly) - app.dart lays a black page over everything meanwhile.
+  final dimmed = ValueNotifier(false);
   static const _motion = EventChannel('home_system/motion');
 
   static bool get supported => !kIsWeb && Platform.isAndroid;
@@ -49,16 +61,35 @@ class DisplayService {
     required int timeoutMinutes,
     required String webhookUrl,
     required String deviceName,
+    required bool dimOnly,
   }) async =>
       await _invoke<bool>('startMotion', {
         'sensitivity': sensitivity,
         'timeoutMinutes': timeoutMinutes,
         'webhookUrl': webhookUrl,
         'deviceName': deviceName,
+        'dimOnly': dimOnly,
       }) ??
       false;
 
   Future<void> stopMotion() => _invoke<void>('stopMotion');
+
+  /// The window's brightness (see BrightnessController.kt).
+  Future<void> setBrightness({
+    required String mode,
+    required int level,
+    required int min,
+    required int max,
+    required int luxForMax,
+  }) =>
+      _invoke<void>('setBrightness', {'mode': mode, 'level': level, 'min': min, 'max': max, 'luxForMax': luxForMax});
+
+  /// The light sensor now: null without a sensor, -1 before its first reading.
+  Future<double?> ambientLight() async {
+    final m = await _invoke<Map<Object?, Object?>>('ambientLight');
+    if (m == null || m['hasSensor'] != true) return null;
+    return (m['lux'] as num?)?.toDouble() ?? -1;
+  }
 
   Future<bool> motionRunning() async => await _invoke<bool>('motionRunning') ?? false;
 

@@ -9,6 +9,7 @@ import '../../data/services/nas_service.dart';
 import '../../l10n/l10n.dart';
 
 String nasFolderLabel(BuildContext context, NasFolder kind) => switch (kind) {
+      NasFolder.backgrounds => context.l10n.nasFolderBackgrounds,
       NasFolder.pictures => context.l10n.nasFolderPictures,
       NasFolder.music => context.l10n.nasFolderMusic,
       NasFolder.videos => context.l10n.nasFolderVideos,
@@ -17,6 +18,7 @@ String nasFolderLabel(BuildContext context, NasFolder kind) => switch (kind) {
     };
 
 IconData _folderIcon(NasFolder kind) => switch (kind) {
+      NasFolder.backgrounds => Icons.wallpaper,
       NasFolder.pictures => Icons.photo_library_outlined,
       NasFolder.music => Icons.library_music_outlined,
       NasFolder.videos => Icons.video_library_outlined,

@@ -35,8 +35,8 @@ import kotlin.math.abs
  * against the last picture - after taking out a change of the whole picture,
  * the camera's own exposure - that's motion.
  *
- * - Motion while the display is off (switched off here) switches it on and
- *   brings Home System to the front.
+ * - Motion while the display is off (by us or the power button) or darkened
+ *   brings it back and Home System to the front.
  * - While the dashboard is shown, no motion and no key/touch for
  *   [Config.timeoutMinutes] switches the display off (the accessibility
  *   service's "lock screen" - no device administrator needed).
@@ -53,6 +53,8 @@ class MotionService : Service() {
         val timeoutMinutes: Int,
         val webhookUrl: String,
         val deviceName: String,
+        /** "Off" only darkens (see [dim]) - no lock screen afterwards. */
+        val dimOnly: Boolean = true,
     )
 
     private val main = Handler(Looper.getMainLooper())
@@ -276,7 +278,8 @@ class MotionService : Service() {
 
     private fun onMotion() {
         lastMotionAt = SystemClock.elapsedRealtime()
-        if (screenOffByUs) wake(this)
+        if (dimmed) undim()
+        else if (screenOffByUs || !isScreenOn(this)) wake(this)
         if (!motionReported) {
             motionReported = true
             report(true)
@@ -292,11 +295,11 @@ class MotionService : Service() {
                 report(false)
             }
             val idle = now - maxOf(lastMotionAt, lastInteractionAt)
-            if (dashboardActive && c.timeoutMinutes > 0 && !screenOffByUs && isScreenOn(this@MotionService) &&
+            if (dashboardActive && c.timeoutMinutes > 0 && !screenOffByUs && !dimmed && isScreenOn(this@MotionService) &&
                 idle > c.timeoutMinutes * 60_000L
             ) {
                 Log.i(TAG, "no motion for ${c.timeoutMinutes} min - display off")
-                screenOff(this@MotionService)
+                displayOff(this@MotionService)
             }
             main.postDelayed(this, TICK_MS)
         }
@@ -372,9 +375,42 @@ class MotionService : Service() {
             context.stopService(Intent(context, MotionService::class.java))
         }
 
-        /** A key or touch: counts like motion for the display timeout. */
+        /** A key or touch: counts like motion for the display timeout, and brings a darkened display back. */
         fun onUserInteraction() {
             lastInteractionAt = SystemClock.elapsedRealtime()
+            if (dimmed) undim()
+        }
+
+        /** The display is darkened ([dim]). */
+        @Volatile
+        var dimmed = false
+            private set
+
+        /** DisplayPlugin: darkens / brightens the window (black page, lowest brightness). */
+        @Volatile
+        var dimHandler: ((Boolean) -> Unit)? = null
+
+        /** Darkened instead of off: the screen stays on, so Android doesn't lock. */
+        fun dim(): Boolean {
+            val handler = dimHandler ?: return false
+            dimmed = true
+            handler(true)
+            return true
+        }
+
+        fun undim() {
+            if (!dimmed) return
+            dimmed = false
+            lastMotionAt = SystemClock.elapsedRealtime()
+            dimHandler?.invoke(false)
+        }
+
+        /** "Display off" as set up: darkened ([Config.dimOnly]) or really off. */
+        fun displayOff(context: Context): Boolean = if (config.dimOnly) dim() else screenOff(context)
+
+        /** "Display on": back from darkened or off. */
+        fun displayOn(context: Context) {
+            if (dimmed) undim() else wake(context)
         }
 
         fun isScreenOn(context: Context): Boolean = context.getSystemService(PowerManager::class.java).isInteractive
@@ -414,6 +450,10 @@ class MotionService : Service() {
             } catch (e: Exception) {
                 Log.w(TAG, "can't bring Home System to the front", e)
             }
+            // A wall tablet shows the dashboard, not the lock screen: one
+            // without PIN is swiped away (Fire OS ignores "show over the
+            // lock screen"), once the display is really on.
+            Handler(Looper.getMainLooper()).postDelayed({ HomeButtonService.instance?.swipeAwayLockScreen() }, 700)
         }
     }
 }

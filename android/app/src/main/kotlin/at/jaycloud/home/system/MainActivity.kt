@@ -41,6 +41,15 @@ class MainActivity : AudioServiceActivity() {
     override fun onResume() {
         super.onResume()
         HomeButtonService.restoreAfterUpdate(this)
+        // Display by motion: shown over the lock screen, and a lock screen
+        // without PIN goes away when the display comes back.
+        if (MotionService.running != null) {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O_MR1) {
+                setShowWhenLocked(true)
+                setTurnScreenOn(true)
+            }
+            DisplayPlugin.dismissKeyguard(this)
+        }
     }
 
     /** Keys and touches count as presence for the Haussteuerung's display timeout. */

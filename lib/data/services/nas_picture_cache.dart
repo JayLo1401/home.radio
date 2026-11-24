@@ -85,7 +85,7 @@ class NasPictureCache {
   /// Where the pictures come from (server, login and folder) - a change
   /// makes the cache outdated.
   static String? sourceOf(NasSettings settings) {
-    final folder = settings.folder(NasFolder.pictures);
+    final folder = settings.folder(NasFolder.backgrounds);
     return folder == null ? null : '${settings.config.identity}|$folder';
   }
 
@@ -133,7 +133,7 @@ class NasPictureCache {
     await _load();
     final settings = await _settings.load();
     final source = sourceOf(settings);
-    final folder = settings.folder(NasFolder.pictures);
+    final folder = settings.folder(NasFolder.backgrounds);
     if (source == null || folder == null) return;
     _syncedSource = source;
     status.value = NasPictureStatus(count: _countFor(source), syncing: true, lastSync: _lastSync);
@@ -141,7 +141,9 @@ class NasPictureCache {
     final client = settings.config.createClient();
     String? error;
     try {
+      final watch = Stopwatch()..start();
       final remote = await _listPictures(client, folder);
+      debugPrint('NAS background: ${remote.length} pictures listed in ${watch.elapsedMilliseconds} ms');
       final available = {for (final e in remote) e.path};
       if (source != _source) {
         _pictures = [];
@@ -163,7 +165,12 @@ class NasPictureCache {
         final total = _pictures.fold<int>(0, (sum, x) => sum + x.bytes);
         if (total >= maxCacheBytes && replace.isEmpty) break;
         try {
-          final shrunk = await shrinkToScreen(await client.read(entry.path, maxBytes: maxFileBytes));
+          watch.reset();
+          final bytes = await client.read(entry.path, maxBytes: maxFileBytes);
+          final readMs = watch.elapsedMilliseconds;
+          final shrunk = await shrinkToScreen(bytes);
+          debugPrint('NAS background ${entry.name}: ${bytes.length} bytes read in $readMs ms, '
+              'prepared in ${watch.elapsedMilliseconds - readMs} ms');
           if (shrunk == null) continue;
           final name = '${DateTime.now().microsecondsSinceEpoch}${_random.nextInt(1000)}.img';
           await File(p.join(dir.path, name)).writeAsBytes(shrunk, flush: true);

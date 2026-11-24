@@ -13,7 +13,9 @@ import '../../l10n/l10n.dart';
 enum NasProtocol { webdav, ftp }
 
 /// The NAS folders the user can pick (Settings → NAS).
-enum NasFolder { pictures, music, videos, movies, backups }
+/// The NAS folders: [backgrounds] for Home's background pictures, the
+/// others for playing files later (and [backups]).
+enum NasFolder { backgrounds, pictures, music, videos, movies, backups }
 
 /// Login and address of the home NAS. Remote paths are POSIX style and
 /// absolute ("/", "/Fotos/Wallpaper"); for WebDAV they count from

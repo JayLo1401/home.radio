@@ -9,7 +9,13 @@
   "nasHost": "Server-Adresse (IP oder Name)",
   "nasHostHint": "z. B. 192.168.1.10",
   "nasPort": "Port (leer = {port})",
-  "@nasPort": {"placeholders": {"port": {"type": "int"}}},
+  "@nasPort": {
+    "placeholders": {
+      "port": {
+        "type": "int"
+      }
+    }
+  },
   "nasHttps": "Verschlüsselt (https)",
   "nasHttpsHint": "Das Zertifikat des NAS wird akzeptiert, auch wenn es selbst signiert ist.",
   "nasBasePath": "WebDAV-Pfad",
@@ -18,9 +24,21 @@
   "nasPassword": "Passwort",
   "nasTest": "Verbindung testen",
   "nasTestOk": "Verbindung OK - {count} Einträge im Hauptordner.",
-  "@nasTestOk": {"placeholders": {"count": {"type": "int"}}},
+  "@nasTestOk": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "nasTestFailed": "Keine Verbindung: {message}",
-  "@nasTestFailed": {"placeholders": {"message": {"type": "String"}}},
+  "@nasTestFailed": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
   "nasFoldersSection": "Ordner",
   "nasFoldersHint": "OK wählt einen Ordner auf dem NAS. Musik, Videos und Filme sind für später (Abspielen vom Server).",
   "nasNeedServer": "Zuerst die Server-Adresse eintragen.",
@@ -32,15 +50,33 @@
   "nasFolderNotChosen": "Nicht gewählt",
   "nasFolderClear": "Auswahl entfernen",
   "nasBackupsHint": "Vor jedem Update wird ein Backup in den Backup-Ordner gelegt; die {count} neuesten dieses Geräts bleiben.",
-  "@nasBackupsHint": {"placeholders": {"count": {"type": "int"}}},
+  "@nasBackupsHint": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "nasPicturesHint": "Die Bilder können der Hintergrund von Home sein (Einstellungen → Home → Hintergrund → Eigener Server).",
   "nasBrowseTitle": "Ordner für {folder}",
-  "@nasBrowseTitle": {"placeholders": {"folder": {"type": "String"}}},
+  "@nasBrowseTitle": {
+    "placeholders": {
+      "folder": {
+        "type": "String"
+      }
+    }
+  },
   "nasChooseThisFolder": "Diesen Ordner wählen",
   "nasUp": "Eine Ebene höher",
   "nasNoSubfolders": "Keine Unterordner.",
   "nasFilesInFolder": "{count} Dateien in diesem Ordner",
-  "@nasFilesInFolder": {"placeholders": {"count": {"type": "int"}}},
+  "@nasFilesInFolder": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "nasBrowseBackHint": "Zurück: eine Ebene höher",
   "nasErrorTimeout": "Der Server antwortet nicht (Zeitüberschreitung).",
   "nasErrorTls": "Die verschlüsselte Verbindung klappt nicht - stimmen https und der Port?",
@@ -48,39 +84,109 @@
   "nasErrorHostNotFound": "Server-Name nicht gefunden.",
   "nasErrorUnreachable": "Server nicht erreichbar.",
   "nasErrorOther": "Fehler: {message}",
-  "@nasErrorOther": {"placeholders": {"message": {"type": "String"}}},
+  "@nasErrorOther": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
   "nasErrorLogin": "Anmeldung fehlgeschlagen - Benutzername oder Passwort falsch, oder keine Berechtigung.",
   "nasErrorNotFound": "Ordner oder Datei nicht gefunden.",
   "nasErrorNoWebDav": "Der Server antwortet nicht wie ein WebDAV-Server - stimmt der WebDAV-Pfad?",
   "nasErrorFull": "Auf dem NAS ist kein Platz mehr.",
   "nasErrorHttp": "Der Server meldet den HTTP-Fehler {status}.",
-  "@nasErrorHttp": {"placeholders": {"status": {"type": "int"}}},
+  "@nasErrorHttp": {
+    "placeholders": {
+      "status": {
+        "type": "int"
+      }
+    }
+  },
   "nasErrorTooBig": "Die Datei ist zu groß.",
   "nasErrorFtp": "Der FTP-Server meldet: {reply}",
-  "@nasErrorFtp": {"placeholders": {"reply": {"type": "String"}}},
+  "@nasErrorFtp": {
+    "placeholders": {
+      "reply": {
+        "type": "String"
+      }
+    }
+  },
   "nasBackupRunning": "Backup auf das NAS …",
   "nasBackupFailed": "Backup auf das NAS fehlgeschlagen ({message}) - das Update läuft trotzdem.",
-  "@nasBackupFailed": {"placeholders": {"message": {"type": "String"}}},
+  "@nasBackupFailed": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
   "nasRestoreSection": "Backups auf dem NAS",
   "nasRestoreHint": "Aus dem Backup-Ordner {folder} - auch die anderer Geräte.",
-  "@nasRestoreHint": {"placeholders": {"folder": {"type": "String"}}},
+  "@nasRestoreHint": {
+    "placeholders": {
+      "folder": {
+        "type": "String"
+      }
+    }
+  },
   "nasRestoreNone": "Keine Backups im NAS-Ordner.",
   "nasRestoreLoadFailed": "Die Backups auf dem NAS konnten nicht gelesen werden: {message}",
-  "@nasRestoreLoadFailed": {"placeholders": {"message": {"type": "String"}}},
+  "@nasRestoreLoadFailed": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
   "nasRestoreDownloadFailed": "Das Backup konnte nicht vom NAS geladen werden: {message}",
-  "@nasRestoreDownloadFailed": {"placeholders": {"message": {"type": "String"}}},
-  "nasBgFromNas": "Bilderordner vom NAS",
+  "@nasRestoreDownloadFailed": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "nasBgFromNas": "Hintergrundbilder vom NAS",
   "nasBgFromNasHint": "{folder} (mit Unterordnern) - davon jedes Mal ein zufälliges Bild. Bis zu 30 Bilder liegen verkleinert auf dem Gerät; abgeglichen wird beim App-Start und mit „Jetzt abgleichen“.",
-  "@nasBgFromNasHint": {"placeholders": {"folder": {"type": "String"}}},
-  "nasBgNoFolder": "Zuerst unter Einstellungen → System → NAS einen Bilderordner wählen.",
+  "@nasBgFromNasHint": {
+    "placeholders": {
+      "folder": {
+        "type": "String"
+      }
+    }
+  },
+  "nasBgNoFolder": "Zuerst unter Einstellungen → System → NAS-Server einen Ordner für Hintergrundbilder wählen.",
   "nasBgFromUrl": "Adresse (http)",
   "nasBgFromUrlHint": "Ein Webserver, der Bilder liefert (siehe unten).",
   "nasBgSyncNow": "Jetzt abgleichen",
   "nasBgSyncing": "Wird abgeglichen …",
   "nasBgStatus": "{count} Bilder auf dem Gerät",
-  "@nasBgStatus": {"placeholders": {"count": {"type": "int"}}},
+  "@nasBgStatus": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "nasBgLastSync": "{count} Bilder auf dem Gerät, abgeglichen am {date}",
-  "@nasBgLastSync": {"placeholders": {"count": {"type": "int"}, "date": {"type": "String"}}},
+  "@nasBgLastSync": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "date": {
+        "type": "String"
+      }
+    }
+  },
   "nasBgSyncError": "Abgleich fehlgeschlagen: {message}",
-  "@nasBgSyncError": {"placeholders": {"message": {"type": "String"}}}
+  "@nasBgSyncError": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "nasFolderBackgrounds": "Hintergrundbilder (Home)"
 }

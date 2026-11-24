@@ -89,11 +89,11 @@ class _LauncherBackgroundSettingsScreenState extends ConsumerState<LauncherBackg
     }
   }
 
-  String? get _nasPicturesFolder => ref.watch(nasSettingsProvider).value?.folder(NasFolder.pictures);
+  String? get _nasPicturesFolder => ref.watch(nasSettingsProvider).value?.folder(NasFolder.backgrounds);
 
   Future<void> _save() async {
     final server = _source == LauncherBackgroundSource.server;
-    if (server && _fromNas && ref.read(nasSettingsProvider).value?.folder(NasFolder.pictures) == null) {
+    if (server && _fromNas && ref.read(nasSettingsProvider).value?.folder(NasFolder.backgrounds) == null) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.l10n.nasBgNoFolder)));
       return;
     }

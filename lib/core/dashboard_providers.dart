@@ -41,6 +41,36 @@ class DashboardDisplayNotifier extends Notifier<DashboardDisplaySettings> {
 final dashboardDisplayProvider =
     NotifierProvider<DashboardDisplayNotifier, DashboardDisplaySettings>(DashboardDisplayNotifier.new);
 
+/// The display's brightness (Settings → Haussteuerung).
+class DisplayBrightnessNotifier extends Notifier<DisplayBrightness> {
+  @override
+  DisplayBrightness build() {
+    ref.read(settingsRepositoryProvider).getDisplayBrightness().then((v) => state = v);
+    return const DisplayBrightness();
+  }
+
+  Future<void> set(DisplayBrightness value) async {
+    state = value;
+    await ref.read(settingsRepositoryProvider).setDisplayBrightness(value);
+  }
+}
+
+final displayBrightnessProvider =
+    NotifierProvider<DisplayBrightnessNotifier, DisplayBrightness>(DisplayBrightnessNotifier.new);
+
+/// Hands the brightness setting to Android (app.dart watches it).
+final brightnessControllerProvider = Provider<void>((ref) {
+  if (!DisplayService.supported) return;
+  final b = ref.watch(displayBrightnessProvider);
+  ref.read(displayServiceProvider).setBrightness(
+        mode: b.mode.name,
+        level: b.level,
+        min: b.min,
+        max: b.max,
+        luxForMax: b.luxForMax,
+      );
+});
+
 /// Runs display-by-motion while the Haussteuerung is on and motion is
 /// switched on - started with the app (app.dart), while it's in front, as
 /// Android wants for a camera service.
@@ -57,6 +87,7 @@ final motionControllerProvider = Provider<void>((ref) {
           timeoutMinutes: display.timeoutMinutes,
           webhookUrl: display.webhookUrl,
           deviceName: device,
+          dimOnly: display.dimOnly,
         )
         .then((ok) => ok ? null : debugPrint('motion: not started (camera permission?)'))
         .catchError((Object e) => debugPrint('motion: $e'));

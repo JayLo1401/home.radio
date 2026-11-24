@@ -148,6 +148,26 @@
     }
   },
   "dashboardTestOff": "Display jetzt ausschalten (Test)",
+  "dashboardDimOnly": "Display nur abdunkeln statt ausschalten",
+  "dashboardDimOnlyHelp": "Das Display wird schwarz und ganz dunkel, schaltet aber nicht ab - so sperrt Android nicht, und beim Zurückkommen erscheint kein Sperrbildschirm (Fire-Tablets). Bewegung, Tippen oder eine Taste holen es sofort zurück.",
+  "dashboardBrightnessHeading": "Helligkeit",
+  "dashboardBrightnessSystem": "Wie im System eingestellt",
+  "dashboardBrightnessFixed": "Feste Helligkeit",
+  "dashboardBrightnessAdaptive": "Adaptiv (Lichtsensor)",
+  "dashboardBrightnessLevel": "Helligkeit",
+  "dashboardBrightnessMin": "Bei Dunkelheit",
+  "dashboardBrightnessMax": "Bei hellem Raum",
+  "dashboardBrightnessLuxForMax": "Volle Helligkeit ab",
+  "dashboardBrightnessHelp": "Der Lichtsensor sitzt hinter dem Glas und misst oft wenig: „Volle Helligkeit ab“ auf den Wert stellen, den er bei hellem Raum anzeigt (siehe unten).",
+  "dashboardBrightnessLux": "Lichtsensor jetzt: {lux} lx",
+  "@dashboardBrightnessLux": {
+    "placeholders": {
+      "lux": {
+        "type": "String"
+      }
+    }
+  },
+  "dashboardBrightnessNoSensor": "Dieses Gerät hat keinen Lichtsensor.",
   "iptvListName": "Internet-TV",
   "iptvBrowse": "Sender suchen",
   "iptvBrowseTitle": "Internet-TV – Sender suchen",
@@ -719,7 +739,7 @@
       }
     }
   },
-  "nasBgFromNas": "Bilderordner vom NAS",
+  "nasBgFromNas": "Hintergrundbilder vom NAS",
   "nasBgFromNasHint": "{folder} (mit Unterordnern) - davon jedes Mal ein zufälliges Bild. Bis zu 30 Bilder liegen verkleinert auf dem Gerät; abgeglichen wird beim App-Start und mit „Jetzt abgleichen“.",
   "@nasBgFromNasHint": {
     "placeholders": {
@@ -728,7 +748,7 @@
       }
     }
   },
-  "nasBgNoFolder": "Zuerst unter Einstellungen → System → NAS einen Bilderordner wählen.",
+  "nasBgNoFolder": "Zuerst unter Einstellungen → System → NAS-Server einen Ordner für Hintergrundbilder wählen.",
   "nasBgFromUrl": "Adresse (http)",
   "nasBgFromUrlHint": "Ein Webserver, der Bilder liefert (siehe unten).",
   "nasBgSyncNow": "Jetzt abgleichen",
@@ -760,6 +780,7 @@
       }
     }
   },
+  "nasFolderBackgrounds": "Hintergrundbilder (Home)",
   "radioErrorConnectionLost": "Verbindung zum Sender verloren - versuche erneut…",
   "radioErrorStationUnreachable": "Sender nicht erreichbar - versuche erneut…",
   "radioErrorPlayback": "Wiedergabefehler: {message}",

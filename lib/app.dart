@@ -44,6 +44,8 @@ class HomeSystemApp extends ConsumerWidget {
     }
     // Haussteuerung: the display by motion (camera), when switched on.
     ref.watch(motionControllerProvider);
+    // ... and its brightness (fixed / from the light sensor).
+    ref.watch(brightnessControllerProvider);
     return MaterialApp(
       title: 'Home System',
       navigatorKey: appNavigatorKey,
@@ -57,7 +59,12 @@ class HomeSystemApp extends ConsumerWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      builder: (context, child) => _PcKeys(child: _UiScaleWrapper(scale: uiScale, child: child!)),
+      builder: (context, child) => _PcKeys(
+        child: _DimmedDisplay(
+          dimmed: ref.read(displayServiceProvider).dimmed,
+          child: _UiScaleWrapper(scale: uiScale, child: child!),
+        ),
+      ),
       home: const SplashScreen(),
     );
   }
@@ -103,6 +110,32 @@ class _PcKeys extends ConsumerWidget {
           return KeyEventResult.ignored;
         },
         child: child,
+      ),
+    );
+  }
+}
+
+/// The Haussteuerung's "display off" without locking (see DisplayService.dimmed):
+/// a black page over everything at the lowest brightness. A touch or key
+/// brings the display back (MainActivity.onUserInteraction) - the touch
+/// doesn't reach the page underneath.
+class _DimmedDisplay extends StatelessWidget {
+  const _DimmedDisplay({required this.dimmed, required this.child});
+
+  final ValueListenable<bool> dimmed;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<bool>(
+      valueListenable: dimmed,
+      child: child,
+      builder: (context, on, child) => Stack(
+        fit: StackFit.expand,
+        children: [
+          child!,
+          if (on) const AbsorbPointer(child: ColoredBox(color: Colors.black)),
+        ],
       ),
     );
   }

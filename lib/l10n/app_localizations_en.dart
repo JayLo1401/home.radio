@@ -342,6 +342,50 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dashboardTestOff => 'Switch the display off now (test)';
 
   @override
+  String get dashboardDimOnly =>
+      'Only darken the display instead of switching it off';
+
+  @override
+  String get dashboardDimOnlyHelp =>
+      'The display goes black and fully dark but doesn\'t switch off - so Android doesn\'t lock and no lock screen appears when it comes back (Fire tablets). Motion, a touch or a key bring it back at once.';
+
+  @override
+  String get dashboardBrightnessHeading => 'Brightness';
+
+  @override
+  String get dashboardBrightnessSystem => 'As set in the system';
+
+  @override
+  String get dashboardBrightnessFixed => 'Fixed brightness';
+
+  @override
+  String get dashboardBrightnessAdaptive => 'Adaptive (light sensor)';
+
+  @override
+  String get dashboardBrightnessLevel => 'Brightness';
+
+  @override
+  String get dashboardBrightnessMin => 'In the dark';
+
+  @override
+  String get dashboardBrightnessMax => 'In a bright room';
+
+  @override
+  String get dashboardBrightnessLuxForMax => 'Full brightness from';
+
+  @override
+  String get dashboardBrightnessHelp =>
+      'The light sensor sits behind the glass and often reads low: set \"Full brightness from\" to what it shows in a bright room (see below).';
+
+  @override
+  String dashboardBrightnessLux(String lux) {
+    return 'Light sensor now: $lux lx';
+  }
+
+  @override
+  String get dashboardBrightnessNoSensor => 'This device has no light sensor.';
+
+  @override
   String get iptvListName => 'Internet TV';
 
   @override
@@ -1197,7 +1241,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get nasBgFromNas => 'Pictures folder on the NAS';
+  String get nasBgFromNas => 'Background pictures from the NAS';
 
   @override
   String nasBgFromNasHint(String folder) {
@@ -1206,7 +1250,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get nasBgNoFolder =>
-      'First choose a pictures folder under Settings → System → NAS.';
+      'First choose a folder for background pictures under Settings → System → NAS server.';
 
   @override
   String get nasBgFromUrl => 'Address (http)';
@@ -1235,6 +1279,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String nasBgSyncError(String message) {
     return 'Sync failed: $message';
   }
+
+  @override
+  String get nasFolderBackgrounds => 'Background pictures (Home)';
 
   @override
   String get radioErrorConnectionLost =>

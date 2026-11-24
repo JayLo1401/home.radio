@@ -72,22 +72,22 @@ class LastPlayed {
   final int? fmFreqKhz;
 
   const LastPlayed.favorite(int programNumber)
-      : favoriteProgramNumber = programNumber,
-        dabFreqKhz = null,
-        dabServiceId = null,
-        fmFreqKhz = null;
+    : favoriteProgramNumber = programNumber,
+      dabFreqKhz = null,
+      dabServiceId = null,
+      fmFreqKhz = null;
 
   const LastPlayed.dabStation({required int freqKhz, required int serviceId})
-      : favoriteProgramNumber = null,
-        dabFreqKhz = freqKhz,
-        dabServiceId = serviceId,
-        fmFreqKhz = null;
+    : favoriteProgramNumber = null,
+      dabFreqKhz = freqKhz,
+      dabServiceId = serviceId,
+      fmFreqKhz = null;
 
   const LastPlayed.fmStation(int freqKhz)
-      : favoriteProgramNumber = null,
-        dabFreqKhz = null,
-        dabServiceId = null,
-        fmFreqKhz = freqKhz;
+    : favoriteProgramNumber = null,
+      dabFreqKhz = null,
+      dabServiceId = null,
+      fmFreqKhz = freqKhz;
 }
 
 class SettingsRepository {
@@ -153,24 +153,22 @@ class SettingsRepository {
     return v == 'fixed' ? AutostartMode.fixedStation : AutostartMode.lastStation;
   }
 
-  Future<void> setAutostartMode(AutostartMode mode) => _db.setSetting(
-      _keyAutostartMode, mode == AutostartMode.fixedStation ? 'fixed' : 'last');
+  Future<void> setAutostartMode(AutostartMode mode) =>
+      _db.setSetting(_keyAutostartMode, mode == AutostartMode.fixedStation ? 'fixed' : 'last');
 
   Future<int?> getFixedProgramNumber() async {
     final v = await _db.getSetting(_keyFixedProgramNumber);
     return v == null ? null : int.tryParse(v);
   }
 
-  Future<void> setFixedProgramNumber(int programNumber) =>
-      _db.setSetting(_keyFixedProgramNumber, '$programNumber');
+  Future<void> setFixedProgramNumber(int programNumber) => _db.setSetting(_keyFixedProgramNumber, '$programNumber');
 
   Future<int?> getLastProgramNumber() async {
     final v = await _db.getSetting(_keyLastProgramNumber);
     return v == null ? null : int.tryParse(v);
   }
 
-  Future<void> setLastProgramNumber(int programNumber) =>
-      _db.setSetting(_keyLastProgramNumber, '$programNumber');
+  Future<void> setLastProgramNumber(int programNumber) => _db.setSetting(_keyLastProgramNumber, '$programNumber');
 
   Future<void> setLastPlayedFavorite(int programNumber) async {
     await setLastProgramNumber(programNumber);
@@ -207,27 +205,21 @@ class SettingsRepository {
     return programNumber == null ? null : LastPlayed.favorite(programNumber);
   }
 
-  Future<bool> getWeatherEnabled() async =>
-      (await _db.getSetting(_keyWeatherEnabled)) != 'false';
+  Future<bool> getWeatherEnabled() async => (await _db.getSetting(_keyWeatherEnabled)) != 'false';
 
-  Future<void> setWeatherEnabled(bool enabled) =>
-      _db.setSetting(_keyWeatherEnabled, '$enabled');
+  Future<void> setWeatherEnabled(bool enabled) => _db.setSetting(_keyWeatherEnabled, '$enabled');
 
-  Future<bool> getRadarEnabled() async =>
-      (await _db.getSetting(_keyRadarEnabled)) != 'false';
+  Future<bool> getRadarEnabled() async => (await _db.getSetting(_keyRadarEnabled)) != 'false';
 
-  Future<void> setRadarEnabled(bool enabled) =>
-      _db.setSetting(_keyRadarEnabled, '$enabled');
+  Future<void> setRadarEnabled(bool enabled) => _db.setSetting(_keyRadarEnabled, '$enabled');
 
   static const defaultLat = 47.0707;
   static const defaultLon = 15.4395; // Graz
   static const defaultLocationName = 'Graz';
 
-  Future<double> getWeatherLat() async =>
-      double.tryParse(await _db.getSetting(_keyWeatherLat) ?? '') ?? defaultLat;
+  Future<double> getWeatherLat() async => double.tryParse(await _db.getSetting(_keyWeatherLat) ?? '') ?? defaultLat;
 
-  Future<double> getWeatherLon() async =>
-      double.tryParse(await _db.getSetting(_keyWeatherLon) ?? '') ?? defaultLon;
+  Future<double> getWeatherLon() async => double.tryParse(await _db.getSetting(_keyWeatherLon) ?? '') ?? defaultLon;
 
   Future<String> getWeatherLocationName() async =>
       (await _db.getSetting(_keyWeatherLocationName)) ?? defaultLocationName;
@@ -337,8 +329,7 @@ class SettingsRepository {
   // oversized on a 65" TV viewed from a couch/terrace distance.
   static const defaultUiScale = 0.85;
 
-  Future<double> getUiScale() async =>
-      double.tryParse(await _db.getSetting(_keyUiScale) ?? '') ?? defaultUiScale;
+  Future<double> getUiScale() async => double.tryParse(await _db.getSetting(_keyUiScale) ?? '') ?? defaultUiScale;
 
   Future<void> setUiScale(double scale) => _db.setSetting(_keyUiScale, '$scale');
 
@@ -348,11 +339,11 @@ class SettingsRepository {
   Future<void> setLanguage(String value) => _db.setSetting(_keyLanguage, value);
 
   Future<Map<String, String?>> getFtpConfig() async => {
-        'host': await _db.getSetting(_keyFtpHost),
-        'user': await _db.getSetting(_keyFtpUser),
-        'pass': await _db.getSetting(_keyFtpPass),
-        'dir': await _db.getSetting(_keyFtpDir),
-      };
+    'host': await _db.getSetting(_keyFtpHost),
+    'user': await _db.getSetting(_keyFtpUser),
+    'pass': await _db.getSetting(_keyFtpPass),
+    'dir': await _db.getSetting(_keyFtpDir),
+  };
 
   Future<void> setFtpConfig({
     required String host,
@@ -374,8 +365,7 @@ class SettingsRepository {
   /// network service (e.g. a Raspberry Pi), see RtlSdrTestScreen.
   Future<String> getRtlSdrHost() async => (await _db.getSetting(_keyRtlSdrHost)) ?? defaultRtlSdrHost;
 
-  Future<int> getRtlSdrPort() async =>
-      int.tryParse(await _db.getSetting(_keyRtlSdrPort) ?? '') ?? defaultRtlSdrPort;
+  Future<int> getRtlSdrPort() async => int.tryParse(await _db.getSetting(_keyRtlSdrPort) ?? '') ?? defaultRtlSdrPort;
 
   /// Every configured rtl_tcp server. rtl_sdr_host/rtl_sdr_port keep holding
   /// the default one (what the receiver connects to); the list adds the
@@ -408,30 +398,23 @@ class SettingsRepository {
   /// costs a delete when nothing is left, and also cleans up settings that
   /// come back with an old backup.
   Future<void> removeRtlTcpLogin() async {
-    await _db.deleteSettings(const [
-      'rtl_tcp_protocol',
-      'rtl_tcp_login',
-      'rtl_tcp_user',
-    ]);
+    await _db.deleteSettings(const ['rtl_tcp_protocol', 'rtl_tcp_login', 'rtl_tcp_user']);
     await _secrets.delete('rtl_tcp_password');
   }
 
   /// How DAB+ reaches its receiver (see [ReceiverMode]). Unset counts as
   /// [ReceiverMode.tcp], which was the default before "no receiver" existed.
   Future<ReceiverMode> getReceiverMode() async => switch (await _db.getSetting(_keyRtlSdrMode)) {
-        'own' => ReceiverMode.usb,
-        'none' => ReceiverMode.none,
-        _ => ReceiverMode.tcp,
-      };
+    'own' => ReceiverMode.usb,
+    'none' => ReceiverMode.none,
+    _ => ReceiverMode.tcp,
+  };
 
-  Future<void> setReceiverMode(ReceiverMode mode) => _db.setSetting(
-        _keyRtlSdrMode,
-        switch (mode) {
-          ReceiverMode.usb => 'own',
-          ReceiverMode.none => 'none',
-          ReceiverMode.tcp => 'external',
-        },
-      );
+  Future<void> setReceiverMode(ReceiverMode mode) => _db.setSetting(_keyRtlSdrMode, switch (mode) {
+    ReceiverMode.usb => 'own',
+    ReceiverMode.none => 'none',
+    ReceiverMode.tcp => 'external',
+  });
 
   /// Whether DAB+ uses the RTL-SDR stick directly over USB ('own',
   /// "RTL-SDR-USB" on RtlSdrTestScreen) rather than an rtl_tcp server
@@ -439,19 +422,16 @@ class SettingsRepository {
   Future<bool> getRtlSdrAutoStartOwnService() async => await getReceiverMode() == ReceiverMode.usb;
 
   Future<DabSortMode> getDabSortMode() async => switch (await _db.getSetting(_keyDabSortMode)) {
-        'alphabet' => DabSortMode.byAlphabet,
-        'grouped' => DabSortMode.groupedByEnsemble,
-        _ => DabSortMode.byEnsembleThenAlphabet,
-      };
+    'alphabet' => DabSortMode.byAlphabet,
+    'grouped' => DabSortMode.groupedByEnsemble,
+    _ => DabSortMode.byEnsembleThenAlphabet,
+  };
 
-  Future<void> setDabSortMode(DabSortMode mode) => _db.setSetting(
-        _keyDabSortMode,
-        switch (mode) {
-          DabSortMode.byAlphabet => 'alphabet',
-          DabSortMode.groupedByEnsemble => 'grouped',
-          DabSortMode.byEnsembleThenAlphabet => 'ensemble',
-        },
-      );
+  Future<void> setDabSortMode(DabSortMode mode) => _db.setSetting(_keyDabSortMode, switch (mode) {
+    DabSortMode.byAlphabet => 'alphabet',
+    DabSortMode.groupedByEnsemble => 'grouped',
+    DabSortMode.byEnsembleThenAlphabet => 'ensemble',
+  });
 
   Future<bool> getShowClockDate() async => (await _db.getSetting(_keyShowClockDate)) == 'true';
 
@@ -533,8 +513,13 @@ class SettingsRepository {
     return (bandwidthHz: int.tryParse(p[0]) ?? 0, noiseBlanker: p[1] == 'true', voiceFilter: p[2] == 'true', agc: p[3]);
   }
 
-  Future<void> setNbFilters(String band, {required int bandwidthHz, required bool noiseBlanker, required bool voiceFilter, required String agc}) =>
-      _db.setSetting('nb_filters_$band', '$bandwidthHz|$noiseBlanker|$voiceFilter|$agc');
+  Future<void> setNbFilters(
+    String band, {
+    required int bandwidthHz,
+    required bool noiseBlanker,
+    required bool voiceFilter,
+    required String agc,
+  }) => _db.setSetting('nb_filters_$band', '$bandwidthHz|$noiseBlanker|$voiceFilter|$agc');
 
   /// Tuner gain per listening band: a gain step, -1 = automatic (default).
   Future<int> getNbGain(String band) async => int.tryParse(await _db.getSetting('nb_gain_$band') ?? '') ?? -1;
@@ -621,17 +606,38 @@ class SettingsRepository {
   Future<void> setDashboardUrl(String value) => _db.setSetting('dashboard_url', value.trim());
 
   Future<DashboardDisplaySettings> getDashboardDisplay() async => DashboardDisplaySettings(
-        motion: await _db.getSetting('motion_enabled') == 'true',
-        sensitivity: int.tryParse(await _db.getSetting('motion_sensitivity') ?? '') ?? 5,
-        timeoutMinutes: int.tryParse(await _db.getSetting('motion_timeout_min') ?? '') ?? 5,
-        webhookUrl: await _db.getSetting('motion_webhook') ?? '',
-      );
+    motion: await _db.getSetting('motion_enabled') == 'true',
+    sensitivity: int.tryParse(await _db.getSetting('motion_sensitivity') ?? '') ?? 5,
+    timeoutMinutes: int.tryParse(await _db.getSetting('motion_timeout_min') ?? '') ?? 5,
+    webhookUrl: await _db.getSetting('motion_webhook') ?? '',
+    dimOnly: await _db.getSetting('motion_dim_only') != 'false',
+  );
+
+  Future<DisplayBrightness> getDisplayBrightness() async {
+    final mode = await _db.getSetting('brightness_mode');
+    return DisplayBrightness(
+      mode: BrightnessMode.values.firstWhere((m) => m.name == mode, orElse: () => BrightnessMode.system),
+      level: int.tryParse(await _db.getSetting('brightness_level') ?? '') ?? 60,
+      min: int.tryParse(await _db.getSetting('brightness_min') ?? '') ?? 10,
+      max: int.tryParse(await _db.getSetting('brightness_max') ?? '') ?? 100,
+      luxForMax: int.tryParse(await _db.getSetting('brightness_lux_max') ?? '') ?? 100,
+    );
+  }
+
+  Future<void> setDisplayBrightness(DisplayBrightness value) async {
+    await _db.setSetting('brightness_mode', value.mode.name);
+    await _db.setSetting('brightness_level', '${value.level}');
+    await _db.setSetting('brightness_min', '${value.min}');
+    await _db.setSetting('brightness_max', '${value.max}');
+    await _db.setSetting('brightness_lux_max', '${value.luxForMax}');
+  }
 
   Future<void> setDashboardDisplay(DashboardDisplaySettings value) async {
     await _db.setSetting('motion_enabled', '${value.motion}');
     await _db.setSetting('motion_sensitivity', '${value.sensitivity}');
     await _db.setSetting('motion_timeout_min', '${value.timeoutMinutes}');
     await _db.setSetting('motion_webhook', value.webhookUrl.trim());
+    await _db.setSetting('motion_dim_only', '${value.dimOnly}');
   }
 
   // --- Home (the launcher) ---
@@ -642,6 +648,7 @@ class SettingsRepository {
     final v = await _db.getSetting('start_screen');
     return StartScreen.values.firstWhere((s) => s.name == v, orElse: () => StartScreen.radio);
   }
+
   Future<void> setStartScreen(StartScreen value) => _db.setSetting('start_screen', value.name);
 
   /// The app started with [StartScreen.app] (its package name), '' = none.
@@ -665,7 +672,10 @@ class SettingsRepository {
 
   Future<LauncherBackgroundSource> getLauncherBackgroundSource() async {
     final v = await _db.getSetting('launcher_bg_source');
-    return LauncherBackgroundSource.values.firstWhere((s) => s.name == v, orElse: () => LauncherBackgroundSource.builtin);
+    return LauncherBackgroundSource.values.firstWhere(
+      (s) => s.name == v,
+      orElse: () => LauncherBackgroundSource.builtin,
+    );
   }
 
   Future<void> setLauncherBackgroundSource(LauncherBackgroundSource value) =>
@@ -762,7 +772,9 @@ class SettingsRepository {
   Future<Map<String, List<int>>> getRemoteKeys() async {
     try {
       final map = jsonDecode(await _db.getSetting('remote_keys') ?? '{}') as Map<String, dynamic>;
-      return {for (final e in map.entries) e.key: [for (final k in e.value as List) k as int]};
+      return {
+        for (final e in map.entries) e.key: [for (final k in e.value as List) k as int],
+      };
     } catch (_) {
       return {};
     }
@@ -796,6 +808,7 @@ class DashboardDisplaySettings {
     this.sensitivity = 5,
     this.timeoutMinutes = 5,
     this.webhookUrl = '',
+    this.dimOnly = true,
   });
 
   /// Display by motion (camera) on.
@@ -810,11 +823,56 @@ class DashboardDisplaySettings {
   /// Home Assistant webhook for motion on/off, '' = none.
   final String webhookUrl;
 
-  DashboardDisplaySettings copyWith({bool? motion, int? sensitivity, int? timeoutMinutes, String? webhookUrl}) =>
-      DashboardDisplaySettings(
-        motion: motion ?? this.motion,
-        sensitivity: sensitivity ?? this.sensitivity,
-        timeoutMinutes: timeoutMinutes ?? this.timeoutMinutes,
-        webhookUrl: webhookUrl ?? this.webhookUrl,
+  /// "Off" only darkens the display (black, lowest brightness) instead of
+  /// switching it off - Android doesn't lock then, so no lock screen comes
+  /// up when it's back (Fire tablets). Default.
+  final bool dimOnly;
+
+  DashboardDisplaySettings copyWith({
+    bool? motion,
+    int? sensitivity,
+    int? timeoutMinutes,
+    String? webhookUrl,
+    bool? dimOnly,
+  }) => DashboardDisplaySettings(
+    motion: motion ?? this.motion,
+    sensitivity: sensitivity ?? this.sensitivity,
+    timeoutMinutes: timeoutMinutes ?? this.timeoutMinutes,
+    webhookUrl: webhookUrl ?? this.webhookUrl,
+    dimOnly: dimOnly ?? this.dimOnly,
+  );
+}
+
+/// The display's brightness (Haussteuerung, wall tablets): Android's own,
+/// fixed, or from the light sensor between [min] and [max] (%), full from
+/// [luxForMax] on - see BrightnessController.kt.
+enum BrightnessMode { system, fixed, adaptive }
+
+class DisplayBrightness {
+  const DisplayBrightness({
+    this.mode = BrightnessMode.system,
+    this.level = 60,
+    this.min = 10,
+    this.max = 100,
+    this.luxForMax = 100,
+  });
+
+  final BrightnessMode mode;
+
+  /// Percent, [BrightnessMode.fixed].
+  final int level;
+
+  /// Percent, [BrightnessMode.adaptive].
+  final int min;
+  final int max;
+  final int luxForMax;
+
+  DisplayBrightness copyWith({BrightnessMode? mode, int? level, int? min, int? max, int? luxForMax}) =>
+      DisplayBrightness(
+        mode: mode ?? this.mode,
+        level: level ?? this.level,
+        min: min ?? this.min,
+        max: max ?? this.max,
+        luxForMax: luxForMax ?? this.luxForMax,
       );
 }

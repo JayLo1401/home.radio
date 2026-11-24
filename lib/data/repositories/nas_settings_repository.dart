@@ -53,6 +53,15 @@ class NasSettingsRepository {
       final path = await _db.getSetting(_folderKey(kind));
       if (path != null && path.isNotEmpty) folders[kind] = path;
     }
+    // Before the own background folder, Home's pictures came from the
+    // pictures folder - it carries on as the background folder.
+    final pictures = folders[NasFolder.pictures];
+    if (!folders.containsKey(NasFolder.backgrounds) &&
+        pictures != null &&
+        await _db.getSetting(_folderKey(NasFolder.backgrounds)) == null) {
+      folders[NasFolder.backgrounds] = pictures;
+      await setFolder(NasFolder.backgrounds, pictures);
+    }
     return NasSettings(config: config, folders: folders);
   }
 

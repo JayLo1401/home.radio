@@ -403,6 +403,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       tileToggle(l.dashboardMotion, display.motion, _setMotion),
       Padding(padding: const EdgeInsets.fromLTRB(12, 4, 12, 0), child: Text(l.dashboardMotionHelp, style: help)),
       if (display.motion) ...[
+        tileToggle(l.dashboardDimOnly, display.dimOnly, (v) => notifier.set(display.copyWith(dimOnly: v))),
+        Padding(padding: const EdgeInsets.fromLTRB(12, 4, 12, 0), child: Text(l.dashboardDimOnlyHelp, style: help)),
         stepper(l.dashboardSensitivity, l.dashboardSensitivityValue(display.sensitivity), (d) {
           notifier.set(display.copyWith(sensitivity: (display.sensitivity + d).clamp(1, 10)));
         }),
@@ -447,6 +449,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
         ),
       ],
+      ..._brightnessSection(context, nextOrder, stepper, help),
       const Divider(height: 32),
       Text(l.dashboardHaHeading, style: Theme.of(context).textTheme.titleLarge),
       const SizedBox(height: 8),
@@ -468,6 +471,62 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ),
     ];
   }
+
+  /// Settings → Haussteuerung → Helligkeit.
+  List<Widget> _brightnessSection(
+    BuildContext context,
+    double Function() nextOrder,
+    Widget Function(String, String, void Function(int)) stepper,
+    TextStyle help,
+  ) {
+    final l = context.l10n;
+    final b = ref.watch(displayBrightnessProvider);
+    final notifier = ref.read(displayBrightnessProvider.notifier);
+    Widget choice(String label, BrightnessMode mode) => FocusTraversalOrder(
+          order: NumericFocusOrder(nextOrder()),
+          child: _TvChoiceTile(label: label, selected: b.mode == mode, onTap: () => notifier.set(b.copyWith(mode: mode))),
+        );
+    const luxSteps = [5, 10, 20, 50, 100, 200, 500, 1000, 2000];
+    final luxIndex = luxSteps.indexWhere((x) => x >= b.luxForMax).clamp(0, luxSteps.length - 1);
+    return [
+      const Divider(height: 32),
+      Text(l.dashboardBrightnessHeading, style: Theme.of(context).textTheme.titleLarge),
+      const SizedBox(height: 8),
+      choice(l.dashboardBrightnessSystem, BrightnessMode.system),
+      choice(l.dashboardBrightnessFixed, BrightnessMode.fixed),
+      choice(l.dashboardBrightnessAdaptive, BrightnessMode.adaptive),
+      if (b.mode == BrightnessMode.fixed)
+        stepper(l.dashboardBrightnessLevel, '${b.level} %',
+            (d) => notifier.set(b.copyWith(level: (b.level + d * 5).clamp(5, 100)))),
+      if (b.mode == BrightnessMode.adaptive) ...[
+        stepper(l.dashboardBrightnessMin, '${b.min} %',
+            (d) => notifier.set(b.copyWith(min: (b.min + d * 5).clamp(1, b.max)))),
+        stepper(l.dashboardBrightnessMax, '${b.max} %',
+            (d) => notifier.set(b.copyWith(max: (b.max + d * 5).clamp(b.min, 100)))),
+        stepper(l.dashboardBrightnessLuxForMax, '${luxSteps[luxIndex]} lx',
+            (d) => notifier.set(b.copyWith(luxForMax: luxSteps[(luxIndex + d).clamp(0, luxSteps.length - 1)]))),
+        Padding(padding: const EdgeInsets.fromLTRB(12, 8, 12, 0), child: Text(l.dashboardBrightnessHelp, style: help)),
+        // The sensor now - to find the room's "bright" value.
+        StreamBuilder<double?>(
+          stream: _ambientLight,
+          builder: (context, snapshot) => Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+            child: Text(
+              !snapshot.hasData && snapshot.connectionState == ConnectionState.done
+                  ? l.dashboardBrightnessNoSensor
+                  : snapshot.data == null
+                      ? ''
+                      : l.dashboardBrightnessLux(snapshot.data! < 0 ? '–' : snapshot.data!.toStringAsFixed(0)),
+              style: const TextStyle(fontSize: 18, color: Colors.white70),
+            ),
+          ),
+        ),
+      ],
+    ];
+  }
+
+  late final Stream<double?> _ambientLight = Stream.periodic(const Duration(seconds: 1))
+      .asyncMap((_) => ref.read(displayServiceProvider).ambientLight());
 
   /// The camera's motion level for the test display - one subscription per page.
   late final Stream<({double level, bool motion})> _motionLevels =

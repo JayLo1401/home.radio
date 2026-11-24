@@ -4,6 +4,7 @@ import '../../core/dashboard_providers.dart';
 import '../../core/providers.dart';
 import '../../core/system_providers.dart';
 import '../../data/models/launcher_tile.dart';
+import '../../data/repositories/settings_repository.dart';
 import '../../data/services/admin_server.dart';
 import '../../data/services/display_service.dart';
 import '../../data/services/enigma2_service.dart';
@@ -78,6 +79,27 @@ class AdminSettings implements AdminSettingsSource {
     final apps = LauncherService.supported ? await _c.read(launcherServiceProvider).listApps() : const <InstalledApp>[];
     final dashboardUrl = await repo.getDashboardUrl();
     final display = await repo.getDashboardDisplay();
+    final brightness = await repo.getDisplayBrightness();
+    Future<String?> setBrightness(DisplayBrightness Function(DisplayBrightness b) change) async {
+      await _c.read(displayBrightnessProvider.notifier).set(change(await repo.getDisplayBrightness()));
+      return null;
+    }
+
+    _Setting percent(String id, String label, int value, int min, DisplayBrightness Function(DisplayBrightness, int) f) =>
+        _Setting(
+          id: id,
+          label: label,
+          type: 'int',
+          help: '%',
+          min: min,
+          max: 100,
+          get: () => value,
+          set: (v) async {
+            final p = _int(v);
+            if (p == null || p < min || p > 100) return l.adminInvalidValue;
+            return setBrightness((b) => f(b, p));
+          },
+        );
     final android = DisplayService.supported;
 
     Future<String?> setTv(Enigma2Config Function(Enigma2Config c) change) async {
@@ -358,6 +380,18 @@ class AdminSettings implements AdminSettingsSource {
               },
             ),
             _Setting(
+              id: 'motionDimOnly',
+              label: l.dashboardDimOnly,
+              type: 'bool',
+              help: l.dashboardDimOnlyHelp,
+              get: () => display.dimOnly,
+              set: (v) async {
+                final d = await repo.getDashboardDisplay();
+                await _c.read(dashboardDisplayProvider.notifier).set(d.copyWith(dimOnly: _bool(v) ?? true));
+                return null;
+              },
+            ),
+            _Setting(
               id: 'motionSensitivity',
               label: l.dashboardSensitivity,
               type: 'int',
@@ -387,6 +421,39 @@ class AdminSettings implements AdminSettingsSource {
                 final d = await repo.getDashboardDisplay();
                 await _c.read(dashboardDisplayProvider.notifier).set(d.copyWith(timeoutMinutes: m));
                 return null;
+              },
+            ),
+            _Setting(
+              id: 'brightnessMode',
+              label: l.dashboardBrightnessHeading,
+              type: 'choice',
+              options: [
+                ('system', l.dashboardBrightnessSystem),
+                ('fixed', l.dashboardBrightnessFixed),
+                ('adaptive', l.dashboardBrightnessAdaptive),
+              ],
+              get: () => brightness.mode.name,
+              set: (v) {
+                final m = BrightnessMode.values.where((m) => m.name == v).firstOrNull;
+                if (m == null) return Future.value(l.adminInvalidValue);
+                return setBrightness((b) => b.copyWith(mode: m));
+              },
+            ),
+            percent('brightnessLevel', l.dashboardBrightnessLevel, brightness.level, 5, (b, p) => b.copyWith(level: p)),
+            percent('brightnessMin', l.dashboardBrightnessMin, brightness.min, 1, (b, p) => b.copyWith(min: p)),
+            percent('brightnessMax', l.dashboardBrightnessMax, brightness.max, 1, (b, p) => b.copyWith(max: p)),
+            _Setting(
+              id: 'brightnessLuxForMax',
+              label: l.dashboardBrightnessLuxForMax,
+              type: 'int',
+              help: 'lx',
+              min: 1,
+              max: 100000,
+              get: () => brightness.luxForMax,
+              set: (v) {
+                final x = _int(v);
+                if (x == null || x < 1) return Future.value(l.adminInvalidValue);
+                return setBrightness((b) => b.copyWith(luxForMax: x));
               },
             ),
             _Setting(

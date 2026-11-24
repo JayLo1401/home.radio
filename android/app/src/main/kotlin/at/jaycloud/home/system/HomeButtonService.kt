@@ -148,6 +148,28 @@ class HomeButtonService : AccessibilityService() {
 
     override fun onInterrupt() = Unit
 
+    /**
+     * The Haussteuerung: after the display came back on (MotionService.wake),
+     * a lock screen without PIN/password is swiped up like with a finger -
+     * a secure one stays. False if there was none or it can't.
+     */
+    fun swipeAwayLockScreen(): Boolean {
+        val keyguard = getSystemService(android.app.KeyguardManager::class.java) ?: return false
+        if (!keyguard.isKeyguardLocked || keyguard.isDeviceSecure) return false
+        val metrics = resources.displayMetrics
+        val x = metrics.widthPixels / 2f
+        val path = android.graphics.Path().apply {
+            moveTo(x, metrics.heightPixels * 0.92f)
+            lineTo(x, metrics.heightPixels * 0.35f)
+        }
+        val gesture = android.accessibilityservice.GestureDescription.Builder()
+            .addStroke(android.accessibilityservice.GestureDescription.StrokeDescription(path, 0, 300))
+            .build()
+        val sent = dispatchGesture(gesture, null, null)
+        Log.i(TAG, "lock screen swipe: $sent")
+        return sent
+    }
+
     override fun onDestroy() {
         if (instance === this) instance = null
         super.onDestroy()
