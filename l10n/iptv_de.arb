@@ -158,5 +158,7 @@
         "type": "int"
       }
     }
-  }
+  },
+  "iptvChipMine": "Meine Sender",
+  "iptvChipSearch": "Suchen"
 }

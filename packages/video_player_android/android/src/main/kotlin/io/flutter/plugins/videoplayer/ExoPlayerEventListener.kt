@@ -78,7 +78,28 @@ internal abstract class ExoPlayerEventListener(
     isWaitingForValidDuration = false
     isInitialized = true
     mainHandler.removeCallbacks(initializationFallback)
+    // Home Media: a video track no decoder of this device takes (DivX 3, WMV, ...) - ExoPlayer
+    // would play the sound alone. An error instead, so the app can hand the file to another
+    // player.
+    val unplayable = unplayableVideo()
+    if (unplayable != null) {
+      events.onError("VideoError", "Video player had error: no decoder for the video ($unplayable)", null)
+      return
+    }
     sendInitialized()
+  }
+
+  /**
+   * Home Media: the format of the stream's video if it has video tracks but none of them is
+   * selected (no decoder for any of them) - null if the video plays or there is none.
+   */
+  private fun unplayableVideo(): String? {
+    val video = exoPlayer.currentTracks.groups.filter { it.type == C.TRACK_TYPE_VIDEO }
+    if (video.isEmpty() || video.any { it.isSelected }) {
+      return null
+    }
+    val format = video.first().getTrackFormat(0)
+    return format.sampleMimeType ?: format.codecs ?: "unknown"
   }
 
   override fun onPlaybackStateChanged(playbackState: Int) {

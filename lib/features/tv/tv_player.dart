@@ -99,6 +99,10 @@ abstract class TvPlayer {
   /// Android's API level (0 elsewhere) - [prepare] reads it once.
   static int _androidSdk = 0;
 
+  /// Android's API level (0 elsewhere or before [prepare]) - the films'
+  /// player picks its picture output by it, like TV.
+  static int get androidSdk => _androidSdk;
+
   /// Called once on start (main): what [TvPlayer] needs to know about the
   /// device before the first channel.
   static Future<void> prepare() async {

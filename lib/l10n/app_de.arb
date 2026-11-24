@@ -58,6 +58,115 @@
   "adminMotionTimeout": "Display aus nach (Minuten)",
   "adminMotionTimeoutHelp": "0 = nie",
   "adminCameraOnDevice": "Der Zugriff auf die Kamera muss einmal am Gerät erlaubt werden: Einstellungen → Haussteuerung.",
+  "browserTitle": "Browser",
+  "browserAndroidOnly": "Den Browser gibt es nur auf Android (TV-Box, Tablet, Handy).",
+  "browserAddress": "Adresse oder Suche",
+  "browserAddressHint": "z. B. orf.at oder ein Suchbegriff",
+  "browserBack": "Zurück",
+  "browserForward": "Vor",
+  "browserReload": "Neu laden",
+  "browserHome": "Startseite",
+  "browserBookmarks": "Lesezeichen",
+  "browserBookmarkAdd": "Lesezeichen setzen",
+  "browserBookmarkRemove": "Lesezeichen entfernen",
+  "browserBookmarksEmpty": "Noch keine Lesezeichen - im Menü einer Seite mit dem Stern setzen.",
+  "browserBlockedCount": "{count, plural, =0{nichts blockiert} =1{1 blockiert} other{{count} blockiert}}",
+  "@browserBlockedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "browserBlockerSiteOn": "Werbefilter auf dieser Seite an",
+  "browserBlockerSiteOff": "Werbefilter auf dieser Seite aus",
+  "browserBlockerOff": "Werbefilter aus",
+  "browserDesktop": "Desktop-Ansicht",
+  "browserTextSize": "Textgröße {percent} %",
+  "@browserTextSize": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "browserSmaller": "Kleiner",
+  "browserLarger": "Größer",
+  "browserSettings": "Einstellungen",
+  "browserClose": "Browser schließen",
+  "browserLeaveTitle": "Browser schließen?",
+  "browserLeave": "Schließen",
+  "browserStay": "Bleiben",
+  "browserEnterText": "Text eingeben",
+  "browserTextInsert": "Einfügen",
+  "browserTextSend": "Senden",
+  "browserNoField": "Hier ist kein Textfeld ausgewählt - zuerst mit OK in ein Feld klicken.",
+  "browserFieldHint": "Textfeld: OK zeigt die Tastatur, Menü-Taste: Text eingeben, Zurück: fertig",
+  "browserPointerHint": "Steuerkreuz bewegt den Zeiger, OK klickt, am Rand wird geblättert. Menü-Taste: Adresse, Lesezeichen, Werbefilter.",
+  "browserDownloadUnsupported": "Downloads werden im Browser nicht unterstützt.",
+  "browserSettingsTitle": "Browser-Einstellungen",
+  "browserAreaSubtitle": "Werbefilter, Suchmaschine, Startseite",
+  "browserBlocker": "Werbe- und Trackerfilter",
+  "browserBlockerHelp": "Blockiert Werbung und Tracker mit den Filterlisten von uBlock Origin und EasyList - auch die Werbung auf YouTube, so weit es geht. Für einzelne Seiten im Menü der Seite abschaltbar.",
+  "browserFilterLists": "Filterlisten",
+  "browserListSource": "Lizenz {license} - {homepage}",
+  "@browserListSource": {
+    "placeholders": {
+      "license": {
+        "type": "String"
+      },
+      "homepage": {
+        "type": "String"
+      }
+    }
+  },
+  "browserListsUpdated": "Stand {date}, {rules} Regeln",
+  "@browserListsUpdated": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      },
+      "rules": {
+        "type": "int"
+      }
+    }
+  },
+  "browserListsNever": "Noch nicht geladen",
+  "browserListsUpdating": "Filterlisten werden geladen …",
+  "browserListsUpdateNow": "Jetzt aktualisieren",
+  "browserListsFailed": "Nicht geladen (ältere Fassung benutzt): {lists}",
+  "@browserListsFailed": {
+    "placeholders": {
+      "lists": {
+        "type": "String"
+      }
+    }
+  },
+  "browserListsError": "Die Filterlisten konnten nicht geladen werden.",
+  "browserListsCredit": "Filterlisten: uBlock Origin uAssets (GPLv3), EasyList und EasyPrivacy (GPLv3 / CC BY-SA 3.0), Peter Lowe (McRae GPL). Die Skripte gegen Werbung (Scriptlets) sind eine eigene Umsetzung.",
+  "browserAllowlist": "Seiten ohne Werbefilter",
+  "browserAllowlistEmpty": "Keine - im Menü einer Seite abschaltbar.",
+  "browserSearchEngine": "Suchmaschine",
+  "browserHomePage": "Startseite",
+  "browserHomePageDefault": "Seite der Suchmaschine",
+  "browserDesktopDefault": "Seiten in der Desktop-Ansicht öffnen",
+  "browserDesktopHelp": "Seiten wie am PC statt der Handy-Fassung.",
+  "browserTextZoom": "Textgröße",
+  "browserClearCookies": "Cookies und Anmeldungen löschen",
+  "browserClearCookiesConfirm": "Alle Cookies und Anmeldungen des Browsers löschen?",
+  "browserClearCache": "Zwischenspeicher leeren",
+  "browserCleared": "Gelöscht.",
+  "browserDelete": "Löschen",
+  "browserRemove": "Entfernen",
+  "browserWebView": "Browser-Engine: {version}",
+  "@browserWebView": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "browserAdminPart": "Browser eingeschaltet",
   "commonOk": "OK",
   "commonCancel": "Abbrechen",
   "commonSave": "Speichern",
@@ -328,6 +437,85 @@
       }
     }
   },
+  "iptvChipMine": "Meine Sender",
+  "iptvChipSearch": "Suchen",
+  "launcherAddToGroup": "Zu Gruppe hinzufügen …",
+  "launcherAddToGroupTitle": "„{app}“ zu Gruppe hinzufügen",
+  "@launcherAddToGroupTitle": {
+    "placeholders": {
+      "app": {
+        "type": "String"
+      }
+    }
+  },
+  "launcherMoveToGroup": "In andere Gruppe verschieben …",
+  "launcherMoveToGroupTitle": "„{app}“ verschieben nach",
+  "@launcherMoveToGroupTitle": {
+    "placeholders": {
+      "app": {
+        "type": "String"
+      }
+    }
+  },
+  "launcherRemoveFromGroup": "Aus der Gruppe entfernen",
+  "launcherNewGroup": "Neue Gruppe …",
+  "launcherNewGroupTitle": "Name der neuen Gruppe",
+  "launcherGroupNameHint": "z. B. System-Tools",
+  "launcherGroupUnnamed": "Gruppe",
+  "launcherGroupOptions": "Gruppe „{group}“ …",
+  "@launcherGroupOptions": {
+    "placeholders": {
+      "group": {
+        "type": "String"
+      }
+    }
+  },
+  "launcherGroupRename": "Umbenennen",
+  "launcherGroupRenameTitle": "Gruppe umbenennen",
+  "launcherGroupMoveUp": "Gruppe nach oben",
+  "launcherGroupMoveDown": "Gruppe nach unten",
+  "launcherGroupDelete": "Gruppe löschen",
+  "launcherGroupDeleteTitle": "Gruppe „{group}“ löschen?",
+  "@launcherGroupDeleteTitle": {
+    "placeholders": {
+      "group": {
+        "type": "String"
+      }
+    }
+  },
+  "launcherGroupDeleteBody": "Nur die Zeile verschwindet - die Apps bleiben installiert, in den Favoriten und in anderen Gruppen.",
+  "launcherGroupEmpty": "Noch leer",
+  "launcherGroupEmptyHint": "{key}  Optionen der Gruppe",
+  "@launcherGroupEmptyHint": {
+    "placeholders": {
+      "key": {
+        "type": "String"
+      }
+    }
+  },
+  "launcherAddedToGroup": "„{app}“ ist jetzt in „{group}“",
+  "@launcherAddedToGroup": {
+    "placeholders": {
+      "app": {
+        "type": "String"
+      },
+      "group": {
+        "type": "String"
+      }
+    }
+  },
+  "launcherRemovedFromGroup": "„{app}“ aus „{group}“ entfernt",
+  "@launcherRemovedFromGroup": {
+    "placeholders": {
+      "app": {
+        "type": "String"
+      },
+      "group": {
+        "type": "String"
+      }
+    }
+  },
+  "launcherAllAppsHelp": "OK: App öffnen  ·  ☰ oder OK lange drücken: Favorit, Gruppe, App-Info (beenden, deinstallieren)",
   "miscApply": "Übernehmen",
   "miscLocationTitle": "Standort einrichten",
   "miscLocationIntro": "Gemeinsamer Standort für Wetterprognose, Wetterradar und Sonne & Mond.",
@@ -591,6 +779,264 @@
       }
     }
   },
+  "moviesTitle": "Filme",
+  "moviesNotSetUpTitle": "Noch kein Film-Ordner",
+  "moviesNotSetUp": "Die Filme kommen vom NAS. Unter Einstellungen → NAS den Server eintragen und die Ordner „Filme“ und/oder „Videos“ wählen.",
+  "moviesOpenNasSettings": "NAS einrichten",
+  "moviesEmpty": "In diesem Ordner sind keine Filme.",
+  "moviesListError": "Der Ordner lässt sich nicht lesen: {error}",
+  "@moviesListError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "moviesRetry": "Nochmal",
+  "moviesOpenFolder": "Ordner öffnen",
+  "moviesHoldOkForFolder": "OK lange drücken: Ordner öffnen",
+  "moviesDvd": "DVD",
+  "moviesOpening": "Film wird geöffnet…",
+  "moviesResumeTitle": "Weiterschauen?",
+  "moviesResumeFrom": "Fortsetzen ab {time}",
+  "@moviesResumeFrom": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "moviesFromStart": "Von vorne",
+  "moviesErrorNoDvd": "Darin ist keine Video-DVD (kein Ordner VIDEO_TS mit Filmdateien).",
+  "moviesErrorPlay": "Der Film lässt sich nicht abspielen: {error}",
+  "@moviesErrorPlay": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "moviesErrorTimeout": "Der Film startet nicht - das Gerät kann dieses Format vermutlich nicht abspielen, oder das NAS liefert zu langsam.",
+  "moviesBack": "Zurück",
+  "moviesOptions": "Optionen",
+  "moviesAudio": "Tonspur",
+  "moviesSubtitles": "Untertitel",
+  "moviesSubtitlesOff": "Aus",
+  "moviesNoAudioChoice": "Dieser Film hat nur eine Tonspur.",
+  "moviesAudioComments": "Kommentar",
+  "moviesAudioDescription": "Hörfilm",
+  "moviesChapter": "Kapitel {number} von {count}",
+  "@moviesChapter": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "moviesKeyHint": "OK: Pause · ◀ ▶: spulen · ▲ ▼: {jump} · {options}: Ton & Untertitel",
+  "@moviesKeyHint": {
+    "placeholders": {
+      "jump": {
+        "type": "String"
+      },
+      "options": {
+        "type": "String"
+      }
+    }
+  },
+  "moviesJumpChapters": "Kapitel",
+  "moviesJumpMinutes": "±5 Min.",
+  "moviesDvdNote": "DVD ohne Menü und ohne DVD-Untertitel",
+  "moviesAdminPart": "Filme eingeschaltet",
+  "musicTitle": "Musik",
+  "musicAreaSubtitle": "Wiedergabe, Visualisierung, Index",
+  "musicAdminPart": "Musik (vom NAS)",
+  "musicAdminIndex": "Musik-Index",
+  "musicAllShuffled": "Alles zufällig",
+  "musicSearch": "Suchen",
+  "musicNowPlaying": "Wiedergabe",
+  "musicSettingsTitle": "Musik",
+  "musicPlayFolder": "Abspielen",
+  "musicShuffleFolder": "Zufällig abspielen",
+  "musicRefreshFolderIndex": "Ordner neu einlesen (Index)",
+  "musicFolderIndexed": "{count} Titel neu eingelesen.",
+  "@musicFolderIndexed": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "musicFolderSummary": "{folders} Ordner · {tracks} Titel",
+  "@musicFolderSummary": {
+    "placeholders": {
+      "folders": {
+        "type": "int"
+      },
+      "tracks": {
+        "type": "int"
+      }
+    }
+  },
+  "musicEmptyFolder": "In diesem Ordner ist keine Musik.",
+  "musicNoFolder": "Noch kein Musikordner gewählt.\nWähle ihn in Einstellungen → NAS.",
+  "musicOpenNasSettings": "NAS-Einstellungen öffnen",
+  "musicRetry": "Nochmal versuchen",
+  "musicErrorNoFolder": "Kein Musikordner gewählt (Einstellungen → NAS).",
+  "musicErrorNoMusic": "Hier ist keine Musik zu finden.",
+  "musicErrorUnplayable": "„{name}“ lässt sich nicht abspielen - weiter mit dem nächsten Titel.",
+  "@musicErrorUnplayable": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "musicNothingPlaying": "Gerade läuft keine Musik.",
+  "musicPaused": "Pausiert",
+  "musicCollecting": "Ordner werden noch durchsucht …",
+  "musicQueuePosition": "Titel {index} von {count}",
+  "@musicQueuePosition": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "musicQueue": "Warteschlange",
+  "musicQueueTitle": "Warteschlange ({count})",
+  "@musicQueueTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "musicNowPlayingHint": "OK Pause · ←/→ spulen (halten: schneller) · ↑ Visualisierung · ↓ Tasten · {menu} Warteschlange",
+  "@musicNowPlayingHint": {
+    "placeholders": {
+      "menu": {
+        "type": "String"
+      }
+    }
+  },
+  "musicControlsHint": "←/→ Taste wählen · OK drücken · ↑ zurück zum Spulen",
+  "musicPlay": "Abspielen",
+  "musicPause": "Pause",
+  "musicStop": "Stopp",
+  "musicNext": "Nächster Titel",
+  "musicPrevious": "Voriger Titel",
+  "musicShuffleOn": "Zufällig: an",
+  "musicShuffleOff": "Zufällig: aus",
+  "musicRepeatOff": "Nicht wiederholen",
+  "musicRepeatAll": "Alle wiederholen",
+  "musicRepeatOne": "Titel wiederholen",
+  "musicVisualizer": "Visualisierung",
+  "musicSearchLabel": "Titel, Interpret oder Ordner",
+  "musicSearchHint": "z. B. Queen Bohemian",
+  "musicSearchIntro": "Sucht in den Datei- und Ordnernamen der ganzen Sammlung.",
+  "musicSearchNothing": "Nichts gefunden.",
+  "musicSearchResults": "Suche: {query}",
+  "@musicSearchResults": {
+    "placeholders": {
+      "query": {
+        "type": "String"
+      }
+    }
+  },
+  "musicSearchNeedsIndex": "Für die Suche braucht es den Index - eine Liste aller Musikdateien, einmal vom NAS eingelesen (dauert bei vielen Titeln eine Weile, läuft im Hintergrund).",
+  "musicIndexBuild": "Index erstellen",
+  "musicIndexRefresh": "Index aktualisieren",
+  "musicIndexContinue": "Index fortsetzen",
+  "musicIndexStop": "Anhalten",
+  "musicIndexDelete": "Index löschen",
+  "musicIndexNone": "Kein Index - Ordner werden direkt vom NAS gelesen.",
+  "musicIndexRunning": "Wird eingelesen: {folders} Ordner, {tracks} Titel …",
+  "@musicIndexRunning": {
+    "placeholders": {
+      "folders": {
+        "type": "int"
+      },
+      "tracks": {
+        "type": "int"
+      }
+    }
+  },
+  "musicIndexInterrupted": "Unterbrochen nach {tracks} Titeln - geht beim nächsten Öffnen von Musik weiter.",
+  "@musicIndexInterrupted": {
+    "placeholders": {
+      "tracks": {
+        "type": "int"
+      }
+    }
+  },
+  "musicIndexState": "{tracks} Titel in {folders} Ordnern · Stand {date}",
+  "@musicIndexState": {
+    "placeholders": {
+      "tracks": {
+        "type": "int"
+      },
+      "folders": {
+        "type": "int"
+      },
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "musicIndexSummary": "{tracks} Titel · {folders} Ordner",
+  "@musicIndexSummary": {
+    "placeholders": {
+      "tracks": {
+        "type": "int"
+      },
+      "folders": {
+        "type": "int"
+      }
+    }
+  },
+  "musicSettingsFolder": "Musikordner",
+  "musicSettingsNoFolder": "Nicht gewählt - in den NAS-Einstellungen",
+  "musicSettingsPlayback": "Wiedergabe",
+  "musicSettingsShuffle": "Zufällige Reihenfolge",
+  "musicSettingsShuffleHelp": "Gilt für das Abspielen eines Titels und bleibt bis zum Umschalten.",
+  "musicSettingsRepeat": "Wiederholen",
+  "musicSettingsPreferTags": "Titel und Interpret aus den Dateien",
+  "musicSettingsPreferTagsHelp": "Aus den Tags der Datei (ID3, MP4, FLAC …), sonst aus dem Dateinamen. Aus: immer der Dateiname.",
+  "musicSettingsVisualizer": "Visualisierung",
+  "musicVisualizerOff": "Aus",
+  "musicVisualizerManual": "Mit ↑ in der Wiedergabe",
+  "musicVisualizerAuto": "Auch von selbst nach einer Minute ohne Taste",
+  "musicSettingsQuality": "Bildqualität",
+  "musicQualityAuto": "Automatisch",
+  "musicQualityLow": "Schonend (schwache Boxen)",
+  "musicQualityHigh": "Hoch",
+  "musicSettingsReactive": "Folgt der Musik",
+  "musicSettingsReactiveHelp": "Bewegt sich im Takt der Musik. Braucht unter Android die Berechtigung „Audio aufnehmen“ - ohne sie pulsiert das Bild ruhig von selbst.",
+  "musicSettingsReactivePermission": "Damit die Visualisierung der Musik folgen kann, liest sie das Frequenzspektrum der eigenen Wiedergabe. Android verlangt dafür die Berechtigung „Audio aufnehmen“ und fragt nach dem Mikrofon - das Mikrofon wird dabei aber nicht benutzt, es wird nichts aufgenommen oder gespeichert.",
+  "musicSettingsReactiveAllow": "Erlauben",
+  "musicSettingsReactiveDenied": "Ohne die Berechtigung pulsiert die Visualisierung von selbst.",
+  "musicSettingsIndex": "Index (optional)",
+  "musicSettingsIndexHelp": "Eine Liste aller Musikdateien (nur Namen, keine Tags) für die Suche und „Alles zufällig“ ohne Wartezeit. Ordner durchstöbern und abspielen geht auch ohne. Das Einlesen läuft im Hintergrund und setzt nach einer Unterbrechung fort.",
+  "musicWithSubfolders": "Mit Unterordnern",
+  "musicWithSubfoldersHelp": "„Abspielen“ und „Zufällig abspielen“ nehmen auch alle Unterordner des Ordners mit.",
+  "musicSettingsInterval": "Wechsel zur nächsten Visualisierung",
+  "musicIntervalSeconds": "Alle {seconds} s",
+  "@musicIntervalSeconds": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "musicIntervalManual": "Nur mit ↑",
+  "musicVisualizerHint": "↑ nächste Visualisierung · ←/→ Titel · ↓ zurück",
   "nasTitle": "NAS (Netzwerkspeicher)",
   "nasIntro": "Der Netzwerkspeicher im eigenen Netz: Backups vor jedem Update, Hintergrundbilder für Home - und später Musik, Videos und Filme vom Server.",
   "nasServerSection": "Server",
@@ -763,8 +1209,6 @@
     }
   },
   "nasBgNoFolder": "Zuerst unter Einstellungen → System → NAS-Server einen Ordner für Hintergrundbilder wählen.",
-  "nasBgFromUrl": "Adresse (http)",
-  "nasBgFromUrlHint": "Ein Webserver, der Bilder liefert (siehe unten).",
   "nasBgSyncNow": "Jetzt abgleichen",
   "nasBgSyncing": "Wird abgeglichen …",
   "nasBgStatus": "{count} Bilder auf dem Gerät",
@@ -795,6 +1239,197 @@
     }
   },
   "nasFolderBackgrounds": "Hintergrundbilder (Home)",
+  "nasBgSyncListing": "Ordner wird gelesen …",
+  "nasBgSyncNothingNew": "Keine neuen Bilder - wird abgeschlossen …",
+  "nasBgSyncProgress": "Bild {loaded} von {total} wird geladen …",
+  "@nasBgSyncProgress": {
+    "placeholders": {
+      "loaded": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "permissionsTitle": "Berechtigungen",
+  "permissionsIntro": "Home System fragt nur nach dem, was eine Funktion wirklich braucht - und jede Erlaubnis ist freiwillig. Ohne sie läuft alles andere ganz normal, nur die jeweilige Funktion fehlt.",
+  "permissionsSummary": "{granted} von {total} erteilt",
+  "@permissionsSummary": {
+    "placeholders": {
+      "granted": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "permissionsNoneNeeded": "Auf diesem Gerät braucht Home System keine besonderen Berechtigungen.",
+  "permissionsStatusGranted": "Erteilt",
+  "permissionsStatusMissing": "Nicht erteilt",
+  "permissionsStatusNotNeeded": "Nicht nötig",
+  "permissionsStatusUsb": "Android fragt beim Einstecken",
+  "permissionsStatusNotifications": "Keine Erlaubnis nötig",
+  "permissionsStatusAdb": "Nur per adb",
+  "permissionsAllow": "Erlauben",
+  "permissionsSetUp": "Einrichten",
+  "permissionsChange": "Ändern",
+  "permissionsLater": "Später",
+  "permissionsNotNeededHeading": "Gerade nicht nötig",
+  "permissionsNotNeededDevice": "Auf diesem Gerät nicht nötig.",
+  "permissionsNotNeededPart": "Nicht nötig, solange „{part}“ ausgeschaltet ist.",
+  "@permissionsNotNeededPart": {
+    "placeholders": {
+      "part": {
+        "type": "String"
+      }
+    }
+  },
+  "permissionsNotNeededNoCamera": "Dieses Gerät hat keine Kamera.",
+  "permissionsBlocked": "Android fragt nicht mehr nach. Auf der App-Seite, die sich geöffnet hat, unter „Berechtigungen“ erlauben.",
+  "permissionsDenied": "Nicht erlaubt - die Funktion bleibt aus. Das lässt sich jederzeit hier nachholen.",
+  "permissionsMusicOn": "„Folgt der Musik“ ist jetzt eingeschaltet.",
+  "permissionsHomeKeyTitle": "Home-Taste",
+  "permissionsHomeKeyWhy": "Damit die Home-Taste der Fernbedienung Home System öffnet, wird Home System Standard-Launcher - oder, wo das nicht geht (z. B. Fire TV, Google TV), wird der Dienst „Home System: Home-Taste“ eingeschaltet, eine Bedienungshilfe. Der Dienst sieht nur, welche App gerade vorne ist - keine Bildschirminhalte, keine Eingaben, keine Passwörter.",
+  "permissionsHomeKeyWhyDashboard": "Für die Haussteuerung schaltet derselbe Dienst außerdem das Display aus und wischt einen Sperrbildschirm ohne PIN weg, wenn das Display wieder angeht.",
+  "permissionsCameraTitle": "Kamera",
+  "permissionsCameraWhy": "Für die Haussteuerung („Display per Kamera ein- und ausschalten“): Die Kamera erkennt nur, ob sich vor dem Gerät etwas bewegt. Es werden keine Bilder gespeichert oder verschickt.",
+  "permissionsInstallTitle": "Apps installieren",
+  "permissionsInstallWhy": "Damit Home System seine eigenen Updates einspielen kann. Android fragt vor jedem Update trotzdem noch einmal nach, und andere Apps installiert Home System nie.",
+  "permissionsStorageTitle": "Speicher",
+  "permissionsStorageWhy": "Für Backups: Sie liegen im Ordner Download/HomeSystem und überstehen so auch ein Deinstallieren der App. Home System liest und schreibt dort nur seine eigenen Backup-Dateien.",
+  "permissionsAllFilesTitle": "Zugriff auf alle Dateien",
+  "permissionsAllFilesWhy": "Nur für Backups: Neue Backups im Ordner Download/HomeSystem gehen auch ohne. Diesen Zugriff braucht Home System erst, um nach einer Neuinstallation die Backups der früheren Installation zu finden - es liest dort nur seine eigenen Backup-Dateien.",
+  "permissionsRecordAudioTitle": "Audio aufnehmen",
+  "permissionsRecordAudioWhy": "Nur für die Musik-Visualisierung („Folgt der Musik“): Sie liest das Frequenzspektrum der eigenen Wiedergabe. Android nennt das „Audio aufnehmen“ und spricht vom Mikrofon - das Mikrofon wird aber nie benutzt, es wird nichts aufgenommen oder gespeichert.",
+  "permissionsUsbTitle": "USB-Stick für DAB+ und UKW",
+  "permissionsUsbWhy": "Steckt man einen RTL-SDR-Stick an, fragt Android einmal, ob Home System ihn verwenden darf. Einfach „OK“ wählen (wenn angeboten, mit „Immer“) - Home System verwendet nur diesen Stick.",
+  "permissionsNotificationsTitle": "Benachrichtigungen",
+  "permissionsNotificationsWhy": "Home System fragt nicht danach und schickt keine Mitteilungen. Während Radio oder Musik spielt, zeigt Android die Wiedergabe-Steuerung an - dafür ist keine Erlaubnis nötig.",
+  "permissionsAdvanced": "Für Fortgeschrittene",
+  "permissionsSecureSettingsTitle": "Systemeinstellungen ändern",
+  "permissionsSecureSettingsWhy": "Lässt sich nur vom Computer aus per adb erteilen und ist nicht nötig. Damit schaltet Home System den Dienst für die Home-Taste selbst ein - auch wenn Android ihn nach einem Update abgeschaltet hat. Sonst ändert Home System damit nichts.",
+  "permissionsRestrictedWhy": "Ab Android 13 sperrt Android Bedienungshilfen von Apps, die nicht aus einem App-Store kommen („eingeschränkte Einstellungen“). Das hebt dieser Befehl auf:",
+  "permissionsWizardTitle": "Berechtigungen (freiwillig)",
+  "permissionsWizardHint": "Hier steht, wofür Home System welche Erlaubnis braucht. Nichts davon ist Pflicht - „Später“ geht immer, und alles lässt sich unter Einstellungen → System → Berechtigungen nachholen.",
+  "permissionsWizardCounter": "Berechtigung {index} von {count}",
+  "@permissionsWizardCounter": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "permissionsWizardNoneLeft": "Das war's mit den Berechtigungen.",
+  "permissionsWizardNoneLeftHint": "Später findet sich alles unter Einstellungen → System → Berechtigungen.",
+  "picturesTitle": "Bilder",
+  "picturesAreaSubtitle": "Fotos vom NAS, Diashow",
+  "picturesSettingsTitle": "Bilder-Einstellungen",
+  "picturesAdminPart": "Bilder eingeschaltet",
+  "picturesNoFolder": "Noch kein Bilder-Ordner gewählt. Lege in den NAS-Einstellungen fest, wo deine Fotos liegen.",
+  "picturesOpenNasSettings": "NAS-Einstellungen öffnen",
+  "picturesLoadError": "Der Ordner lässt sich nicht lesen.\n{message}",
+  "@picturesLoadError": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "picturesSlideshowWithSubfolders": "Diashow: {folder} (mit Unterordnern)",
+  "@picturesSlideshowWithSubfolders": {
+    "placeholders": {
+      "folder": {
+        "type": "String"
+      }
+    }
+  },
+  "picturesSlideshow": "Diashow: {folder}",
+  "@picturesSlideshow": {
+    "placeholders": {
+      "folder": {
+        "type": "String"
+      }
+    }
+  },
+  "picturesCount": "{count, plural, =0{keine Bilder} =1{1 Bild} other{{count} Bilder}}",
+  "@picturesCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "picturesFolderCount": "{count, plural, =1{1 Ordner} other{{count} Ordner}}",
+  "@picturesFolderCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "picturesEmptyFolder": "In diesem Ordner sind keine Bilder.",
+  "picturesBrowserHint": "OK öffnet · OK auf einem Bild: Diashow ab diesem Bild · ⏯ oder {options} startet die Diashow des Ordners · Zurück geht eine Ebene hoch",
+  "@picturesBrowserHint": {
+    "placeholders": {
+      "options": {
+        "type": "String"
+      }
+    }
+  },
+  "picturesSearching": "Suche Bilder …",
+  "picturesNoneFound": "Hier sind keine Bilder - auch nicht in den Unterordnern.",
+  "picturesStillSearching": "sucht weiter …",
+  "picturesPaused": "Pause",
+  "picturesSlideshowHint": "← → zurück/vor · OK Pause · {options} Einstellungen · Zurück beendet",
+  "@picturesSlideshowHint": {
+    "placeholders": {
+      "options": {
+        "type": "String"
+      }
+    }
+  },
+  "picturesInterval": "Bild wechselt alle",
+  "picturesIntervalSeconds": "{seconds} Sekunden",
+  "@picturesIntervalSeconds": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "picturesOrder": "Reihenfolge",
+  "picturesOrderFolders": "Ordner für Ordner, nach Namen",
+  "picturesOrderShuffled": "Gemischt",
+  "picturesOrderNextTime": "Die Reihenfolge gilt ab der nächsten Diashow.",
+  "picturesBlur": "Ränder mit dem unscharfen Bild füllen",
+  "picturesFolder": "Bilder-Ordner",
+  "picturesMusicHelp": "Radio und Musik laufen während der Diashow einfach weiter.",
+  "picturesSlideshowHeading": "Diashow",
+  "picturesInThisFolder": "{count, plural, =1{1 Bild in diesem Ordner} other{{count} Bilder in diesem Ordner}} - OK auf einem Bild startet die Diashow ab dort",
+  "@picturesInThisFolder": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "picturesResumeFrom": "Fortsetzen ab Bild {position} ({name})",
+  "@picturesResumeFrom": {
+    "placeholders": {
+      "position": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "picturesResumeRestart": "Von vorne",
   "radioErrorConnectionLost": "Verbindung zum Sender verloren - versuche erneut…",
   "radioErrorStationUnreachable": "Sender nicht erreichbar - versuche erneut…",
   "radioErrorPlayback": "Wiedergabefehler: {message}",
@@ -2365,7 +3000,7 @@
       }
     }
   },
-  "settingsAreaSystemSubtitle": "Radio & TV ein/aus, Gerätename, NAS, Start, Home, Home-Taste, Anzeige, Backup, Updates",
+  "settingsAreaSystemSubtitle": "Radio & TV ein/aus, Gerätename, NAS, Start, Home, Home-Taste, Berechtigungen, Anzeige, Backup, Updates",
   "settingsAreaSystemSubtitleNoHomeKey": "Radio & TV ein/aus, Gerätename, NAS, Start, Home, Anzeige, Backup, Updates",
   "settingsAreaRadioSubtitle": "Empfänger (DAB+, UKW, Funk), Autostart-Sender, Wetter, Radar, Sonne & Mond",
   "settingsAreaTvSubtitle": "Sat-Receiver (Enigma2, z. B. GigaBlue)",
@@ -2475,10 +3110,6 @@
   "settingsWizardNameHint": "Ein eindeutiger Name, damit man die Geräte unterscheiden kann - auf der Verwaltungsseite und bei Backups.",
   "settingsWizardNameOwn": "Oder eigener Name",
   "settingsWizardNext": "Weiter",
-  "settingsWizardHomeKeyTitle": "Home-Taste der Fernbedienung (freiwillig)",
-  "settingsWizardHomeKeyHint": "Wer möchte, dass die Home-Taste der Fernbedienung Home System öffnet, richtet das hier ein - Home System wird dafür Standard-Launcher, oder eine Bedienungshilfe wird eingeschaltet. Wer das nicht will, geht einfach weiter; es lässt sich jederzeit unter Einstellungen → System → Home-Taste nachholen.",
-  "settingsWizardHomeKeySetUp": "Home-Taste einrichten",
-  "settingsWizardHomeKeySkip": "Weiter (ohne bzw. nach dem Einrichten)",
   "settingsWizardDone": "Fertig - „{name}“ ist eingerichtet.",
   "@settingsWizardDone": {
     "placeholders": {
@@ -2497,6 +3128,130 @@
     }
   },
   "settingsWizardStart": "Los geht's",
+  "settingsOpenSourceLicenses": "Open-Source-Lizenzen",
+  "settingsAboutInternetTv": "Internet-TV",
+  "settingsAboutInternetTvData": "Senderliste, Streams und Logos aus dem offenen Verzeichnis iptv-org (github.com/iptv-org/iptv) - nur frei verfügbare Sender; die Streams kommen von den Sendern selbst",
+  "settingsAboutMaps": "Karten (Funk)",
+  "settingsAboutMapsData": "Kartenkacheln © OpenStreetMap-Mitwirkende, Daten unter der Open Database License (ODbL), über tile.openstreetmap.org",
+  "settingsAboutAircraft": "Flugzeugdaten (ADS-B)",
+  "settingsAboutAircraftData": "Flugzeugtypen, Halter und Flugrouten über adsbdb.com",
+  "settingsBgTitle": "Hintergrund von Home",
+  "settingsBgGradientsHint": "Mitgelieferte Farbverläufe (Nordlicht, Abendrot, Ozean, …) - ohne Internet.",
+  "settingsBgPhotos": "Landschaftsfotos aus dem Internet",
+  "settingsBgPhotosHint": "Landschafts- und Naturfotos - die Bing-Bilder des Tages der letzten zwei Wochen, abwechselnd. Ort und Fotograf stehen klein rechts oben.",
+  "settingsBgBand": "Band hinter den Favoriten",
+  "settingsBgBandHint": "Wie stark das Band das Bild abdeckt - wirkt sofort.",
+  "settingsBgBandNone": "Keines",
+  "settingsBgInterval": "Neues Bild alle",
+  "settingsBgOneHour": "1 Stunde",
+  "settingsIconPackTitle": "Icon-Paket für die App-Kacheln",
+  "settingsIconPackNoneOriginal": "Keines - Original-Logos der Apps",
+  "settingsIconPackNoneInstalled": "Kein Icon-Paket installiert. Icon-Pakete für Android-Launcher (ADW-/Nova-Format) werden unterstützt - als App installieren, dann hier auswählen.\nEinzelne Kacheln bekommen ein eigenes Bild über ☰ auf der Kachel → „Bild ändern“.",
+  "settingsHomeKeyIntro": "Mit der Home-Taste der Fernbedienung öffnet sich Home System mit Home (den Kacheln).",
+  "settingsHomeKeyIsDefault": "Home System ist der Standard-Launcher.",
+  "settingsHomeKeyNotDefault": "Home System ist noch nicht der Standard-Launcher.",
+  "settingsHomeKeyDefaultHelp": "Auf Android-TV-Boxen Home System als Startbildschirm („Home-App“) wählen. Fragt das Gerät beim Drücken der Home-Taste nach, „Home System“ und „Immer“ wählen.",
+  "settingsHomeKeyChooseDefault": "Standard-Launcher wählen",
+  "settingsHomeKeyServiceFallback": "Lässt das Gerät keinen anderen Launcher zu (z. B. Google TV), hilft der Dienst unten - wie beim Fire TV.",
+  "settingsHomeKeyServiceOn": "Dienst „Home System: Home-Taste“ ist eingeschaltet.",
+  "settingsHomeKeyServiceOff": "Dienst „Home System: Home-Taste“ ist ausgeschaltet.",
+  "settingsHomeKeyServiceFireTv": "Der Fire TV zeigt mit der Home-Taste immer den Amazon-Startbildschirm. Der Dienst (eine Bedienungshilfe) holt Home System dann sofort nach vorne. Er sieht nur, welche App im Vordergrund ist - keine Inhalte, keine Tasten und keine Eingaben.",
+  "settingsHomeKeyServiceOther": "Der Dienst (eine Bedienungshilfe) holt Home System nach vorne, sobald der Startbildschirm des Geräts erscheint. Er sieht nur, welche App im Vordergrund ist.",
+  "settingsHomeKeyEnable": "Dienst einschalten",
+  "settingsHomeKeyOpenA11y": "Bedienungshilfen öffnen",
+  "settingsHomeKeyBlocked": "Android hat den Dienst gesperrt („eingeschränkte Einstellungen“ - ab Android 13 bei Apps, die nicht aus einem App-Store kommen). Einmalig vom Computer aus per adb erlauben, dann noch einmal „Dienst einschalten“:",
+  "settingsHomeKeyEnableThere": "Dort „Home System: Home-Taste“ einschalten. Zeigt das Gerät den Dienst nicht an oder ist er ausgegraut, einmalig vom Computer aus per adb freischalten - danach schaltet ihn dieser Knopf selbst ein:",
+  "settingsHomeKeyRedirect": "Home-Taste öffnet Home System",
+  "settingsHomeKeyRedirectHint": "Aus: der Startbildschirm des Geräts bleibt, Home System öffnet man wie jede App.",
+  "settingsBackupSaved": "Backup gespeichert: {location}",
+  "@settingsBackupSaved": {
+    "placeholders": {
+      "location": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsBackupDownloadAlso": "Zum Herunterladen auch unter {urls}",
+  "@settingsBackupDownloadAlso": {
+    "description": "One or more admin page addresses, joined with the word for 'or'.",
+    "placeholders": {
+      "urls": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsBackupNoPermission": "Ohne Speicher-Berechtigung kann kein Backup gespeichert werden.",
+  "settingsBackupFailed": "Backup fehlgeschlagen: {message}",
+  "@settingsBackupFailed": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsRestoreNoPermission": "Ohne Speicher-Berechtigung können keine Backups gelesen werden.",
+  "settingsRestoreReadFailed": "Backups konnten nicht gelesen werden ({message}).",
+  "@settingsRestoreReadFailed": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsRestoreBusy": "Das Gerät spielt gerade schon ein Backup ein.",
+  "settingsRestoreFromWebDone": "Backup von der Verwaltungsseite eingespielt - App startet neu …",
+  "settingsRestoreConfirmTitle": "Backup wiederherstellen?",
+  "settingsRestoreConfirmText": "{what}\n\nAlle aktuellen Favoriten, DAB+ Sender und Einstellungen werden ersetzt. Danach startet die App neu.",
+  "@settingsRestoreConfirmText": {
+    "description": "The backup file name, or the sentence settingsRestorePickedFile.",
+    "placeholders": {
+      "what": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsRestoreButton": "Wiederherstellen",
+  "settingsRestoreDone": "Backup wiederhergestellt - App startet neu …",
+  "settingsRestoreNoPicker": "Dieses Gerät hat keine Dateiauswahl. Bitte stattdessen „Zugriff auf alle Dateien“ erlauben.",
+  "settingsRestoreFailed": "Wiederherstellen fehlgeschlagen: {message}",
+  "@settingsRestoreFailed": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsRestorePickedFile": "Die ausgewählte Datei wird eingespielt.",
+  "settingsRestoreNoAllFilesSetting": "Dieses Gerät bietet die Einstellung „Zugriff auf alle Dateien“ nicht an.",
+  "settingsRestoreViaAdmin": "Über die Verwaltungsseite",
+  "settingsRestoreNoNetwork": "Keine Netzwerkverbindung - die Verwaltungsseite ist nicht erreichbar.",
+  "settingsRestoreOpenInBrowser": "Auf einem Computer oder Handy im selben Netz im Browser öffnen:",
+  "settingsRestoreHostname": "Hostname dieses Geräts: {name}",
+  "@settingsRestoreHostname": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsRestoreAdminHint": "Dort die Backup-Datei auswählen und einspielen. Solange diese Seite hier offen ist, nimmt das Gerät ein Backup an. Danach startet die App neu.",
+  "settingsRestoreOnDevice": "Backups auf diesem Gerät",
+  "settingsRestoreOnDeviceHint": "Aus dem Ordner „{folder}/HomeSystem“ (und HomeRadio der früheren App).",
+  "@settingsRestoreOnDeviceHint": {
+    "description": "'Download' on Android, settingsRestoreFolderDocuments elsewhere.",
+    "placeholders": {
+      "folder": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsRestoreFolderDocuments": "Dokumente",
+  "settingsRestoreNone": "Keine Backups gefunden.",
+  "settingsRestoreAllFilesHint": "Backups von einer früheren Installation der App sind erst sichtbar, wenn der „Zugriff auf alle Dateien“ erlaubt wurde. Alternativ die Datei direkt auswählen.",
+  "settingsRestoreAllowAllFiles": "Zugriff auf alle Dateien erlauben",
+  "settingsRestorePickFile": "Backup-Datei auswählen … (z. B. vom USB-Stick)",
+  "settingsAboutAdblock": "Werbefilter (Browser)",
+  "settingsAboutAdblockData": "Filterlisten, zur Laufzeit geladen: uBlock Origin uAssets (GPLv3, github.com/uBlockOrigin/uAssets), EasyList, EasyPrivacy, EasyList Germany (GPLv3 oder CC BY-SA 3.0, easylist.to), Peter Lowe’s Ad and tracking server list (pgl.yoyo.org/adservers). Die Scriptlets sind eigene Umsetzungen nach den Namen und Argumenten von uBlock Origin.",
   "systemStartDashboard": "Haussteuerung anzeigen (Wandtablet)",
   "systemStartAppNone": "Andere App starten …",
   "systemStartApp": "App starten: {app}",
@@ -2774,5 +3529,17 @@
       }
     }
   },
-  "tvSettingsButton": "TV-Einstellungen"
+  "tvSettingsButton": "TV-Einstellungen",
+  "tvBannerLaterHint": "Sendung {index} von {count} - → weiter, ← zurück",
+  "@tvBannerLaterHint": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "tvRowReceiver": "Receiver"
 }

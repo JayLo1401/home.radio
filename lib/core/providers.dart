@@ -266,6 +266,10 @@ final radioAudioHandlerProvider = FutureProvider<RadioAudioHandler>((ref) async 
       androidNotificationChannelId: 'at.jaycloud.home.system.audio',
       androidNotificationChannelName: l10n.settingsAudioChannelName,
       androidNotificationOngoing: true,
+      // Covers decoded small for the notification (a 3000 px album cover
+      // decoded at full size blocked Android's main thread).
+      artDownscaleWidth: 512,
+      artDownscaleHeight: 512,
     ),
   );
 });

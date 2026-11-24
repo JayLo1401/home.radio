@@ -22,6 +22,10 @@ class MainActivity : AudioServiceActivity() {
         flutterEngine.plugins.add(UpdatePlugin())
         flutterEngine.plugins.add(launcher)
         flutterEngine.plugins.add(DisplayPlugin())
+        // Musik: the visualisation follows the sound (only with RECORD_AUDIO, an opt-in setting).
+        flutterEngine.plugins.add(MusicVisualizerPlugin())
+        flutterEngine.plugins.add(PermissionsPlugin())
+        flutterEngine.plugins.add(at.jaycloud.home.system.browser.BrowserPlugin())
     }
 
     private var createdAt = 0L

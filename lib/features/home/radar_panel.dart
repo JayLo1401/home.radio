@@ -235,6 +235,10 @@ class _RadarPanelState extends State<RadarPanel> {
           );
         }
         if (widget.isWebPage) {
+          // Only while the radio is on screen: under the launcher (or any
+          // other screen) the web page would keep a whole browser renderer
+          // alive - ~180 MB, too much for a 2 GB box next to the music.
+          if (!TickerMode.valuesOf(context).enabled) return const ColoredBox(color: Colors.black);
           return Stack(
             fit: StackFit.expand,
             children: [

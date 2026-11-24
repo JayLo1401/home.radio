@@ -1,0 +1,111 @@
+{
+  "browserTitle": "Browser",
+  "browserAndroidOnly": "Den Browser gibt es nur auf Android (TV-Box, Tablet, Handy).",
+  "browserAddress": "Adresse oder Suche",
+  "browserAddressHint": "z. B. orf.at oder ein Suchbegriff",
+  "browserBack": "Zurück",
+  "browserForward": "Vor",
+  "browserReload": "Neu laden",
+  "browserHome": "Startseite",
+  "browserBookmarks": "Lesezeichen",
+  "browserBookmarkAdd": "Lesezeichen setzen",
+  "browserBookmarkRemove": "Lesezeichen entfernen",
+  "browserBookmarksEmpty": "Noch keine Lesezeichen - im Menü einer Seite mit dem Stern setzen.",
+  "browserBlockedCount": "{count, plural, =0{nichts blockiert} =1{1 blockiert} other{{count} blockiert}}",
+  "@browserBlockedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "browserBlockerSiteOn": "Werbefilter auf dieser Seite an",
+  "browserBlockerSiteOff": "Werbefilter auf dieser Seite aus",
+  "browserBlockerOff": "Werbefilter aus",
+  "browserDesktop": "Desktop-Ansicht",
+  "browserTextSize": "Textgröße {percent} %",
+  "@browserTextSize": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "browserSmaller": "Kleiner",
+  "browserLarger": "Größer",
+  "browserSettings": "Einstellungen",
+  "browserClose": "Browser schließen",
+  "browserLeaveTitle": "Browser schließen?",
+  "browserLeave": "Schließen",
+  "browserStay": "Bleiben",
+  "browserEnterText": "Text eingeben",
+  "browserTextInsert": "Einfügen",
+  "browserTextSend": "Senden",
+  "browserNoField": "Hier ist kein Textfeld ausgewählt - zuerst mit OK in ein Feld klicken.",
+  "browserFieldHint": "Textfeld: OK zeigt die Tastatur, Menü-Taste: Text eingeben, Zurück: fertig",
+  "browserPointerHint": "Steuerkreuz bewegt den Zeiger, OK klickt, am Rand wird geblättert. Menü-Taste: Adresse, Lesezeichen, Werbefilter.",
+  "browserDownloadUnsupported": "Downloads werden im Browser nicht unterstützt.",
+  "browserSettingsTitle": "Browser-Einstellungen",
+  "browserAreaSubtitle": "Werbefilter, Suchmaschine, Startseite",
+  "browserBlocker": "Werbe- und Trackerfilter",
+  "browserBlockerHelp": "Blockiert Werbung und Tracker mit den Filterlisten von uBlock Origin und EasyList - auch die Werbung auf YouTube, so weit es geht. Für einzelne Seiten im Menü der Seite abschaltbar.",
+  "browserFilterLists": "Filterlisten",
+  "browserListSource": "Lizenz {license} - {homepage}",
+  "@browserListSource": {
+    "placeholders": {
+      "license": {
+        "type": "String"
+      },
+      "homepage": {
+        "type": "String"
+      }
+    }
+  },
+  "browserListsUpdated": "Stand {date}, {rules} Regeln",
+  "@browserListsUpdated": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      },
+      "rules": {
+        "type": "int"
+      }
+    }
+  },
+  "browserListsNever": "Noch nicht geladen",
+  "browserListsUpdating": "Filterlisten werden geladen …",
+  "browserListsUpdateNow": "Jetzt aktualisieren",
+  "browserListsFailed": "Nicht geladen (ältere Fassung benutzt): {lists}",
+  "@browserListsFailed": {
+    "placeholders": {
+      "lists": {
+        "type": "String"
+      }
+    }
+  },
+  "browserListsError": "Die Filterlisten konnten nicht geladen werden.",
+  "browserListsCredit": "Filterlisten: uBlock Origin uAssets (GPLv3), EasyList und EasyPrivacy (GPLv3 / CC BY-SA 3.0), Peter Lowe (McRae GPL). Die Skripte gegen Werbung (Scriptlets) sind eine eigene Umsetzung.",
+  "browserAllowlist": "Seiten ohne Werbefilter",
+  "browserAllowlistEmpty": "Keine - im Menü einer Seite abschaltbar.",
+  "browserSearchEngine": "Suchmaschine",
+  "browserHomePage": "Startseite",
+  "browserHomePageDefault": "Seite der Suchmaschine",
+  "browserDesktopDefault": "Seiten in der Desktop-Ansicht öffnen",
+  "browserDesktopHelp": "Seiten wie am PC statt der Handy-Fassung.",
+  "browserTextZoom": "Textgröße",
+  "browserClearCookies": "Cookies und Anmeldungen löschen",
+  "browserClearCookiesConfirm": "Alle Cookies und Anmeldungen des Browsers löschen?",
+  "browserClearCache": "Zwischenspeicher leeren",
+  "browserCleared": "Gelöscht.",
+  "browserDelete": "Löschen",
+  "browserRemove": "Entfernen",
+  "browserWebView": "Browser-Engine: {version}",
+  "@browserWebView": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "browserAdminPart": "Browser eingeschaltet"
+}

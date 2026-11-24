@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/music_providers.dart';
 import '../../core/ok_long_press.dart';
 import '../../core/popup_text_field.dart';
 import '../../core/remote_keys.dart';
@@ -10,11 +11,11 @@ import '../../data/models/launcher_tile.dart';
 import '../../data/services/launcher_service.dart';
 import '../../l10n/l10n.dart';
 import 'launcher_providers.dart';
-import 'launcher_screen.dart' show TileArt, launcherMenuOption, openAppInfo;
+import 'launcher_screen.dart' show TileArt, chooseGroupFor, launcherMenuOption, openAppInfo;
 
 /// Every installed app, searchable: OK opens it, ☰ (menu) or holding OK
-/// gives its options - favourite on/off, app info (force stop, uninstall).
-/// The star marks the ones already in the row.
+/// gives its options - favourite on/off, into a group of Home, app info
+/// (force stop, uninstall). The star marks the ones in the favourites.
 class AllAppsScreen extends ConsumerStatefulWidget {
   const AllAppsScreen({super.key});
 
@@ -41,10 +42,12 @@ class _AllAppsScreenState extends ConsumerState<AllAppsScreen> with WidgetsBindi
 
   Future<void> _launch(InstalledApp app) async {
     ref.read(radioCommandProvider.notifier).send(RadioCommand.pauseForApp);
+    ref.read(musicPlayerProvider).pauseForApp();
     await ref.read(launcherServiceProvider).launchApp(app.package);
   }
 
-  /// ☰ or holding OK: favourite on/off, app info (force stop, uninstall).
+  /// ☰ or holding OK: favourite on/off, into a group, app info (force
+  /// stop, uninstall).
   Future<void> _options(InstalledApp app) async {
     final inRow = ref.read(launcherTilesProvider.notifier).contains(LauncherTile.app(package: app.package, label: app.label).id);
     final choice = await showDialog<String>(
@@ -59,6 +62,7 @@ class _AllAppsScreenState extends ConsumerState<AllAppsScreen> with WidgetsBindi
             inRow ? Icons.star : Icons.star_border,
             inRow ? context.l10n.miscAllAppsRemoveFavorite : context.l10n.miscAllAppsAddFavorite,
           ),
+          launcherMenuOption(context, 'group', Icons.playlist_add, context.l10n.launcherAddToGroup),
           launcherMenuOption(context, 'info', Icons.info_outline, context.l10n.miscAllAppsAppInfo),
         ],
       ),
@@ -69,6 +73,8 @@ class _AllAppsScreenState extends ConsumerState<AllAppsScreen> with WidgetsBindi
         await _launch(app);
       case 'favorite':
         await _toggleFavorite(app);
+      case 'group':
+        await chooseGroupFor(context, ref, _tileFor(app));
       case 'info':
         await openAppInfo(context, ref, app.package, app.label);
     }
@@ -80,9 +86,19 @@ class _AllAppsScreenState extends ConsumerState<AllAppsScreen> with WidgetsBindi
     if (state == AppLifecycleState.resumed) ref.invalidate(installedAppsProvider);
   }
 
+  /// The app's tile - with the picture it has on Home already, if any.
+  LauncherTile _tileFor(InstalledApp app) {
+    final tile = LauncherTile.app(package: app.package, label: app.label);
+    return [
+          ...ref.read(launcherTilesProvider),
+          for (final g in ref.read(launcherGroupsProvider)) ...g.tiles,
+        ].where((t) => t.id == tile.id).firstOrNull ??
+        tile;
+  }
+
   Future<void> _toggleFavorite(InstalledApp app) async {
     final notifier = ref.read(launcherTilesProvider.notifier);
-    final tile = LauncherTile.app(package: app.package, label: app.label);
+    final tile = _tileFor(app);
     final inRow = notifier.contains(tile.id);
     if (inRow) {
       await notifier.remove(tile.id);
@@ -146,7 +162,7 @@ class _AllAppsScreenState extends ConsumerState<AllAppsScreen> with WidgetsBindi
             ),
             const SizedBox(height: 8),
             Text(
-              l.miscAllAppsHelp,
+              l.launcherAllAppsHelp,
               style: const TextStyle(color: Colors.white54, fontSize: 13),
             ),
             const SizedBox(height: 12),

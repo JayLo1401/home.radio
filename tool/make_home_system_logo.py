@@ -8,7 +8,7 @@ out first and stored as the source. Writes
 - assets/icon/home_system_logo.png       the tile, transparent corners (in the app)
 - assets/icon/home_system_foreground.png the house alone, for adaptive icons
 - android/app/src/main/res/drawable/tv_banner.png  the Android TV banner
-- assets/icon/tv_logo.png, dashboard_logo.png  the parts' tiles
+- assets/icon/tv_logo.png, dashboard_logo.png, pictures_logo.png  the parts' tiles
 - android/app/src/main/res/drawable-nodpi/launch_logo.png  Android's launch screen
 then `dart run flutter_launcher_icons` makes the app icons from them.
 Needs Pillow; the banner text uses Segoe UI (Windows).
@@ -140,6 +140,55 @@ def dashboard_logo(size: int) -> Image.Image:
     return out
 
 
+def pictures_logo(size: int) -> Image.Image:
+    """Bilder in the same style: a picture frame as a green ribbon with a
+    second one peeking out behind it (a stack - "a slideshow"), inside a
+    mountain range and the sun."""
+    s = 4
+    n = size * s
+    k = n / 1000
+    shape = Image.new('L', (n, n), 0)
+    d = ImageDraw.Draw(shape)
+    t = 82
+    # The frame behind: only its top and right edge show, as one bent bar.
+    back = Image.new('L', (n, n), 0)
+    bd = ImageDraw.Draw(back)
+    bd.rounded_rectangle((250 * k, 170 * k, 850 * k, 650 * k), radius=110 * k, fill=255)
+    bd.rounded_rectangle(((250 + 62) * k, (170 + 62) * k, (850 - 62) * k, (650 - 62) * k), radius=50 * k, fill=0)
+    # Cut free around the front frame (a gap of the tile's colour).
+    gap = Image.new('L', (n, n), 0)
+    ImageDraw.Draw(gap).rounded_rectangle((110 * k, 250 * k, 790 * k, 870 * k), radius=150 * k, fill=255)
+    back = ImageChops.subtract(back, gap)
+    # The front frame: outer minus inner area.
+    d.rounded_rectangle((150 * k, 290 * k, 750 * k, 830 * k), radius=120 * k, fill=255)
+    d.rounded_rectangle(((150 + t) * k, (290 + t) * k, (750 - t) * k, (830 - t) * k), radius=45 * k, fill=0)
+    accent = Image.new('L', (n, n), 0)
+    ad = ImageDraw.Draw(accent)
+    # Mountains: a big and a small peak standing on the frame's floor.
+    floor = 830 - t + 4
+    ad.polygon([(232 * k, floor * k), (232 * k, 700 * k), (400 * k, 470 * k), (530 * k, 640 * k),
+                (590 * k, 570 * k), (668 * k, 670 * k), (668 * k, floor * k)], fill=255)
+    # Rounded peaks: soften the polygon a bit.
+    accent = accent.filter(ImageFilter.GaussianBlur(10 * k)).point(lambda v: 255 if v > 128 else 0)
+    ad = ImageDraw.Draw(accent)
+    # The sun, top right inside the frame.
+    ad.ellipse((540 * k, 395 * k, 630 * k, 485 * k), fill=255)
+    inner = Image.new('L', (n, n), 0)
+    ImageDraw.Draw(inner).rounded_rectangle(((150 + t) * k, (290 + t) * k, (750 - t) * k, (830 - t) * k),
+                                            radius=45 * k, fill=255)
+    accent = ImageChops.multiply(accent, inner)
+    shape = ImageChops.lighter(shape, back)
+
+    out = tile_background(n)
+    fold = ImageChops.offset(shape, round(16 * k), round(16 * k)).filter(ImageFilter.GaussianBlur(6 * k))
+    out = Image.composite(Image.new('RGBA', (n, n), (0, 95, 35, 255)), out, fold)
+    out = Image.composite(gradient(n), out, shape)
+    out = Image.composite(gradient(n, start=(170, 255, 60), end=(20, 200, 70)), out, accent)
+    out = out.resize((size, size), Image.LANCZOS)
+    out.putalpha(ImageChops.multiply(out.getchannel('A'), rounded_mask(size, inset=0.0, radius=0.19)))
+    return out
+
+
 def rounded_mask(size: int, inset: float, radius: float) -> Image.Image:
     s = 4
     m = Image.new('L', (size * s, size * s), 0)
@@ -202,6 +251,7 @@ if __name__ == '__main__':
     logo(512, RADIO_SOURCE).save(ROOT / 'assets/icon/radio_logo.png')
     tv_logo(512).save(ROOT / 'assets/icon/tv_logo.png')
     dashboard_logo(512).save(ROOT / 'assets/icon/dashboard_logo.png')
+    pictures_logo(512).save(ROOT / 'assets/icon/pictures_logo.png')
     foreground(1024).save(ROOT / 'assets/icon/home_system_foreground.png')
     banner().save(ROOT / 'android/app/src/main/res/drawable/tv_banner.png')
     # Android's launch screen (launch_background.xml shows it at 144dp).

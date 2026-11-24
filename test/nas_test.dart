@@ -191,4 +191,242 @@ void main() {
       expect(const NasConfig(protocol: NasProtocol.smb).createClient(), isA<SmbClient>());
     });
   });
+
+  group('ranged reads', () {
+    test('range header and content range', () {
+      expect(httpRangeHeader(0, null), isNull);
+      expect(httpRangeHeader(100, null), 'bytes=100-');
+      expect(httpRangeHeader(0, 10), 'bytes=0-9');
+      expect(httpRangeHeader(2048, 2048), 'bytes=2048-4095');
+      expect(contentRangeStart('bytes 100-199/1000'), 100);
+      expect(contentRangeTotal('bytes 100-199/1000'), 1000);
+      expect(contentRangeTotal('bytes 100-199/*'), isNull);
+      expect(contentRangeStart(null), isNull);
+    });
+
+    test('slicing a stream', () async {
+      Stream<List<int>> source() => Stream.fromIterable([
+            [0, 1, 2],
+            [3, 4],
+            [5, 6, 7, 8],
+          ]);
+      expect(await _collect(sliceByteStream(source())), [0, 1, 2, 3, 4, 5, 6, 7, 8]);
+      expect(await _collect(sliceByteStream(source(), skip: 4)), [4, 5, 6, 7, 8]);
+      expect(await _collect(sliceByteStream(source(), skip: 2, length: 4)), [2, 3, 4, 5]);
+      expect(await _collect(sliceByteStream(source(), length: 3)), [0, 1, 2]);
+      expect(await _collect(sliceByteStream(source(), skip: 20)), isEmpty);
+    });
+
+    final file = List<int>.generate(100000, (i) => (i * 7) & 0xFF);
+
+    test('FTP: REST + RETR, ABOR when stopped early, connection kept', () async {
+      final server = await _FakeFtpServer.start({'/Filme/a.iso': file});
+      final client = FtpClient(NasConfig(protocol: NasProtocol.ftp, host: '127.0.0.1', port: server.port));
+      try {
+        expect(await client.size('/Filme/a.iso'), file.length);
+        final part = await _collect(client.openRead('/Filme/a.iso', offset: 1000, length: 5000));
+        expect(part, file.sublist(1000, 6000));
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+        expect(server.commands, contains('REST 1000'));
+        expect(server.commands, contains('ABOR'));
+        // The rest of the file: read to the end, no ABOR needed.
+        server.commands.clear();
+        final rest = await _collect(client.openRead('/Filme/a.iso', offset: 99000));
+        expect(rest, file.sublist(99000));
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+        expect(server.commands, isNot(contains('ABOR')));
+        // SIZE on the control connection, the streams on one more (kept
+        // between them).
+        expect(server.logins, 2);
+        // Cancelling a running stream.
+        server.commands.clear();
+        final received = <int>[];
+        final done = Completer<void>();
+        late StreamSubscription<List<int>> sub;
+        sub = client.openRead('/Filme/a.iso').listen((chunk) {
+          received.addAll(chunk);
+          if (!done.isCompleted) {
+            done.complete();
+            sub.cancel();
+          }
+        });
+        await done.future;
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+        expect(server.commands, contains('ABOR'));
+        expect(received, file.sublist(0, received.length));
+        expect(server.logins, 2);
+      } finally {
+        client.close();
+        await server.close();
+      }
+    });
+
+    test('FTP: server without REST - skipped on this side', () async {
+      final server = await _FakeFtpServer.start({'/a.mpg': file}, rest: false);
+      final client = FtpClient(NasConfig(protocol: NasProtocol.ftp, host: '127.0.0.1', port: server.port));
+      try {
+        expect(await _collect(client.openRead('/a.mpg', offset: 50000, length: 10)), file.sublist(50000, 50010));
+        await expectLater(_collect(client.openRead('/missing.mpg')), throwsA(isA<NasException>()));
+      } finally {
+        client.close();
+        await server.close();
+      }
+    });
+
+    test('WebDAV: Range request, and servers that ignore it', () async {
+      var honourRange = true;
+      String? lastRange;
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      server.listen((request) async {
+        final response = request.response;
+        lastRange = request.headers.value('range');
+        final m = RegExp(r'bytes=(\d+)-(\d*)').firstMatch(lastRange ?? '');
+        if (request.method == 'HEAD') {
+          response.contentLength = file.length;
+        } else if (m != null && honourRange) {
+          final start = int.parse(m.group(1)!);
+          final end = m.group(2)!.isEmpty ? file.length - 1 : int.parse(m.group(2)!);
+          response
+            ..statusCode = 206
+            ..headers.set('content-range', 'bytes $start-$end/${file.length}')
+            ..add(file.sublist(start, end + 1));
+        } else {
+          response.add(file);
+        }
+        await response.close();
+      });
+      final client = WebDavClient(NasConfig(host: '127.0.0.1', port: server.port));
+      try {
+        expect(await client.size('/Filme/b.mp4'), file.length);
+        expect(await _collect(client.openRead('/Filme/b.mp4', offset: 300, length: 700)), file.sublist(300, 1000));
+        expect(lastRange, 'bytes=300-999');
+        expect(await _collect(client.openRead('/Filme/b.mp4', offset: 99990)), file.sublist(99990));
+        honourRange = false;
+        expect(await _collect(client.openRead('/Filme/b.mp4', offset: 300, length: 700)), file.sublist(300, 1000));
+      } finally {
+        client.close();
+        await server.close(force: true);
+      }
+    });
+  });
+}
+
+Future<List<int>> _collect(Stream<List<int>> stream) async => [for (final c in await stream.toList()) ...c];
+
+/// A tiny FTP server for the tests: login, TYPE, EPSV, SIZE, REST, RETR,
+/// ABOR, NOOP, QUIT.
+class _FakeFtpServer {
+  _FakeFtpServer._(this._server, this.files, this.rest);
+
+  final ServerSocket _server;
+  final Map<String, List<int>> files;
+  final bool rest;
+  final commands = <String>[];
+  final _clients = <Socket>[];
+  int logins = 0;
+
+  int get port => _server.port;
+
+  static Future<_FakeFtpServer> start(Map<String, List<int>> files, {bool rest = true}) async {
+    final server = _FakeFtpServer._(await ServerSocket.bind(InternetAddress.loopbackIPv4, 0), files, rest);
+    server._server.listen(server._serve);
+    return server;
+  }
+
+  Future<void> _serve(Socket control) async {
+    _clients.add(control);
+    void reply(String line) {
+      try {
+        control.write('$line\r\n');
+      } catch (_) {}
+    }
+
+    reply('220 fake');
+    ServerSocket? passive;
+    var offset = 0;
+    Future<void>? transfer;
+    var aborted = false;
+    var pending = '';
+    await for (final chunk in control) {
+      pending += String.fromCharCodes(chunk);
+      while (pending.contains('\r\n')) {
+        final i = pending.indexOf('\r\n');
+        final line = pending.substring(0, i);
+        pending = pending.substring(i + 2);
+        commands.add(line);
+        final space = line.indexOf(' ');
+        final verb = (space < 0 ? line : line.substring(0, space)).toUpperCase();
+        final arg = space < 0 ? '' : line.substring(space + 1);
+        switch (verb) {
+          case 'USER':
+            reply('331 password');
+          case 'PASS':
+            logins++;
+            reply('230 ok');
+          case 'TYPE' || 'OPTS':
+            reply('200 ok');
+          case 'NOOP':
+            await transfer;
+            reply('200 noop');
+          case 'EPSV':
+            passive = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+            reply('229 Entering Extended Passive Mode (|||${passive.port}|)');
+          case 'SIZE':
+            final f = files[arg];
+            reply(f == null ? '550 not found' : '213 ${f.length}');
+          case 'REST':
+            if (rest) {
+              offset = int.parse(arg);
+              reply('350 restarting');
+            } else {
+              reply('502 not implemented');
+            }
+          case 'RETR':
+            final f = files[arg];
+            final p = passive;
+            passive = null;
+            if (f == null || p == null) {
+              await p?.close();
+              reply('550 not found');
+              continue;
+            }
+            reply('150 opening');
+            final start = offset;
+            offset = 0;
+            aborted = false;
+            transfer = () async {
+              final data = await p.first;
+              await p.close();
+              try {
+                for (var pos = start; pos < f.length && !aborted; pos += 4096) {
+                  data.add(f.sublist(pos, pos + 4096 > f.length ? f.length : pos + 4096));
+                  await data.flush();
+                }
+                await data.close();
+                reply(aborted ? '426 aborted' : '226 done');
+              } catch (_) {
+                data.destroy();
+                reply('426 connection closed');
+              }
+            }();
+          case 'ABOR':
+            aborted = true;
+            await transfer;
+            reply('226 abort ok');
+          case 'QUIT':
+            reply('221 bye');
+            await control.close();
+          default:
+            reply('502 unknown');
+        }
+      }
+    }
+  }
+
+  Future<void> close() async {
+    for (final c in _clients) {
+      c.destroy();
+    }
+    await _server.close();
+  }
 }

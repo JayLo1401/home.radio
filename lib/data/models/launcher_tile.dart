@@ -21,6 +21,10 @@ class LauncherTile {
   const LauncherTile.radio({String? image}) : this._(radioType, image: image);
   const LauncherTile.tv({String? image}) : this._(tvType, image: image);
   const LauncherTile.dashboard({String? image}) : this._(dashboardType, image: image);
+  const LauncherTile.pictures({String? image}) : this._(picturesType, image: image);
+  const LauncherTile.movies({String? image}) : this._(moviesType, image: image);
+  const LauncherTile.music({String? image}) : this._(musicType, image: image);
+  const LauncherTile.browser({String? image}) : this._(browserType, image: image);
   const LauncherTile.systemSettings({String? image}) : this._(settingsType, image: image);
   const LauncherTile.app({required String package, required String label, String? image})
       : this._(appType, package: package, label: label, image: image);
@@ -28,6 +32,10 @@ class LauncherTile {
   static const radioType = 'radio';
   static const tvType = 'tv';
   static const dashboardType = 'dashboard';
+  static const picturesType = 'pictures';
+  static const moviesType = 'movies';
+  static const musicType = 'music';
+  static const browserType = 'browser';
   static const settingsType = 'settings';
   static const appType = 'app';
 
@@ -47,12 +55,16 @@ class LauncherTile {
   bool get isRadio => type == radioType;
   bool get isTv => type == tvType;
   bool get isDashboard => type == dashboardType;
+  bool get isPictures => type == picturesType;
+  bool get isMovies => type == moviesType;
+  bool get isMusic => type == musicType;
+  bool get isBrowser => type == browserType;
   bool get isApp => type == appType;
   bool get isSystemSettings => type == settingsType;
 
-  /// A built-in part of Home System (Radio, TV) - can be moved, but
-  /// not removed.
-  bool get isBuiltIn => isRadio || isTv || isDashboard;
+  /// A built-in part of Home System (Radio, TV, Haussteuerung, Bilder) -
+  /// can be moved, but not removed.
+  bool get isBuiltIn => isRadio || isTv || isDashboard || isPictures || isMovies || isMusic || isBrowser;
 
   String? get imageUrl => image != null && image!.startsWith('http') ? image : null;
 
@@ -63,6 +75,10 @@ class LauncherTile {
         radioType => 'Radio',
         tvType => 'TV',
         dashboardType => l10n.dashboardTitle,
+        picturesType => l10n.picturesTitle,
+        moviesType => l10n.moviesTitle,
+        musicType => l10n.musicTitle,
+        browserType => l10n.browserTitle,
         settingsType => l10n.systemTileSettings,
         _ => label ?? package ?? '',
       };
@@ -86,6 +102,14 @@ class LauncherTile {
         return LauncherTile.tv(image: image);
       case dashboardType:
         return LauncherTile.dashboard(image: image);
+      case picturesType:
+        return LauncherTile.pictures(image: image);
+      case moviesType:
+        return LauncherTile.movies(image: image);
+      case musicType:
+        return LauncherTile.music(image: image);
+      case browserType:
+        return LauncherTile.browser(image: image);
       case settingsType:
         return LauncherTile.systemSettings(image: image);
       case appType:

@@ -133,10 +133,74 @@ abstract class NasClient {
 
   Future<void> delete(String path);
 
+  /// The size of the file at [path] in bytes - null if the server doesn't
+  /// say. Throws [NasException] (e.g. not found).
+  Future<int?> size(String path);
+
+  /// The file's bytes from [offset] on: [length] bytes, or up to its end
+  /// (fewer if the file ends before). For playing and seeking in big files
+  /// (films, music): the bytes come as they arrive, nothing is held in
+  /// memory. Each stream has its own transfer - FTP a connection of its
+  /// own, SMB a second connection shared by the streams - so listings and
+  /// other reads go on meanwhile, and several streams can run at once.
+  /// Cancelling the subscription stops the transfer (FTP: ABOR). Errors
+  /// come as [NasException]s on the stream.
+  Stream<List<int>> openRead(String path, {int offset = 0, int? length});
+
   void close();
 }
 
+/// The HTTP "Range" header value for [offset] / [length] - null for the
+/// whole file.
+String? httpRangeHeader(int offset, int? length) {
+  if (offset <= 0 && length == null) return null;
+  final start = offset < 0 ? 0 : offset;
+  return length == null ? 'bytes=$start-' : 'bytes=$start-${start + length - 1}';
+}
+
+/// The first byte of a "Content-Range: bytes 100-199/1000" answer.
+int? contentRangeStart(String? header) {
+  final m = RegExp(r'bytes\s+(\d+)-\d+').firstMatch(header ?? '');
+  return m == null ? null : int.parse(m.group(1)!);
+}
+
+/// The total size in a "Content-Range: bytes 100-199/1000" answer.
+int? contentRangeTotal(String? header) {
+  final m = RegExp(r'/(\d+)\s*$').firstMatch(header ?? '');
+  return m == null ? null : int.parse(m.group(1)!);
+}
+
+/// Cuts a byte stream to the part from [skip] on, at most [length] bytes
+/// (servers that ignore the requested range send the whole file); ends
+/// (cancelling [source]) as soon as [length] is through.
+Stream<List<int>> sliceByteStream(Stream<List<int>> source, {int skip = 0, int? length}) async* {
+  var toSkip = skip;
+  var left = length;
+  if (left != null && left <= 0) return;
+  await for (var chunk in source) {
+    if (toSkip > 0) {
+      if (chunk.length <= toSkip) {
+        toSkip -= chunk.length;
+        continue;
+      }
+      chunk = chunk.sublist(toSkip);
+      toSkip = 0;
+    }
+    if (left != null) {
+      if (chunk.length >= left) {
+        yield chunk.length == left ? chunk : chunk.sublist(0, left);
+        return;
+      }
+      left -= chunk.length;
+    }
+    yield chunk;
+  }
+}
+
 const _timeout = Duration(seconds: 20);
+
+/// A call to a client that was closed meanwhile (nobody waits for it).
+const _closedMessage = 'NAS connection closed';
 
 /// Large transfers (backups, pictures) - the per-request timeout is longer.
 const _transferTimeout = Duration(seconds: 60);
@@ -280,6 +344,51 @@ class WebDavClient implements NasClient {
     }
   }
 
+  @override
+  Future<int?> size(String path) async {
+    final response = await _send('HEAD', uriFor(path));
+    if (response.statusCode >= 300) throw _statusError(response.statusCode);
+    final length = int.tryParse(response.headers['content-length'] ?? '');
+    if (length != null) return length;
+    // No length on HEAD (some servers) - the folder's listing has it.
+    final name = normalizeNasPath(path).split('/').last;
+    final entries = await list(parentNasPath(path));
+    return entries.where((e) => e.name == name && !e.isDirectory).firstOrNull?.size;
+  }
+
+  /// GET with a "Range" header; a server that ignores it (200, the whole
+  /// file) is cut to the requested part here.
+  @override
+  Stream<List<int>> openRead(String path, {int offset = 0, int? length}) async* {
+    if (length != null && length <= 0) return;
+    final abort = Completer<void>();
+    final request = http.AbortableRequest('GET', uriFor(path), abortTrigger: abort.future)
+      ..headers.addAll({..._auth, 'Range': ?httpRangeHeader(offset, length)});
+    try {
+      final http.StreamedResponse response;
+      try {
+        response = await _client.send(request).timeout(_timeout);
+      } catch (e) {
+        throw _describe(e);
+      }
+      if (response.statusCode == 416) return; // From behind the end.
+      if (response.statusCode != 200 && response.statusCode != 206) {
+        unawaited(response.stream.drain<void>().catchError((_) {}));
+        throw _statusError(response.statusCode);
+      }
+      final start = response.statusCode == 206 ? contentRangeStart(response.headers['content-range']) ?? offset : 0;
+      try {
+        yield* sliceByteStream(response.stream.timeout(_transferTimeout), skip: offset - start, length: length);
+      } on http.RequestAbortedException {
+        return;
+      } catch (e) {
+        throw _describe(e);
+      }
+    } finally {
+      if (!abort.isCompleted) abort.complete();
+    }
+  }
+
   /// Creates [folder] (its parent must exist).
   Future<void> createFolder(String folder) async {
     final response = await _send('MKCOL', uriFor(folder, directory: true));
@@ -370,10 +479,14 @@ class FtpClient implements NasClient {
   _FtpConnection? _connection;
   Future<void> _queue = Future.value();
 
+  /// After [close], calls still waiting don't open a new connection.
+  bool _closed = false;
+
   /// Runs [action] after the previous call and turns errors into
   /// [NasException]s; a broken connection is dropped.
   Future<T> _run<T>(Future<T> Function(_FtpConnection c) action) {
     final result = _queue.then((_) async {
+      if (_closed) throw const NasException(_closedMessage);
       try {
         final connection = _connection ??= await _FtpConnection.open(config);
         return await action(connection);
@@ -409,10 +522,135 @@ class FtpClient implements NasClient {
       });
 
   @override
+  Future<int?> size(String path) => _run((c) async {
+        final reply = await c.command('SIZE ${normalizeNasPath(path)}');
+        if (reply.code == 213) return int.tryParse(reply.text.trim());
+        if (reply.code == 550) throw _FtpReplyException(reply);
+        // No SIZE on this server: the folder's listing.
+        final name = normalizeNasPath(path).split('/').last;
+        final entries = await c.list(parentNasPath(path));
+        return entries.where((e) => e.name == name && !e.isDirectory).firstOrNull?.size;
+      });
+
+  /// Logged-in connections of finished streams, for the next one (a player
+  /// seeking opens one stream after the other).
+  final _idle = <_FtpConnection>[];
+  static const _maxIdle = 2;
+  static const _idleTime = Duration(seconds: 30);
+
+  /// "REST offset" + "RETR" on a connection of its own (the control
+  /// connection of [list] & co. stays free). A server without REST sends
+  /// from the start - skipped here. Stopping early closes the data
+  /// connection and sends ABOR; the connection is kept for the next stream
+  /// once it answers again (NOOP).
+  @override
+  Stream<List<int>> openRead(String path, {int offset = 0, int? length}) async* {
+    if (length != null && length <= 0) return;
+    if (_closed) throw const NasException(_closedMessage);
+    _FtpConnection? connection;
+    Socket? data;
+    var usable = true; // the control connection is in a known state
+    var transferring = false;
+    var ended = false;
+    try {
+      var skip = 0;
+      try {
+        final pooled = _idle.isNotEmpty;
+        connection = pooled ? _takeIdle() : await _FtpConnection.open(config);
+        try {
+          (data, skip) = await _startRetrieve(connection, path, offset);
+        } catch (e) {
+          // A kept connection the server has dropped meanwhile: a new one.
+          if (!pooled || e is _FtpReplyException) rethrow;
+          connection.destroy();
+          connection = null;
+          connection = await _FtpConnection.open(config);
+          (data, skip) = await _startRetrieve(connection, path, offset);
+        }
+        transferring = true;
+      } catch (e) {
+        if (e is! _FtpReplyException) usable = false;
+        throw e is _FtpReplyException ? e.toNas() : _describe(e);
+      }
+      final source = data.transform<List<int>>(StreamTransformer.fromHandlers(handleDone: (sink) {
+        ended = true;
+        sink.close();
+      }));
+      try {
+        yield* sliceByteStream(source.timeout(_transferTimeout), skip: skip, length: length);
+      } catch (e) {
+        usable = false;
+        throw _describe(e);
+      }
+    } finally {
+      data?.destroy();
+      final c = connection;
+      if (c != null) {
+        if (!usable) {
+          c.destroy();
+        } else {
+          unawaited(_settle(c, transferring: transferring, aborted: transferring && !ended));
+        }
+      }
+    }
+  }
+
+  _FtpConnection _takeIdle() {
+    final c = _idle.removeLast();
+    c.idleTimer?.cancel();
+    return c;
+  }
+
+  static Future<(Socket, int)> _startRetrieve(_FtpConnection c, String path, int offset) async {
+    final data = await c._openData();
+    try {
+      var skip = 0;
+      if (offset > 0) {
+        final rest = await c.command('REST $offset');
+        if (rest.code != 350) skip = offset;
+      }
+      await c.command('RETR ${normalizeNasPath(path)}', ok: {125, 150});
+      return (data, skip);
+    } catch (_) {
+      data.destroy();
+      rethrow;
+    }
+  }
+
+  /// After a stream: the transfer's last answer read (or the transfer
+  /// aborted), then the connection is kept for the next stream.
+  Future<void> _settle(_FtpConnection c, {required bool transferring, required bool aborted}) async {
+    try {
+      if (aborted) {
+        await c.abort();
+      } else if (transferring) {
+        await c._reply(expect: {226, 250}, timeout: const Duration(seconds: 10));
+      }
+    } catch (_) {
+      c.destroy();
+      return;
+    }
+    if (_closed || _idle.length >= _maxIdle) {
+      c.quit();
+      return;
+    }
+    _idle.add(c);
+    c.idleTimer = Timer(_idleTime, () {
+      if (_idle.remove(c)) c.quit();
+    });
+  }
+
+  @override
   void close() {
+    _closed = true;
     final connection = _connection;
     _connection = null;
     connection?.quit();
+    for (final c in _idle) {
+      c.idleTimer?.cancel();
+      c.quit();
+    }
+    _idle.clear();
   }
 }
 
@@ -444,6 +682,21 @@ class _FtpConnection {
   final Socket _socket;
   final StreamIterator<String> _lines;
   bool _mlsd = true;
+
+  /// While kept for the next stream (FtpClient.openRead): quits it later.
+  Timer? idleTimer;
+
+  /// After a transfer was stopped early (data connection closed): ABOR,
+  /// then NOOP - its "200" is the sign that every answer of the aborted
+  /// transfer (426, 225/226, or 500 if it had ended anyway) is read.
+  Future<void> abort() async {
+    _socket.add(utf8.encode('ABOR\r\nNOOP\r\n'));
+    for (var i = 0; i < 6; i++) {
+      final reply = await _reply(timeout: const Duration(seconds: 5));
+      if (reply.code == 200) return;
+    }
+    throw const SocketException('FTP: no answer after ABOR');
+  }
 
   /// UTF-8, or Latin-1 for lines that aren't (older servers).
   static Stream<String> _decodeLines(Stream<List<int>> bytes) async* {
@@ -700,6 +953,9 @@ class SmbClient implements NasClient {
   bool _broken = false;
   Future<void> _queue = Future.value();
 
+  /// After [close], calls still waiting don't open a new connection.
+  bool _closed = false;
+
   static const port = 445;
 
   /// Bytes per read/write request (a request must fit into 64 KiB).
@@ -710,19 +966,43 @@ class SmbClient implements NasClient {
   static const _smbTransferTimeout = Duration(minutes: 5);
 
   Future<SmbConnect> _open() async {
+    _broken = false;
+    return _connect(() => _broken = true);
+  }
+
+  Future<SmbConnect> _connect(void Function() onDisconnect) async {
     final host = config.host.trim();
     // The package swallows the reason of a failed connection - this tells
     // "not found / refused / no answer" apart first.
     final probe = await Socket.connect(host, port, timeout: _timeout);
     probe.destroy();
-    _broken = false;
     return SmbConnect.connectAuth(
       host: host,
       username: config.user.trim(),
       password: config.password,
       domain: config.domain.trim(),
-      onDisconnect: (_) => _broken = true,
+      onDisconnect: (_) => onDisconnect(),
     );
+  }
+
+  /// The second connection, for [openRead]'s streams (the package sends
+  /// one request at a time per connection - a running film doesn't hold up
+  /// the listings).
+  Future<SmbConnect>? _streamConnection;
+  bool _streamBroken = false;
+
+  Future<SmbConnect> _streams() {
+    if (_streamBroken) _dropStreams();
+    return _streamConnection ??= () {
+      _streamBroken = false;
+      return _connect(() => _streamBroken = true);
+    }();
+  }
+
+  void _dropStreams() {
+    final connection = _streamConnection;
+    _streamConnection = null;
+    if (connection != null) unawaited(connection.then((c) => c.close()).catchError((_) {}));
   }
 
   void _drop() {
@@ -736,6 +1016,7 @@ class SmbClient implements NasClient {
   /// like "not found" keep it).
   Future<T> _run<T>(Future<T> Function(SmbConnect c) action, {Duration timeout = _timeout}) {
     final result = _queue.then((_) async {
+      if (_closed) throw const NasException(_closedMessage);
       try {
         if (_broken) _drop();
         return await () async {
@@ -840,9 +1121,57 @@ class SmbClient implements NasClient {
       });
 
   @override
+  Future<int?> size(String path) => _run((c) async {
+        final file = await c.file(_inShare(path));
+        if (!file.isExists || file.isDirectory()) throw NasException(l10n.nasErrorNotFound);
+        return file.size;
+      });
+
+  /// Reads of [_chunk] bytes from the given place, on the second connection.
+  @override
+  Stream<List<int>> openRead(String path, {int offset = 0, int? length}) async* {
+    if (length != null && length <= 0) return;
+    if (_closed) throw const NasException(_closedMessage);
+    RandomAccessFile? raf;
+    try {
+      final int end;
+      try {
+        final c = await _streams().timeout(_timeout);
+        final file = await c.file(_inShare(path)).timeout(_timeout);
+        if (!file.isExists || file.isDirectory()) throw NasException(l10n.nasErrorNotFound);
+        end = length == null ? file.size : min(file.size, offset + length);
+        if (offset >= end) return;
+        raf = await c.open(file).timeout(_timeout);
+        await raf.setPosition(offset);
+      } catch (e) {
+        if (!isSmbServerAnswer(e)) _dropStreams();
+        throw describeSmbError(e);
+      }
+      var position = offset;
+      while (position < end) {
+        final Uint8List chunk;
+        try {
+          chunk = await raf.read(min(_chunk, end - position)).timeout(_timeout);
+        } catch (e) {
+          if (!isSmbServerAnswer(e)) _dropStreams();
+          throw describeSmbError(e);
+        }
+        if (chunk.isEmpty) return;
+        position += chunk.length;
+        yield chunk;
+      }
+    } finally {
+      final open = raf;
+      if (open != null) unawaited(open.close().catchError((_) {}));
+    }
+  }
+
+  @override
   void close() {
+    _closed = true;
     // After a running call (closing under it would break it).
     _queue = _queue.then((_) => _drop());
+    _dropStreams();
   }
 }
 

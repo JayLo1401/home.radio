@@ -1,0 +1,188 @@
+{
+  "musicTitle": "Musik",
+  "musicAreaSubtitle": "Wiedergabe, Visualisierung, Index",
+  "musicAdminPart": "Musik (vom NAS)",
+  "musicAdminIndex": "Musik-Index",
+  "musicAllShuffled": "Alles zufällig",
+  "musicSearch": "Suchen",
+  "musicNowPlaying": "Wiedergabe",
+  "musicSettingsTitle": "Musik",
+  "musicPlayFolder": "Abspielen",
+  "musicShuffleFolder": "Zufällig abspielen",
+  "musicRefreshFolderIndex": "Ordner neu einlesen (Index)",
+  "musicFolderIndexed": "{count} Titel neu eingelesen.",
+  "@musicFolderIndexed": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "musicFolderSummary": "{folders} Ordner · {tracks} Titel",
+  "@musicFolderSummary": {
+    "placeholders": {
+      "folders": {
+        "type": "int"
+      },
+      "tracks": {
+        "type": "int"
+      }
+    }
+  },
+  "musicEmptyFolder": "In diesem Ordner ist keine Musik.",
+  "musicNoFolder": "Noch kein Musikordner gewählt.\nWähle ihn in Einstellungen → NAS.",
+  "musicOpenNasSettings": "NAS-Einstellungen öffnen",
+  "musicRetry": "Nochmal versuchen",
+  "musicErrorNoFolder": "Kein Musikordner gewählt (Einstellungen → NAS).",
+  "musicErrorNoMusic": "Hier ist keine Musik zu finden.",
+  "musicErrorUnplayable": "„{name}“ lässt sich nicht abspielen - weiter mit dem nächsten Titel.",
+  "@musicErrorUnplayable": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "musicNothingPlaying": "Gerade läuft keine Musik.",
+  "musicPaused": "Pausiert",
+  "musicCollecting": "Ordner werden noch durchsucht …",
+  "musicQueuePosition": "Titel {index} von {count}",
+  "@musicQueuePosition": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "musicQueue": "Warteschlange",
+  "musicQueueTitle": "Warteschlange ({count})",
+  "@musicQueueTitle": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "musicNowPlayingHint": "OK Pause · ←/→ spulen (halten: schneller) · ↑ Visualisierung · ↓ Tasten · {menu} Warteschlange",
+  "@musicNowPlayingHint": {
+    "placeholders": {
+      "menu": {
+        "type": "String"
+      }
+    }
+  },
+  "musicControlsHint": "←/→ Taste wählen · OK drücken · ↑ zurück zum Spulen",
+  "musicPlay": "Abspielen",
+  "musicPause": "Pause",
+  "musicStop": "Stopp",
+  "musicNext": "Nächster Titel",
+  "musicPrevious": "Voriger Titel",
+  "musicShuffleOn": "Zufällig: an",
+  "musicShuffleOff": "Zufällig: aus",
+  "musicRepeatOff": "Nicht wiederholen",
+  "musicRepeatAll": "Alle wiederholen",
+  "musicRepeatOne": "Titel wiederholen",
+  "musicVisualizer": "Visualisierung",
+  "musicSearchLabel": "Titel, Interpret oder Ordner",
+  "musicSearchHint": "z. B. Queen Bohemian",
+  "musicSearchIntro": "Sucht in den Datei- und Ordnernamen der ganzen Sammlung.",
+  "musicSearchNothing": "Nichts gefunden.",
+  "musicSearchResults": "Suche: {query}",
+  "@musicSearchResults": {
+    "placeholders": {
+      "query": {
+        "type": "String"
+      }
+    }
+  },
+  "musicSearchNeedsIndex": "Für die Suche braucht es den Index - eine Liste aller Musikdateien, einmal vom NAS eingelesen (dauert bei vielen Titeln eine Weile, läuft im Hintergrund).",
+  "musicIndexBuild": "Index erstellen",
+  "musicIndexRefresh": "Index aktualisieren",
+  "musicIndexContinue": "Index fortsetzen",
+  "musicIndexStop": "Anhalten",
+  "musicIndexDelete": "Index löschen",
+  "musicIndexNone": "Kein Index - Ordner werden direkt vom NAS gelesen.",
+  "musicIndexRunning": "Wird eingelesen: {folders} Ordner, {tracks} Titel …",
+  "@musicIndexRunning": {
+    "placeholders": {
+      "folders": {
+        "type": "int"
+      },
+      "tracks": {
+        "type": "int"
+      }
+    }
+  },
+  "musicIndexInterrupted": "Unterbrochen nach {tracks} Titeln - geht beim nächsten Öffnen von Musik weiter.",
+  "@musicIndexInterrupted": {
+    "placeholders": {
+      "tracks": {
+        "type": "int"
+      }
+    }
+  },
+  "musicIndexState": "{tracks} Titel in {folders} Ordnern · Stand {date}",
+  "@musicIndexState": {
+    "placeholders": {
+      "tracks": {
+        "type": "int"
+      },
+      "folders": {
+        "type": "int"
+      },
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "musicIndexSummary": "{tracks} Titel · {folders} Ordner",
+  "@musicIndexSummary": {
+    "placeholders": {
+      "tracks": {
+        "type": "int"
+      },
+      "folders": {
+        "type": "int"
+      }
+    }
+  },
+  "musicSettingsFolder": "Musikordner",
+  "musicSettingsNoFolder": "Nicht gewählt - in den NAS-Einstellungen",
+  "musicSettingsPlayback": "Wiedergabe",
+  "musicSettingsShuffle": "Zufällige Reihenfolge",
+  "musicSettingsShuffleHelp": "Gilt für das Abspielen eines Titels und bleibt bis zum Umschalten.",
+  "musicSettingsRepeat": "Wiederholen",
+  "musicSettingsPreferTags": "Titel und Interpret aus den Dateien",
+  "musicSettingsPreferTagsHelp": "Aus den Tags der Datei (ID3, MP4, FLAC …), sonst aus dem Dateinamen. Aus: immer der Dateiname.",
+  "musicSettingsVisualizer": "Visualisierung",
+  "musicVisualizerOff": "Aus",
+  "musicVisualizerManual": "Mit ↑ in der Wiedergabe",
+  "musicVisualizerAuto": "Auch von selbst nach einer Minute ohne Taste",
+  "musicSettingsQuality": "Bildqualität",
+  "musicQualityAuto": "Automatisch",
+  "musicQualityLow": "Schonend (schwache Boxen)",
+  "musicQualityHigh": "Hoch",
+  "musicSettingsReactive": "Folgt der Musik",
+  "musicSettingsReactiveHelp": "Bewegt sich im Takt der Musik. Braucht unter Android die Berechtigung „Audio aufnehmen“ - ohne sie pulsiert das Bild ruhig von selbst.",
+  "musicSettingsReactivePermission": "Damit die Visualisierung der Musik folgen kann, liest sie das Frequenzspektrum der eigenen Wiedergabe. Android verlangt dafür die Berechtigung „Audio aufnehmen“ und fragt nach dem Mikrofon - das Mikrofon wird dabei aber nicht benutzt, es wird nichts aufgenommen oder gespeichert.",
+  "musicSettingsReactiveAllow": "Erlauben",
+  "musicSettingsReactiveDenied": "Ohne die Berechtigung pulsiert die Visualisierung von selbst.",
+  "musicSettingsIndex": "Index (optional)",
+  "musicSettingsIndexHelp": "Eine Liste aller Musikdateien (nur Namen, keine Tags) für die Suche und „Alles zufällig“ ohne Wartezeit. Ordner durchstöbern und abspielen geht auch ohne. Das Einlesen läuft im Hintergrund und setzt nach einer Unterbrechung fort.",
+  "musicWithSubfolders": "Mit Unterordnern",
+  "musicWithSubfoldersHelp": "„Abspielen“ und „Zufällig abspielen“ nehmen auch alle Unterordner des Ordners mit.",
+  "musicSettingsInterval": "Wechsel zur nächsten Visualisierung",
+  "musicIntervalSeconds": "Alle {seconds} s",
+  "@musicIntervalSeconds": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "musicIntervalManual": "Nur mit ↑",
+  "musicVisualizerHint": "↑ nächste Visualisierung · ←/→ Titel · ↓ zurück"
+}

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -68,6 +69,10 @@ class _TvScreenState extends ConsumerState<TvScreen> {
   int _generation = 0;
 
   bool _infoVisible = false;
+
+  /// The banner looks ahead: 0 = now and next, 1.. = the programmes after
+  /// that on this channel (→ / ← in the picture).
+  int _bannerAhead = 0;
   Timer? _infoTimer;
   bool _listVisible = false;
 
@@ -679,11 +684,20 @@ class _TvScreenState extends ConsumerState<TvScreen> {
     });
   }
 
-  void _showInfo() {
+  void _showInfo({int ahead = 0}) {
     _infoTimer?.cancel();
-    setState(() => _infoVisible = true);
-    _infoTimer = Timer(const Duration(seconds: 6), () {
-      if (mounted) setState(() => _infoVisible = false);
+    setState(() {
+      _infoVisible = true;
+      _bannerAhead = ahead;
+    });
+    // Looking ahead takes reading - a little longer.
+    _infoTimer = Timer(Duration(seconds: ahead > 0 ? 10 : 6), () {
+      if (mounted) {
+        setState(() {
+          _infoVisible = false;
+          _bannerAhead = 0;
+        });
+      }
     });
   }
 
@@ -768,8 +782,15 @@ class _TvScreenState extends ConsumerState<TvScreen> {
         return KeyEventResult.handled;
       case null:
     }
-    if (key == LogicalKeyboardKey.arrowLeft || key == LogicalKeyboardKey.arrowRight) {
-      _showInfo();
+    // → in the picture: what's on later on this channel, one programme per
+    // press; ← back to now. (Internet-TV has no programme - just the banner.)
+    if (key == LogicalKeyboardKey.arrowRight) {
+      // Straight to the next programme, then one further per press.
+      _showInfo(ahead: _iptv == null ? (_infoVisible ? _bannerAhead + 1 : 1) : 0);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowLeft) {
+      _showInfo(ahead: _bannerAhead > 0 ? _bannerAhead - 1 : 0);
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.mediaPlayPause || key == LogicalKeyboardKey.mediaPlay || key == LogicalKeyboardKey.mediaPause) {
@@ -899,6 +920,10 @@ class _TvScreenState extends ConsumerState<TvScreen> {
                                   channel: _current!,
                                   link: _stopped ? null : _link,
                                   player: player,
+                                  ahead: _bannerAhead,
+                                  onAheadLimit: (max) {
+                                    if (_bannerAhead > max) setState(() => _bannerAhead = max);
+                                  },
                                 ),
                         ),
                       if (_listVisible)
@@ -1126,7 +1151,20 @@ class _Chip extends StatelessWidget {
 /// Channel, now and next - shown on every channel change, like Radio's
 /// "now playing" banner at the bottom.
 class _InfoBanner extends ConsumerWidget {
-  const _InfoBanner({required this.config, required this.channel, this.link, this.player});
+  const _InfoBanner({
+    required this.config,
+    required this.channel,
+    this.link,
+    this.player,
+    this.ahead = 0,
+    this.onAheadLimit,
+  });
+
+  /// 0: now and next; 1..: the n-th programme after the one running now.
+  final int ahead;
+
+  /// Told how far ahead the programme goes (→ stops at the last one).
+  final void Function(int max)? onAheadLimit;
 
   final Enigma2Config config;
   final E2Channel channel;
@@ -1144,11 +1182,62 @@ class _InfoBanner extends ConsumerWidget {
     return context.l10n.tvBannerKeyHint(k(RemoteAction.channelList), k(RemoteAction.guide), k(RemoteAction.options));
   }
 
+  /// "Heute 20:15 – 21:45" / "Morgen 06:00 – 06:30" / "Mo 20:15 – …".
+  static String _when(BuildContext context, E2Event e) {
+    final today = DateTime.now();
+    final day = DateTime(e.begin.year, e.begin.month, e.begin.day);
+    final diff = day.difference(DateTime(today.year, today.month, today.day)).inDays;
+    final l = context.l10n;
+    final d = diff == 0
+        ? l.tvToday
+        : diff == 1
+            ? l.tvTomorrow
+            : DateFormat.E(l.localeName).format(e.begin);
+    return '$d ${hhmm(e.begin)} – ${hhmm(e.end)}';
+  }
+
+  /// A later programme (→): when, title, what it is - and what follows.
+  Widget _later(BuildContext context, WidgetRef ref) {
+    final l = context.l10n;
+    final all = ref.watch(tvChannelEpgProvider(channel.ref)).value;
+    if (all == null) return Text(l.commonLoading, style: const TextStyle(color: Colors.white54, fontSize: 18));
+    final t = DateTime.now();
+    final later = all.where((e) => e.begin.isAfter(t)).toList()..sort((a, b) => a.begin.compareTo(b.begin));
+    if (later.isEmpty) return Text(l.tvNoProgramInfo, style: const TextStyle(color: Colors.white54, fontSize: 18));
+    if (ahead > later.length) WidgetsBinding.instance.addPostFrameCallback((_) => onAheadLimit?.call(later.length));
+    final i = (ahead - 1).clamp(0, later.length - 1);
+    final e = later[i];
+    final after = i + 1 < later.length ? later[i + 1] : null;
+    final about = e.shortDescription.isNotEmpty ? e.shortDescription : e.longDescription;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('${_when(context, e)}   ${e.title}',
+            maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 20)),
+        if (about.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Text(about,
+              maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70, fontSize: 16)),
+        ],
+        if (after != null) ...[
+          const SizedBox(height: 8),
+          Text('${l.tvThen} ${hhmm(after.begin)}   ${after.title}',
+              maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white60, fontSize: 17)),
+        ],
+        const SizedBox(height: 6),
+        Text(l.tvBannerLaterHint(i + 1, later.length),
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 14)),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final epg = ref.watch(tvNowNextProvider).value ?? const {};
     final nn = nowNextFor(epg, channel, DateTime.now());
     final now = nn.now, next = nn.next;
+    final lookingAhead = ahead > 0 && link == null;
     return Container(
       color: Colors.black.withValues(alpha: 0.75),
       padding: const EdgeInsets.fromLTRB(40, 20, 40, 28),
@@ -1168,6 +1257,8 @@ class _InfoBanner extends ConsumerWidget {
                 if (link case final link?) ...[
                   const SizedBox(height: 4),
                   ConnectionChain(view: link),
+                ] else if (lookingAhead) ...[
+                  _later(context, ref),
                 ] else if (now != null) ...[
                   Text('${hhmm(now.begin)} – ${hhmm(now.end)}   ${now.title}',
                       maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 20)),
@@ -1175,12 +1266,12 @@ class _InfoBanner extends ConsumerWidget {
                   EventProgress(event: now, width: 520),
                 ] else
                   Text(context.l10n.tvNoProgramInfo, style: const TextStyle(color: Colors.white54, fontSize: 18)),
-                if (next != null && link == null) ...[
+                if (next != null && link == null && !lookingAhead) ...[
                   const SizedBox(height: 8),
                   Text('${context.l10n.tvThen} ${hhmm(next.begin)}   ${next.title}',
                       maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white60, fontSize: 17)),
                 ],
-                if (player case final player? when link == null) ...[
+                if (player case final player? when link == null && !lookingAhead) ...[
                   const SizedBox(height: 10),
                   ValueListenableBuilder(
                     valueListenable: player.info,
@@ -1638,12 +1729,15 @@ class _ChannelListState extends ConsumerState<_ChannelList> {
                   ],
                 ),
                 const Spacer(),
+                // Like Radio's: the settings top right, next to the clock.
+                _BouquetChip(label: context.l10n.tvSettingsButton, icon: Icons.settings, onTap: widget.onSettings),
+                const SizedBox(width: 16),
                 const TvClock(),
               ],
             ),
             const SizedBox(height: 14),
-            // The receiver's channel lists and Internet-TV - up from the
-            // first channel.
+            // The receiver's channel lists, below them Internet-TV - up from
+            // the first channel.
             _BouquetChoice(
               bouquets: widget.config.configured ? ref.watch(tvBouquetsProvider).value ?? const [] : const [],
               current: isIptv ? null : bouquet,
@@ -1855,7 +1949,7 @@ class _BouquetChoice extends StatelessWidget {
   final E2Bouquet? current;
   final ValueChanged<E2Bouquet> onPick;
 
-  /// "TV-Einstellungen" at the end of the row.
+  /// "TV-Einstellungen" - now top right in the header; kept for callers.
   final VoidCallback onSettings;
 
   /// Internet-TV's chips: its favorites and "Sender suchen".
@@ -1877,18 +1971,32 @@ class _BouquetChoice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final settings = _BouquetChip(label: context.l10n.tvSettingsButton, icon: Icons.settings, onTap: onSettings);
-    if (bouquets.length < 2 && !iptv) {
-      return Row(
-        children: [
-          Expanded(
-            child: Text(current == null ? context.l10n.tvChannelList : label(context.l10n, current!.name),
-                style: const TextStyle(color: brandGreen, fontSize: 18, fontWeight: FontWeight.w600)),
+    final l = context.l10n;
+    // One line per source: the receiver's lists, then Internet-TV.
+    Widget row(String title, List<Widget> chips) => Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              SizedBox(
+                width: 104,
+                child: Text(title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Colors.white54, fontSize: 13, fontWeight: FontWeight.w600)),
+              ),
+              Expanded(child: Wrap(spacing: 8, runSpacing: 8, children: chips)),
+            ],
           ),
-          settings,
-        ],
-      );
-    }
+        );
+    final receiver = [
+      for (final b in bouquets)
+        _BouquetChip(
+          label: label(l, b.name),
+          selected: !iptvSelected && b.ref == current?.ref,
+          onTap: () => onPick(b),
+        ),
+    ];
     // Left/right move between the lists here (the channel rows below use
     // them for info and the programme guide).
     return Focus(
@@ -1905,31 +2013,29 @@ class _BouquetChoice extends StatelessWidget {
         }
         return KeyEventResult.ignored;
       },
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          for (final b in bouquets)
-            _BouquetChip(
-              label: label(context.l10n, b.name),
-              selected: !iptvSelected && b.ref == current?.ref,
-              onTap: () => onPick(b),
-            ),
-          if (iptv) ...[
-            _BouquetChip(
-              label: context.l10n.iptvListName,
-              icon: Icons.public,
-              selected: iptvSelected,
-              onTap: onIptv ?? () {},
-            ),
-            _BouquetChip(
-              label: context.l10n.iptvBrowse,
-              icon: Icons.travel_explore,
-              focusNode: browseNode,
-              onTap: onBrowse ?? () {},
-            ),
-          ],
-          settings,
+          if (receiver.length >= 2)
+            row(l.tvRowReceiver, receiver)
+          else if (current != null && !iptv)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(label(l, current!.name),
+                  style: const TextStyle(color: brandGreen, fontSize: 18, fontWeight: FontWeight.w600)),
+            )
+          else if (receiver.length == 1)
+            row(l.tvRowReceiver, receiver),
+          if (iptv)
+            row(l.iptvListName, [
+              _BouquetChip(label: l.iptvChipMine, icon: Icons.public, selected: iptvSelected, onTap: onIptv ?? () {}),
+              _BouquetChip(
+                label: l.iptvChipSearch,
+                icon: Icons.travel_explore,
+                focusNode: browseNode,
+                onTap: onBrowse ?? () {},
+              ),
+            ]),
         ],
       ),
     );

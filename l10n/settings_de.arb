@@ -1,14 +1,33 @@
 {
   "settingsOr": "oder",
-  "@settingsOr": {"description": "Between two addresses of the admin page: 'http://… oder http://…'."},
+  "@settingsOr": {
+    "description": "Between two addresses of the admin page: 'http://… oder http://…'."
+  },
   "settingsNotSetUp": "nicht eingerichtet",
   "settingsPercent": "{value} %",
-  "@settingsPercent": {"placeholders": {"value": {"type": "int"}}},
+  "@settingsPercent": {
+    "placeholders": {
+      "value": {
+        "type": "int"
+      }
+    }
+  },
   "settingsMinutesShort": "{minutes} Min.",
-  "@settingsMinutesShort": {"placeholders": {"minutes": {"type": "int"}}},
+  "@settingsMinutesShort": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
   "settingsSecondsShort": "{seconds} Sek.",
-  "@settingsSecondsShort": {"placeholders": {"seconds": {"type": "int"}}},
-
+  "@settingsSecondsShort": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
   "settingsDeviceNameHelp": "Eindeutig im Heimnetz - erscheint auf der Verwaltungsseite und im Namen der Backups.",
   "settingsDeviceNameOwn": "Eigener Name",
   "settingsDeviceNameNotSet": "nicht vergeben",
@@ -16,7 +35,6 @@
   "settingsDeviceNameSuggestionLivingRoom": "Wohnzimmer-TV",
   "settingsDeviceNameSuggestionBedroom": "Schlafzimmer-TV",
   "settingsDeviceNameSuggestionKitchen": "Küchen-Tablet",
-
   "settingsReception": "Empfang",
   "settingsReceiverNone": "Kein Empfänger",
   "settingsReceiverUsb": "RTL-SDR per USB",
@@ -25,13 +43,18 @@
   "settingsShowFm": "FM anzeigen",
   "settingsShowAm": "LW/MW/KW anzeigen",
   "settingsShowFunk": "Funk anzeigen",
-
   "settingsPartsHeading": "Teile von Home System",
   "settingsPartsHelp": "Ausgeschaltete Teile haben keine Kachel unter Home, und ihre Einstellungen sind ausgegraut.",
   "settingsDeviceHeading": "Gerät",
   "settingsAdminPageOffline": "Verwaltungsseite (Backups): ohne Netzwerkverbindung nicht erreichbar",
   "settingsAdminPageAt": "Verwaltungsseite (Backups) im Browser: {url}",
-  "@settingsAdminPageAt": {"placeholders": {"url": {"type": "String"}}},
+  "@settingsAdminPageAt": {
+    "placeholders": {
+      "url": {
+        "type": "String"
+      }
+    }
+  },
   "settingsNas": "NAS-Server",
   "settingsStartShowHome": "Home anzeigen",
   "settingsStartRadio": "Radio mit Sender starten (Radio → Autostart)",
@@ -43,7 +66,6 @@
   "settingsIconPack": "Icon-Paket",
   "settingsIconPackNone": "Original-Logos",
   "settingsHomeKey": "Home-Taste",
-
   "settingsReceiverHeading": "Receiver",
   "settingsSatReceiver": "Sat-Receiver (Enigma2)",
   "settingsTvKeysValue": "Senderliste, Programmführer, Optionen, Tonspur",
@@ -53,14 +75,19 @@
   "settingsTvStartLast": "Zuletzt gesehenen Sender",
   "settingsTvStartFixed": "Festen Sender",
   "settingsTvChannelsError": "Senderliste nicht erreichbar: {error}",
-  "@settingsTvChannelsError": {"placeholders": {"error": {"type": "String"}}},
+  "@settingsTvChannelsError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "settingsTvSetUpReceiverFirst": "Erst den Receiver einrichten.",
   "settingsTvNextUpHeading": "Als Nächstes",
   "settingsTvNextUpHelp": "Kurz bevor auf dem laufenden Sender die nächste Sendung beginnt, erscheint ein Hinweis, was als Nächstes kommt.",
   "settingsTvNextUpToggle": "Hinweis auf die nächste Sendung",
   "settingsTvNextUpLead": "Wie lange vorher",
   "settingsTvNextUpShow": "Wie lange anzeigen",
-
   "settingsAutostartHeading": "Autostart",
   "settingsAutostartLast": "Zuletzt gehörten Sender starten",
   "settingsAutostartFixed": "Festen Sender starten",
@@ -69,7 +96,16 @@
   "settingsFullscreen": "Vollbild",
   "settingsFullscreenMonitor": "Monitor für Vollbild",
   "settingsMonitorOf": "{monitor} von {count}",
-  "@settingsMonitorOf": {"placeholders": {"monitor": {"type": "int"}, "count": {"type": "int"}}},
+  "@settingsMonitorOf": {
+    "placeholders": {
+      "monitor": {
+        "type": "int"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "settingsUiScale": "Größe der Oberfläche",
   "settingsTilesHeading": "Kacheln",
   "settingsLocation": "Standort",
@@ -82,12 +118,15 @@
   "settingsRadarRadius": "Umkreis um den Standort ({token} in der Adresse)",
   "@settingsRadarRadius": {
     "description": "token is the literal URL placeholder {r}.",
-    "placeholders": {"token": {"type": "String"}}
+    "placeholders": {
+      "token": {
+        "type": "String"
+      }
+    }
   },
   "settingsRadarDimming": "Abdunkeln (für abends)",
   "settingsSunMoon": "Sonne & Mond",
   "settingsMoreSettings": "Weitere Einstellungen (System, TV)",
-
   "settingsMoreHeading": "Weiteres",
   "settingsBackupCreate": "Backup erstellen",
   "settingsBackupRestore": "Backup wiederherstellen",
@@ -96,15 +135,19 @@
   "settingsQuit": "Programm beenden",
   "settingsQuitConfirm": "Programm beenden?",
   "settingsQuitButton": "Beenden",
-
   "settingsPartOff": "{part} ist ausgeschaltet - unter System → Teile von Home System einschalten.",
-  "@settingsPartOff": {"placeholders": {"part": {"type": "String"}}},
-  "settingsAreaSystemSubtitle": "Radio & TV ein/aus, Gerätename, NAS, Start, Home, Home-Taste, Anzeige, Backup, Updates",
+  "@settingsPartOff": {
+    "placeholders": {
+      "part": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsAreaSystemSubtitle": "Radio & TV ein/aus, Gerätename, NAS, Start, Home, Home-Taste, Berechtigungen, Anzeige, Backup, Updates",
   "settingsAreaSystemSubtitleNoHomeKey": "Radio & TV ein/aus, Gerätename, NAS, Start, Home, Anzeige, Backup, Updates",
   "settingsAreaRadioSubtitle": "Empfänger (DAB+, UKW, Funk), Autostart-Sender, Wetter, Radar, Sonne & Mond",
   "settingsAreaTvSubtitle": "Sat-Receiver (Enigma2, z. B. GigaBlue)",
   "settingsAreaOff": "Ausgeschaltet - unter System einschalten",
-
   "settingsAboutLicense": "PolyForm Noncommercial 1.0.0 - frei für private und nicht-kommerzielle Nutzung. © 2026 Jürgen Laschak, github.com/JayLo1401/home.system",
   "settingsAboutWeatherData": "Daten: © GeoSphere Austria, lizenziert unter CC BY 4.0 (data.hub.geosphere.at)",
   "settingsAboutUvIndex": "UV-Index",
@@ -116,59 +159,240 @@
   "settingsAboutBackgroundPhotos": "Hintergrundfotos von Home",
   "settingsAboutBackgroundPhotosData": "Bing-Bilder des Tages, © bei den jeweiligen Fotografen (nur wenn „Landschaftsfotos aus dem Internet“ gewählt ist).",
   "settingsAboutRadarData": "Das Radarbild kommt von der selbst eingetragenen Quelle; Rechte und Quellenangaben liegen beim jeweiligen Anbieter.",
-
   "settingsAudioChannelName": "Radio-Wiedergabe",
-  "@settingsAudioChannelName": {"description": "Android notification channel of the radio playback."},
-
+  "@settingsAudioChannelName": {
+    "description": "Android notification channel of the radio playback."
+  },
   "settingsBackupNotHomeSystem": "Die Datei ist kein Home-System-Backup.",
   "settingsBackupNewerVersion": "Das Backup stammt von einer neueren App-Version.",
   "settingsBackupCorrupt": "Das Backup ist beschädigt oder unvollständig.",
-
   "settingsLauncherMenuApp": "Home System (App-Einstellungen)",
   "settingsLauncherMenuAndroid": "Android-Einstellungen",
   "settingsLauncherNotInstalled": "„{app}“ ist nicht (mehr) installiert.",
-  "@settingsLauncherNotInstalled": {"placeholders": {"app": {"type": "String"}}},
+  "@settingsLauncherNotInstalled": {
+    "placeholders": {
+      "app": {
+        "type": "String"
+      }
+    }
+  },
   "settingsLauncherMoveLeft": "Nach links verschieben",
   "settingsLauncherMoveRight": "Nach rechts verschieben",
   "settingsLauncherChangeImage": "Bild ändern",
   "settingsLauncherRemove": "Aus der Startleiste entfernen",
   "settingsLauncherOptionsHint": "{key}  Optionen der Kachel",
-  "@settingsLauncherOptionsHint": {"placeholders": {"key": {"type": "String"}}},
+  "@settingsLauncherOptionsHint": {
+    "placeholders": {
+      "key": {
+        "type": "String"
+      }
+    }
+  },
   "settingsLauncherOptionsHintMouse": "{key} oder Rechtsklick  Optionen der Kachel",
-  "@settingsLauncherOptionsHintMouse": {"placeholders": {"key": {"type": "String"}}},
+  "@settingsLauncherOptionsHintMouse": {
+    "placeholders": {
+      "key": {
+        "type": "String"
+      }
+    }
+  },
   "settingsLauncherAppInfoFailed": "Die App-Info von „{app}“ lässt sich nicht öffnen.",
-  "@settingsLauncherAppInfoFailed": {"placeholders": {"app": {"type": "String"}}},
+  "@settingsLauncherAppInfoFailed": {
+    "placeholders": {
+      "app": {
+        "type": "String"
+      }
+    }
+  },
   "settingsLauncherImageTitle": "Bild für „{tile}“",
-  "@settingsLauncherImageTitle": {"placeholders": {"tile": {"type": "String"}}},
+  "@settingsLauncherImageTitle": {
+    "placeholders": {
+      "tile": {
+        "type": "String"
+      }
+    }
+  },
   "settingsLauncherImageAuto": "Automatisch (Icon-Paket, sonst Original)",
   "settingsLauncherImageDefault": "Standard",
   "settingsLauncherImageOriginal": "Original der App",
   "settingsLauncherImageFromUrl": "Bild von einer Adresse (URL) …",
   "settingsLauncherImageUrlTitle": "Bild-Adresse (PNG/JPG, am besten 16:9)",
   "settingsLauncherFindApps": "Apps suchen & hinzufügen",
-
   "settingsWizardTitle": "Home System einrichten",
   "settingsWizardStep": "Schritt {step} von {count}",
-  "@settingsWizardStep": {"placeholders": {"step": {"type": "int"}, "count": {"type": "int"}}},
+  "@settingsWizardStep": {
+    "placeholders": {
+      "step": {
+        "type": "int"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "settingsWizardWelcome": "Willkommen! Gibt es schon ein Backup von Home System?",
   "settingsWizardRestoreHint": "Von diesem Gerät, vom USB-Stick oder über die Verwaltungsseite",
   "settingsWizardRestoreHintUrl": "Von diesem Gerät, vom USB-Stick oder über die Verwaltungsseite ({url})",
-  "@settingsWizardRestoreHintUrl": {"placeholders": {"url": {"type": "String"}}},
+  "@settingsWizardRestoreHintUrl": {
+    "placeholders": {
+      "url": {
+        "type": "String"
+      }
+    }
+  },
   "settingsWizardNew": "Neu einrichten",
   "settingsWizardLanguage": "Sprache: {language}",
-  "@settingsWizardLanguage": {"placeholders": {"language": {"type": "String"}}},
+  "@settingsWizardLanguage": {
+    "placeholders": {
+      "language": {
+        "type": "String"
+      }
+    }
+  },
   "settingsWizardNameQuestion": "Wie soll dieses Gerät heißen?",
   "settingsWizardNameHint": "Ein eindeutiger Name, damit man die Geräte unterscheiden kann - auf der Verwaltungsseite und bei Backups.",
   "settingsWizardNameOwn": "Oder eigener Name",
   "settingsWizardNext": "Weiter",
-  "settingsWizardHomeKeyTitle": "Home-Taste der Fernbedienung (freiwillig)",
-  "settingsWizardHomeKeyHint": "Wer möchte, dass die Home-Taste der Fernbedienung Home System öffnet, richtet das hier ein - Home System wird dafür Standard-Launcher, oder eine Bedienungshilfe wird eingeschaltet. Wer das nicht will, geht einfach weiter; es lässt sich jederzeit unter Einstellungen → System → Home-Taste nachholen.",
-  "settingsWizardHomeKeySetUp": "Home-Taste einrichten",
-  "settingsWizardHomeKeySkip": "Weiter (ohne bzw. nach dem Einrichten)",
   "settingsWizardDone": "Fertig - „{name}“ ist eingerichtet.",
-  "@settingsWizardDone": {"placeholders": {"name": {"type": "String"}}},
+  "@settingsWizardDone": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "settingsWizardDoneHint": "Home System startet mit Home: Radio, TV und die Apps als Kacheln. Weiteres (Radio-Empfänger, Sat-Receiver, Hintergrund …) unter Einstellungen.",
   "settingsWizardDoneBackups": "Backups gibt es jederzeit auf der Verwaltungsseite: {url}",
-  "@settingsWizardDoneBackups": {"placeholders": {"url": {"type": "String"}}},
-  "settingsWizardStart": "Los geht's"
+  "@settingsWizardDoneBackups": {
+    "placeholders": {
+      "url": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsWizardStart": "Los geht's",
+  "settingsOpenSourceLicenses": "Open-Source-Lizenzen",
+  "settingsAboutInternetTv": "Internet-TV",
+  "settingsAboutInternetTvData": "Senderliste, Streams und Logos aus dem offenen Verzeichnis iptv-org (github.com/iptv-org/iptv) - nur frei verfügbare Sender; die Streams kommen von den Sendern selbst",
+  "settingsAboutMaps": "Karten (Funk)",
+  "settingsAboutMapsData": "Kartenkacheln © OpenStreetMap-Mitwirkende, Daten unter der Open Database License (ODbL), über tile.openstreetmap.org",
+  "settingsAboutAircraft": "Flugzeugdaten (ADS-B)",
+  "settingsAboutAircraftData": "Flugzeugtypen, Halter und Flugrouten über adsbdb.com",
+  "settingsBgTitle": "Hintergrund von Home",
+  "settingsBgGradientsHint": "Mitgelieferte Farbverläufe (Nordlicht, Abendrot, Ozean, …) - ohne Internet.",
+  "settingsBgPhotos": "Landschaftsfotos aus dem Internet",
+  "settingsBgPhotosHint": "Landschafts- und Naturfotos - die Bing-Bilder des Tages der letzten zwei Wochen, abwechselnd. Ort und Fotograf stehen klein rechts oben.",
+  "settingsBgBand": "Band hinter den Favoriten",
+  "settingsBgBandHint": "Wie stark das Band das Bild abdeckt - wirkt sofort.",
+  "settingsBgBandNone": "Keines",
+  "settingsBgInterval": "Neues Bild alle",
+  "settingsBgOneHour": "1 Stunde",
+  "settingsIconPackTitle": "Icon-Paket für die App-Kacheln",
+  "settingsIconPackNoneOriginal": "Keines - Original-Logos der Apps",
+  "settingsIconPackNoneInstalled": "Kein Icon-Paket installiert. Icon-Pakete für Android-Launcher (ADW-/Nova-Format) werden unterstützt - als App installieren, dann hier auswählen.\nEinzelne Kacheln bekommen ein eigenes Bild über ☰ auf der Kachel → „Bild ändern“.",
+  "settingsHomeKeyIntro": "Mit der Home-Taste der Fernbedienung öffnet sich Home System mit Home (den Kacheln).",
+  "settingsHomeKeyIsDefault": "Home System ist der Standard-Launcher.",
+  "settingsHomeKeyNotDefault": "Home System ist noch nicht der Standard-Launcher.",
+  "settingsHomeKeyDefaultHelp": "Auf Android-TV-Boxen Home System als Startbildschirm („Home-App“) wählen. Fragt das Gerät beim Drücken der Home-Taste nach, „Home System“ und „Immer“ wählen.",
+  "settingsHomeKeyChooseDefault": "Standard-Launcher wählen",
+  "settingsHomeKeyServiceFallback": "Lässt das Gerät keinen anderen Launcher zu (z. B. Google TV), hilft der Dienst unten - wie beim Fire TV.",
+  "settingsHomeKeyServiceOn": "Dienst „Home System: Home-Taste“ ist eingeschaltet.",
+  "settingsHomeKeyServiceOff": "Dienst „Home System: Home-Taste“ ist ausgeschaltet.",
+  "settingsHomeKeyServiceFireTv": "Der Fire TV zeigt mit der Home-Taste immer den Amazon-Startbildschirm. Der Dienst (eine Bedienungshilfe) holt Home System dann sofort nach vorne. Er sieht nur, welche App im Vordergrund ist - keine Inhalte, keine Tasten und keine Eingaben.",
+  "settingsHomeKeyServiceOther": "Der Dienst (eine Bedienungshilfe) holt Home System nach vorne, sobald der Startbildschirm des Geräts erscheint. Er sieht nur, welche App im Vordergrund ist.",
+  "settingsHomeKeyEnable": "Dienst einschalten",
+  "settingsHomeKeyOpenA11y": "Bedienungshilfen öffnen",
+  "settingsHomeKeyBlocked": "Android hat den Dienst gesperrt („eingeschränkte Einstellungen“ - ab Android 13 bei Apps, die nicht aus einem App-Store kommen). Einmalig vom Computer aus per adb erlauben, dann noch einmal „Dienst einschalten“:",
+  "settingsHomeKeyEnableThere": "Dort „Home System: Home-Taste“ einschalten. Zeigt das Gerät den Dienst nicht an oder ist er ausgegraut, einmalig vom Computer aus per adb freischalten - danach schaltet ihn dieser Knopf selbst ein:",
+  "settingsHomeKeyRedirect": "Home-Taste öffnet Home System",
+  "settingsHomeKeyRedirectHint": "Aus: der Startbildschirm des Geräts bleibt, Home System öffnet man wie jede App.",
+  "settingsBackupSaved": "Backup gespeichert: {location}",
+  "@settingsBackupSaved": {
+    "placeholders": {
+      "location": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsBackupDownloadAlso": "Zum Herunterladen auch unter {urls}",
+  "@settingsBackupDownloadAlso": {
+    "description": "One or more admin page addresses, joined with the word for 'or'.",
+    "placeholders": {
+      "urls": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsBackupNoPermission": "Ohne Speicher-Berechtigung kann kein Backup gespeichert werden.",
+  "settingsBackupFailed": "Backup fehlgeschlagen: {message}",
+  "@settingsBackupFailed": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsRestoreNoPermission": "Ohne Speicher-Berechtigung können keine Backups gelesen werden.",
+  "settingsRestoreReadFailed": "Backups konnten nicht gelesen werden ({message}).",
+  "@settingsRestoreReadFailed": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsRestoreBusy": "Das Gerät spielt gerade schon ein Backup ein.",
+  "settingsRestoreFromWebDone": "Backup von der Verwaltungsseite eingespielt - App startet neu …",
+  "settingsRestoreConfirmTitle": "Backup wiederherstellen?",
+  "settingsRestoreConfirmText": "{what}\n\nAlle aktuellen Favoriten, DAB+ Sender und Einstellungen werden ersetzt. Danach startet die App neu.",
+  "@settingsRestoreConfirmText": {
+    "description": "The backup file name, or the sentence settingsRestorePickedFile.",
+    "placeholders": {
+      "what": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsRestoreButton": "Wiederherstellen",
+  "settingsRestoreDone": "Backup wiederhergestellt - App startet neu …",
+  "settingsRestoreNoPicker": "Dieses Gerät hat keine Dateiauswahl. Bitte stattdessen „Zugriff auf alle Dateien“ erlauben.",
+  "settingsRestoreFailed": "Wiederherstellen fehlgeschlagen: {message}",
+  "@settingsRestoreFailed": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsRestorePickedFile": "Die ausgewählte Datei wird eingespielt.",
+  "settingsRestoreNoAllFilesSetting": "Dieses Gerät bietet die Einstellung „Zugriff auf alle Dateien“ nicht an.",
+  "settingsRestoreViaAdmin": "Über die Verwaltungsseite",
+  "settingsRestoreNoNetwork": "Keine Netzwerkverbindung - die Verwaltungsseite ist nicht erreichbar.",
+  "settingsRestoreOpenInBrowser": "Auf einem Computer oder Handy im selben Netz im Browser öffnen:",
+  "settingsRestoreHostname": "Hostname dieses Geräts: {name}",
+  "@settingsRestoreHostname": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsRestoreAdminHint": "Dort die Backup-Datei auswählen und einspielen. Solange diese Seite hier offen ist, nimmt das Gerät ein Backup an. Danach startet die App neu.",
+  "settingsRestoreOnDevice": "Backups auf diesem Gerät",
+  "settingsRestoreOnDeviceHint": "Aus dem Ordner „{folder}/HomeSystem“ (und HomeRadio der früheren App).",
+  "@settingsRestoreOnDeviceHint": {
+    "description": "'Download' on Android, settingsRestoreFolderDocuments elsewhere.",
+    "placeholders": {
+      "folder": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsRestoreFolderDocuments": "Dokumente",
+  "settingsRestoreNone": "Keine Backups gefunden.",
+  "settingsRestoreAllFilesHint": "Backups von einer früheren Installation der App sind erst sichtbar, wenn der „Zugriff auf alle Dateien“ erlaubt wurde. Alternativ die Datei direkt auswählen.",
+  "settingsRestoreAllowAllFiles": "Zugriff auf alle Dateien erlauben",
+  "settingsRestorePickFile": "Backup-Datei auswählen … (z. B. vom USB-Stick)",
+  "settingsAboutAdblock": "Werbefilter (Browser)",
+  "settingsAboutAdblockData": "Filterlisten, zur Laufzeit geladen: uBlock Origin uAssets (GPLv3, github.com/uBlockOrigin/uAssets), EasyList, EasyPrivacy, EasyList Germany (GPLv3 oder CC BY-SA 3.0, easylist.to), Peter Lowe’s Ad and tracking server list (pgl.yoyo.org/adservers). Die Scriptlets sind eigene Umsetzungen nach den Namen und Argumenten von uBlock Origin."
 }

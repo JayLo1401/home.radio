@@ -251,5 +251,17 @@
       }
     }
   },
-  "tvSettingsButton": "TV-Einstellungen"
+  "tvSettingsButton": "TV-Einstellungen",
+  "tvBannerLaterHint": "Sendung {index} von {count} - → weiter, ← zurück",
+  "@tvBannerLaterHint": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "tvRowReceiver": "Receiver"
 }

@@ -7,11 +7,12 @@ import '../../core/theme.dart';
 import '../../data/models/launcher_tile.dart' show StartScreen;
 import '../../data/services/admin_server.dart';
 import '../../data/services/launcher_service.dart';
+import '../../data/services/permissions_service.dart' show PermissionEntry;
 import '../../l10n/l10n.dart';
 import '../launcher/launcher_providers.dart';
 import '../settings/language_picker.dart';
-import '../settings/launcher_settings_screens.dart' show HomeButtonSettingsScreen;
 import '../settings/restore_backup_screen.dart';
+import 'permissions_screen.dart';
 
 /// Suggestions for the device's name - picked with the remote, no typing.
 List<String> deviceNameSuggestions(AppLocalizations l) => [
@@ -21,11 +22,12 @@ List<String> deviceNameSuggestions(AppLocalizations l) => [
       l.settingsDeviceNameSuggestionKitchen,
     ];
 
-enum _Step { welcome, name, homeKey, done }
+enum _Step { welcome, name, permissions, done }
 
 /// First start without any settings: restore a backup (on the device or via
-/// the admin page) or set up anew - device name, the Home key (optional,
-/// Android only), and Home as what shows on start. [onFinished] then opens
+/// the admin page) or set up anew - device name, the permissions one by one
+/// with what they're for (all optional, Android only; the Home key is the
+/// first of them), and Home as what shows on start. [onFinished] then opens
 /// the app as usual; a restored backup restarts the app by itself.
 class SetupWizardScreen extends ConsumerStatefulWidget {
   const SetupWizardScreen({super.key, required this.onFinished});
@@ -43,6 +45,9 @@ class _SetupWizardScreenState extends ConsumerState<SetupWizardScreen> {
   final _nextFocus = FocusNode(debugLabel: 'weiter');
   // The admin page's addresses (by IP and, if known, by host name).
   List<String> _urls = const [];
+  // The permission shown (index into wizardPermissions - an allowed one
+  // drops out of it, so the next one moves up).
+  int _permission = 0;
 
   @override
   void initState() {
@@ -59,11 +64,28 @@ class _SetupWizardScreenState extends ConsumerState<SetupWizardScreen> {
     super.dispose();
   }
 
-  List<_Step> get _steps => [_Step.welcome, _Step.name, if (LauncherService.supported) _Step.homeKey, _Step.done];
+  List<_Step> get _steps => [_Step.welcome, _Step.name, if (LauncherService.supported) _Step.permissions, _Step.done];
 
   void _go(int direction) {
     final i = (_steps.indexOf(_step) + direction).clamp(0, _steps.length - 1);
     setState(() => _step = _steps[i]);
+  }
+
+  List<PermissionEntry>? _permissions({bool watch = false}) {
+    final provider = permissionEntriesProvider;
+    final state = watch ? ref.watch(provider).value : ref.read(provider).value;
+    return state == null ? null : wizardPermissions(state);
+  }
+
+  /// Back on the permissions step: the previous permission, before the
+  /// first one the previous step.
+  void _back() {
+    final count = _permissions()?.length ?? 0;
+    if (_step == _Step.permissions && _permission.clamp(0, count) > 0) {
+      setState(() => _permission = _permission.clamp(0, count) - 1);
+    } else {
+      _go(-1);
+    }
   }
 
   Future<void> _finish() async {
@@ -80,7 +102,7 @@ class _SetupWizardScreenState extends ConsumerState<SetupWizardScreen> {
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop && index > 0) _go(-1);
+        if (!didPop && index > 0) _back();
       },
       child: Scaffold(
         backgroundColor: const Color(0xFF05070A),
@@ -124,8 +146,9 @@ class _SetupWizardScreenState extends ConsumerState<SetupWizardScreen> {
                     const SizedBox(height: 32),
                     Expanded(
                       child: FocusTraversalGroup(
-                        // A new step's widgets - autofocus picks them up.
-                        key: ValueKey(_step),
+                        // A new step's (permission's) widgets - autofocus
+                        // picks them up.
+                        key: ValueKey(_pageKey),
                         child: SingleChildScrollView(child: _content()),
                       ),
                     ),
@@ -137,6 +160,13 @@ class _SetupWizardScreenState extends ConsumerState<SetupWizardScreen> {
         ),
       ),
     );
+  }
+
+  Object get _pageKey {
+    if (_step != _Step.permissions) return _step;
+    final list = _permissions(watch: true);
+    final i = _permission.clamp(0, list?.length ?? 0);
+    return (_step, i, list == null || i >= list.length ? null : list[i].kind);
   }
 
   Widget _content() {
@@ -221,28 +251,8 @@ class _SetupWizardScreenState extends ConsumerState<SetupWizardScreen> {
             ),
           ],
         );
-      case _Step.homeKey:
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(l.settingsWizardHomeKeyTitle, style: lead),
-            const SizedBox(height: 4),
-            Text(l.settingsWizardHomeKeyHint, style: hint),
-            const SizedBox(height: 16),
-            ActionTile(
-              icon: Icons.home_outlined,
-              label: l.settingsWizardHomeKeySetUp,
-              onTap: () =>
-                  Navigator.of(context).push(MaterialPageRoute(builder: (_) => const HomeButtonSettingsScreen())),
-            ),
-            ActionTile(
-              icon: Icons.skip_next_outlined,
-              label: l.settingsWizardHomeKeySkip,
-              autofocus: true,
-              onTap: () => _go(1),
-            ),
-          ],
-        );
+      case _Step.permissions:
+        return PermissionsAutoRefresh(child: _permissionsPage(lead, hint));
       case _Step.done:
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -265,6 +275,67 @@ class _SetupWizardScreenState extends ConsumerState<SetupWizardScreen> {
           ],
         );
     }
+  }
+
+  /// One permission at a time: why it's needed, "Erlauben" and "Später" -
+  /// then "that's it" with "Weiter".
+  Widget _permissionsPage(TextStyle lead, TextStyle hint) {
+    final l = context.l10n;
+    final state = ref.watch(permissionEntriesProvider).value;
+    if (state == null) return const Center(child: CircularProgressIndicator());
+    final list = wizardPermissions(state);
+    final i = _permission.clamp(0, list.length);
+    if (i >= list.length) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(l.permissionsWizardNoneLeft, style: lead),
+          const SizedBox(height: 4),
+          Text(l.permissionsWizardNoneLeftHint, style: hint),
+          const SizedBox(height: 24),
+          Row(
+            children: [
+              OutlinedButton(onPressed: _back, child: Text(l.commonBack)),
+              const SizedBox(width: 12),
+              FilledButton(autofocus: true, onPressed: () => _go(1), child: Text(l.settingsWizardNext)),
+            ],
+          ),
+        ],
+      );
+    }
+    final entry = list[i];
+    final action = permissionActionLabel(l, entry);
+    void next() => setState(() => _permission = i + 1);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(l.permissionsWizardTitle, style: lead),
+        const SizedBox(height: 4),
+        Text(l.permissionsWizardHint, style: hint),
+        const SizedBox(height: 16),
+        Text(l.permissionsWizardCounter(i + 1, list.length), style: const TextStyle(color: Colors.white54, fontSize: 15)),
+        const SizedBox(height: 8),
+        PermissionCard(entry: entry, state: state, large: true),
+        const SizedBox(height: 24),
+        Row(
+          children: [
+            OutlinedButton(onPressed: _back, child: Text(l.commonBack)),
+            const SizedBox(width: 12),
+            if (action == null)
+              FilledButton(autofocus: true, onPressed: next, child: Text(l.settingsWizardNext))
+            else ...[
+              OutlinedButton(onPressed: next, child: Text(l.permissionsLater)),
+              const SizedBox(width: 12),
+              FilledButton(
+                autofocus: true,
+                onPressed: () => askPermission(context, ref, entry),
+                child: Text(action),
+              ),
+            ],
+          ],
+        ),
+      ],
+    );
   }
 }
 

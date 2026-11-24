@@ -20,7 +20,19 @@ class NasPictureStatus {
   /// The last sync's error (user-facing), if it failed.
   final String? error;
 
-  const NasPictureStatus({this.count = 0, this.syncing = false, this.lastSync, this.error});
+  /// While syncing: pictures fetched so far of [total] to fetch; [total] is
+  /// null while the folder is still being read.
+  final int loaded;
+  final int? total;
+
+  const NasPictureStatus({
+    this.count = 0,
+    this.syncing = false,
+    this.lastSync,
+    this.error,
+    this.loaded = 0,
+    this.total,
+  });
 }
 
 /// The launcher's background pictures from the NAS pictures folder
@@ -136,6 +148,8 @@ class NasPictureCache {
     final folder = settings.folder(NasFolder.backgrounds);
     if (source == null || folder == null) return;
     _syncedSource = source;
+    _syncLoaded = 0;
+    _syncTotal = null;
     status.value = NasPictureStatus(count: _countFor(source), syncing: true, lastSync: _lastSync);
     final dir = await _directory();
     final client = settings.config.createClient();
@@ -158,6 +172,7 @@ class NasPictureCache {
           .toList();
       final wanted = maxPictures - kept.length + replace.length;
       _pictures = kept;
+      _syncTotal = min(wanted, candidates.length);
       _publish();
       var added = 0;
       for (final entry in candidates) {
@@ -166,6 +181,9 @@ class NasPictureCache {
         if (total >= maxCacheBytes && replace.isEmpty) break;
         try {
           watch.reset();
+          // Counted when it's tried - a picture that fails still moves on.
+          _syncLoaded++;
+          _publish();
           final bytes = await client.read(entry.path, maxBytes: maxFileBytes);
           final readMs = watch.elapsedMilliseconds;
           final shrunk = await shrinkToScreen(bytes);
@@ -220,13 +238,20 @@ class NasPictureCache {
   int _countFor(String source) => source == _source ? _pictures.length : 0;
 
   void _publish() {
+    final syncing = _sync != null;
     status.value = NasPictureStatus(
       count: _pictures.length,
-      syncing: _sync != null,
+      syncing: syncing,
       lastSync: _lastSync,
       error: status.value.error,
+      loaded: syncing ? _syncLoaded : 0,
+      total: syncing ? _syncTotal : null,
     );
   }
+
+  /// The running sync's progress (see [NasPictureStatus.loaded]).
+  int _syncLoaded = 0;
+  int? _syncTotal;
 
   /// Reads what's cached (for [status]) - without asking the NAS.
   Future<void> init() => _load();

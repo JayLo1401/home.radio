@@ -80,5 +80,7 @@
   "tvErrorHttpStatus": "Receiver responded with error {status}",
   "tvErrorUnexpectedResponse": "Unexpected response from the receiver",
   "tvErrorZapFailed": "Receiver won't switch channels: {message}",
-  "tvSettingsButton": "TV settings"
+  "tvSettingsButton": "TV settings",
+  "tvBannerLaterHint": "Programme {index} of {count} - → next, ← back",
+  "tvRowReceiver": "Receiver"
 }

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/nas_providers.dart';
 import '../../core/providers.dart';
+import '../../data/models/launcher_group.dart';
 import '../../data/models/launcher_tile.dart';
 import '../../data/repositories/settings_repository.dart';
 import '../../data/services/launcher_background_service.dart';
@@ -134,9 +135,13 @@ final launcherSettingsProvider =
 /// The launcher's row. On the very first start: Radio and the installed
 /// streaming apps of [defaultLauncherPackages].
 class LauncherTilesNotifier extends Notifier<List<LauncherTile>> {
+  /// The saved row is loaded - a tile added before (a part switched on at
+  /// the start) mustn't replace it.
+  late Future<void> _ready;
+
   @override
   List<LauncherTile> build() {
-    _load();
+    _ready = _load();
     return const [LauncherTile.radio()];
   }
 
@@ -153,6 +158,13 @@ class LauncherTilesNotifier extends Notifier<List<LauncherTile>> {
         await _repo.setLauncherTiles(saved);
       }
       await _repo.setLauncherTvAdded();
+      // Once: parts added to the end before (behind the apps) move up to
+      // the other own tiles - later the user's own order stays.
+      if (!await _repo.getLauncherOwnTilesMoved()) {
+        saved = ownTilesToFront(saved);
+        await _repo.setLauncherTiles(saved);
+        await _repo.setLauncherOwnTilesMoved();
+      }
       state = saved;
       return;
     }
@@ -174,9 +186,13 @@ class LauncherTilesNotifier extends Notifier<List<LauncherTile>> {
 
   bool contains(String id) => state.any((t) => t.id == id);
 
+  /// Home System's parts go right after the last part in the row (so one
+  /// switched on later isn't put behind the apps), everything else at the
+  /// end - see insertLauncherTile.
   Future<void> add(LauncherTile tile) async {
+    await _ready.catchError((_) {});
     if (contains(tile.id)) return;
-    await _save([...state, tile]);
+    await _save(insertLauncherTile(state, tile));
   }
 
   Future<void> remove(String id) async {
@@ -197,11 +213,73 @@ class LauncherTilesNotifier extends Notifier<List<LauncherTile>> {
   }
 
   Future<void> setImage(String id, String? image) async {
+    if (!contains(id)) return;
     await _save([for (final t in state) t.id == id ? t.withImage(image) : t]);
   }
 }
 
 final launcherTilesProvider = NotifierProvider<LauncherTilesNotifier, List<LauncherTile>>(LauncherTilesNotifier.new);
+
+/// The launcher's groups - rows of apps under the favourites, each with a
+/// name (see LauncherGroup). None until the user makes one; there are no
+/// app tiles on the PC, so none there either.
+class LauncherGroupsNotifier extends Notifier<List<LauncherGroup>> {
+  late Future<void> _ready;
+
+  @override
+  List<LauncherGroup> build() {
+    _ready = _load();
+    return const [];
+  }
+
+  SettingsRepository get _repo => ref.read(settingsRepositoryProvider);
+
+  Future<void> _load() async {
+    if (!LauncherService.supported) return;
+    state = await _repo.getLauncherGroups();
+  }
+
+  Future<void> _save(List<LauncherGroup> groups) async {
+    await _ready.catchError((_) {});
+    state = groups;
+    await _repo.setLauncherGroups(groups);
+  }
+
+  Future<void> _edit(List<LauncherGroup> Function(List<LauncherGroup> groups) change) async {
+    await _ready.catchError((_) {});
+    await _save(change(state));
+  }
+
+  /// A new group at the end (with [first] in it); returns its id.
+  Future<String> create(String name, {LauncherTile? first}) async {
+    await _ready.catchError((_) {});
+    final group = LauncherGroup(id: newLauncherGroupId(state), name: name.trim());
+    var groups = [...state, group];
+    if (first != null) groups = groups.addTile(group.id, first);
+    await _save(groups);
+    return group.id;
+  }
+
+  Future<void> rename(String id, String name) => _edit((g) => g.rename(id, name.trim()));
+  Future<void> delete(String id) => _edit((g) => g.without(id));
+  Future<void> moveGroup(String id, int direction) => _edit((g) => g.moveGroup(id, direction));
+  Future<void> addTile(String groupId, LauncherTile tile) => _edit((g) => g.addTile(groupId, tile));
+  Future<void> removeTile(String groupId, String tileId) => _edit((g) => g.removeTile(groupId, tileId));
+  Future<void> moveTile(String groupId, String tileId, int direction) =>
+      _edit((g) => g.moveTile(groupId, tileId, direction));
+  Future<void> moveTileTo(String fromId, String toId, LauncherTile tile) =>
+      _edit((g) => g.moveTileTo(fromId, toId, tile));
+
+  /// The tile's picture in every group it's in.
+  Future<void> setImage(String tileId, String? image) async {
+    await _ready.catchError((_) {});
+    if (!state.any((g) => g.contains(tileId))) return;
+    await _save(state.setImage(tileId, image));
+  }
+}
+
+final launcherGroupsProvider =
+    NotifierProvider<LauncherGroupsNotifier, List<LauncherGroup>>(LauncherGroupsNotifier.new);
 
 /// Every installed app (refreshed with ref.invalidate when "Alle Apps" opens).
 final installedAppsProvider = FutureProvider<List<InstalledApp>>((ref) {

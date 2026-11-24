@@ -1,0 +1,106 @@
+{
+  "picturesTitle": "Bilder",
+  "picturesAreaSubtitle": "Fotos vom NAS, Diashow",
+  "picturesSettingsTitle": "Bilder-Einstellungen",
+  "picturesAdminPart": "Bilder eingeschaltet",
+  "picturesNoFolder": "Noch kein Bilder-Ordner gewählt. Lege in den NAS-Einstellungen fest, wo deine Fotos liegen.",
+  "picturesOpenNasSettings": "NAS-Einstellungen öffnen",
+  "picturesLoadError": "Der Ordner lässt sich nicht lesen.\n{message}",
+  "@picturesLoadError": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "picturesSlideshowWithSubfolders": "Diashow: {folder} (mit Unterordnern)",
+  "@picturesSlideshowWithSubfolders": {
+    "placeholders": {
+      "folder": {
+        "type": "String"
+      }
+    }
+  },
+  "picturesSlideshow": "Diashow: {folder}",
+  "@picturesSlideshow": {
+    "placeholders": {
+      "folder": {
+        "type": "String"
+      }
+    }
+  },
+  "picturesCount": "{count, plural, =0{keine Bilder} =1{1 Bild} other{{count} Bilder}}",
+  "@picturesCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "picturesFolderCount": "{count, plural, =1{1 Ordner} other{{count} Ordner}}",
+  "@picturesFolderCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "picturesEmptyFolder": "In diesem Ordner sind keine Bilder.",
+  "picturesBrowserHint": "OK öffnet · OK auf einem Bild: Diashow ab diesem Bild · ⏯ oder {options} startet die Diashow des Ordners · Zurück geht eine Ebene hoch",
+  "@picturesBrowserHint": {
+    "placeholders": {
+      "options": {
+        "type": "String"
+      }
+    }
+  },
+  "picturesSearching": "Suche Bilder …",
+  "picturesNoneFound": "Hier sind keine Bilder - auch nicht in den Unterordnern.",
+  "picturesStillSearching": "sucht weiter …",
+  "picturesPaused": "Pause",
+  "picturesSlideshowHint": "← → zurück/vor · OK Pause · {options} Einstellungen · Zurück beendet",
+  "@picturesSlideshowHint": {
+    "placeholders": {
+      "options": {
+        "type": "String"
+      }
+    }
+  },
+  "picturesInterval": "Bild wechselt alle",
+  "picturesIntervalSeconds": "{seconds} Sekunden",
+  "@picturesIntervalSeconds": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "picturesOrder": "Reihenfolge",
+  "picturesOrderFolders": "Ordner für Ordner, nach Namen",
+  "picturesOrderShuffled": "Gemischt",
+  "picturesOrderNextTime": "Die Reihenfolge gilt ab der nächsten Diashow.",
+  "picturesBlur": "Ränder mit dem unscharfen Bild füllen",
+  "picturesFolder": "Bilder-Ordner",
+  "picturesMusicHelp": "Radio und Musik laufen während der Diashow einfach weiter.",
+  "picturesSlideshowHeading": "Diashow",
+  "picturesInThisFolder": "{count, plural, =1{1 Bild in diesem Ordner} other{{count} Bilder in diesem Ordner}} - OK auf einem Bild startet die Diashow ab dort",
+  "@picturesInThisFolder": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "picturesResumeFrom": "Fortsetzen ab Bild {position} ({name})",
+  "@picturesResumeFrom": {
+    "placeholders": {
+      "position": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "picturesResumeRestart": "Von vorne"
+}

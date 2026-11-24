@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../../core/nas_providers.dart';
-import '../../core/popup_text_field.dart';
 import '../../data/models/launcher_tile.dart';
 import '../../data/repositories/settings_repository.dart';
 import '../../data/services/launcher_background_service.dart';
@@ -41,13 +41,7 @@ class _LauncherBackgroundSettingsScreenState extends ConsumerState<LauncherBackg
   late final _settings = ref.read(launcherSettingsProvider);
   late LauncherBackgroundSource _source = _settings.backgroundSource;
 
-  /// "Own server" is the NAS pictures folder (Settings → NAS), not an
-  /// address.
-  late bool _fromNas = LauncherBackgroundService.isNasAddress(_settings.backgroundUrl);
-  late final _url = TextEditingController(text: _fromNas ? '' : _settings.backgroundUrl);
   late int _interval = _settings.backgroundInterval;
-  String? _testResult;
-  bool _testing = false;
 
   @override
   void initState() {
@@ -56,54 +50,15 @@ class _LauncherBackgroundSettingsScreenState extends ConsumerState<LauncherBackg
     ref.read(nasPictureCacheProvider).init();
   }
 
-  @override
-  void dispose() {
-    _url.dispose();
-    super.dispose();
-  }
-
-  bool get _urlValid {
-    final uri = Uri.tryParse(_url.text.trim());
-    return uri != null && uri.scheme.startsWith('http') && uri.host.isNotEmpty;
-  }
-
-  Future<void> _test() async {
-    setState(() {
-      _testing = true;
-      _testResult = null;
-    });
-    String result;
-    try {
-      final bytes = await ref.read(launcherBackgroundServiceProvider).fromServer(_url.text);
-      result = bytes == null
-          ? 'Kein Bild gefunden - liefert die Adresse ein Bild, eine JSON-Liste oder eine Seite mit Bild-Links?'
-          : 'OK - Bild geladen (${(bytes.length / 1024).round()} KB).';
-    } catch (e) {
-      result = 'Fehler: $e';
-    }
-    if (mounted) {
-      setState(() {
-        _testing = false;
-        _testResult = result;
-      });
-    }
-  }
-
   String? get _nasPicturesFolder => ref.watch(nasSettingsProvider).value?.folder(NasFolder.backgrounds);
 
   Future<void> _save() async {
     final server = _source == LauncherBackgroundSource.server;
-    if (server && _fromNas && ref.read(nasSettingsProvider).value?.folder(NasFolder.backgrounds) == null) {
+    if (server && ref.read(nasSettingsProvider).value?.folder(NasFolder.backgrounds) == null) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.l10n.nasBgNoFolder)));
       return;
     }
-    if (server && !_fromNas && !_urlValid) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Bitte eine vollständige Adresse mit http:// oder https:// eingeben.')),
-      );
-      return;
-    }
-    final url = server && _fromNas ? LauncherBackgroundService.nasAddress : _url.text.trim();
+    final url = server ? LauncherBackgroundService.nasAddress : '';
     await ref.read(launcherSettingsProvider.notifier).setBackground(source: _source, url: url, interval: _interval);
     if (mounted) Navigator.of(context).pop();
   }
@@ -113,6 +68,7 @@ class _LauncherBackgroundSettingsScreenState extends ConsumerState<LauncherBackg
     final l = context.l10n;
     final cache = ref.read(nasPictureCacheProvider);
     String date(DateTime t) {
+      if (l.localeName != 'de') return DateFormat.yMd(l.localeName).add_Hm().format(t);
       String two(int v) => v.toString().padLeft(2, '0');
       return '${two(t.day)}.${two(t.month)}.${t.year}, ${two(t.hour)}:${two(t.minute)}';
     }
@@ -131,12 +87,25 @@ class _LauncherBackgroundSettingsScreenState extends ConsumerState<LauncherBackg
               children: [
                 Text(
                   status.syncing
-                      ? l.nasBgSyncing
+                      ? (status.total == null
+                          ? l.nasBgSyncListing
+                          : status.total == 0
+                              ? l.nasBgSyncNothingNew
+                              : l.nasBgSyncProgress(status.loaded, status.total!))
                       : lastSync == null
                           ? l.nasBgStatus(status.count)
                           : l.nasBgLastSync(status.count, date(lastSync)),
                   style: help,
                 ),
+                // Moves while it works - the folder being read, then each picture.
+                if (status.syncing)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6, right: 24),
+                    child: LinearProgressIndicator(
+                      value: (status.total ?? 0) > 0 ? status.loaded / status.total! : null,
+                      minHeight: 4,
+                    ),
+                  ),
                 if (error != null && !status.syncing) Text(l.nasBgSyncError(error), style: help),
                 const SizedBox(height: 8),
                 OutlinedButton.icon(
@@ -157,116 +126,61 @@ class _LauncherBackgroundSettingsScreenState extends ConsumerState<LauncherBackg
   @override
   Widget build(BuildContext context) {
     const help = TextStyle(color: Colors.white54, fontSize: 13);
+    final l = context.l10n;
     return Scaffold(
-      appBar: AppBar(title: const Text('Hintergrund von Home')),
+      appBar: AppBar(title: Text(l.settingsBgTitle)),
       body: FocusTraversalGroup(
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
             _choice(
               context,
-              title: 'Farbverläufe',
-              subtitle: 'Mitgelieferte Farbverläufe (Nordlicht, Abendrot, Ozean, …) - ohne Internet.',
+              title: l.settingsBackgroundGradients,
+              subtitle: l.settingsBgGradientsHint,
               selected: _source == LauncherBackgroundSource.builtin,
               autofocus: true,
               onTap: () => setState(() => _source = LauncherBackgroundSource.builtin),
             ),
             _choice(
               context,
-              title: 'Landschaftsfotos aus dem Internet',
-              subtitle: 'Landschafts- und Naturfotos - die Bing-Bilder des Tages der letzten zwei Wochen, '
-                  'abwechselnd. Ort und Fotograf stehen klein rechts oben.',
+              title: l.settingsBgPhotos,
+              subtitle: l.settingsBgPhotosHint,
               selected: _source == LauncherBackgroundSource.photos,
               onTap: () => setState(() => _source = LauncherBackgroundSource.photos),
             ),
             _choice(
               context,
-              title: 'Eigener Server',
-              subtitle: 'Bilder von einem Server im eigenen Netz, z. B. ein Ordner mit Hintergrundbildern auf dem NAS.',
+              title: context.l10n.nasBgFromNas,
+              subtitle: _nasPicturesFolder == null
+                  ? context.l10n.nasBgNoFolder
+                  : context.l10n.nasBgFromNasHint(_nasPicturesFolder!),
               selected: _source == LauncherBackgroundSource.server,
               onTap: () => setState(() => _source = LauncherBackgroundSource.server),
             ),
-            if (_source == LauncherBackgroundSource.server) ...[
-              Padding(
-                padding: const EdgeInsets.only(left: 24),
-                child: _choice(
-                  context,
-                  title: context.l10n.nasBgFromNas,
-                  subtitle: _nasPicturesFolder == null
-                      ? context.l10n.nasBgNoFolder
-                      : context.l10n.nasBgFromNasHint(_nasPicturesFolder!),
-                  selected: _fromNas,
-                  onTap: () => setState(() => _fromNas = true),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.only(left: 24),
-                child: _choice(
-                  context,
-                  title: context.l10n.nasBgFromUrl,
-                  subtitle: context.l10n.nasBgFromUrlHint,
-                  selected: !_fromNas,
-                  onTap: () => setState(() => _fromNas = false),
-                ),
-              ),
-              if (_fromNas && _nasPicturesFolder != null) ..._nasPart(context, help),
-            ],
-            if (_source == LauncherBackgroundSource.server && !_fromNas) ...[
-              const SizedBox(height: 12),
-              PopupTextField(
-                controller: _url,
-                keyboardType: TextInputType.url,
-                label: 'Adresse (URL)',
-                hint: 'http://nas.local/wallpapers/',
-                onSubmitted: (_) => setState(() => _testResult = null),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Die Adresse darf liefern:\n'
-                '• ein Bild (z. B. ein Skript, das jedes Mal ein anderes Bild schickt),\n'
-                '• eine JSON-Liste von Bild-Adressen: ["bild1.jpg", "bild2.jpg"] oder {"images": [...]},\n'
-                '• eine Seite mit Links auf Bilder - z. B. die Ordneransicht von nginx, Apache oder '
-                '„python -m http.server“ in einem Bilderordner.\n'
-                'Davon wird jedes Mal ein zufälliges Bild genommen.',
-                style: help,
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  OutlinedButton.icon(
-                    onPressed: _testing || !_urlValid ? null : _test,
-                    icon: const Icon(Icons.network_check),
-                    label: const Text('Testen'),
-                  ),
-                  const SizedBox(width: 12),
-                  if (_testing) const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
-                  if (_testResult != null) Expanded(child: Text(_testResult!, style: help)),
-                ],
-              ),
-            ],
+            if (_source == LauncherBackgroundSource.server && _nasPicturesFolder != null) ..._nasPart(context, help),
             const SizedBox(height: 20),
-            Text('Band hinter den Favoriten', style: Theme.of(context).textTheme.titleMedium),
-            const Text('Wie stark das Band das Bild abdeckt - wirkt sofort.', style: help),
+            Text(l.settingsBgBand, style: Theme.of(context).textTheme.titleMedium),
+            Text(l.settingsBgBandHint, style: help),
             const SizedBox(height: 6),
             Wrap(
               spacing: 8,
               children: [
                 for (final opacity in SettingsRepository.launcherBandOpacities)
                   ChoiceChip(
-                    label: Text(opacity == 0 ? 'Keines' : '${(opacity * 100).round()} %'),
+                    label: Text(opacity == 0 ? l.settingsBgBandNone : l.settingsPercent((opacity * 100).round())),
                     selected: (ref.watch(launcherSettingsProvider).bandOpacity - opacity).abs() < 0.01,
                     onSelected: (_) => ref.read(launcherSettingsProvider.notifier).setBandOpacity(opacity),
                   ),
               ],
             ),
             const SizedBox(height: 20),
-            Text('Neues Bild alle', style: Theme.of(context).textTheme.titleMedium),
+            Text(l.settingsBgInterval, style: Theme.of(context).textTheme.titleMedium),
             Wrap(
               spacing: 8,
               children: [
                 for (final minutes in SettingsRepository.launcherBackgroundIntervals)
                   ChoiceChip(
-                    label: Text(minutes == 60 ? '1 Stunde' : '$minutes Min.'),
+                    label: Text(minutes == 60 ? l.settingsBgOneHour : l.settingsMinutesShort(minutes)),
                     selected: _interval == minutes,
                     onSelected: (_) => setState(() => _interval = minutes),
                   ),
@@ -300,7 +214,7 @@ class _LauncherBackgroundSettingsScreenState extends ConsumerState<LauncherBackg
             const SizedBox(height: 24),
             Align(
               alignment: Alignment.centerLeft,
-              child: FilledButton.icon(onPressed: _save, icon: const Icon(Icons.check), label: const Text('Speichern')),
+              child: FilledButton.icon(onPressed: _save, icon: const Icon(Icons.check), label: Text(l.commonSave)),
             ),
           ],
         ),
@@ -318,11 +232,11 @@ Future<void> chooseIconPack(BuildContext context, WidgetRef ref) async {
   final choice = await showDialog<String>(
     context: context,
     builder: (context) => SimpleDialog(
-      title: const Text('Icon-Paket für die App-Kacheln'),
+      title: Text(context.l10n.settingsIconPackTitle),
       children: [
         _choice(
           context,
-          title: 'Keines - Original-Logos der Apps',
+          title: context.l10n.settingsIconPackNoneOriginal,
           selected: current == null,
           autofocus: current == null,
           onTap: () => Navigator.of(context).pop(''),
@@ -337,13 +251,11 @@ Future<void> chooseIconPack(BuildContext context, WidgetRef ref) async {
             onTap: () => Navigator.of(context).pop(p.package),
           ),
         if (packs.isEmpty)
-          const Padding(
-            padding: EdgeInsets.fromLTRB(24, 8, 24, 8),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 8, 24, 8),
             child: Text(
-              'Kein Icon-Paket installiert. Icon-Pakete für Android-Launcher (ADW-/Nova-Format) werden '
-              'unterstützt - als App installieren, dann hier auswählen.\n'
-              'Einzelne Kacheln bekommen ein eigenes Bild über ☰ auf der Kachel → „Bild ändern“.',
-              style: TextStyle(color: Colors.white60),
+              context.l10n.settingsIconPackNoneInstalled,
+              style: const TextStyle(color: Colors.white60),
             ),
           ),
       ],
@@ -428,8 +340,9 @@ class _HomeButtonSettingsScreenState extends ConsumerState<HomeButtonSettingsScr
             Expanded(child: Text(ok ? yes : no, style: const TextStyle(fontSize: 16))),
           ],
         );
+    final l = context.l10n;
     return Scaffold(
-      appBar: AppBar(title: const Text('Home-Taste')),
+      appBar: AppBar(title: Text(l.settingsHomeKey)),
       body: !_loaded
           ? const Center(child: CircularProgressIndicator())
           : FocusTraversalGroup(
@@ -437,18 +350,14 @@ class _HomeButtonSettingsScreenState extends ConsumerState<HomeButtonSettingsScr
                 padding: const EdgeInsets.all(16),
                 children: [
                   Text(
-                    'Mit der Home-Taste der Fernbedienung öffnet sich Home System mit Home (den Kacheln).',
+                    l.settingsHomeKeyIntro,
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   const SizedBox(height: 16),
                   if (!_fireTv) ...[
-                    state(_defaultHome, 'Home System ist der Standard-Launcher.', 'Home System ist noch nicht der Standard-Launcher.'),
+                    state(_defaultHome, l.settingsHomeKeyIsDefault, l.settingsHomeKeyNotDefault),
                     const SizedBox(height: 8),
-                    const Text(
-                      'Auf Android-TV-Boxen Home System als Startbildschirm („Home-App“) wählen. Fragt das Gerät '
-                      'beim Drücken der Home-Taste nach, „Home System“ und „Immer“ wählen.',
-                      style: help,
-                    ),
+                    Text(l.settingsHomeKeyDefaultHelp, style: help),
                     const SizedBox(height: 8),
                     Align(
                       alignment: Alignment.centerLeft,
@@ -458,29 +367,21 @@ class _HomeButtonSettingsScreenState extends ConsumerState<HomeButtonSettingsScr
                           await _service.openHomeSettings();
                         },
                         icon: const Icon(Icons.home_outlined),
-                        label: const Text('Standard-Launcher wählen'),
+                        label: Text(l.settingsHomeKeyChooseDefault),
                       ),
                     ),
                     const Divider(height: 32),
-                    const Text(
-                      'Lässt das Gerät keinen anderen Launcher zu (z. B. Google TV), hilft der Dienst unten - wie beim Fire TV.',
-                      style: help,
-                    ),
+                    Text(l.settingsHomeKeyServiceFallback, style: help),
                     const SizedBox(height: 12),
                   ],
                   state(
                     _status.serviceEnabled,
-                    'Dienst „Home System: Home-Taste“ ist eingeschaltet.',
-                    'Dienst „Home System: Home-Taste“ ist ausgeschaltet.',
+                    l.settingsHomeKeyServiceOn,
+                    l.settingsHomeKeyServiceOff,
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    _fireTv
-                        ? 'Der Fire TV zeigt mit der Home-Taste immer den Amazon-Startbildschirm. Der Dienst (eine '
-                            'Bedienungshilfe) holt Home System dann sofort nach vorne. Er sieht nur, welche App im '
-                            'Vordergrund ist - keine Inhalte, keine Tasten und keine Eingaben.'
-                        : 'Der Dienst (eine Bedienungshilfe) holt Home System nach vorne, sobald der Startbildschirm '
-                            'des Geräts erscheint. Er sieht nur, welche App im Vordergrund ist.',
+                    _fireTv ? l.settingsHomeKeyServiceFireTv : l.settingsHomeKeyServiceOther,
                     style: help,
                   ),
                   const SizedBox(height: 12),
@@ -491,19 +392,13 @@ class _HomeButtonSettingsScreenState extends ConsumerState<HomeButtonSettingsScr
                         autofocus: _fireTv,
                         onPressed: _enable,
                         icon: const Icon(Icons.power_settings_new),
-                        label: Text(_status.canEnable ? 'Dienst einschalten' : 'Bedienungshilfen öffnen'),
+                        label: Text(_status.canEnable ? l.settingsHomeKeyEnable : l.settingsHomeKeyOpenA11y),
                       ),
                     ),
                   if (!_status.serviceEnabled && (!_status.canEnable || _blocked)) ...[
                     const SizedBox(height: 12),
                     Text(
-                      _blocked
-                          ? 'Android hat den Dienst gesperrt („eingeschränkte Einstellungen“ - ab Android 13 bei '
-                              'Apps, die nicht aus einem App-Store kommen). Einmalig vom Computer aus per adb erlauben, '
-                              'dann noch einmal „Dienst einschalten“:'
-                          : 'Dort „Home System: Home-Taste“ einschalten. Zeigt das Gerät den Dienst nicht an oder ist er '
-                              'ausgegraut, einmalig vom Computer aus per adb freischalten - danach schaltet ihn dieser '
-                              'Knopf selbst ein:',
+                      _blocked ? l.settingsHomeKeyBlocked : l.settingsHomeKeyEnableThere,
                       style: help,
                     ),
                     const SizedBox(height: 6),
@@ -516,8 +411,8 @@ class _HomeButtonSettingsScreenState extends ConsumerState<HomeButtonSettingsScr
                   if (_status.serviceEnabled)
                     SwitchListTile(
                       autofocus: _fireTv,
-                      title: const Text('Home-Taste öffnet Home System'),
-                      subtitle: const Text('Aus: der Startbildschirm des Geräts bleibt, Home System öffnet man wie jede App.'),
+                      title: Text(l.settingsHomeKeyRedirect),
+                      subtitle: Text(l.settingsHomeKeyRedirectHint),
                       value: _status.redirect,
                       onChanged: (v) async {
                         await _service.setHomeRedirect(v);

@@ -5,6 +5,7 @@ import '../data/services/nas_backup_service.dart';
 import '../data/services/nas_picture_cache.dart';
 import '../data/services/nas_service.dart';
 import 'providers.dart';
+import 'system_providers.dart';
 
 final nasSettingsRepositoryProvider = Provider<NasSettingsRepository>((ref) {
   return NasSettingsRepository(ref.watch(databaseProvider));
@@ -36,6 +37,16 @@ class NasSettingsNotifier extends AsyncNotifier<NasSettings> {
       folders[kind] = path;
     }
     state = AsyncData(current.copyWith(folders: folders));
+    // Bilder goes on with its folder (unless switched off by hand before).
+    if ((kind == NasFolder.movies || kind == NasFolder.videos) && path != null && path.isNotEmpty) {
+      await ref.read(systemPartsProvider.notifier).moviesFolderChosen();
+    }
+    if (kind == NasFolder.pictures && path != null && path.isNotEmpty) {
+      await ref.read(systemPartsProvider.notifier).picturesFolderChosen();
+    }
+    if (kind == NasFolder.music && path != null && path.isNotEmpty) {
+      await ref.read(systemPartsProvider.notifier).musicFolderChosen();
+    }
   }
 }
 

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../core/dashboard_providers.dart';
 import '../../core/display_mode.dart';
@@ -11,8 +12,14 @@ import '../../core/system_providers.dart';
 import '../../core/theme.dart';
 import '../../data/services/admin_server.dart';
 import '../../core/nas_providers.dart';
+import '../../core/pictures_providers.dart';
 import '../../data/services/display_service.dart';
+import '../../data/services/permissions_service.dart';
+import '../../data/services/nas_service.dart' show NasFolder;
+import '../../data/services/picture_library.dart' show SlideshowOrder;
 import '../../l10n/l10n.dart';
+import '../music/music_settings_screen.dart';
+import '../setup/permissions_screen.dart';
 import '../setup/setup_wizard_screen.dart' show deviceNameSuggestions;
 import '../../data/models/favorite_channel.dart';
 import '../../data/models/launcher_tile.dart';
@@ -25,6 +32,8 @@ import 'restore_backup_screen.dart';
 import '../tv/tv_providers.dart';
 import '../tv/iptv_providers.dart';
 import 'iptv_settings_screen.dart';
+import '../browser/browser_channel.dart';
+import '../browser/browser_settings_screen.dart';
 import 'language_picker.dart';
 import 'launcher_settings_screens.dart';
 import 'remote_keys_settings_screen.dart';
@@ -37,7 +46,7 @@ import 'radar_source_settings_screen.dart';
 /// The settings' areas - one page each, reached from the overview.
 /// [system]: the device itself - which parts are on, its name, start, Home
 /// (the launcher), display, backup, updates.
-enum SettingsSection { system, radio, tv, dashboard }
+enum SettingsSection { system, radio, tv, dashboard, pictures }
 
 /// Settings: without [section] the overview of the areas (System, Radio,
 /// TV), with it that area's page - Radio's gear opens its own area right
@@ -143,11 +152,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   /// Switches a part on/off (SystemPartsNotifier stops the radio and moves
   /// the start to Home when needed).
-  Future<void> _setPart({bool? radio, bool? tv, bool? dashboard}) async {
+  Future<void> _setPart({
+    bool? radio,
+    bool? tv,
+    bool? dashboard,
+    bool? pictures,
+    bool? movies,
+    bool? music,
+    bool? browser,
+  }) async {
     final parts = ref.read(systemPartsProvider.notifier);
     if (radio != null) await parts.setRadio(radio);
     if (tv != null) await parts.setTv(tv);
     if (dashboard != null) await parts.setDashboard(dashboard);
+    if (pictures != null) await parts.setPictures(pictures);
+    if (movies != null) await parts.setMovies(movies);
+    if (music != null) await parts.setMusic(music);
+    if (browser != null) await parts.setBrowser(browser);
   }
 
   void _openOverview() {
@@ -472,6 +493,72 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     ];
   }
 
+  /// Settings → Bilder: where the pictures are, how the slideshow runs.
+  List<Widget> _picturesSection(
+    BuildContext context,
+    double Function() nextOrder,
+    Widget Function(String, bool, void Function(bool)) tileToggle,
+  ) {
+    final l = context.l10n;
+    final folder = ref.watch(nasSettingsProvider).value?.folder(NasFolder.pictures);
+    final slideshow = ref.watch(slideshowSettingsProvider);
+    final notifier = ref.read(slideshowSettingsProvider.notifier);
+    const help = TextStyle(color: Colors.white60);
+    Widget order(String label, SlideshowOrder value) => FocusTraversalOrder(
+          order: NumericFocusOrder(nextOrder()),
+          child: _TvChoiceTile(
+            label: label,
+            selected: slideshow.order == value,
+            onTap: () => notifier.set(slideshow.copyWith(order: value)),
+          ),
+        );
+    return [
+      FocusTraversalOrder(
+        order: NumericFocusOrder(nextOrder()),
+        child: _TvNavTile(
+          label: l.picturesFolder,
+          value: folder ?? l.settingsNotSetUp,
+          configured: folder != null,
+          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const NasSettingsScreen())),
+        ),
+      ),
+      Padding(padding: const EdgeInsets.fromLTRB(12, 4, 12, 0), child: Text(l.picturesMusicHelp, style: help)),
+      const Divider(height: 32),
+      Text(l.picturesSlideshowHeading, style: Theme.of(context).textTheme.titleLarge),
+      Padding(
+        padding: const EdgeInsets.only(top: 12),
+        child: Row(
+          children: [
+            SizedBox(width: 260, child: Text(l.picturesInterval, style: Theme.of(context).textTheme.bodyLarge)),
+            FocusTraversalOrder(
+              order: NumericFocusOrder(nextOrder()),
+              child: _TvIconButton(icon: Icons.remove, onTap: () => notifier.stepInterval(-1)),
+            ),
+            SizedBox(
+              width: 140,
+              child: Text(
+                l.picturesIntervalSeconds(slideshow.intervalSeconds),
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 18),
+              ),
+            ),
+            FocusTraversalOrder(
+              order: NumericFocusOrder(nextOrder()),
+              child: _TvIconButton(icon: Icons.add, onTap: () => notifier.stepInterval(1)),
+            ),
+          ],
+        ),
+      ),
+      const SizedBox(height: 12),
+      Text(l.picturesOrder, style: Theme.of(context).textTheme.bodyLarge),
+      order(l.picturesOrderFolders, SlideshowOrder.folders),
+      order(l.picturesOrderShuffled, SlideshowOrder.shuffled),
+      const SizedBox(height: 8),
+      tileToggle(l.picturesBlur, slideshow.blurredBackground,
+          (v) => notifier.set(slideshow.copyWith(blurredBackground: v))),
+    ];
+  }
+
   /// Settings → Haussteuerung → Helligkeit.
   List<Widget> _brightnessSection(
     BuildContext context,
@@ -664,6 +751,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           SettingsSection.radio => context.l10n.systemSettingsTitleRadio,
           SettingsSection.tv => context.l10n.systemSettingsTitleTv,
           SettingsSection.dashboard => context.l10n.dashboardSettingsTitle,
+          SettingsSection.pictures => context.l10n.picturesSettingsTitle,
         }),
       ),
       body: FocusTraversalGroup(
@@ -679,6 +767,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
             const SizedBox(height: 8),
             if (section == SettingsSection.dashboard) ..._dashboardSection(context, nextOrder, tileToggle),
+            if (section == SettingsSection.pictures) ..._picturesSection(context, nextOrder, tileToggle),
             if (section == SettingsSection.radio) ...[
             // First, since it decides whether DAB+ shows up anywhere at all.
             Text(l.settingsReception, style: Theme.of(context).textTheme.titleLarge),
@@ -726,6 +815,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               tileToggle('TV', parts.tv, (v) => _setPart(tv: v)),
               if (DisplayService.supported)
                 tileToggle(context.l10n.dashboardTitle, parts.dashboard, (v) => _setPart(dashboard: v)),
+              tileToggle(context.l10n.picturesTitle, parts.pictures, (v) => _setPart(pictures: v)),
+              tileToggle(context.l10n.moviesTitle, parts.movies, (v) => _setPart(movies: v)),
+              tileToggle(context.l10n.musicTitle, parts.music, (v) => _setPart(music: v)),
+              if (BrowserChannel.supported)
+                tileToggle(context.l10n.browserTitle, parts.browser, (v) => _setPart(browser: v)),
               const Divider(height: 32),
               Text(l.settingsDeviceHeading, style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 8),
@@ -745,6 +839,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   style: const TextStyle(color: Colors.white60),
                 ),
               ),
+              // What the device allows Home System (Android only).
+              if (PermissionsService.supported)
+                FocusTraversalOrder(
+                  order: NumericFocusOrder(nextOrder()),
+                  child: _TvNavTile(
+                    label: l.permissionsTitle,
+                    value: switch (ref.watch(permissionEntriesProvider).value?.entries) {
+                      final entries? => l.permissionsSummary(
+                          permissionsCount(entries).granted,
+                          permissionsCount(entries).total,
+                        ),
+                      null => null,
+                    },
+                    icon: Icons.verified_user_outlined,
+                    onTap: () async {
+                      await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PermissionsScreen()));
+                      ref.invalidate(permissionEntriesProvider);
+                    },
+                  ),
+                ),
               // Backups before updates, Home's background pictures.
               FocusTraversalOrder(
                 order: NumericFocusOrder(nextOrder()),
@@ -860,9 +974,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 child: _TvNavTile(
                   label: l.settingsHomeKey,
                   icon: Icons.home_outlined,
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const HomeButtonSettingsScreen()),
-                  ),
+                  onTap: () async {
+                    await Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const HomeButtonSettingsScreen()),
+                    );
+                    ref.invalidate(permissionEntriesProvider);
+                  },
                 ),
               ),
               ],
@@ -1244,15 +1361,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ),
             const Divider(height: 32),
-            Text(l.settingsAboutHeading, style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 8),
-            // Focusable so the D-Pad can scroll down to it (plain text after
-            // the last focusable control would stay out of reach on a TV).
-            FocusTraversalOrder(
-              order: NumericFocusOrder(nextOrder()),
-              child: const _AboutBlock(),
-            ),
-            const Divider(height: 32),
             FocusTraversalOrder(
               order: NumericFocusOrder(nextOrder()),
               child: _TvNavTile(
@@ -1261,11 +1369,44 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 onTap: _quitApp,
               ),
             ),
+            const Divider(height: 32),
+            Text(l.settingsAboutHeading, style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 8),
+            // Focusable so the D-Pad can scroll down to it (plain text after
+            // the last focusable control would stay out of reach on a TV).
+            FocusTraversalOrder(
+              order: NumericFocusOrder(nextOrder()),
+              child: const _AboutBlock(),
+            ),
+            FocusTraversalOrder(
+              order: NumericFocusOrder(nextOrder()),
+              child: _TvNavTile(
+                label: l.settingsOpenSourceLicenses,
+                icon: Icons.description_outlined,
+                onTap: _showLicenses,
+              ),
+            ),
             ],
             const SizedBox(height: 24),
           ],
         ),
       ),
+    );
+  }
+
+  /// Flutter's licence page: every package's licence plus the extra texts
+  /// registered in main.dart (third_party_licenses.dart).
+  Future<void> _showLicenses() async {
+    String? version;
+    try {
+      version = (await PackageInfo.fromPlatform()).version;
+    } catch (_) {}
+    if (!mounted) return;
+    showLicensePage(
+      context: context,
+      applicationName: 'Home System',
+      applicationVersion: version,
+      applicationIcon: Image.asset('assets/icon/home_system_logo.png', width: 64, height: 64),
     );
   }
 
@@ -1352,6 +1493,32 @@ class _SettingsOverview extends ConsumerWidget {
               subtitle: l.dashboardAreaSubtitle,
               enabled: parts.dashboard,
               onTap: () => parts.dashboard ? open(SettingsSection.dashboard) : off(l.dashboardTitle),
+            ),
+          _AreaTile(
+            logo: 'assets/icon/pictures_logo.png',
+            title: l.picturesTitle,
+            subtitle: l.picturesAreaSubtitle,
+            enabled: parts.pictures,
+            onTap: () => parts.pictures ? open(SettingsSection.pictures) : off(l.picturesTitle),
+          ),
+          _AreaTile(
+            logo: 'assets/icon/music_logo.png',
+            title: l.musicTitle,
+            subtitle: l.musicAreaSubtitle,
+            enabled: parts.music,
+            onTap: () => parts.music
+                ? Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MusicSettingsScreen()))
+                : off(l.musicTitle),
+          ),
+          if (BrowserChannel.supported)
+            _AreaTile(
+              logo: 'assets/icon/browser_logo.png',
+              title: l.browserTitle,
+              subtitle: l.browserAreaSubtitle,
+              enabled: parts.browser,
+              onTap: () => parts.browser
+                  ? Navigator.of(context).push(MaterialPageRoute(builder: (_) => const BrowserSettingsScreen()))
+                  : off(l.browserTitle),
             ),
         ],
       ),
@@ -1475,6 +1642,10 @@ class _AboutBlockState extends State<_AboutBlock> {
             line(l.settingsWeatherForecast, l.settingsAboutWeatherData),
             line(l.settingsAboutUvIndex, l.settingsAboutUvData),
             line(l.settingsAboutInternetRadio, l.settingsAboutInternetRadioData),
+            line(l.settingsAboutInternetTv, l.settingsAboutInternetTvData),
+            line(l.settingsAboutMaps, l.settingsAboutMapsData),
+            line(l.settingsAboutAircraft, l.settingsAboutAircraftData),
+            line(l.settingsAboutAdblock, l.settingsAboutAdblockData),
             line(l.settingsAboutPlaceSearch, l.settingsAboutPlaceSearchData),
             line(l.settingsAboutBackgroundPhotos, l.settingsAboutBackgroundPhotosData),
             line(l.settingsWeatherRadar, l.settingsAboutRadarData),

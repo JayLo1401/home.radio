@@ -8,6 +8,23 @@ import '../repositories/dab_stations_repository.dart' show DabStationDisplay;
 import '../repositories/fm_stations_repository.dart' show FmStationDisplay;
 import 'audio_player_service.dart';
 
+/// Another player of the app that takes the media session over while it
+/// is in use - Musik: its track shows in the notification / Home
+/// Assistant, and the remote's media keys, the notification's buttons and
+/// Home Assistant control it. See [RadioAudioHandler.attachGuest].
+abstract class MediaSessionGuest {
+  Future<void> play();
+  Future<void> pause();
+  Future<void> stop();
+  Future<void> skipToNext();
+  Future<void> skipToPrevious();
+  Future<void> seek(Duration position);
+
+  /// The radio started playing (a station was chosen, Radio opened again):
+  /// the guest stops - the session already went back to the radio.
+  void radioStarted();
+}
+
 /// Mirrors the app's current channel/playback state into an Android
 /// MediaSession (via `audio_service`) - this is what makes the playing
 /// station show up as a proper media notification/"Now Playing" card for
@@ -29,10 +46,76 @@ class RadioAudioHandler extends BaseAudioHandler {
     // artist line, so the notification/Home Assistant show the current
     // song too, not just the station name.
     _player.icyTitleStream.listen((title) {
-      final item = mediaItem.value;
+      final item = _radioItem;
       if (item == null || _player.currentUrl == null) return;
-      mediaItem.add(item.copyWith(artist: title));
+      _publishRadioItem(item.copyWith(artist: title));
     });
+  }
+
+  // --- Sharing the session with another player (Musik) ---
+  //
+  // Without a guest everything below behaves as before: the radio's item
+  // and state go straight out. With a guest attached, the radio's own
+  // updates are only kept (and published again when the guest leaves),
+  // the guest's go out instead, and the controls go to the guest. As soon
+  // as the radio reports "playing" the guest is told to stop and the
+  // session is the radio's again.
+
+  MediaSessionGuest? _guest;
+  MediaItem? _radioItem;
+  PlaybackState? _radioState;
+
+  /// The radio's last state (what it reported, also while a guest held the
+  /// session) - the base its updates build on.
+  PlaybackState get _radioBase => _radioState ?? PlaybackState();
+
+  void _publishRadioItem(MediaItem? item) {
+    _radioItem = item;
+    if (_guest == null) mediaItem.add(item);
+  }
+
+  void _publishRadioState(PlaybackState state) {
+    // Only a start counts - not the reports of a radio that was still
+    // playing when the guest came (it is being stopped right then).
+    final started = state.playing && !(_radioState?.playing ?? false);
+    _radioState = state;
+    final guest = _guest;
+    if (guest != null && started) {
+      _guest = null;
+      mediaItem.add(_radioItem);
+      guest.radioStarted();
+    }
+    if (_guest == null) playbackState.add(state);
+  }
+
+  /// Whether a guest holds the session now.
+  bool get hasGuest => _guest != null;
+
+  /// [guest] takes the session over (replacing another guest).
+  void attachGuest(MediaSessionGuest guest) => _guest = guest;
+
+  /// The guest's track - ignored unless [guest] holds the session. Send it
+  /// only when it changed: every item goes to Android, which loads its
+  /// artwork again.
+  void publishGuestItem(MediaSessionGuest guest, MediaItem? item) {
+    if (_guest != guest) return;
+    mediaItem.add(item);
+  }
+
+  /// The guest's playback state - ignored unless [guest] holds the session.
+  /// Every state rebuilds the notification: only on real changes.
+  void publishGuestState(MediaSessionGuest guest, PlaybackState state) {
+    if (_guest != guest) return;
+    playbackState.add(state);
+  }
+
+  /// [guest] gives the session back: the radio's last item and state show
+  /// again.
+  void detachGuest(MediaSessionGuest guest) {
+    if (_guest != guest) return;
+    _guest = null;
+    mediaItem.add(_radioItem);
+    playbackState.add(_radioState ?? PlaybackState());
   }
 
   // The actual station play/pause/skip logic lives in HomeScreen (it needs
@@ -77,7 +160,7 @@ class RadioAudioHandler extends BaseAudioHandler {
       ];
 
   void setChannel(FavoriteChannel channel, {required bool playing}) {
-    mediaItem.add(
+    _publishRadioItem(
       MediaItem(
         id: channel.programNumber.toString(),
         title: channel.displayName,
@@ -89,8 +172,8 @@ class RadioAudioHandler extends BaseAudioHandler {
         artUri: channel.logoUrl != null ? Uri.tryParse(channel.logoUrl!) : null,
       ),
     );
-    playbackState.add(
-      playbackState.value.copyWith(
+    _publishRadioState(
+      _radioBase.copyWith(
         controls: _controlsFor(playing),
         systemActions: _systemActions,
         playing: playing,
@@ -104,15 +187,15 @@ class RadioAudioHandler extends BaseAudioHandler {
   /// program number, so the MediaItem id is built from its frequency/service
   /// id instead.
   void setDabStation(DabStation station, {required bool playing}) {
-    mediaItem.add(
+    _publishRadioItem(
       MediaItem(
         id: 'dab_${station.freqKhz}_${station.serviceId}',
         title: station.displayLabel,
         album: 'DAB+',
       ),
     );
-    playbackState.add(
-      playbackState.value.copyWith(
+    _publishRadioState(
+      _radioBase.copyWith(
         controls: _controlsFor(playing),
         systemActions: _systemActions,
         playing: playing,
@@ -123,15 +206,15 @@ class RadioAudioHandler extends BaseAudioHandler {
 
   /// Same as [setDabStation], for an FM station played from the FM tab.
   void setFmStation(FmStation station, {required bool playing}) {
-    mediaItem.add(
+    _publishRadioItem(
       MediaItem(
         id: 'fm_${station.freqKhz}',
         title: station.displayLabel,
         album: '${l10n.radioSourceFm} · ${station.frequencyLabel}',
       ),
     );
-    playbackState.add(
-      playbackState.value.copyWith(
+    _publishRadioState(
+      _radioBase.copyWith(
         controls: _controlsFor(playing),
         systemActions: _systemActions,
         playing: playing,
@@ -145,8 +228,8 @@ class RadioAudioHandler extends BaseAudioHandler {
   /// arrives as another "pause" instead of "play".
   void setPlaying(bool playing) {
     if (_player.currentUrl != null) return; // internet radio reports itself
-    playbackState.add(
-      playbackState.value.copyWith(
+    _publishRadioState(
+      _radioBase.copyWith(
         controls: _controlsFor(playing),
         systemActions: _systemActions,
         playing: playing,
@@ -155,30 +238,44 @@ class RadioAudioHandler extends BaseAudioHandler {
   }
 
   void clearChannel() {
-    mediaItem.add(null);
-    playbackState.add(
-      playbackState.value.copyWith(playing: false, processingState: AudioProcessingState.idle),
+    _publishRadioItem(null);
+    _publishRadioState(
+      _radioBase.copyWith(playing: false, processingState: AudioProcessingState.idle),
     );
   }
 
   @override
   Future<void> play() async {
+    final guest = _guest;
+    if (guest != null) return guest.play();
     await _onPlay?.call();
   }
 
   @override
   Future<void> pause() async {
+    final guest = _guest;
+    if (guest != null) return guest.pause();
     await _onPause?.call();
   }
 
   @override
   Future<void> skipToNext() async {
+    final guest = _guest;
+    if (guest != null) return guest.skipToNext();
     await _onSkipNext?.call();
   }
 
   @override
   Future<void> skipToPrevious() async {
+    final guest = _guest;
+    if (guest != null) return guest.skipToPrevious();
     await _onSkipPrevious?.call();
+  }
+
+  /// Only the guest (Musik) can seek - a live stream can't.
+  @override
+  Future<void> seek(Duration position) async {
+    await _guest?.seek(position);
   }
 
   /// Treated the same as [pause] (not a hard stop that forgets the station)
@@ -188,11 +285,13 @@ class RadioAudioHandler extends BaseAudioHandler {
   /// much more than "pause" for a live stream anyway.
   @override
   Future<void> stop() async {
+    final guest = _guest;
+    if (guest != null) return guest.stop();
     if (_onPause != null) {
       await _onPause!();
     } else {
       await _player.stop();
-      playbackState.add(playbackState.value.copyWith(playing: false));
+      _publishRadioState(_radioBase.copyWith(playing: false));
     }
   }
 
@@ -200,8 +299,8 @@ class RadioAudioHandler extends BaseAudioHandler {
     // Only internet-radio playback drives this - a DAB "playing" state (set
     // via [setChannel]) is left alone since just_audio isn't involved there.
     if (_player.currentUrl == null) return;
-    playbackState.add(
-      playbackState.value.copyWith(
+    _publishRadioState(
+      _radioBase.copyWith(
         controls: _controlsFor(state.playing),
         systemActions: _systemActions,
         playing: state.playing,

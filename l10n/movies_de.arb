@@ -1,0 +1,74 @@
+{
+  "moviesTitle": "Filme",
+  "moviesNotSetUpTitle": "Noch kein Film-Ordner",
+  "moviesNotSetUp": "Die Filme kommen vom NAS. Unter Einstellungen → NAS den Server eintragen und die Ordner „Filme“ und/oder „Videos“ wählen.",
+  "moviesOpenNasSettings": "NAS einrichten",
+  "moviesEmpty": "In diesem Ordner sind keine Filme.",
+  "moviesListError": "Der Ordner lässt sich nicht lesen: {error}",
+  "@moviesListError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "moviesRetry": "Nochmal",
+  "moviesOpenFolder": "Ordner öffnen",
+  "moviesHoldOkForFolder": "OK lange drücken: Ordner öffnen",
+  "moviesDvd": "DVD",
+  "moviesOpening": "Film wird geöffnet…",
+  "moviesResumeTitle": "Weiterschauen?",
+  "moviesResumeFrom": "Fortsetzen ab {time}",
+  "@moviesResumeFrom": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "moviesFromStart": "Von vorne",
+  "moviesErrorNoDvd": "Darin ist keine Video-DVD (kein Ordner VIDEO_TS mit Filmdateien).",
+  "moviesErrorPlay": "Der Film lässt sich nicht abspielen: {error}",
+  "@moviesErrorPlay": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "moviesErrorTimeout": "Der Film startet nicht - das Gerät kann dieses Format vermutlich nicht abspielen, oder das NAS liefert zu langsam.",
+  "moviesBack": "Zurück",
+  "moviesOptions": "Optionen",
+  "moviesAudio": "Tonspur",
+  "moviesSubtitles": "Untertitel",
+  "moviesSubtitlesOff": "Aus",
+  "moviesNoAudioChoice": "Dieser Film hat nur eine Tonspur.",
+  "moviesAudioComments": "Kommentar",
+  "moviesAudioDescription": "Hörfilm",
+  "moviesChapter": "Kapitel {number} von {count}",
+  "@moviesChapter": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "moviesKeyHint": "OK: Pause · ◀ ▶: spulen · ▲ ▼: {jump} · {options}: Ton & Untertitel",
+  "@moviesKeyHint": {
+    "placeholders": {
+      "jump": {
+        "type": "String"
+      },
+      "options": {
+        "type": "String"
+      }
+    }
+  },
+  "moviesJumpChapters": "Kapitel",
+  "moviesJumpMinutes": "±5 Min.",
+  "moviesDvdNote": "DVD ohne Menü und ohne DVD-Untertitel",
+  "moviesAdminPart": "Filme eingeschaltet"
+}

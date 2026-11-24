@@ -66,12 +66,13 @@
   "nasBgFromNas": "Background pictures from the NAS",
   "nasBgFromNasHint": "{folder} (with subfolders) - a random picture from it each time. Up to 30 pictures are kept downscaled on the device; synced at app start and with \"Sync now\".",
   "nasBgNoFolder": "First choose a folder for background pictures under Settings → System → NAS server.",
-  "nasBgFromUrl": "Address (http)",
-  "nasBgFromUrlHint": "A web server that serves pictures (see below).",
   "nasBgSyncNow": "Sync now",
   "nasBgSyncing": "Syncing …",
   "nasBgStatus": "{count} pictures on the device",
   "nasBgLastSync": "{count} pictures on the device, synced on {date}",
   "nasBgSyncError": "Sync failed: {message}",
-  "nasFolderBackgrounds": "Background pictures (Home)"
+  "nasFolderBackgrounds": "Background pictures (Home)",
+  "nasBgSyncListing": "Reading the folder …",
+  "nasBgSyncNothingNew": "No new pictures - finishing …",
+  "nasBgSyncProgress": "Loading picture {loaded} of {total} …"
 }

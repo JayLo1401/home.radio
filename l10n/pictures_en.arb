@@ -1,0 +1,106 @@
+{
+  "picturesTitle": "Pictures",
+  "picturesAreaSubtitle": "Photos from the NAS, slideshow",
+  "picturesSettingsTitle": "Picture settings",
+  "picturesAdminPart": "Pictures switched on",
+  "picturesNoFolder": "No pictures folder chosen yet. Set in the NAS settings where your photos are.",
+  "picturesOpenNasSettings": "Open NAS settings",
+  "picturesLoadError": "The folder can't be read.\n{message}",
+  "@picturesLoadError": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "picturesSlideshowWithSubfolders": "Slideshow: {folder} (with subfolders)",
+  "@picturesSlideshowWithSubfolders": {
+    "placeholders": {
+      "folder": {
+        "type": "String"
+      }
+    }
+  },
+  "picturesSlideshow": "Slideshow: {folder}",
+  "@picturesSlideshow": {
+    "placeholders": {
+      "folder": {
+        "type": "String"
+      }
+    }
+  },
+  "picturesCount": "{count, plural, =0{no pictures} =1{1 picture} other{{count} pictures}}",
+  "@picturesCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "picturesFolderCount": "{count, plural, =1{1 folder} other{{count} folders}}",
+  "@picturesFolderCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "picturesEmptyFolder": "There are no pictures in this folder.",
+  "picturesBrowserHint": "OK opens · OK on a picture: slideshow from that picture · ⏯ or {options} starts the folder's slideshow · Back goes up one level",
+  "@picturesBrowserHint": {
+    "placeholders": {
+      "options": {
+        "type": "String"
+      }
+    }
+  },
+  "picturesSearching": "Looking for pictures …",
+  "picturesNoneFound": "There are no pictures here - not in the subfolders either.",
+  "picturesStillSearching": "still looking …",
+  "picturesPaused": "Paused",
+  "picturesSlideshowHint": "← → back/next · OK pause · {options} settings · Back ends",
+  "@picturesSlideshowHint": {
+    "placeholders": {
+      "options": {
+        "type": "String"
+      }
+    }
+  },
+  "picturesInterval": "Next picture after",
+  "picturesIntervalSeconds": "{seconds} seconds",
+  "@picturesIntervalSeconds": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "picturesOrder": "Order",
+  "picturesOrderFolders": "Folder by folder, by name",
+  "picturesOrderShuffled": "Shuffled",
+  "picturesOrderNextTime": "The order applies from the next slideshow.",
+  "picturesBlur": "Fill the edges with the blurred picture",
+  "picturesFolder": "Pictures folder",
+  "picturesMusicHelp": "Radio and music simply keep playing during the slideshow.",
+  "picturesSlideshowHeading": "Slideshow",
+  "picturesInThisFolder": "{count, plural, =1{1 picture in this folder} other{{count} pictures in this folder}} - OK on a picture starts the slideshow from there",
+  "@picturesInThisFolder": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "picturesResumeFrom": "Continue from picture {position} ({name})",
+  "@picturesResumeFrom": {
+    "placeholders": {
+      "position": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "picturesResumeRestart": "From the start"
+}

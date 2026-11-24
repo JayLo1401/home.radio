@@ -404,6 +404,372 @@ abstract class AppLocalizations {
   /// **'Der Zugriff auf die Kamera muss einmal am Gerät erlaubt werden: Einstellungen → Haussteuerung.'**
   String get adminCameraOnDevice;
 
+  /// No description provided for @browserTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Browser'**
+  String get browserTitle;
+
+  /// No description provided for @browserAndroidOnly.
+  ///
+  /// In de, this message translates to:
+  /// **'Den Browser gibt es nur auf Android (TV-Box, Tablet, Handy).'**
+  String get browserAndroidOnly;
+
+  /// No description provided for @browserAddress.
+  ///
+  /// In de, this message translates to:
+  /// **'Adresse oder Suche'**
+  String get browserAddress;
+
+  /// No description provided for @browserAddressHint.
+  ///
+  /// In de, this message translates to:
+  /// **'z. B. orf.at oder ein Suchbegriff'**
+  String get browserAddressHint;
+
+  /// No description provided for @browserBack.
+  ///
+  /// In de, this message translates to:
+  /// **'Zurück'**
+  String get browserBack;
+
+  /// No description provided for @browserForward.
+  ///
+  /// In de, this message translates to:
+  /// **'Vor'**
+  String get browserForward;
+
+  /// No description provided for @browserReload.
+  ///
+  /// In de, this message translates to:
+  /// **'Neu laden'**
+  String get browserReload;
+
+  /// No description provided for @browserHome.
+  ///
+  /// In de, this message translates to:
+  /// **'Startseite'**
+  String get browserHome;
+
+  /// No description provided for @browserBookmarks.
+  ///
+  /// In de, this message translates to:
+  /// **'Lesezeichen'**
+  String get browserBookmarks;
+
+  /// No description provided for @browserBookmarkAdd.
+  ///
+  /// In de, this message translates to:
+  /// **'Lesezeichen setzen'**
+  String get browserBookmarkAdd;
+
+  /// No description provided for @browserBookmarkRemove.
+  ///
+  /// In de, this message translates to:
+  /// **'Lesezeichen entfernen'**
+  String get browserBookmarkRemove;
+
+  /// No description provided for @browserBookmarksEmpty.
+  ///
+  /// In de, this message translates to:
+  /// **'Noch keine Lesezeichen - im Menü einer Seite mit dem Stern setzen.'**
+  String get browserBookmarksEmpty;
+
+  /// No description provided for @browserBlockedCount.
+  ///
+  /// In de, this message translates to:
+  /// **'{count, plural, =0{nichts blockiert} =1{1 blockiert} other{{count} blockiert}}'**
+  String browserBlockedCount(int count);
+
+  /// No description provided for @browserBlockerSiteOn.
+  ///
+  /// In de, this message translates to:
+  /// **'Werbefilter auf dieser Seite an'**
+  String get browserBlockerSiteOn;
+
+  /// No description provided for @browserBlockerSiteOff.
+  ///
+  /// In de, this message translates to:
+  /// **'Werbefilter auf dieser Seite aus'**
+  String get browserBlockerSiteOff;
+
+  /// No description provided for @browserBlockerOff.
+  ///
+  /// In de, this message translates to:
+  /// **'Werbefilter aus'**
+  String get browserBlockerOff;
+
+  /// No description provided for @browserDesktop.
+  ///
+  /// In de, this message translates to:
+  /// **'Desktop-Ansicht'**
+  String get browserDesktop;
+
+  /// No description provided for @browserTextSize.
+  ///
+  /// In de, this message translates to:
+  /// **'Textgröße {percent} %'**
+  String browserTextSize(int percent);
+
+  /// No description provided for @browserSmaller.
+  ///
+  /// In de, this message translates to:
+  /// **'Kleiner'**
+  String get browserSmaller;
+
+  /// No description provided for @browserLarger.
+  ///
+  /// In de, this message translates to:
+  /// **'Größer'**
+  String get browserLarger;
+
+  /// No description provided for @browserSettings.
+  ///
+  /// In de, this message translates to:
+  /// **'Einstellungen'**
+  String get browserSettings;
+
+  /// No description provided for @browserClose.
+  ///
+  /// In de, this message translates to:
+  /// **'Browser schließen'**
+  String get browserClose;
+
+  /// No description provided for @browserLeaveTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Browser schließen?'**
+  String get browserLeaveTitle;
+
+  /// No description provided for @browserLeave.
+  ///
+  /// In de, this message translates to:
+  /// **'Schließen'**
+  String get browserLeave;
+
+  /// No description provided for @browserStay.
+  ///
+  /// In de, this message translates to:
+  /// **'Bleiben'**
+  String get browserStay;
+
+  /// No description provided for @browserEnterText.
+  ///
+  /// In de, this message translates to:
+  /// **'Text eingeben'**
+  String get browserEnterText;
+
+  /// No description provided for @browserTextInsert.
+  ///
+  /// In de, this message translates to:
+  /// **'Einfügen'**
+  String get browserTextInsert;
+
+  /// No description provided for @browserTextSend.
+  ///
+  /// In de, this message translates to:
+  /// **'Senden'**
+  String get browserTextSend;
+
+  /// No description provided for @browserNoField.
+  ///
+  /// In de, this message translates to:
+  /// **'Hier ist kein Textfeld ausgewählt - zuerst mit OK in ein Feld klicken.'**
+  String get browserNoField;
+
+  /// No description provided for @browserFieldHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Textfeld: OK zeigt die Tastatur, Menü-Taste: Text eingeben, Zurück: fertig'**
+  String get browserFieldHint;
+
+  /// No description provided for @browserPointerHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Steuerkreuz bewegt den Zeiger, OK klickt, am Rand wird geblättert. Menü-Taste: Adresse, Lesezeichen, Werbefilter.'**
+  String get browserPointerHint;
+
+  /// No description provided for @browserDownloadUnsupported.
+  ///
+  /// In de, this message translates to:
+  /// **'Downloads werden im Browser nicht unterstützt.'**
+  String get browserDownloadUnsupported;
+
+  /// No description provided for @browserSettingsTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Browser-Einstellungen'**
+  String get browserSettingsTitle;
+
+  /// No description provided for @browserAreaSubtitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Werbefilter, Suchmaschine, Startseite'**
+  String get browserAreaSubtitle;
+
+  /// No description provided for @browserBlocker.
+  ///
+  /// In de, this message translates to:
+  /// **'Werbe- und Trackerfilter'**
+  String get browserBlocker;
+
+  /// No description provided for @browserBlockerHelp.
+  ///
+  /// In de, this message translates to:
+  /// **'Blockiert Werbung und Tracker mit den Filterlisten von uBlock Origin und EasyList - auch die Werbung auf YouTube, so weit es geht. Für einzelne Seiten im Menü der Seite abschaltbar.'**
+  String get browserBlockerHelp;
+
+  /// No description provided for @browserFilterLists.
+  ///
+  /// In de, this message translates to:
+  /// **'Filterlisten'**
+  String get browserFilterLists;
+
+  /// No description provided for @browserListSource.
+  ///
+  /// In de, this message translates to:
+  /// **'Lizenz {license} - {homepage}'**
+  String browserListSource(String license, String homepage);
+
+  /// No description provided for @browserListsUpdated.
+  ///
+  /// In de, this message translates to:
+  /// **'Stand {date}, {rules} Regeln'**
+  String browserListsUpdated(String date, int rules);
+
+  /// No description provided for @browserListsNever.
+  ///
+  /// In de, this message translates to:
+  /// **'Noch nicht geladen'**
+  String get browserListsNever;
+
+  /// No description provided for @browserListsUpdating.
+  ///
+  /// In de, this message translates to:
+  /// **'Filterlisten werden geladen …'**
+  String get browserListsUpdating;
+
+  /// No description provided for @browserListsUpdateNow.
+  ///
+  /// In de, this message translates to:
+  /// **'Jetzt aktualisieren'**
+  String get browserListsUpdateNow;
+
+  /// No description provided for @browserListsFailed.
+  ///
+  /// In de, this message translates to:
+  /// **'Nicht geladen (ältere Fassung benutzt): {lists}'**
+  String browserListsFailed(String lists);
+
+  /// No description provided for @browserListsError.
+  ///
+  /// In de, this message translates to:
+  /// **'Die Filterlisten konnten nicht geladen werden.'**
+  String get browserListsError;
+
+  /// No description provided for @browserListsCredit.
+  ///
+  /// In de, this message translates to:
+  /// **'Filterlisten: uBlock Origin uAssets (GPLv3), EasyList und EasyPrivacy (GPLv3 / CC BY-SA 3.0), Peter Lowe (McRae GPL). Die Skripte gegen Werbung (Scriptlets) sind eine eigene Umsetzung.'**
+  String get browserListsCredit;
+
+  /// No description provided for @browserAllowlist.
+  ///
+  /// In de, this message translates to:
+  /// **'Seiten ohne Werbefilter'**
+  String get browserAllowlist;
+
+  /// No description provided for @browserAllowlistEmpty.
+  ///
+  /// In de, this message translates to:
+  /// **'Keine - im Menü einer Seite abschaltbar.'**
+  String get browserAllowlistEmpty;
+
+  /// No description provided for @browserSearchEngine.
+  ///
+  /// In de, this message translates to:
+  /// **'Suchmaschine'**
+  String get browserSearchEngine;
+
+  /// No description provided for @browserHomePage.
+  ///
+  /// In de, this message translates to:
+  /// **'Startseite'**
+  String get browserHomePage;
+
+  /// No description provided for @browserHomePageDefault.
+  ///
+  /// In de, this message translates to:
+  /// **'Seite der Suchmaschine'**
+  String get browserHomePageDefault;
+
+  /// No description provided for @browserDesktopDefault.
+  ///
+  /// In de, this message translates to:
+  /// **'Seiten in der Desktop-Ansicht öffnen'**
+  String get browserDesktopDefault;
+
+  /// No description provided for @browserDesktopHelp.
+  ///
+  /// In de, this message translates to:
+  /// **'Seiten wie am PC statt der Handy-Fassung.'**
+  String get browserDesktopHelp;
+
+  /// No description provided for @browserTextZoom.
+  ///
+  /// In de, this message translates to:
+  /// **'Textgröße'**
+  String get browserTextZoom;
+
+  /// No description provided for @browserClearCookies.
+  ///
+  /// In de, this message translates to:
+  /// **'Cookies und Anmeldungen löschen'**
+  String get browserClearCookies;
+
+  /// No description provided for @browserClearCookiesConfirm.
+  ///
+  /// In de, this message translates to:
+  /// **'Alle Cookies und Anmeldungen des Browsers löschen?'**
+  String get browserClearCookiesConfirm;
+
+  /// No description provided for @browserClearCache.
+  ///
+  /// In de, this message translates to:
+  /// **'Zwischenspeicher leeren'**
+  String get browserClearCache;
+
+  /// No description provided for @browserCleared.
+  ///
+  /// In de, this message translates to:
+  /// **'Gelöscht.'**
+  String get browserCleared;
+
+  /// No description provided for @browserDelete.
+  ///
+  /// In de, this message translates to:
+  /// **'Löschen'**
+  String get browserDelete;
+
+  /// No description provided for @browserRemove.
+  ///
+  /// In de, this message translates to:
+  /// **'Entfernen'**
+  String get browserRemove;
+
+  /// No description provided for @browserWebView.
+  ///
+  /// In de, this message translates to:
+  /// **'Browser-Engine: {version}'**
+  String browserWebView(String version);
+
+  /// No description provided for @browserAdminPart.
+  ///
+  /// In de, this message translates to:
+  /// **'Browser eingeschaltet'**
+  String get browserAdminPart;
+
   /// No description provided for @commonOk.
   ///
   /// In de, this message translates to:
@@ -1130,6 +1496,150 @@ abstract class AppLocalizations {
   /// **'Alle {count} Sender aus der Internet-TV-Liste entfernen?'**
   String iptvSettingsClearConfirm(int count);
 
+  /// No description provided for @iptvChipMine.
+  ///
+  /// In de, this message translates to:
+  /// **'Meine Sender'**
+  String get iptvChipMine;
+
+  /// No description provided for @iptvChipSearch.
+  ///
+  /// In de, this message translates to:
+  /// **'Suchen'**
+  String get iptvChipSearch;
+
+  /// No description provided for @launcherAddToGroup.
+  ///
+  /// In de, this message translates to:
+  /// **'Zu Gruppe hinzufügen …'**
+  String get launcherAddToGroup;
+
+  /// No description provided for @launcherAddToGroupTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'„{app}“ zu Gruppe hinzufügen'**
+  String launcherAddToGroupTitle(String app);
+
+  /// No description provided for @launcherMoveToGroup.
+  ///
+  /// In de, this message translates to:
+  /// **'In andere Gruppe verschieben …'**
+  String get launcherMoveToGroup;
+
+  /// No description provided for @launcherMoveToGroupTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'„{app}“ verschieben nach'**
+  String launcherMoveToGroupTitle(String app);
+
+  /// No description provided for @launcherRemoveFromGroup.
+  ///
+  /// In de, this message translates to:
+  /// **'Aus der Gruppe entfernen'**
+  String get launcherRemoveFromGroup;
+
+  /// No description provided for @launcherNewGroup.
+  ///
+  /// In de, this message translates to:
+  /// **'Neue Gruppe …'**
+  String get launcherNewGroup;
+
+  /// No description provided for @launcherNewGroupTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Name der neuen Gruppe'**
+  String get launcherNewGroupTitle;
+
+  /// No description provided for @launcherGroupNameHint.
+  ///
+  /// In de, this message translates to:
+  /// **'z. B. System-Tools'**
+  String get launcherGroupNameHint;
+
+  /// No description provided for @launcherGroupUnnamed.
+  ///
+  /// In de, this message translates to:
+  /// **'Gruppe'**
+  String get launcherGroupUnnamed;
+
+  /// No description provided for @launcherGroupOptions.
+  ///
+  /// In de, this message translates to:
+  /// **'Gruppe „{group}“ …'**
+  String launcherGroupOptions(String group);
+
+  /// No description provided for @launcherGroupRename.
+  ///
+  /// In de, this message translates to:
+  /// **'Umbenennen'**
+  String get launcherGroupRename;
+
+  /// No description provided for @launcherGroupRenameTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Gruppe umbenennen'**
+  String get launcherGroupRenameTitle;
+
+  /// No description provided for @launcherGroupMoveUp.
+  ///
+  /// In de, this message translates to:
+  /// **'Gruppe nach oben'**
+  String get launcherGroupMoveUp;
+
+  /// No description provided for @launcherGroupMoveDown.
+  ///
+  /// In de, this message translates to:
+  /// **'Gruppe nach unten'**
+  String get launcherGroupMoveDown;
+
+  /// No description provided for @launcherGroupDelete.
+  ///
+  /// In de, this message translates to:
+  /// **'Gruppe löschen'**
+  String get launcherGroupDelete;
+
+  /// No description provided for @launcherGroupDeleteTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Gruppe „{group}“ löschen?'**
+  String launcherGroupDeleteTitle(String group);
+
+  /// No description provided for @launcherGroupDeleteBody.
+  ///
+  /// In de, this message translates to:
+  /// **'Nur die Zeile verschwindet - die Apps bleiben installiert, in den Favoriten und in anderen Gruppen.'**
+  String get launcherGroupDeleteBody;
+
+  /// No description provided for @launcherGroupEmpty.
+  ///
+  /// In de, this message translates to:
+  /// **'Noch leer'**
+  String get launcherGroupEmpty;
+
+  /// No description provided for @launcherGroupEmptyHint.
+  ///
+  /// In de, this message translates to:
+  /// **'{key}  Optionen der Gruppe'**
+  String launcherGroupEmptyHint(String key);
+
+  /// No description provided for @launcherAddedToGroup.
+  ///
+  /// In de, this message translates to:
+  /// **'„{app}“ ist jetzt in „{group}“'**
+  String launcherAddedToGroup(String app, String group);
+
+  /// No description provided for @launcherRemovedFromGroup.
+  ///
+  /// In de, this message translates to:
+  /// **'„{app}“ aus „{group}“ entfernt'**
+  String launcherRemovedFromGroup(String app, String group);
+
+  /// No description provided for @launcherAllAppsHelp.
+  ///
+  /// In de, this message translates to:
+  /// **'OK: App öffnen  ·  ☰ oder OK lange drücken: Favorit, Gruppe, App-Info (beenden, deinstallieren)'**
+  String get launcherAllAppsHelp;
+
   /// No description provided for @miscApply.
   ///
   /// In de, this message translates to:
@@ -1852,6 +2362,696 @@ abstract class AppLocalizations {
   /// **'Taste {code}'**
   String modelsIsmButton(String code);
 
+  /// No description provided for @moviesTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Filme'**
+  String get moviesTitle;
+
+  /// No description provided for @moviesNotSetUpTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Noch kein Film-Ordner'**
+  String get moviesNotSetUpTitle;
+
+  /// No description provided for @moviesNotSetUp.
+  ///
+  /// In de, this message translates to:
+  /// **'Die Filme kommen vom NAS. Unter Einstellungen → NAS den Server eintragen und die Ordner „Filme“ und/oder „Videos“ wählen.'**
+  String get moviesNotSetUp;
+
+  /// No description provided for @moviesOpenNasSettings.
+  ///
+  /// In de, this message translates to:
+  /// **'NAS einrichten'**
+  String get moviesOpenNasSettings;
+
+  /// No description provided for @moviesEmpty.
+  ///
+  /// In de, this message translates to:
+  /// **'In diesem Ordner sind keine Filme.'**
+  String get moviesEmpty;
+
+  /// No description provided for @moviesListError.
+  ///
+  /// In de, this message translates to:
+  /// **'Der Ordner lässt sich nicht lesen: {error}'**
+  String moviesListError(String error);
+
+  /// No description provided for @moviesRetry.
+  ///
+  /// In de, this message translates to:
+  /// **'Nochmal'**
+  String get moviesRetry;
+
+  /// No description provided for @moviesOpenFolder.
+  ///
+  /// In de, this message translates to:
+  /// **'Ordner öffnen'**
+  String get moviesOpenFolder;
+
+  /// No description provided for @moviesHoldOkForFolder.
+  ///
+  /// In de, this message translates to:
+  /// **'OK lange drücken: Ordner öffnen'**
+  String get moviesHoldOkForFolder;
+
+  /// No description provided for @moviesDvd.
+  ///
+  /// In de, this message translates to:
+  /// **'DVD'**
+  String get moviesDvd;
+
+  /// No description provided for @moviesOpening.
+  ///
+  /// In de, this message translates to:
+  /// **'Film wird geöffnet…'**
+  String get moviesOpening;
+
+  /// No description provided for @moviesResumeTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Weiterschauen?'**
+  String get moviesResumeTitle;
+
+  /// No description provided for @moviesResumeFrom.
+  ///
+  /// In de, this message translates to:
+  /// **'Fortsetzen ab {time}'**
+  String moviesResumeFrom(String time);
+
+  /// No description provided for @moviesFromStart.
+  ///
+  /// In de, this message translates to:
+  /// **'Von vorne'**
+  String get moviesFromStart;
+
+  /// No description provided for @moviesErrorNoDvd.
+  ///
+  /// In de, this message translates to:
+  /// **'Darin ist keine Video-DVD (kein Ordner VIDEO_TS mit Filmdateien).'**
+  String get moviesErrorNoDvd;
+
+  /// No description provided for @moviesErrorPlay.
+  ///
+  /// In de, this message translates to:
+  /// **'Der Film lässt sich nicht abspielen: {error}'**
+  String moviesErrorPlay(String error);
+
+  /// No description provided for @moviesErrorTimeout.
+  ///
+  /// In de, this message translates to:
+  /// **'Der Film startet nicht - das Gerät kann dieses Format vermutlich nicht abspielen, oder das NAS liefert zu langsam.'**
+  String get moviesErrorTimeout;
+
+  /// No description provided for @moviesBack.
+  ///
+  /// In de, this message translates to:
+  /// **'Zurück'**
+  String get moviesBack;
+
+  /// No description provided for @moviesOptions.
+  ///
+  /// In de, this message translates to:
+  /// **'Optionen'**
+  String get moviesOptions;
+
+  /// No description provided for @moviesAudio.
+  ///
+  /// In de, this message translates to:
+  /// **'Tonspur'**
+  String get moviesAudio;
+
+  /// No description provided for @moviesSubtitles.
+  ///
+  /// In de, this message translates to:
+  /// **'Untertitel'**
+  String get moviesSubtitles;
+
+  /// No description provided for @moviesSubtitlesOff.
+  ///
+  /// In de, this message translates to:
+  /// **'Aus'**
+  String get moviesSubtitlesOff;
+
+  /// No description provided for @moviesNoAudioChoice.
+  ///
+  /// In de, this message translates to:
+  /// **'Dieser Film hat nur eine Tonspur.'**
+  String get moviesNoAudioChoice;
+
+  /// No description provided for @moviesAudioComments.
+  ///
+  /// In de, this message translates to:
+  /// **'Kommentar'**
+  String get moviesAudioComments;
+
+  /// No description provided for @moviesAudioDescription.
+  ///
+  /// In de, this message translates to:
+  /// **'Hörfilm'**
+  String get moviesAudioDescription;
+
+  /// No description provided for @moviesChapter.
+  ///
+  /// In de, this message translates to:
+  /// **'Kapitel {number} von {count}'**
+  String moviesChapter(int number, int count);
+
+  /// No description provided for @moviesKeyHint.
+  ///
+  /// In de, this message translates to:
+  /// **'OK: Pause · ◀ ▶: spulen · ▲ ▼: {jump} · {options}: Ton & Untertitel'**
+  String moviesKeyHint(String jump, String options);
+
+  /// No description provided for @moviesJumpChapters.
+  ///
+  /// In de, this message translates to:
+  /// **'Kapitel'**
+  String get moviesJumpChapters;
+
+  /// No description provided for @moviesJumpMinutes.
+  ///
+  /// In de, this message translates to:
+  /// **'±5 Min.'**
+  String get moviesJumpMinutes;
+
+  /// No description provided for @moviesDvdNote.
+  ///
+  /// In de, this message translates to:
+  /// **'DVD ohne Menü und ohne DVD-Untertitel'**
+  String get moviesDvdNote;
+
+  /// No description provided for @moviesAdminPart.
+  ///
+  /// In de, this message translates to:
+  /// **'Filme eingeschaltet'**
+  String get moviesAdminPart;
+
+  /// No description provided for @musicTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Musik'**
+  String get musicTitle;
+
+  /// No description provided for @musicAreaSubtitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Wiedergabe, Visualisierung, Index'**
+  String get musicAreaSubtitle;
+
+  /// No description provided for @musicAdminPart.
+  ///
+  /// In de, this message translates to:
+  /// **'Musik (vom NAS)'**
+  String get musicAdminPart;
+
+  /// No description provided for @musicAdminIndex.
+  ///
+  /// In de, this message translates to:
+  /// **'Musik-Index'**
+  String get musicAdminIndex;
+
+  /// No description provided for @musicAllShuffled.
+  ///
+  /// In de, this message translates to:
+  /// **'Alles zufällig'**
+  String get musicAllShuffled;
+
+  /// No description provided for @musicSearch.
+  ///
+  /// In de, this message translates to:
+  /// **'Suchen'**
+  String get musicSearch;
+
+  /// No description provided for @musicNowPlaying.
+  ///
+  /// In de, this message translates to:
+  /// **'Wiedergabe'**
+  String get musicNowPlaying;
+
+  /// No description provided for @musicSettingsTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Musik'**
+  String get musicSettingsTitle;
+
+  /// No description provided for @musicPlayFolder.
+  ///
+  /// In de, this message translates to:
+  /// **'Abspielen'**
+  String get musicPlayFolder;
+
+  /// No description provided for @musicShuffleFolder.
+  ///
+  /// In de, this message translates to:
+  /// **'Zufällig abspielen'**
+  String get musicShuffleFolder;
+
+  /// No description provided for @musicRefreshFolderIndex.
+  ///
+  /// In de, this message translates to:
+  /// **'Ordner neu einlesen (Index)'**
+  String get musicRefreshFolderIndex;
+
+  /// No description provided for @musicFolderIndexed.
+  ///
+  /// In de, this message translates to:
+  /// **'{count} Titel neu eingelesen.'**
+  String musicFolderIndexed(int count);
+
+  /// No description provided for @musicFolderSummary.
+  ///
+  /// In de, this message translates to:
+  /// **'{folders} Ordner · {tracks} Titel'**
+  String musicFolderSummary(int folders, int tracks);
+
+  /// No description provided for @musicEmptyFolder.
+  ///
+  /// In de, this message translates to:
+  /// **'In diesem Ordner ist keine Musik.'**
+  String get musicEmptyFolder;
+
+  /// No description provided for @musicNoFolder.
+  ///
+  /// In de, this message translates to:
+  /// **'Noch kein Musikordner gewählt.\nWähle ihn in Einstellungen → NAS.'**
+  String get musicNoFolder;
+
+  /// No description provided for @musicOpenNasSettings.
+  ///
+  /// In de, this message translates to:
+  /// **'NAS-Einstellungen öffnen'**
+  String get musicOpenNasSettings;
+
+  /// No description provided for @musicRetry.
+  ///
+  /// In de, this message translates to:
+  /// **'Nochmal versuchen'**
+  String get musicRetry;
+
+  /// No description provided for @musicErrorNoFolder.
+  ///
+  /// In de, this message translates to:
+  /// **'Kein Musikordner gewählt (Einstellungen → NAS).'**
+  String get musicErrorNoFolder;
+
+  /// No description provided for @musicErrorNoMusic.
+  ///
+  /// In de, this message translates to:
+  /// **'Hier ist keine Musik zu finden.'**
+  String get musicErrorNoMusic;
+
+  /// No description provided for @musicErrorUnplayable.
+  ///
+  /// In de, this message translates to:
+  /// **'„{name}“ lässt sich nicht abspielen - weiter mit dem nächsten Titel.'**
+  String musicErrorUnplayable(String name);
+
+  /// No description provided for @musicNothingPlaying.
+  ///
+  /// In de, this message translates to:
+  /// **'Gerade läuft keine Musik.'**
+  String get musicNothingPlaying;
+
+  /// No description provided for @musicPaused.
+  ///
+  /// In de, this message translates to:
+  /// **'Pausiert'**
+  String get musicPaused;
+
+  /// No description provided for @musicCollecting.
+  ///
+  /// In de, this message translates to:
+  /// **'Ordner werden noch durchsucht …'**
+  String get musicCollecting;
+
+  /// No description provided for @musicQueuePosition.
+  ///
+  /// In de, this message translates to:
+  /// **'Titel {index} von {count}'**
+  String musicQueuePosition(int index, int count);
+
+  /// No description provided for @musicQueue.
+  ///
+  /// In de, this message translates to:
+  /// **'Warteschlange'**
+  String get musicQueue;
+
+  /// No description provided for @musicQueueTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Warteschlange ({count})'**
+  String musicQueueTitle(int count);
+
+  /// No description provided for @musicNowPlayingHint.
+  ///
+  /// In de, this message translates to:
+  /// **'OK Pause · ←/→ spulen (halten: schneller) · ↑ Visualisierung · ↓ Tasten · {menu} Warteschlange'**
+  String musicNowPlayingHint(String menu);
+
+  /// No description provided for @musicControlsHint.
+  ///
+  /// In de, this message translates to:
+  /// **'←/→ Taste wählen · OK drücken · ↑ zurück zum Spulen'**
+  String get musicControlsHint;
+
+  /// No description provided for @musicPlay.
+  ///
+  /// In de, this message translates to:
+  /// **'Abspielen'**
+  String get musicPlay;
+
+  /// No description provided for @musicPause.
+  ///
+  /// In de, this message translates to:
+  /// **'Pause'**
+  String get musicPause;
+
+  /// No description provided for @musicStop.
+  ///
+  /// In de, this message translates to:
+  /// **'Stopp'**
+  String get musicStop;
+
+  /// No description provided for @musicNext.
+  ///
+  /// In de, this message translates to:
+  /// **'Nächster Titel'**
+  String get musicNext;
+
+  /// No description provided for @musicPrevious.
+  ///
+  /// In de, this message translates to:
+  /// **'Voriger Titel'**
+  String get musicPrevious;
+
+  /// No description provided for @musicShuffleOn.
+  ///
+  /// In de, this message translates to:
+  /// **'Zufällig: an'**
+  String get musicShuffleOn;
+
+  /// No description provided for @musicShuffleOff.
+  ///
+  /// In de, this message translates to:
+  /// **'Zufällig: aus'**
+  String get musicShuffleOff;
+
+  /// No description provided for @musicRepeatOff.
+  ///
+  /// In de, this message translates to:
+  /// **'Nicht wiederholen'**
+  String get musicRepeatOff;
+
+  /// No description provided for @musicRepeatAll.
+  ///
+  /// In de, this message translates to:
+  /// **'Alle wiederholen'**
+  String get musicRepeatAll;
+
+  /// No description provided for @musicRepeatOne.
+  ///
+  /// In de, this message translates to:
+  /// **'Titel wiederholen'**
+  String get musicRepeatOne;
+
+  /// No description provided for @musicVisualizer.
+  ///
+  /// In de, this message translates to:
+  /// **'Visualisierung'**
+  String get musicVisualizer;
+
+  /// No description provided for @musicSearchLabel.
+  ///
+  /// In de, this message translates to:
+  /// **'Titel, Interpret oder Ordner'**
+  String get musicSearchLabel;
+
+  /// No description provided for @musicSearchHint.
+  ///
+  /// In de, this message translates to:
+  /// **'z. B. Queen Bohemian'**
+  String get musicSearchHint;
+
+  /// No description provided for @musicSearchIntro.
+  ///
+  /// In de, this message translates to:
+  /// **'Sucht in den Datei- und Ordnernamen der ganzen Sammlung.'**
+  String get musicSearchIntro;
+
+  /// No description provided for @musicSearchNothing.
+  ///
+  /// In de, this message translates to:
+  /// **'Nichts gefunden.'**
+  String get musicSearchNothing;
+
+  /// No description provided for @musicSearchResults.
+  ///
+  /// In de, this message translates to:
+  /// **'Suche: {query}'**
+  String musicSearchResults(String query);
+
+  /// No description provided for @musicSearchNeedsIndex.
+  ///
+  /// In de, this message translates to:
+  /// **'Für die Suche braucht es den Index - eine Liste aller Musikdateien, einmal vom NAS eingelesen (dauert bei vielen Titeln eine Weile, läuft im Hintergrund).'**
+  String get musicSearchNeedsIndex;
+
+  /// No description provided for @musicIndexBuild.
+  ///
+  /// In de, this message translates to:
+  /// **'Index erstellen'**
+  String get musicIndexBuild;
+
+  /// No description provided for @musicIndexRefresh.
+  ///
+  /// In de, this message translates to:
+  /// **'Index aktualisieren'**
+  String get musicIndexRefresh;
+
+  /// No description provided for @musicIndexContinue.
+  ///
+  /// In de, this message translates to:
+  /// **'Index fortsetzen'**
+  String get musicIndexContinue;
+
+  /// No description provided for @musicIndexStop.
+  ///
+  /// In de, this message translates to:
+  /// **'Anhalten'**
+  String get musicIndexStop;
+
+  /// No description provided for @musicIndexDelete.
+  ///
+  /// In de, this message translates to:
+  /// **'Index löschen'**
+  String get musicIndexDelete;
+
+  /// No description provided for @musicIndexNone.
+  ///
+  /// In de, this message translates to:
+  /// **'Kein Index - Ordner werden direkt vom NAS gelesen.'**
+  String get musicIndexNone;
+
+  /// No description provided for @musicIndexRunning.
+  ///
+  /// In de, this message translates to:
+  /// **'Wird eingelesen: {folders} Ordner, {tracks} Titel …'**
+  String musicIndexRunning(int folders, int tracks);
+
+  /// No description provided for @musicIndexInterrupted.
+  ///
+  /// In de, this message translates to:
+  /// **'Unterbrochen nach {tracks} Titeln - geht beim nächsten Öffnen von Musik weiter.'**
+  String musicIndexInterrupted(int tracks);
+
+  /// No description provided for @musicIndexState.
+  ///
+  /// In de, this message translates to:
+  /// **'{tracks} Titel in {folders} Ordnern · Stand {date}'**
+  String musicIndexState(int tracks, int folders, String date);
+
+  /// No description provided for @musicIndexSummary.
+  ///
+  /// In de, this message translates to:
+  /// **'{tracks} Titel · {folders} Ordner'**
+  String musicIndexSummary(int tracks, int folders);
+
+  /// No description provided for @musicSettingsFolder.
+  ///
+  /// In de, this message translates to:
+  /// **'Musikordner'**
+  String get musicSettingsFolder;
+
+  /// No description provided for @musicSettingsNoFolder.
+  ///
+  /// In de, this message translates to:
+  /// **'Nicht gewählt - in den NAS-Einstellungen'**
+  String get musicSettingsNoFolder;
+
+  /// No description provided for @musicSettingsPlayback.
+  ///
+  /// In de, this message translates to:
+  /// **'Wiedergabe'**
+  String get musicSettingsPlayback;
+
+  /// No description provided for @musicSettingsShuffle.
+  ///
+  /// In de, this message translates to:
+  /// **'Zufällige Reihenfolge'**
+  String get musicSettingsShuffle;
+
+  /// No description provided for @musicSettingsShuffleHelp.
+  ///
+  /// In de, this message translates to:
+  /// **'Gilt für das Abspielen eines Titels und bleibt bis zum Umschalten.'**
+  String get musicSettingsShuffleHelp;
+
+  /// No description provided for @musicSettingsRepeat.
+  ///
+  /// In de, this message translates to:
+  /// **'Wiederholen'**
+  String get musicSettingsRepeat;
+
+  /// No description provided for @musicSettingsPreferTags.
+  ///
+  /// In de, this message translates to:
+  /// **'Titel und Interpret aus den Dateien'**
+  String get musicSettingsPreferTags;
+
+  /// No description provided for @musicSettingsPreferTagsHelp.
+  ///
+  /// In de, this message translates to:
+  /// **'Aus den Tags der Datei (ID3, MP4, FLAC …), sonst aus dem Dateinamen. Aus: immer der Dateiname.'**
+  String get musicSettingsPreferTagsHelp;
+
+  /// No description provided for @musicSettingsVisualizer.
+  ///
+  /// In de, this message translates to:
+  /// **'Visualisierung'**
+  String get musicSettingsVisualizer;
+
+  /// No description provided for @musicVisualizerOff.
+  ///
+  /// In de, this message translates to:
+  /// **'Aus'**
+  String get musicVisualizerOff;
+
+  /// No description provided for @musicVisualizerManual.
+  ///
+  /// In de, this message translates to:
+  /// **'Mit ↑ in der Wiedergabe'**
+  String get musicVisualizerManual;
+
+  /// No description provided for @musicVisualizerAuto.
+  ///
+  /// In de, this message translates to:
+  /// **'Auch von selbst nach einer Minute ohne Taste'**
+  String get musicVisualizerAuto;
+
+  /// No description provided for @musicSettingsQuality.
+  ///
+  /// In de, this message translates to:
+  /// **'Bildqualität'**
+  String get musicSettingsQuality;
+
+  /// No description provided for @musicQualityAuto.
+  ///
+  /// In de, this message translates to:
+  /// **'Automatisch'**
+  String get musicQualityAuto;
+
+  /// No description provided for @musicQualityLow.
+  ///
+  /// In de, this message translates to:
+  /// **'Schonend (schwache Boxen)'**
+  String get musicQualityLow;
+
+  /// No description provided for @musicQualityHigh.
+  ///
+  /// In de, this message translates to:
+  /// **'Hoch'**
+  String get musicQualityHigh;
+
+  /// No description provided for @musicSettingsReactive.
+  ///
+  /// In de, this message translates to:
+  /// **'Folgt der Musik'**
+  String get musicSettingsReactive;
+
+  /// No description provided for @musicSettingsReactiveHelp.
+  ///
+  /// In de, this message translates to:
+  /// **'Bewegt sich im Takt der Musik. Braucht unter Android die Berechtigung „Audio aufnehmen“ - ohne sie pulsiert das Bild ruhig von selbst.'**
+  String get musicSettingsReactiveHelp;
+
+  /// No description provided for @musicSettingsReactivePermission.
+  ///
+  /// In de, this message translates to:
+  /// **'Damit die Visualisierung der Musik folgen kann, liest sie das Frequenzspektrum der eigenen Wiedergabe. Android verlangt dafür die Berechtigung „Audio aufnehmen“ und fragt nach dem Mikrofon - das Mikrofon wird dabei aber nicht benutzt, es wird nichts aufgenommen oder gespeichert.'**
+  String get musicSettingsReactivePermission;
+
+  /// No description provided for @musicSettingsReactiveAllow.
+  ///
+  /// In de, this message translates to:
+  /// **'Erlauben'**
+  String get musicSettingsReactiveAllow;
+
+  /// No description provided for @musicSettingsReactiveDenied.
+  ///
+  /// In de, this message translates to:
+  /// **'Ohne die Berechtigung pulsiert die Visualisierung von selbst.'**
+  String get musicSettingsReactiveDenied;
+
+  /// No description provided for @musicSettingsIndex.
+  ///
+  /// In de, this message translates to:
+  /// **'Index (optional)'**
+  String get musicSettingsIndex;
+
+  /// No description provided for @musicSettingsIndexHelp.
+  ///
+  /// In de, this message translates to:
+  /// **'Eine Liste aller Musikdateien (nur Namen, keine Tags) für die Suche und „Alles zufällig“ ohne Wartezeit. Ordner durchstöbern und abspielen geht auch ohne. Das Einlesen läuft im Hintergrund und setzt nach einer Unterbrechung fort.'**
+  String get musicSettingsIndexHelp;
+
+  /// No description provided for @musicWithSubfolders.
+  ///
+  /// In de, this message translates to:
+  /// **'Mit Unterordnern'**
+  String get musicWithSubfolders;
+
+  /// No description provided for @musicWithSubfoldersHelp.
+  ///
+  /// In de, this message translates to:
+  /// **'„Abspielen“ und „Zufällig abspielen“ nehmen auch alle Unterordner des Ordners mit.'**
+  String get musicWithSubfoldersHelp;
+
+  /// No description provided for @musicSettingsInterval.
+  ///
+  /// In de, this message translates to:
+  /// **'Wechsel zur nächsten Visualisierung'**
+  String get musicSettingsInterval;
+
+  /// No description provided for @musicIntervalSeconds.
+  ///
+  /// In de, this message translates to:
+  /// **'Alle {seconds} s'**
+  String musicIntervalSeconds(int seconds);
+
+  /// No description provided for @musicIntervalManual.
+  ///
+  /// In de, this message translates to:
+  /// **'Nur mit ↑'**
+  String get musicIntervalManual;
+
+  /// No description provided for @musicVisualizerHint.
+  ///
+  /// In de, this message translates to:
+  /// **'↑ nächste Visualisierung · ←/→ Titel · ↓ zurück'**
+  String get musicVisualizerHint;
+
   /// No description provided for @nasTitle.
   ///
   /// In de, this message translates to:
@@ -2254,18 +3454,6 @@ abstract class AppLocalizations {
   /// **'Zuerst unter Einstellungen → System → NAS-Server einen Ordner für Hintergrundbilder wählen.'**
   String get nasBgNoFolder;
 
-  /// No description provided for @nasBgFromUrl.
-  ///
-  /// In de, this message translates to:
-  /// **'Adresse (http)'**
-  String get nasBgFromUrl;
-
-  /// No description provided for @nasBgFromUrlHint.
-  ///
-  /// In de, this message translates to:
-  /// **'Ein Webserver, der Bilder liefert (siehe unten).'**
-  String get nasBgFromUrlHint;
-
   /// No description provided for @nasBgSyncNow.
   ///
   /// In de, this message translates to:
@@ -2301,6 +3489,492 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'Hintergrundbilder (Home)'**
   String get nasFolderBackgrounds;
+
+  /// No description provided for @nasBgSyncListing.
+  ///
+  /// In de, this message translates to:
+  /// **'Ordner wird gelesen …'**
+  String get nasBgSyncListing;
+
+  /// No description provided for @nasBgSyncNothingNew.
+  ///
+  /// In de, this message translates to:
+  /// **'Keine neuen Bilder - wird abgeschlossen …'**
+  String get nasBgSyncNothingNew;
+
+  /// No description provided for @nasBgSyncProgress.
+  ///
+  /// In de, this message translates to:
+  /// **'Bild {loaded} von {total} wird geladen …'**
+  String nasBgSyncProgress(int loaded, int total);
+
+  /// No description provided for @permissionsTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Berechtigungen'**
+  String get permissionsTitle;
+
+  /// No description provided for @permissionsIntro.
+  ///
+  /// In de, this message translates to:
+  /// **'Home System fragt nur nach dem, was eine Funktion wirklich braucht - und jede Erlaubnis ist freiwillig. Ohne sie läuft alles andere ganz normal, nur die jeweilige Funktion fehlt.'**
+  String get permissionsIntro;
+
+  /// No description provided for @permissionsSummary.
+  ///
+  /// In de, this message translates to:
+  /// **'{granted} von {total} erteilt'**
+  String permissionsSummary(int granted, int total);
+
+  /// No description provided for @permissionsNoneNeeded.
+  ///
+  /// In de, this message translates to:
+  /// **'Auf diesem Gerät braucht Home System keine besonderen Berechtigungen.'**
+  String get permissionsNoneNeeded;
+
+  /// No description provided for @permissionsStatusGranted.
+  ///
+  /// In de, this message translates to:
+  /// **'Erteilt'**
+  String get permissionsStatusGranted;
+
+  /// No description provided for @permissionsStatusMissing.
+  ///
+  /// In de, this message translates to:
+  /// **'Nicht erteilt'**
+  String get permissionsStatusMissing;
+
+  /// No description provided for @permissionsStatusNotNeeded.
+  ///
+  /// In de, this message translates to:
+  /// **'Nicht nötig'**
+  String get permissionsStatusNotNeeded;
+
+  /// No description provided for @permissionsStatusUsb.
+  ///
+  /// In de, this message translates to:
+  /// **'Android fragt beim Einstecken'**
+  String get permissionsStatusUsb;
+
+  /// No description provided for @permissionsStatusNotifications.
+  ///
+  /// In de, this message translates to:
+  /// **'Keine Erlaubnis nötig'**
+  String get permissionsStatusNotifications;
+
+  /// No description provided for @permissionsStatusAdb.
+  ///
+  /// In de, this message translates to:
+  /// **'Nur per adb'**
+  String get permissionsStatusAdb;
+
+  /// No description provided for @permissionsAllow.
+  ///
+  /// In de, this message translates to:
+  /// **'Erlauben'**
+  String get permissionsAllow;
+
+  /// No description provided for @permissionsSetUp.
+  ///
+  /// In de, this message translates to:
+  /// **'Einrichten'**
+  String get permissionsSetUp;
+
+  /// No description provided for @permissionsChange.
+  ///
+  /// In de, this message translates to:
+  /// **'Ändern'**
+  String get permissionsChange;
+
+  /// No description provided for @permissionsLater.
+  ///
+  /// In de, this message translates to:
+  /// **'Später'**
+  String get permissionsLater;
+
+  /// No description provided for @permissionsNotNeededHeading.
+  ///
+  /// In de, this message translates to:
+  /// **'Gerade nicht nötig'**
+  String get permissionsNotNeededHeading;
+
+  /// No description provided for @permissionsNotNeededDevice.
+  ///
+  /// In de, this message translates to:
+  /// **'Auf diesem Gerät nicht nötig.'**
+  String get permissionsNotNeededDevice;
+
+  /// No description provided for @permissionsNotNeededPart.
+  ///
+  /// In de, this message translates to:
+  /// **'Nicht nötig, solange „{part}“ ausgeschaltet ist.'**
+  String permissionsNotNeededPart(String part);
+
+  /// No description provided for @permissionsNotNeededNoCamera.
+  ///
+  /// In de, this message translates to:
+  /// **'Dieses Gerät hat keine Kamera.'**
+  String get permissionsNotNeededNoCamera;
+
+  /// No description provided for @permissionsBlocked.
+  ///
+  /// In de, this message translates to:
+  /// **'Android fragt nicht mehr nach. Auf der App-Seite, die sich geöffnet hat, unter „Berechtigungen“ erlauben.'**
+  String get permissionsBlocked;
+
+  /// No description provided for @permissionsDenied.
+  ///
+  /// In de, this message translates to:
+  /// **'Nicht erlaubt - die Funktion bleibt aus. Das lässt sich jederzeit hier nachholen.'**
+  String get permissionsDenied;
+
+  /// No description provided for @permissionsMusicOn.
+  ///
+  /// In de, this message translates to:
+  /// **'„Folgt der Musik“ ist jetzt eingeschaltet.'**
+  String get permissionsMusicOn;
+
+  /// No description provided for @permissionsHomeKeyTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Home-Taste'**
+  String get permissionsHomeKeyTitle;
+
+  /// No description provided for @permissionsHomeKeyWhy.
+  ///
+  /// In de, this message translates to:
+  /// **'Damit die Home-Taste der Fernbedienung Home System öffnet, wird Home System Standard-Launcher - oder, wo das nicht geht (z. B. Fire TV, Google TV), wird der Dienst „Home System: Home-Taste“ eingeschaltet, eine Bedienungshilfe. Der Dienst sieht nur, welche App gerade vorne ist - keine Bildschirminhalte, keine Eingaben, keine Passwörter.'**
+  String get permissionsHomeKeyWhy;
+
+  /// No description provided for @permissionsHomeKeyWhyDashboard.
+  ///
+  /// In de, this message translates to:
+  /// **'Für die Haussteuerung schaltet derselbe Dienst außerdem das Display aus und wischt einen Sperrbildschirm ohne PIN weg, wenn das Display wieder angeht.'**
+  String get permissionsHomeKeyWhyDashboard;
+
+  /// No description provided for @permissionsCameraTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Kamera'**
+  String get permissionsCameraTitle;
+
+  /// No description provided for @permissionsCameraWhy.
+  ///
+  /// In de, this message translates to:
+  /// **'Für die Haussteuerung („Display per Kamera ein- und ausschalten“): Die Kamera erkennt nur, ob sich vor dem Gerät etwas bewegt. Es werden keine Bilder gespeichert oder verschickt.'**
+  String get permissionsCameraWhy;
+
+  /// No description provided for @permissionsInstallTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Apps installieren'**
+  String get permissionsInstallTitle;
+
+  /// No description provided for @permissionsInstallWhy.
+  ///
+  /// In de, this message translates to:
+  /// **'Damit Home System seine eigenen Updates einspielen kann. Android fragt vor jedem Update trotzdem noch einmal nach, und andere Apps installiert Home System nie.'**
+  String get permissionsInstallWhy;
+
+  /// No description provided for @permissionsStorageTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Speicher'**
+  String get permissionsStorageTitle;
+
+  /// No description provided for @permissionsStorageWhy.
+  ///
+  /// In de, this message translates to:
+  /// **'Für Backups: Sie liegen im Ordner Download/HomeSystem und überstehen so auch ein Deinstallieren der App. Home System liest und schreibt dort nur seine eigenen Backup-Dateien.'**
+  String get permissionsStorageWhy;
+
+  /// No description provided for @permissionsAllFilesTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Zugriff auf alle Dateien'**
+  String get permissionsAllFilesTitle;
+
+  /// No description provided for @permissionsAllFilesWhy.
+  ///
+  /// In de, this message translates to:
+  /// **'Nur für Backups: Neue Backups im Ordner Download/HomeSystem gehen auch ohne. Diesen Zugriff braucht Home System erst, um nach einer Neuinstallation die Backups der früheren Installation zu finden - es liest dort nur seine eigenen Backup-Dateien.'**
+  String get permissionsAllFilesWhy;
+
+  /// No description provided for @permissionsRecordAudioTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Audio aufnehmen'**
+  String get permissionsRecordAudioTitle;
+
+  /// No description provided for @permissionsRecordAudioWhy.
+  ///
+  /// In de, this message translates to:
+  /// **'Nur für die Musik-Visualisierung („Folgt der Musik“): Sie liest das Frequenzspektrum der eigenen Wiedergabe. Android nennt das „Audio aufnehmen“ und spricht vom Mikrofon - das Mikrofon wird aber nie benutzt, es wird nichts aufgenommen oder gespeichert.'**
+  String get permissionsRecordAudioWhy;
+
+  /// No description provided for @permissionsUsbTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'USB-Stick für DAB+ und UKW'**
+  String get permissionsUsbTitle;
+
+  /// No description provided for @permissionsUsbWhy.
+  ///
+  /// In de, this message translates to:
+  /// **'Steckt man einen RTL-SDR-Stick an, fragt Android einmal, ob Home System ihn verwenden darf. Einfach „OK“ wählen (wenn angeboten, mit „Immer“) - Home System verwendet nur diesen Stick.'**
+  String get permissionsUsbWhy;
+
+  /// No description provided for @permissionsNotificationsTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Benachrichtigungen'**
+  String get permissionsNotificationsTitle;
+
+  /// No description provided for @permissionsNotificationsWhy.
+  ///
+  /// In de, this message translates to:
+  /// **'Home System fragt nicht danach und schickt keine Mitteilungen. Während Radio oder Musik spielt, zeigt Android die Wiedergabe-Steuerung an - dafür ist keine Erlaubnis nötig.'**
+  String get permissionsNotificationsWhy;
+
+  /// No description provided for @permissionsAdvanced.
+  ///
+  /// In de, this message translates to:
+  /// **'Für Fortgeschrittene'**
+  String get permissionsAdvanced;
+
+  /// No description provided for @permissionsSecureSettingsTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Systemeinstellungen ändern'**
+  String get permissionsSecureSettingsTitle;
+
+  /// No description provided for @permissionsSecureSettingsWhy.
+  ///
+  /// In de, this message translates to:
+  /// **'Lässt sich nur vom Computer aus per adb erteilen und ist nicht nötig. Damit schaltet Home System den Dienst für die Home-Taste selbst ein - auch wenn Android ihn nach einem Update abgeschaltet hat. Sonst ändert Home System damit nichts.'**
+  String get permissionsSecureSettingsWhy;
+
+  /// No description provided for @permissionsRestrictedWhy.
+  ///
+  /// In de, this message translates to:
+  /// **'Ab Android 13 sperrt Android Bedienungshilfen von Apps, die nicht aus einem App-Store kommen („eingeschränkte Einstellungen“). Das hebt dieser Befehl auf:'**
+  String get permissionsRestrictedWhy;
+
+  /// No description provided for @permissionsWizardTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Berechtigungen (freiwillig)'**
+  String get permissionsWizardTitle;
+
+  /// No description provided for @permissionsWizardHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Hier steht, wofür Home System welche Erlaubnis braucht. Nichts davon ist Pflicht - „Später“ geht immer, und alles lässt sich unter Einstellungen → System → Berechtigungen nachholen.'**
+  String get permissionsWizardHint;
+
+  /// No description provided for @permissionsWizardCounter.
+  ///
+  /// In de, this message translates to:
+  /// **'Berechtigung {index} von {count}'**
+  String permissionsWizardCounter(int index, int count);
+
+  /// No description provided for @permissionsWizardNoneLeft.
+  ///
+  /// In de, this message translates to:
+  /// **'Das war\'s mit den Berechtigungen.'**
+  String get permissionsWizardNoneLeft;
+
+  /// No description provided for @permissionsWizardNoneLeftHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Später findet sich alles unter Einstellungen → System → Berechtigungen.'**
+  String get permissionsWizardNoneLeftHint;
+
+  /// No description provided for @picturesTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Bilder'**
+  String get picturesTitle;
+
+  /// No description provided for @picturesAreaSubtitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Fotos vom NAS, Diashow'**
+  String get picturesAreaSubtitle;
+
+  /// No description provided for @picturesSettingsTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Bilder-Einstellungen'**
+  String get picturesSettingsTitle;
+
+  /// No description provided for @picturesAdminPart.
+  ///
+  /// In de, this message translates to:
+  /// **'Bilder eingeschaltet'**
+  String get picturesAdminPart;
+
+  /// No description provided for @picturesNoFolder.
+  ///
+  /// In de, this message translates to:
+  /// **'Noch kein Bilder-Ordner gewählt. Lege in den NAS-Einstellungen fest, wo deine Fotos liegen.'**
+  String get picturesNoFolder;
+
+  /// No description provided for @picturesOpenNasSettings.
+  ///
+  /// In de, this message translates to:
+  /// **'NAS-Einstellungen öffnen'**
+  String get picturesOpenNasSettings;
+
+  /// No description provided for @picturesLoadError.
+  ///
+  /// In de, this message translates to:
+  /// **'Der Ordner lässt sich nicht lesen.\n{message}'**
+  String picturesLoadError(String message);
+
+  /// No description provided for @picturesSlideshowWithSubfolders.
+  ///
+  /// In de, this message translates to:
+  /// **'Diashow: {folder} (mit Unterordnern)'**
+  String picturesSlideshowWithSubfolders(String folder);
+
+  /// No description provided for @picturesSlideshow.
+  ///
+  /// In de, this message translates to:
+  /// **'Diashow: {folder}'**
+  String picturesSlideshow(String folder);
+
+  /// No description provided for @picturesCount.
+  ///
+  /// In de, this message translates to:
+  /// **'{count, plural, =0{keine Bilder} =1{1 Bild} other{{count} Bilder}}'**
+  String picturesCount(int count);
+
+  /// No description provided for @picturesFolderCount.
+  ///
+  /// In de, this message translates to:
+  /// **'{count, plural, =1{1 Ordner} other{{count} Ordner}}'**
+  String picturesFolderCount(int count);
+
+  /// No description provided for @picturesEmptyFolder.
+  ///
+  /// In de, this message translates to:
+  /// **'In diesem Ordner sind keine Bilder.'**
+  String get picturesEmptyFolder;
+
+  /// No description provided for @picturesBrowserHint.
+  ///
+  /// In de, this message translates to:
+  /// **'OK öffnet · OK auf einem Bild: Diashow ab diesem Bild · ⏯ oder {options} startet die Diashow des Ordners · Zurück geht eine Ebene hoch'**
+  String picturesBrowserHint(String options);
+
+  /// No description provided for @picturesSearching.
+  ///
+  /// In de, this message translates to:
+  /// **'Suche Bilder …'**
+  String get picturesSearching;
+
+  /// No description provided for @picturesNoneFound.
+  ///
+  /// In de, this message translates to:
+  /// **'Hier sind keine Bilder - auch nicht in den Unterordnern.'**
+  String get picturesNoneFound;
+
+  /// No description provided for @picturesStillSearching.
+  ///
+  /// In de, this message translates to:
+  /// **'sucht weiter …'**
+  String get picturesStillSearching;
+
+  /// No description provided for @picturesPaused.
+  ///
+  /// In de, this message translates to:
+  /// **'Pause'**
+  String get picturesPaused;
+
+  /// No description provided for @picturesSlideshowHint.
+  ///
+  /// In de, this message translates to:
+  /// **'← → zurück/vor · OK Pause · {options} Einstellungen · Zurück beendet'**
+  String picturesSlideshowHint(String options);
+
+  /// No description provided for @picturesInterval.
+  ///
+  /// In de, this message translates to:
+  /// **'Bild wechselt alle'**
+  String get picturesInterval;
+
+  /// No description provided for @picturesIntervalSeconds.
+  ///
+  /// In de, this message translates to:
+  /// **'{seconds} Sekunden'**
+  String picturesIntervalSeconds(int seconds);
+
+  /// No description provided for @picturesOrder.
+  ///
+  /// In de, this message translates to:
+  /// **'Reihenfolge'**
+  String get picturesOrder;
+
+  /// No description provided for @picturesOrderFolders.
+  ///
+  /// In de, this message translates to:
+  /// **'Ordner für Ordner, nach Namen'**
+  String get picturesOrderFolders;
+
+  /// No description provided for @picturesOrderShuffled.
+  ///
+  /// In de, this message translates to:
+  /// **'Gemischt'**
+  String get picturesOrderShuffled;
+
+  /// No description provided for @picturesOrderNextTime.
+  ///
+  /// In de, this message translates to:
+  /// **'Die Reihenfolge gilt ab der nächsten Diashow.'**
+  String get picturesOrderNextTime;
+
+  /// No description provided for @picturesBlur.
+  ///
+  /// In de, this message translates to:
+  /// **'Ränder mit dem unscharfen Bild füllen'**
+  String get picturesBlur;
+
+  /// No description provided for @picturesFolder.
+  ///
+  /// In de, this message translates to:
+  /// **'Bilder-Ordner'**
+  String get picturesFolder;
+
+  /// No description provided for @picturesMusicHelp.
+  ///
+  /// In de, this message translates to:
+  /// **'Radio und Musik laufen während der Diashow einfach weiter.'**
+  String get picturesMusicHelp;
+
+  /// No description provided for @picturesSlideshowHeading.
+  ///
+  /// In de, this message translates to:
+  /// **'Diashow'**
+  String get picturesSlideshowHeading;
+
+  /// No description provided for @picturesInThisFolder.
+  ///
+  /// In de, this message translates to:
+  /// **'{count, plural, =1{1 Bild in diesem Ordner} other{{count} Bilder in diesem Ordner}} - OK auf einem Bild startet die Diashow ab dort'**
+  String picturesInThisFolder(int count);
+
+  /// No description provided for @picturesResumeFrom.
+  ///
+  /// In de, this message translates to:
+  /// **'Fortsetzen ab Bild {position} ({name})'**
+  String picturesResumeFrom(int position, String name);
+
+  /// No description provided for @picturesResumeRestart.
+  ///
+  /// In de, this message translates to:
+  /// **'Von vorne'**
+  String get picturesResumeRestart;
 
   /// No description provided for @radioErrorConnectionLost.
   ///
@@ -6019,7 +7693,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsAreaSystemSubtitle.
   ///
   /// In de, this message translates to:
-  /// **'Radio & TV ein/aus, Gerätename, NAS, Start, Home, Home-Taste, Anzeige, Backup, Updates'**
+  /// **'Radio & TV ein/aus, Gerätename, NAS, Start, Home, Home-Taste, Berechtigungen, Anzeige, Backup, Updates'**
   String get settingsAreaSystemSubtitle;
 
   /// No description provided for @settingsAreaSystemSubtitleNoHomeKey.
@@ -6304,30 +7978,6 @@ abstract class AppLocalizations {
   /// **'Weiter'**
   String get settingsWizardNext;
 
-  /// No description provided for @settingsWizardHomeKeyTitle.
-  ///
-  /// In de, this message translates to:
-  /// **'Home-Taste der Fernbedienung (freiwillig)'**
-  String get settingsWizardHomeKeyTitle;
-
-  /// No description provided for @settingsWizardHomeKeyHint.
-  ///
-  /// In de, this message translates to:
-  /// **'Wer möchte, dass die Home-Taste der Fernbedienung Home System öffnet, richtet das hier ein - Home System wird dafür Standard-Launcher, oder eine Bedienungshilfe wird eingeschaltet. Wer das nicht will, geht einfach weiter; es lässt sich jederzeit unter Einstellungen → System → Home-Taste nachholen.'**
-  String get settingsWizardHomeKeyHint;
-
-  /// No description provided for @settingsWizardHomeKeySetUp.
-  ///
-  /// In de, this message translates to:
-  /// **'Home-Taste einrichten'**
-  String get settingsWizardHomeKeySetUp;
-
-  /// No description provided for @settingsWizardHomeKeySkip.
-  ///
-  /// In de, this message translates to:
-  /// **'Weiter (ohne bzw. nach dem Einrichten)'**
-  String get settingsWizardHomeKeySkip;
-
   /// No description provided for @settingsWizardDone.
   ///
   /// In de, this message translates to:
@@ -6351,6 +8001,396 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'Los geht\'s'**
   String get settingsWizardStart;
+
+  /// No description provided for @settingsOpenSourceLicenses.
+  ///
+  /// In de, this message translates to:
+  /// **'Open-Source-Lizenzen'**
+  String get settingsOpenSourceLicenses;
+
+  /// No description provided for @settingsAboutInternetTv.
+  ///
+  /// In de, this message translates to:
+  /// **'Internet-TV'**
+  String get settingsAboutInternetTv;
+
+  /// No description provided for @settingsAboutInternetTvData.
+  ///
+  /// In de, this message translates to:
+  /// **'Senderliste, Streams und Logos aus dem offenen Verzeichnis iptv-org (github.com/iptv-org/iptv) - nur frei verfügbare Sender; die Streams kommen von den Sendern selbst'**
+  String get settingsAboutInternetTvData;
+
+  /// No description provided for @settingsAboutMaps.
+  ///
+  /// In de, this message translates to:
+  /// **'Karten (Funk)'**
+  String get settingsAboutMaps;
+
+  /// No description provided for @settingsAboutMapsData.
+  ///
+  /// In de, this message translates to:
+  /// **'Kartenkacheln © OpenStreetMap-Mitwirkende, Daten unter der Open Database License (ODbL), über tile.openstreetmap.org'**
+  String get settingsAboutMapsData;
+
+  /// No description provided for @settingsAboutAircraft.
+  ///
+  /// In de, this message translates to:
+  /// **'Flugzeugdaten (ADS-B)'**
+  String get settingsAboutAircraft;
+
+  /// No description provided for @settingsAboutAircraftData.
+  ///
+  /// In de, this message translates to:
+  /// **'Flugzeugtypen, Halter und Flugrouten über adsbdb.com'**
+  String get settingsAboutAircraftData;
+
+  /// No description provided for @settingsBgTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Hintergrund von Home'**
+  String get settingsBgTitle;
+
+  /// No description provided for @settingsBgGradientsHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Mitgelieferte Farbverläufe (Nordlicht, Abendrot, Ozean, …) - ohne Internet.'**
+  String get settingsBgGradientsHint;
+
+  /// No description provided for @settingsBgPhotos.
+  ///
+  /// In de, this message translates to:
+  /// **'Landschaftsfotos aus dem Internet'**
+  String get settingsBgPhotos;
+
+  /// No description provided for @settingsBgPhotosHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Landschafts- und Naturfotos - die Bing-Bilder des Tages der letzten zwei Wochen, abwechselnd. Ort und Fotograf stehen klein rechts oben.'**
+  String get settingsBgPhotosHint;
+
+  /// No description provided for @settingsBgBand.
+  ///
+  /// In de, this message translates to:
+  /// **'Band hinter den Favoriten'**
+  String get settingsBgBand;
+
+  /// No description provided for @settingsBgBandHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Wie stark das Band das Bild abdeckt - wirkt sofort.'**
+  String get settingsBgBandHint;
+
+  /// No description provided for @settingsBgBandNone.
+  ///
+  /// In de, this message translates to:
+  /// **'Keines'**
+  String get settingsBgBandNone;
+
+  /// No description provided for @settingsBgInterval.
+  ///
+  /// In de, this message translates to:
+  /// **'Neues Bild alle'**
+  String get settingsBgInterval;
+
+  /// No description provided for @settingsBgOneHour.
+  ///
+  /// In de, this message translates to:
+  /// **'1 Stunde'**
+  String get settingsBgOneHour;
+
+  /// No description provided for @settingsIconPackTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Icon-Paket für die App-Kacheln'**
+  String get settingsIconPackTitle;
+
+  /// No description provided for @settingsIconPackNoneOriginal.
+  ///
+  /// In de, this message translates to:
+  /// **'Keines - Original-Logos der Apps'**
+  String get settingsIconPackNoneOriginal;
+
+  /// No description provided for @settingsIconPackNoneInstalled.
+  ///
+  /// In de, this message translates to:
+  /// **'Kein Icon-Paket installiert. Icon-Pakete für Android-Launcher (ADW-/Nova-Format) werden unterstützt - als App installieren, dann hier auswählen.\nEinzelne Kacheln bekommen ein eigenes Bild über ☰ auf der Kachel → „Bild ändern“.'**
+  String get settingsIconPackNoneInstalled;
+
+  /// No description provided for @settingsHomeKeyIntro.
+  ///
+  /// In de, this message translates to:
+  /// **'Mit der Home-Taste der Fernbedienung öffnet sich Home System mit Home (den Kacheln).'**
+  String get settingsHomeKeyIntro;
+
+  /// No description provided for @settingsHomeKeyIsDefault.
+  ///
+  /// In de, this message translates to:
+  /// **'Home System ist der Standard-Launcher.'**
+  String get settingsHomeKeyIsDefault;
+
+  /// No description provided for @settingsHomeKeyNotDefault.
+  ///
+  /// In de, this message translates to:
+  /// **'Home System ist noch nicht der Standard-Launcher.'**
+  String get settingsHomeKeyNotDefault;
+
+  /// No description provided for @settingsHomeKeyDefaultHelp.
+  ///
+  /// In de, this message translates to:
+  /// **'Auf Android-TV-Boxen Home System als Startbildschirm („Home-App“) wählen. Fragt das Gerät beim Drücken der Home-Taste nach, „Home System“ und „Immer“ wählen.'**
+  String get settingsHomeKeyDefaultHelp;
+
+  /// No description provided for @settingsHomeKeyChooseDefault.
+  ///
+  /// In de, this message translates to:
+  /// **'Standard-Launcher wählen'**
+  String get settingsHomeKeyChooseDefault;
+
+  /// No description provided for @settingsHomeKeyServiceFallback.
+  ///
+  /// In de, this message translates to:
+  /// **'Lässt das Gerät keinen anderen Launcher zu (z. B. Google TV), hilft der Dienst unten - wie beim Fire TV.'**
+  String get settingsHomeKeyServiceFallback;
+
+  /// No description provided for @settingsHomeKeyServiceOn.
+  ///
+  /// In de, this message translates to:
+  /// **'Dienst „Home System: Home-Taste“ ist eingeschaltet.'**
+  String get settingsHomeKeyServiceOn;
+
+  /// No description provided for @settingsHomeKeyServiceOff.
+  ///
+  /// In de, this message translates to:
+  /// **'Dienst „Home System: Home-Taste“ ist ausgeschaltet.'**
+  String get settingsHomeKeyServiceOff;
+
+  /// No description provided for @settingsHomeKeyServiceFireTv.
+  ///
+  /// In de, this message translates to:
+  /// **'Der Fire TV zeigt mit der Home-Taste immer den Amazon-Startbildschirm. Der Dienst (eine Bedienungshilfe) holt Home System dann sofort nach vorne. Er sieht nur, welche App im Vordergrund ist - keine Inhalte, keine Tasten und keine Eingaben.'**
+  String get settingsHomeKeyServiceFireTv;
+
+  /// No description provided for @settingsHomeKeyServiceOther.
+  ///
+  /// In de, this message translates to:
+  /// **'Der Dienst (eine Bedienungshilfe) holt Home System nach vorne, sobald der Startbildschirm des Geräts erscheint. Er sieht nur, welche App im Vordergrund ist.'**
+  String get settingsHomeKeyServiceOther;
+
+  /// No description provided for @settingsHomeKeyEnable.
+  ///
+  /// In de, this message translates to:
+  /// **'Dienst einschalten'**
+  String get settingsHomeKeyEnable;
+
+  /// No description provided for @settingsHomeKeyOpenA11y.
+  ///
+  /// In de, this message translates to:
+  /// **'Bedienungshilfen öffnen'**
+  String get settingsHomeKeyOpenA11y;
+
+  /// No description provided for @settingsHomeKeyBlocked.
+  ///
+  /// In de, this message translates to:
+  /// **'Android hat den Dienst gesperrt („eingeschränkte Einstellungen“ - ab Android 13 bei Apps, die nicht aus einem App-Store kommen). Einmalig vom Computer aus per adb erlauben, dann noch einmal „Dienst einschalten“:'**
+  String get settingsHomeKeyBlocked;
+
+  /// No description provided for @settingsHomeKeyEnableThere.
+  ///
+  /// In de, this message translates to:
+  /// **'Dort „Home System: Home-Taste“ einschalten. Zeigt das Gerät den Dienst nicht an oder ist er ausgegraut, einmalig vom Computer aus per adb freischalten - danach schaltet ihn dieser Knopf selbst ein:'**
+  String get settingsHomeKeyEnableThere;
+
+  /// No description provided for @settingsHomeKeyRedirect.
+  ///
+  /// In de, this message translates to:
+  /// **'Home-Taste öffnet Home System'**
+  String get settingsHomeKeyRedirect;
+
+  /// No description provided for @settingsHomeKeyRedirectHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Aus: der Startbildschirm des Geräts bleibt, Home System öffnet man wie jede App.'**
+  String get settingsHomeKeyRedirectHint;
+
+  /// No description provided for @settingsBackupSaved.
+  ///
+  /// In de, this message translates to:
+  /// **'Backup gespeichert: {location}'**
+  String settingsBackupSaved(String location);
+
+  /// One or more admin page addresses, joined with the word for 'or'.
+  ///
+  /// In de, this message translates to:
+  /// **'Zum Herunterladen auch unter {urls}'**
+  String settingsBackupDownloadAlso(String urls);
+
+  /// No description provided for @settingsBackupNoPermission.
+  ///
+  /// In de, this message translates to:
+  /// **'Ohne Speicher-Berechtigung kann kein Backup gespeichert werden.'**
+  String get settingsBackupNoPermission;
+
+  /// No description provided for @settingsBackupFailed.
+  ///
+  /// In de, this message translates to:
+  /// **'Backup fehlgeschlagen: {message}'**
+  String settingsBackupFailed(String message);
+
+  /// No description provided for @settingsRestoreNoPermission.
+  ///
+  /// In de, this message translates to:
+  /// **'Ohne Speicher-Berechtigung können keine Backups gelesen werden.'**
+  String get settingsRestoreNoPermission;
+
+  /// No description provided for @settingsRestoreReadFailed.
+  ///
+  /// In de, this message translates to:
+  /// **'Backups konnten nicht gelesen werden ({message}).'**
+  String settingsRestoreReadFailed(String message);
+
+  /// No description provided for @settingsRestoreBusy.
+  ///
+  /// In de, this message translates to:
+  /// **'Das Gerät spielt gerade schon ein Backup ein.'**
+  String get settingsRestoreBusy;
+
+  /// No description provided for @settingsRestoreFromWebDone.
+  ///
+  /// In de, this message translates to:
+  /// **'Backup von der Verwaltungsseite eingespielt - App startet neu …'**
+  String get settingsRestoreFromWebDone;
+
+  /// No description provided for @settingsRestoreConfirmTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Backup wiederherstellen?'**
+  String get settingsRestoreConfirmTitle;
+
+  /// The backup file name, or the sentence settingsRestorePickedFile.
+  ///
+  /// In de, this message translates to:
+  /// **'{what}\n\nAlle aktuellen Favoriten, DAB+ Sender und Einstellungen werden ersetzt. Danach startet die App neu.'**
+  String settingsRestoreConfirmText(String what);
+
+  /// No description provided for @settingsRestoreButton.
+  ///
+  /// In de, this message translates to:
+  /// **'Wiederherstellen'**
+  String get settingsRestoreButton;
+
+  /// No description provided for @settingsRestoreDone.
+  ///
+  /// In de, this message translates to:
+  /// **'Backup wiederhergestellt - App startet neu …'**
+  String get settingsRestoreDone;
+
+  /// No description provided for @settingsRestoreNoPicker.
+  ///
+  /// In de, this message translates to:
+  /// **'Dieses Gerät hat keine Dateiauswahl. Bitte stattdessen „Zugriff auf alle Dateien“ erlauben.'**
+  String get settingsRestoreNoPicker;
+
+  /// No description provided for @settingsRestoreFailed.
+  ///
+  /// In de, this message translates to:
+  /// **'Wiederherstellen fehlgeschlagen: {message}'**
+  String settingsRestoreFailed(String message);
+
+  /// No description provided for @settingsRestorePickedFile.
+  ///
+  /// In de, this message translates to:
+  /// **'Die ausgewählte Datei wird eingespielt.'**
+  String get settingsRestorePickedFile;
+
+  /// No description provided for @settingsRestoreNoAllFilesSetting.
+  ///
+  /// In de, this message translates to:
+  /// **'Dieses Gerät bietet die Einstellung „Zugriff auf alle Dateien“ nicht an.'**
+  String get settingsRestoreNoAllFilesSetting;
+
+  /// No description provided for @settingsRestoreViaAdmin.
+  ///
+  /// In de, this message translates to:
+  /// **'Über die Verwaltungsseite'**
+  String get settingsRestoreViaAdmin;
+
+  /// No description provided for @settingsRestoreNoNetwork.
+  ///
+  /// In de, this message translates to:
+  /// **'Keine Netzwerkverbindung - die Verwaltungsseite ist nicht erreichbar.'**
+  String get settingsRestoreNoNetwork;
+
+  /// No description provided for @settingsRestoreOpenInBrowser.
+  ///
+  /// In de, this message translates to:
+  /// **'Auf einem Computer oder Handy im selben Netz im Browser öffnen:'**
+  String get settingsRestoreOpenInBrowser;
+
+  /// No description provided for @settingsRestoreHostname.
+  ///
+  /// In de, this message translates to:
+  /// **'Hostname dieses Geräts: {name}'**
+  String settingsRestoreHostname(String name);
+
+  /// No description provided for @settingsRestoreAdminHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Dort die Backup-Datei auswählen und einspielen. Solange diese Seite hier offen ist, nimmt das Gerät ein Backup an. Danach startet die App neu.'**
+  String get settingsRestoreAdminHint;
+
+  /// No description provided for @settingsRestoreOnDevice.
+  ///
+  /// In de, this message translates to:
+  /// **'Backups auf diesem Gerät'**
+  String get settingsRestoreOnDevice;
+
+  /// 'Download' on Android, settingsRestoreFolderDocuments elsewhere.
+  ///
+  /// In de, this message translates to:
+  /// **'Aus dem Ordner „{folder}/HomeSystem“ (und HomeRadio der früheren App).'**
+  String settingsRestoreOnDeviceHint(String folder);
+
+  /// No description provided for @settingsRestoreFolderDocuments.
+  ///
+  /// In de, this message translates to:
+  /// **'Dokumente'**
+  String get settingsRestoreFolderDocuments;
+
+  /// No description provided for @settingsRestoreNone.
+  ///
+  /// In de, this message translates to:
+  /// **'Keine Backups gefunden.'**
+  String get settingsRestoreNone;
+
+  /// No description provided for @settingsRestoreAllFilesHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Backups von einer früheren Installation der App sind erst sichtbar, wenn der „Zugriff auf alle Dateien“ erlaubt wurde. Alternativ die Datei direkt auswählen.'**
+  String get settingsRestoreAllFilesHint;
+
+  /// No description provided for @settingsRestoreAllowAllFiles.
+  ///
+  /// In de, this message translates to:
+  /// **'Zugriff auf alle Dateien erlauben'**
+  String get settingsRestoreAllowAllFiles;
+
+  /// No description provided for @settingsRestorePickFile.
+  ///
+  /// In de, this message translates to:
+  /// **'Backup-Datei auswählen … (z. B. vom USB-Stick)'**
+  String get settingsRestorePickFile;
+
+  /// No description provided for @settingsAboutAdblock.
+  ///
+  /// In de, this message translates to:
+  /// **'Werbefilter (Browser)'**
+  String get settingsAboutAdblock;
+
+  /// No description provided for @settingsAboutAdblockData.
+  ///
+  /// In de, this message translates to:
+  /// **'Filterlisten, zur Laufzeit geladen: uBlock Origin uAssets (GPLv3, github.com/uBlockOrigin/uAssets), EasyList, EasyPrivacy, EasyList Germany (GPLv3 oder CC BY-SA 3.0, easylist.to), Peter Lowe’s Ad and tracking server list (pgl.yoyo.org/adservers). Die Scriptlets sind eigene Umsetzungen nach den Namen und Argumenten von uBlock Origin.'**
+  String get settingsAboutAdblockData;
 
   /// No description provided for @systemStartDashboard.
   ///
@@ -6913,6 +8953,18 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'TV-Einstellungen'**
   String get tvSettingsButton;
+
+  /// No description provided for @tvBannerLaterHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Sendung {index} von {count} - → weiter, ← zurück'**
+  String tvBannerLaterHint(int index, int count);
+
+  /// No description provided for @tvRowReceiver.
+  ///
+  /// In de, this message translates to:
+  /// **'Receiver'**
+  String get tvRowReceiver;
 }
 
 class _AppLocalizationsDelegate

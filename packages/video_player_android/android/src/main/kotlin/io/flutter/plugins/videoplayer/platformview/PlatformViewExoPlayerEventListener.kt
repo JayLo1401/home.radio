@@ -20,9 +20,13 @@ internal class PlatformViewExoPlayerEventListener(
   override fun sendInitialized() {
     // We can't rely on VideoSize here, because at this point it is not available - the platform
     // view was not created yet. We use the video format instead.
-    val videoFormat =
-        exoPlayer.videoFormat
-            ?: throw IllegalStateException("sendInitialized called with no video playing")
+    // Home Media: no video format (a file without picture, or one whose video no decoder
+    // takes) is reported as size 0x0 - upstream threw here and took the whole app down.
+    val videoFormat = exoPlayer.videoFormat
+    if (videoFormat == null) {
+      events.onInitialized(0, 0, exoPlayer.duration, 0)
+      return
+    }
     var rotationCorrection = fromDegrees(videoFormat.rotationDegrees)
     var width = videoFormat.width
     var height = videoFormat.height

@@ -1,7 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/dashboard_providers.dart';
+import '../../core/pictures_providers.dart';
 import '../../core/providers.dart';
+import '../../data/services/music_library.dart' show MusicRepeat;
+import '../../data/repositories/music_settings_repository.dart';
+import '../../core/music_providers.dart';
 import '../../core/system_providers.dart';
 import '../../data/models/launcher_tile.dart';
 import '../../data/repositories/settings_repository.dart';
@@ -9,7 +13,10 @@ import '../../data/services/admin_server.dart';
 import '../../data/services/display_service.dart';
 import '../../data/services/enigma2_service.dart';
 import '../../data/services/launcher_service.dart';
+import '../../data/services/picture_library.dart' show SlideshowOrder;
 import '../../l10n/l10n.dart';
+import '../browser/browser_channel.dart';
+import '../browser/browser_settings.dart';
 import '../launcher/launcher_providers.dart';
 import '../tv/tv_providers.dart';
 
@@ -80,6 +87,24 @@ class AdminSettings implements AdminSettingsSource {
     final dashboardUrl = await repo.getDashboardUrl();
     final display = await repo.getDashboardDisplay();
     final brightness = await repo.getDisplayBrightness();
+    final music = await _c.read(musicSettingsRepositoryProvider).load();
+    final browser = await _c.read(browserSettingsProvider.notifier).loaded();
+    Future<String?> setBrowser(BrowserSettings Function(BrowserSettings s) f) async {
+      await _c.read(browserSettingsProvider.notifier).update(f);
+      return null;
+    }
+
+    Future<String?> setMusic(MusicSettings Function(MusicSettings s) f) async {
+      await _c.read(musicSettingsProvider.notifier).set(f);
+      return null;
+    }
+
+    final slideshow = await repo.getSlideshowSettings();
+    Future<String?> setSlideshow(SlideshowSettings Function(SlideshowSettings s) change) async {
+      await _c.read(slideshowSettingsProvider.notifier).set(change(await repo.getSlideshowSettings()));
+      return null;
+    }
+
     Future<String?> setBrightness(DisplayBrightness Function(DisplayBrightness b) change) async {
       await _c.read(displayBrightnessProvider.notifier).set(change(await repo.getDisplayBrightness()));
       return null;
@@ -175,6 +200,47 @@ class AdminSettings implements AdminSettingsSource {
               get: () => parts.dashboard,
               set: (v) async {
                 await _c.read(systemPartsProvider.notifier).setDashboard(_bool(v) ?? false);
+                return null;
+              },
+            ),
+          _Setting(
+            id: 'partPictures',
+            label: l.picturesAdminPart,
+            type: 'bool',
+            get: () => parts.pictures,
+            set: (v) async {
+              await _c.read(systemPartsProvider.notifier).setPictures(_bool(v) ?? false);
+              return null;
+            },
+          ),
+          _Setting(
+            id: 'partMovies',
+            label: l.moviesAdminPart,
+            type: 'bool',
+            get: () => parts.movies,
+            set: (v) async {
+              await _c.read(systemPartsProvider.notifier).setMovies(_bool(v) ?? false);
+              return null;
+            },
+          ),
+          _Setting(
+            id: 'partMusic',
+            label: l.musicAdminPart,
+            type: 'bool',
+            get: () => parts.music,
+            set: (v) async {
+              await _c.read(systemPartsProvider.notifier).setMusic(_bool(v) ?? false);
+              return null;
+            },
+          ),
+          if (BrowserChannel.supported)
+            _Setting(
+              id: 'partBrowser',
+              label: l.browserAdminPart,
+              type: 'bool',
+              get: () => parts.browser,
+              set: (v) async {
+                await _c.read(systemPartsProvider.notifier).setBrowser(_bool(v) ?? true);
                 return null;
               },
             ),
@@ -347,6 +413,179 @@ class AdminSettings implements AdminSettingsSource {
                     .set((enabled: _bool(v) ?? true, leadMinutes: n.leadMinutes, showSeconds: n.showSeconds));
                 return null;
               },
+            ),
+          ],
+        ),
+      if (parts.pictures)
+        (
+          title: l.picturesSettingsTitle,
+          items: [
+            _Setting(
+              id: 'slideshowInterval',
+              label: l.picturesInterval,
+              type: 'choice',
+              options: [
+                for (final s in SettingsRepository.slideshowIntervals) ('$s', l.picturesIntervalSeconds(s)),
+              ],
+              get: () => '${slideshow.intervalSeconds}',
+              set: (v) {
+                final s = _int(v);
+                if (s == null || !SettingsRepository.slideshowIntervals.contains(s)) {
+                  return Future.value(l.adminInvalidValue);
+                }
+                return setSlideshow((x) => x.copyWith(intervalSeconds: s));
+              },
+            ),
+            _Setting(
+              id: 'slideshowOrder',
+              label: l.picturesOrder,
+              type: 'choice',
+              options: [
+                (SlideshowOrder.folders.name, l.picturesOrderFolders),
+                (SlideshowOrder.shuffled.name, l.picturesOrderShuffled),
+              ],
+              get: () => slideshow.order.name,
+              set: (v) {
+                final o = SlideshowOrder.values.where((o) => o.name == v).firstOrNull;
+                if (o == null) return Future.value(l.adminInvalidValue);
+                return setSlideshow((x) => x.copyWith(order: o));
+              },
+            ),
+            _Setting(
+              id: 'slideshowBlur',
+              label: l.picturesBlur,
+              type: 'bool',
+              get: () => slideshow.blurredBackground,
+              set: (v) => setSlideshow((x) => x.copyWith(blurredBackground: _bool(v) ?? true)),
+            ),
+          ],
+        ),
+      if (parts.music)
+        (
+          title: l.musicSettingsTitle,
+          items: [
+            _Setting(
+              id: 'musicShuffle',
+              label: l.musicSettingsShuffle,
+              type: 'bool',
+              get: () => music.shuffle,
+              set: (v) => setMusic((s) => s.copyWith(shuffle: _bool(v) ?? false)),
+            ),
+            _Setting(
+              id: 'musicRepeat',
+              label: l.musicSettingsRepeat,
+              type: 'choice',
+              options: [
+                (MusicRepeat.off.name, l.musicRepeatOff),
+                (MusicRepeat.all.name, l.musicRepeatAll),
+                (MusicRepeat.one.name, l.musicRepeatOne),
+              ],
+              get: () => music.repeat.name,
+              set: (v) {
+                final r = MusicRepeat.values.where((x) => x.name == v).firstOrNull;
+                return r == null ? Future.value(l.adminInvalidValue) : setMusic((s) => s.copyWith(repeat: r));
+              },
+            ),
+            _Setting(
+              id: 'musicSubfolders',
+              label: l.musicWithSubfolders,
+              help: l.musicWithSubfoldersHelp,
+              type: 'bool',
+              get: () => music.subfolders,
+              set: (v) => setMusic((s) => s.copyWith(subfolders: _bool(v) ?? false)),
+            ),
+            _Setting(
+              id: 'musicPreferTags',
+              label: l.musicSettingsPreferTags,
+              help: l.musicSettingsPreferTagsHelp,
+              type: 'bool',
+              get: () => music.preferTags,
+              set: (v) => setMusic((s) => s.copyWith(preferTags: _bool(v) ?? true)),
+            ),
+            _Setting(
+              id: 'musicVisualizer',
+              label: l.musicSettingsVisualizer,
+              type: 'choice',
+              options: [
+                (MusicVisualizerMode.off.name, l.musicVisualizerOff),
+                (MusicVisualizerMode.manual.name, l.musicVisualizerManual),
+                (MusicVisualizerMode.auto.name, l.musicVisualizerAuto),
+              ],
+              get: () => music.visualizer.name,
+              set: (v) {
+                final m = MusicVisualizerMode.values.where((x) => x.name == v).firstOrNull;
+                return m == null ? Future.value(l.adminInvalidValue) : setMusic((s) => s.copyWith(visualizer: m));
+              },
+            ),
+            _Setting(
+              id: 'musicVisualizerInterval',
+              label: l.musicSettingsInterval,
+              type: 'choice',
+              options: [
+                for (final s in MusicSettings.visualizerIntervals)
+                  ('$s', s == 0 ? l.musicIntervalManual : l.musicIntervalSeconds(s)),
+              ],
+              get: () => '${music.visualizerInterval}',
+              set: (v) {
+                final s = _int(v);
+                if (s == null || !MusicSettings.visualizerIntervals.contains(s)) {
+                  return Future.value(l.adminInvalidValue);
+                }
+                return setMusic((x) => x.copyWith(visualizerInterval: s));
+              },
+            ),
+            _Setting(
+              id: 'musicVisualizerQuality',
+              label: l.musicSettingsQuality,
+              type: 'choice',
+              options: [
+                (MusicVisualizerQuality.auto.name, l.musicQualityAuto),
+                (MusicVisualizerQuality.low.name, l.musicQualityLow),
+                (MusicVisualizerQuality.high.name, l.musicQualityHigh),
+              ],
+              get: () => music.quality.name,
+              set: (v) {
+                final q = MusicVisualizerQuality.values.where((x) => x.name == v).firstOrNull;
+                return q == null ? Future.value(l.adminInvalidValue) : setMusic((s) => s.copyWith(quality: q));
+              },
+            ),
+          ],
+        ),
+      if (BrowserChannel.supported && parts.browser)
+        (
+          title: l.browserSettingsTitle,
+          items: [
+            _Setting(
+              id: 'browserBlocker',
+              label: l.browserBlocker,
+              type: 'bool',
+              get: () => browser.blocker,
+              set: (v) => setBrowser((s) => s.copyWith(blocker: _bool(v) ?? true)),
+            ),
+            _Setting(
+              id: 'browserSearchEngine',
+              label: l.browserSearchEngine,
+              type: 'choice',
+              options: [for (final e in SearchEngine.values) (e.name, e.label)],
+              get: () => browser.searchEngine.name,
+              set: (v) => setBrowser((s) => s.copyWith(searchEngine: SearchEngine.parse('$v'))),
+            ),
+            _Setting(
+              id: 'browserHomePage',
+              label: l.browserHomePage,
+              type: 'text',
+              get: () => browser.homePage,
+              set: (v) {
+                final text = '${v ?? ''}'.trim();
+                return setBrowser((s) => s.copyWith(homePage: text.isEmpty ? '' : browserUrlFor(text, s.searchEngine)));
+              },
+            ),
+            _Setting(
+              id: 'browserDesktop',
+              label: l.browserDesktopDefault,
+              type: 'bool',
+              get: () => browser.desktop,
+              set: (v) => setBrowser((s) => s.copyWith(desktop: _bool(v) ?? false)),
             ),
           ],
         ),

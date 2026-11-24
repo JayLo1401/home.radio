@@ -58,5 +58,7 @@
   "iptvSettingsFavorites": "{count, plural, =0{No channels in the Internet TV list yet} =1{1 channel in the Internet TV list} other{{count} channels in the Internet TV list}}",
   "iptvSettingsFavoritesHelp": "Sort and remove them in TV’s channel list: → on a channel there.",
   "iptvSettingsClearFavorites": "Remove all",
-  "iptvSettingsClearConfirm": "Remove all {count} channels from the Internet TV list?"
+  "iptvSettingsClearConfirm": "Remove all {count} channels from the Internet TV list?",
+  "iptvChipMine": "My channels",
+  "iptvChipSearch": "Search"
 }

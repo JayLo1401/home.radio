@@ -69,14 +69,25 @@ dependencies:
   # resolution of the stream; Android keeps ExoPlayer (video_player).
   media_kit: ^1.2.6
   media_kit_video: ^2.0.1
+  # Films on Android: libmpv (FFmpeg) for what ExoPlayer can't play -
+  # RealMedia, WMV, FLV, DivX 3, 3GP with H.263/AMR, Ogg video ... (see
+  # MovieEngine). Our copy (dependency_overrides below) takes the "full"
+  # FFmpeg build - see packages/media_kit_libs_android_video/HOME_SYSTEM.md.
+  media_kit_libs_android_video: 1.3.8
   smb_connect: ^0.0.9
 
-# video_player's Android side (2.13.0) with one change: ExoPlayer gets a
+# video_player's Android side (2.13.0) with two changes: ExoPlayer gets a
 # software MP2 decoder for devices without one (Fire TV - most satellite
-# channels stayed silent there). See packages/video_player_android/HOME_MEDIA.md.
+# channels stayed silent there), and a film without a playable picture is
+# reported instead of crashing the app. See packages/video_player_android/HOME_MEDIA.md.
 dependency_overrides:
   video_player_android:
     path: packages/video_player_android
+  # media_kit's Android libmpv with all of FFmpeg's decoders ("full" flavour
+  # of libmpv-android-video-build v1.1.11, still LGPL) - the default one has
+  # no RealVideo, RealAudio, AMR, SVQ, Cinepak ... See its HOME_SYSTEM.md.
+  media_kit_libs_android_video:
+    path: packages/media_kit_libs_android_video
 
 dev_dependencies:
   flutter_test:
@@ -121,6 +132,10 @@ flutter:
     - assets/icon/radio_logo.png
     - assets/icon/tv_logo.png
     - assets/icon/dashboard_logo.png
+    - assets/icon/pictures_logo.png
+    - assets/icon/movies_logo.png
+    - assets/icon/music_logo.png
+    - assets/icon/browser_logo.png
 
   # To add assets to your application, add an assets section, like this:
   # assets:

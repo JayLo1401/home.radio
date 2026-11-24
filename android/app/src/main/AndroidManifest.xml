@@ -12,6 +12,10 @@
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
+    <!-- Musik: the visualisation reads the playing sound (android.media.audiofx.Visualizer
+         needs these) - only when "follows the music" is switched on; the microphone is never used. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
     <!-- Backups in Download/HomeSystem (see BackupPlugin.kt): legacy storage
          permissions for Android 9/10, and "All files access" so that from

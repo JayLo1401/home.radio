@@ -51,6 +51,67 @@
   "adminMotionTimeout": "Display off after (minutes)",
   "adminMotionTimeoutHelp": "0 = never",
   "adminCameraOnDevice": "Camera access has to be allowed once on the device: Settings → Smart Home.",
+  "browserTitle": "Browser",
+  "browserAndroidOnly": "The browser is only available on Android (TV box, tablet, phone).",
+  "browserAddress": "Address or search",
+  "browserAddressHint": "e.g. bbc.com or a search term",
+  "browserBack": "Back",
+  "browserForward": "Forward",
+  "browserReload": "Reload",
+  "browserHome": "Home page",
+  "browserBookmarks": "Bookmarks",
+  "browserBookmarkAdd": "Add bookmark",
+  "browserBookmarkRemove": "Remove bookmark",
+  "browserBookmarksEmpty": "No bookmarks yet - add one with the star in a page's menu.",
+  "browserBlockedCount": "{count, plural, =0{nothing blocked} =1{1 blocked} other{{count} blocked}}",
+  "browserBlockerSiteOn": "Ad blocker on for this site",
+  "browserBlockerSiteOff": "Ad blocker off for this site",
+  "browserBlockerOff": "Ad blocker off",
+  "browserDesktop": "Desktop view",
+  "browserTextSize": "Text size {percent} %",
+  "browserSmaller": "Smaller",
+  "browserLarger": "Larger",
+  "browserSettings": "Settings",
+  "browserClose": "Close browser",
+  "browserLeaveTitle": "Close the browser?",
+  "browserLeave": "Close",
+  "browserStay": "Stay",
+  "browserEnterText": "Enter text",
+  "browserTextInsert": "Insert",
+  "browserTextSend": "Send",
+  "browserNoField": "No text field selected - click into one with OK first.",
+  "browserFieldHint": "Text field: OK shows the keyboard, menu key: enter text, Back: done",
+  "browserPointerHint": "The D-pad moves the pointer, OK clicks, at the edge the page scrolls. Menu key: address, bookmarks, ad blocker.",
+  "browserDownloadUnsupported": "Downloads aren't supported in the browser.",
+  "browserSettingsTitle": "Browser settings",
+  "browserAreaSubtitle": "Ad blocker, search engine, home page",
+  "browserBlocker": "Ad and tracker blocker",
+  "browserBlockerHelp": "Blocks ads and trackers with the filter lists of uBlock Origin and EasyList - YouTube's ads too, as far as possible. Can be switched off per site in the page's menu.",
+  "browserFilterLists": "Filter lists",
+  "browserListSource": "License {license} - {homepage}",
+  "browserListsUpdated": "Updated {date}, {rules} rules",
+  "browserListsNever": "Not loaded yet",
+  "browserListsUpdating": "Loading the filter lists …",
+  "browserListsUpdateNow": "Update now",
+  "browserListsFailed": "Not loaded (older copy used): {lists}",
+  "browserListsError": "The filter lists couldn't be loaded.",
+  "browserListsCredit": "Filter lists: uBlock Origin uAssets (GPLv3), EasyList and EasyPrivacy (GPLv3 / CC BY-SA 3.0), Peter Lowe (McRae GPL). The anti-ad scripts (scriptlets) are our own implementation.",
+  "browserAllowlist": "Sites without the ad blocker",
+  "browserAllowlistEmpty": "None - can be switched off in a page's menu.",
+  "browserSearchEngine": "Search engine",
+  "browserHomePage": "Home page",
+  "browserHomePageDefault": "The search engine's page",
+  "browserDesktopDefault": "Open pages in desktop view",
+  "browserDesktopHelp": "Pages as on a PC instead of the mobile version.",
+  "browserTextZoom": "Text size",
+  "browserClearCookies": "Delete cookies and logins",
+  "browserClearCookiesConfirm": "Delete all of the browser's cookies and logins?",
+  "browserClearCache": "Clear the cache",
+  "browserCleared": "Deleted.",
+  "browserDelete": "Delete",
+  "browserRemove": "Remove",
+  "browserWebView": "Browser engine: {version}",
+  "browserAdminPart": "Browser switched on",
   "commonOk": "OK",
   "commonCancel": "Cancel",
   "commonSave": "Save",
@@ -172,6 +233,30 @@
   "iptvSettingsFavoritesHelp": "Sort and remove them in TV’s channel list: → on a channel there.",
   "iptvSettingsClearFavorites": "Remove all",
   "iptvSettingsClearConfirm": "Remove all {count} channels from the Internet TV list?",
+  "iptvChipMine": "My channels",
+  "iptvChipSearch": "Search",
+  "launcherAddToGroup": "Add to group …",
+  "launcherAddToGroupTitle": "Add \"{app}\" to group",
+  "launcherMoveToGroup": "Move to another group …",
+  "launcherMoveToGroupTitle": "Move \"{app}\" to",
+  "launcherRemoveFromGroup": "Remove from the group",
+  "launcherNewGroup": "New group …",
+  "launcherNewGroupTitle": "Name of the new group",
+  "launcherGroupNameHint": "e.g. System tools",
+  "launcherGroupUnnamed": "Group",
+  "launcherGroupOptions": "Group \"{group}\" …",
+  "launcherGroupRename": "Rename",
+  "launcherGroupRenameTitle": "Rename group",
+  "launcherGroupMoveUp": "Move group up",
+  "launcherGroupMoveDown": "Move group down",
+  "launcherGroupDelete": "Delete group",
+  "launcherGroupDeleteTitle": "Delete group \"{group}\"?",
+  "launcherGroupDeleteBody": "Only the row goes - the apps stay installed, in the favorites and in other groups.",
+  "launcherGroupEmpty": "Still empty",
+  "launcherGroupEmptyHint": "{key}  Group options",
+  "launcherAddedToGroup": "\"{app}\" is now in \"{group}\"",
+  "launcherRemovedFromGroup": "\"{app}\" removed from \"{group}\"",
+  "launcherAllAppsHelp": "OK: open app  ·  ☰ or hold OK: favorite, group, app info (force stop, uninstall)",
   "miscApply": "Apply",
   "miscLocationTitle": "Set up location",
   "miscLocationIntro": "Shared location for the weather forecast, weather radar and sun & moon.",
@@ -291,6 +376,162 @@
   "modelsDmrDirect": "Direct mode",
   "modelsIsmRemoteSwitch": "Radio switch (EV1527)",
   "modelsIsmButton": "Button {code}",
+  "moviesTitle": "Movies",
+  "moviesNotSetUpTitle": "No movie folder yet",
+  "moviesNotSetUp": "Movies come from the NAS. Under Settings → NAS, enter the server and choose the folders “Movies” and/or “Videos”.",
+  "moviesOpenNasSettings": "Set up NAS",
+  "moviesEmpty": "There are no movies in this folder.",
+  "moviesListError": "The folder can't be read: {error}",
+  "@moviesListError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "moviesRetry": "Try again",
+  "moviesOpenFolder": "Open folder",
+  "moviesHoldOkForFolder": "Hold OK: open the folder",
+  "moviesDvd": "DVD",
+  "moviesOpening": "Opening the movie…",
+  "moviesResumeTitle": "Continue watching?",
+  "moviesResumeFrom": "Resume from {time}",
+  "@moviesResumeFrom": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "moviesFromStart": "From the start",
+  "moviesErrorNoDvd": "There's no video DVD in it (no VIDEO_TS folder with movie files).",
+  "moviesErrorPlay": "The movie can't be played: {error}",
+  "@moviesErrorPlay": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "moviesErrorTimeout": "The movie doesn't start - this device probably can't play the format, or the NAS delivers too slowly.",
+  "moviesBack": "Back",
+  "moviesOptions": "Options",
+  "moviesAudio": "Sound track",
+  "moviesSubtitles": "Subtitles",
+  "moviesSubtitlesOff": "Off",
+  "moviesNoAudioChoice": "This movie has only one sound track.",
+  "moviesAudioComments": "Commentary",
+  "moviesAudioDescription": "Audio description",
+  "moviesChapter": "Chapter {number} of {count}",
+  "@moviesChapter": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "moviesKeyHint": "OK: pause · ◀ ▶: seek · ▲ ▼: {jump} · {options}: sound & subtitles",
+  "@moviesKeyHint": {
+    "placeholders": {
+      "jump": {
+        "type": "String"
+      },
+      "options": {
+        "type": "String"
+      }
+    }
+  },
+  "moviesJumpChapters": "chapters",
+  "moviesJumpMinutes": "±5 min",
+  "moviesDvdNote": "DVD without menus and without DVD subtitles",
+  "moviesAdminPart": "Films switched on",
+  "musicTitle": "Music",
+  "musicAreaSubtitle": "Playback, visualisation, index",
+  "musicAdminPart": "Music (from the NAS)",
+  "musicAdminIndex": "Music index",
+  "musicAllShuffled": "Shuffle all",
+  "musicSearch": "Search",
+  "musicNowPlaying": "Now playing",
+  "musicSettingsTitle": "Music",
+  "musicPlayFolder": "Play",
+  "musicShuffleFolder": "Shuffle",
+  "musicRefreshFolderIndex": "Re-read folder (index)",
+  "musicFolderIndexed": "{count} tracks read again.",
+  "musicFolderSummary": "{folders} folders · {tracks} tracks",
+  "musicEmptyFolder": "There is no music in this folder.",
+  "musicNoFolder": "No music folder chosen yet.\nChoose it in Settings → NAS.",
+  "musicOpenNasSettings": "Open NAS settings",
+  "musicRetry": "Try again",
+  "musicErrorNoFolder": "No music folder chosen (Settings → NAS).",
+  "musicErrorNoMusic": "No music to be found here.",
+  "musicErrorUnplayable": "“{name}” can't be played - on to the next track.",
+  "musicNothingPlaying": "No music playing right now.",
+  "musicPaused": "Paused",
+  "musicCollecting": "Still looking through folders …",
+  "musicQueuePosition": "Track {index} of {count}",
+  "musicQueue": "Queue",
+  "musicQueueTitle": "Queue ({count})",
+  "musicNowPlayingHint": "OK pause · ←/→ seek (hold: faster) · ↑ visualisation · ↓ buttons · {menu} queue",
+  "musicControlsHint": "←/→ choose a button · OK press · ↑ back to seeking",
+  "musicPlay": "Play",
+  "musicPause": "Pause",
+  "musicStop": "Stop",
+  "musicNext": "Next track",
+  "musicPrevious": "Previous track",
+  "musicShuffleOn": "Shuffle: on",
+  "musicShuffleOff": "Shuffle: off",
+  "musicRepeatOff": "Don't repeat",
+  "musicRepeatAll": "Repeat all",
+  "musicRepeatOne": "Repeat track",
+  "musicVisualizer": "Visualisation",
+  "musicSearchLabel": "Title, artist or folder",
+  "musicSearchHint": "e.g. Queen Bohemian",
+  "musicSearchIntro": "Searches the file and folder names of the whole collection.",
+  "musicSearchNothing": "Nothing found.",
+  "musicSearchResults": "Search: {query}",
+  "musicSearchNeedsIndex": "Searching needs the index - a list of all music files, read from the NAS once (takes a while with many tracks, runs in the background).",
+  "musicIndexBuild": "Build index",
+  "musicIndexRefresh": "Update index",
+  "musicIndexContinue": "Continue index",
+  "musicIndexStop": "Stop",
+  "musicIndexDelete": "Delete index",
+  "musicIndexNone": "No index - folders are read straight from the NAS.",
+  "musicIndexRunning": "Reading: {folders} folders, {tracks} tracks …",
+  "musicIndexInterrupted": "Interrupted after {tracks} tracks - continues the next time Music is opened.",
+  "musicIndexState": "{tracks} tracks in {folders} folders · as of {date}",
+  "musicIndexSummary": "{tracks} tracks · {folders} folders",
+  "musicSettingsFolder": "Music folder",
+  "musicSettingsNoFolder": "Not chosen - in the NAS settings",
+  "musicSettingsPlayback": "Playback",
+  "musicSettingsShuffle": "Shuffle",
+  "musicSettingsShuffleHelp": "For playing a track; stays until switched.",
+  "musicSettingsRepeat": "Repeat",
+  "musicSettingsPreferTags": "Title and artist from the files",
+  "musicSettingsPreferTagsHelp": "From the file's tags (ID3, MP4, FLAC …), else from the file name. Off: always the file name.",
+  "musicSettingsVisualizer": "Visualisation",
+  "musicVisualizerOff": "Off",
+  "musicVisualizerManual": "With ↑ on the player",
+  "musicVisualizerAuto": "Also by itself after a minute without a key",
+  "musicSettingsQuality": "Picture quality",
+  "musicQualityAuto": "Automatic",
+  "musicQualityLow": "Light (weak boxes)",
+  "musicQualityHigh": "High",
+  "musicSettingsReactive": "Follows the music",
+  "musicSettingsReactiveHelp": "Moves with the beat. On Android it needs the \"record audio\" permission - without it the picture pulses calmly by itself.",
+  "musicSettingsReactivePermission": "To follow the music, the visualisation reads the frequency spectrum of the app's own playback. Android requires the \"record audio\" permission for that and asks about the microphone - the microphone isn't used though, nothing is recorded or stored.",
+  "musicSettingsReactiveAllow": "Allow",
+  "musicSettingsReactiveDenied": "Without the permission the visualisation pulses by itself.",
+  "musicSettingsIndex": "Index (optional)",
+  "musicSettingsIndexHelp": "A list of all music files (names only, no tags) for searching and \"Shuffle all\" without waiting. Browsing and playing folders works without it. Reading runs in the background and continues after an interruption.",
+  "musicWithSubfolders": "Include subfolders",
+  "musicWithSubfoldersHelp": "\"Play\" and \"Shuffle\" also take all of the folder's subfolders along.",
+  "musicSettingsInterval": "Change to the next visualisation",
+  "musicIntervalSeconds": "Every {seconds} s",
+  "musicIntervalManual": "Only with ↑",
+  "musicVisualizerHint": "↑ next visualisation · ←/→ track · ↓ back",
   "nasTitle": "NAS (network storage)",
   "nasIntro": "The network storage in your home network: backups before every update, background pictures for Home - and later music, videos and movies from the server.",
   "nasServerSection": "Server",
@@ -358,14 +599,193 @@
   "nasBgFromNas": "Background pictures from the NAS",
   "nasBgFromNasHint": "{folder} (with subfolders) - a random picture from it each time. Up to 30 pictures are kept downscaled on the device; synced at app start and with \"Sync now\".",
   "nasBgNoFolder": "First choose a folder for background pictures under Settings → System → NAS server.",
-  "nasBgFromUrl": "Address (http)",
-  "nasBgFromUrlHint": "A web server that serves pictures (see below).",
   "nasBgSyncNow": "Sync now",
   "nasBgSyncing": "Syncing …",
   "nasBgStatus": "{count} pictures on the device",
   "nasBgLastSync": "{count} pictures on the device, synced on {date}",
   "nasBgSyncError": "Sync failed: {message}",
   "nasFolderBackgrounds": "Background pictures (Home)",
+  "nasBgSyncListing": "Reading the folder …",
+  "nasBgSyncNothingNew": "No new pictures - finishing …",
+  "nasBgSyncProgress": "Loading picture {loaded} of {total} …",
+  "permissionsTitle": "Permissions",
+  "permissionsIntro": "Home System only asks for what a feature really needs - and every permission is optional. Without it everything else works as usual; only that one feature is missing.",
+  "permissionsSummary": "{granted} of {total} granted",
+  "@permissionsSummary": {
+    "placeholders": {
+      "granted": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "permissionsNoneNeeded": "On this device Home System doesn't need any special permissions.",
+  "permissionsStatusGranted": "Granted",
+  "permissionsStatusMissing": "Not granted",
+  "permissionsStatusNotNeeded": "Not needed",
+  "permissionsStatusUsb": "Android asks when it's plugged in",
+  "permissionsStatusNotifications": "No permission needed",
+  "permissionsStatusAdb": "adb only",
+  "permissionsAllow": "Allow",
+  "permissionsSetUp": "Set up",
+  "permissionsChange": "Change",
+  "permissionsLater": "Later",
+  "permissionsNotNeededHeading": "Not needed right now",
+  "permissionsNotNeededDevice": "Not needed on this device.",
+  "permissionsNotNeededPart": "Not needed while “{part}” is switched off.",
+  "@permissionsNotNeededPart": {
+    "placeholders": {
+      "part": {
+        "type": "String"
+      }
+    }
+  },
+  "permissionsNotNeededNoCamera": "This device has no camera.",
+  "permissionsBlocked": "Android won't ask again. Allow it under “Permissions” on the app page that just opened.",
+  "permissionsDenied": "Not allowed - the feature stays off. You can change this here at any time.",
+  "permissionsMusicOn": "“Follows the music” is switched on now.",
+  "permissionsHomeKeyTitle": "Home key",
+  "permissionsHomeKeyWhy": "To make the remote's Home key open Home System, Home System becomes the default launcher - or, where that isn't possible (e.g. Fire TV, Google TV), the service “Home System: Home-Taste” is switched on, an accessibility service. The service only sees which app is in front - no screen content, no input, no passwords.",
+  "permissionsHomeKeyWhyDashboard": "For the home control the same service also switches the display off and swipes away a lock screen without PIN when the display comes back on.",
+  "permissionsCameraTitle": "Camera",
+  "permissionsCameraWhy": "For the home control (“switch the display on and off by camera”): the camera only detects whether something moves in front of the device. No pictures are stored or sent anywhere.",
+  "permissionsInstallTitle": "Install apps",
+  "permissionsInstallWhy": "So that Home System can install its own updates. Android still asks before every update, and Home System never installs any other apps.",
+  "permissionsStorageTitle": "Storage",
+  "permissionsStorageWhy": "For backups: they're kept in the Download/HomeSystem folder, so they survive uninstalling the app. Home System only reads and writes its own backup files there.",
+  "permissionsAllFilesTitle": "All files access",
+  "permissionsAllFilesWhy": "Only for backups: new backups in Download/HomeSystem work without it. Home System only needs this access to find an earlier installation's backups after reinstalling - and only reads its own backup files there.",
+  "permissionsRecordAudioTitle": "Record audio",
+  "permissionsRecordAudioWhy": "Only for the music visualisation (“Follows the music”): it reads the frequency spectrum of the app's own playback. Android calls that “record audio” and mentions the microphone - but the microphone is never used, nothing is recorded or stored.",
+  "permissionsUsbTitle": "USB stick for DAB+ and FM",
+  "permissionsUsbWhy": "When you plug in an RTL-SDR stick, Android asks once whether Home System may use it. Just choose “OK” (with “Always”, if offered) - Home System only uses that stick.",
+  "permissionsNotificationsTitle": "Notifications",
+  "permissionsNotificationsWhy": "Home System doesn't ask for them and sends no notifications. While radio or music is playing, Android shows the playback controls - that needs no permission.",
+  "permissionsAdvanced": "For advanced users",
+  "permissionsSecureSettingsTitle": "Change system settings",
+  "permissionsSecureSettingsWhy": "Can only be granted from a computer via adb and isn't needed. With it, Home System switches the Home key service on by itself - also when Android switched it off after an update. Home System changes nothing else with it.",
+  "permissionsRestrictedWhy": "From Android 13 on, Android blocks accessibility services of apps that don't come from an app store (“restricted settings”). This command lifts that:",
+  "permissionsWizardTitle": "Permissions (optional)",
+  "permissionsWizardHint": "Here's what Home System needs which permission for. None of it is required - “Later” always works, and everything can be done later under Settings → System → Permissions.",
+  "permissionsWizardCounter": "Permission {index} of {count}",
+  "@permissionsWizardCounter": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "permissionsWizardNoneLeft": "That's it for permissions.",
+  "permissionsWizardNoneLeftHint": "You'll find all of this later under Settings → System → Permissions.",
+  "picturesTitle": "Pictures",
+  "picturesAreaSubtitle": "Photos from the NAS, slideshow",
+  "picturesSettingsTitle": "Picture settings",
+  "picturesAdminPart": "Pictures switched on",
+  "picturesNoFolder": "No pictures folder chosen yet. Set in the NAS settings where your photos are.",
+  "picturesOpenNasSettings": "Open NAS settings",
+  "picturesLoadError": "The folder can't be read.\n{message}",
+  "@picturesLoadError": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "picturesSlideshowWithSubfolders": "Slideshow: {folder} (with subfolders)",
+  "@picturesSlideshowWithSubfolders": {
+    "placeholders": {
+      "folder": {
+        "type": "String"
+      }
+    }
+  },
+  "picturesSlideshow": "Slideshow: {folder}",
+  "@picturesSlideshow": {
+    "placeholders": {
+      "folder": {
+        "type": "String"
+      }
+    }
+  },
+  "picturesCount": "{count, plural, =0{no pictures} =1{1 picture} other{{count} pictures}}",
+  "@picturesCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "picturesFolderCount": "{count, plural, =1{1 folder} other{{count} folders}}",
+  "@picturesFolderCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "picturesEmptyFolder": "There are no pictures in this folder.",
+  "picturesBrowserHint": "OK opens · OK on a picture: slideshow from that picture · ⏯ or {options} starts the folder's slideshow · Back goes up one level",
+  "@picturesBrowserHint": {
+    "placeholders": {
+      "options": {
+        "type": "String"
+      }
+    }
+  },
+  "picturesSearching": "Looking for pictures …",
+  "picturesNoneFound": "There are no pictures here - not in the subfolders either.",
+  "picturesStillSearching": "still looking …",
+  "picturesPaused": "Paused",
+  "picturesSlideshowHint": "← → back/next · OK pause · {options} settings · Back ends",
+  "@picturesSlideshowHint": {
+    "placeholders": {
+      "options": {
+        "type": "String"
+      }
+    }
+  },
+  "picturesInterval": "Next picture after",
+  "picturesIntervalSeconds": "{seconds} seconds",
+  "@picturesIntervalSeconds": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "picturesOrder": "Order",
+  "picturesOrderFolders": "Folder by folder, by name",
+  "picturesOrderShuffled": "Shuffled",
+  "picturesOrderNextTime": "The order applies from the next slideshow.",
+  "picturesBlur": "Fill the edges with the blurred picture",
+  "picturesFolder": "Pictures folder",
+  "picturesMusicHelp": "Radio and music simply keep playing during the slideshow.",
+  "picturesSlideshowHeading": "Slideshow",
+  "picturesInThisFolder": "{count, plural, =1{1 picture in this folder} other{{count} pictures in this folder}} - OK on a picture starts the slideshow from there",
+  "@picturesInThisFolder": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "picturesResumeFrom": "Continue from picture {position} ({name})",
+  "@picturesResumeFrom": {
+    "placeholders": {
+      "position": {
+        "type": "int"
+      },
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "picturesResumeRestart": "From the start",
   "radioErrorConnectionLost": "Lost connection to the station - retrying…",
   "radioErrorStationUnreachable": "Station not reachable - retrying…",
   "radioErrorPlayback": "Playback error: {message}",
@@ -985,7 +1405,7 @@
   "settingsQuitConfirm": "Quit the app?",
   "settingsQuitButton": "Quit",
   "settingsPartOff": "{part} is switched off - switch it on under System → Parts of Home System.",
-  "settingsAreaSystemSubtitle": "Radio & TV on/off, device name, NAS, start, Home, Home button, display, backup, updates",
+  "settingsAreaSystemSubtitle": "Radio & TV on/off, device name, NAS, start, Home, Home button, permissions, display, backup, updates",
   "settingsAreaSystemSubtitleNoHomeKey": "Radio & TV on/off, device name, NAS, start, Home, display, backup, updates",
   "settingsAreaRadioSubtitle": "Receiver (DAB+, FM, Scanner), autostart station, weather, radar, sun & moon",
   "settingsAreaTvSubtitle": "Satellite receiver (Enigma2, e.g. GigaBlue)",
@@ -1033,14 +1453,75 @@
   "settingsWizardNameHint": "A unique name so the devices can be told apart - on the admin page and in backups.",
   "settingsWizardNameOwn": "Or a custom name",
   "settingsWizardNext": "Next",
-  "settingsWizardHomeKeyTitle": "The remote's Home button (optional)",
-  "settingsWizardHomeKeyHint": "If the remote's Home button should open Home System, set that up here - Home System then becomes the default launcher, or an accessibility service is switched on. If you don't want that, simply go on; it can be done any time later under Settings → System → Home button.",
-  "settingsWizardHomeKeySetUp": "Set up the Home button",
-  "settingsWizardHomeKeySkip": "Next (without it, or after setting it up)",
   "settingsWizardDone": "Done - \"{name}\" is set up.",
   "settingsWizardDoneHint": "Home System starts with Home: Radio, TV and the apps as tiles. More (radio receiver, satellite receiver, background …) under Settings.",
   "settingsWizardDoneBackups": "Backups are available any time on the admin page: {url}",
   "settingsWizardStart": "Let's go",
+  "settingsOpenSourceLicenses": "Open source licences",
+  "settingsAboutInternetTv": "Internet TV",
+  "settingsAboutInternetTvData": "Channel list, streams and logos from the open directory iptv-org (github.com/iptv-org/iptv) - only freely available channels; the streams come from the broadcasters themselves",
+  "settingsAboutMaps": "Maps (Scanner)",
+  "settingsAboutMapsData": "Map tiles © OpenStreetMap contributors, data under the Open Database License (ODbL), via tile.openstreetmap.org",
+  "settingsAboutAircraft": "Aircraft data (ADS-B)",
+  "settingsAboutAircraftData": "Aircraft types, owners and routes via adsbdb.com",
+  "settingsBgTitle": "Home background",
+  "settingsBgGradientsHint": "Built-in color gradients (Northern lights, Sunset, Ocean, …) - no internet needed.",
+  "settingsBgPhotos": "Landscape photos from the internet",
+  "settingsBgPhotosHint": "Landscape and nature photos - Bing's pictures of the day from the last two weeks, taking turns. Place and photographer are shown small at the top right.",
+  "settingsBgBand": "Band behind the favorites",
+  "settingsBgBandHint": "How much the band covers the picture - applies right away.",
+  "settingsBgBandNone": "None",
+  "settingsBgInterval": "New picture every",
+  "settingsBgOneHour": "1 hour",
+  "settingsIconPackTitle": "Icon pack for the app tiles",
+  "settingsIconPackNoneOriginal": "None - the apps' original logos",
+  "settingsIconPackNoneInstalled": "No icon pack installed. Icon packs for Android launchers (ADW/Nova format) are supported - install one as an app, then choose it here.\nSingle tiles get their own picture via ☰ on the tile → \"Change picture\".",
+  "settingsHomeKeyIntro": "The remote's Home button opens Home System with Home (the tiles).",
+  "settingsHomeKeyIsDefault": "Home System is the default launcher.",
+  "settingsHomeKeyNotDefault": "Home System isn't the default launcher yet.",
+  "settingsHomeKeyDefaultHelp": "On Android TV boxes, choose Home System as the home screen (\"Home app\"). If the device asks when the Home button is pressed, choose \"Home System\" and \"Always\".",
+  "settingsHomeKeyChooseDefault": "Choose default launcher",
+  "settingsHomeKeyServiceFallback": "If the device doesn't allow another launcher (e.g. Google TV), the service below helps - as on the Fire TV.",
+  "settingsHomeKeyServiceOn": "The service \"Home System: Home key\" is on.",
+  "settingsHomeKeyServiceOff": "The service \"Home System: Home key\" is off.",
+  "settingsHomeKeyServiceFireTv": "On the Home button the Fire TV always shows the Amazon home screen. The service (an accessibility service) then brings Home System to the front right away. It only sees which app is in front - no content, no keys and no input.",
+  "settingsHomeKeyServiceOther": "The service (an accessibility service) brings Home System to the front as soon as the device's home screen appears. It only sees which app is in front.",
+  "settingsHomeKeyEnable": "Switch the service on",
+  "settingsHomeKeyOpenA11y": "Open accessibility settings",
+  "settingsHomeKeyBlocked": "Android has blocked the service (\"restricted settings\" - from Android 13 on, for apps that don't come from an app store). Allow it once from a computer via adb, then \"Switch the service on\" again:",
+  "settingsHomeKeyEnableThere": "Switch on \"Home System: Home key\" there. If the device doesn't show the service or it's greyed out, unlock it once from a computer via adb - after that this button switches it on by itself:",
+  "settingsHomeKeyRedirect": "Home button opens Home System",
+  "settingsHomeKeyRedirectHint": "Off: the device's home screen stays, Home System opens like any other app.",
+  "settingsBackupSaved": "Backup saved: {location}",
+  "settingsBackupDownloadAlso": "Also available for download at {urls}",
+  "settingsBackupNoPermission": "Without storage permission the backup can't be saved.",
+  "settingsBackupFailed": "Backup failed: {message}",
+  "settingsRestoreNoPermission": "Without storage permission no backups can be read.",
+  "settingsRestoreReadFailed": "Backups couldn't be read ({message}).",
+  "settingsRestoreBusy": "The device is already restoring a backup.",
+  "settingsRestoreFromWebDone": "Backup from the admin page restored - the app restarts …",
+  "settingsRestoreConfirmTitle": "Restore backup?",
+  "settingsRestoreConfirmText": "{what}\n\nAll current favorites, DAB+ stations and settings will be replaced. The app then restarts.",
+  "settingsRestoreButton": "Restore",
+  "settingsRestoreDone": "Backup restored - the app restarts …",
+  "settingsRestoreNoPicker": "This device has no file picker. Please allow \"All files access\" instead.",
+  "settingsRestoreFailed": "Restore failed: {message}",
+  "settingsRestorePickedFile": "The selected file will be restored.",
+  "settingsRestoreNoAllFilesSetting": "This device doesn't offer the \"All files access\" setting.",
+  "settingsRestoreViaAdmin": "Via the admin page",
+  "settingsRestoreNoNetwork": "No network connection - the admin page can't be reached.",
+  "settingsRestoreOpenInBrowser": "Open in the browser on a computer or phone in the same network:",
+  "settingsRestoreHostname": "This device's host name: {name}",
+  "settingsRestoreAdminHint": "Choose the backup file there and restore it. As long as this screen is open, the device accepts a backup. The app then restarts.",
+  "settingsRestoreOnDevice": "Backups on this device",
+  "settingsRestoreOnDeviceHint": "From the folder \"{folder}/HomeSystem\" (and HomeRadio of the earlier app).",
+  "settingsRestoreFolderDocuments": "Documents",
+  "settingsRestoreNone": "No backups found.",
+  "settingsRestoreAllFilesHint": "Backups from an earlier installation of the app only show up once \"All files access\" has been allowed. Or choose the file directly.",
+  "settingsRestoreAllowAllFiles": "Allow all files access",
+  "settingsRestorePickFile": "Choose a backup file … (e.g. from a USB stick)",
+  "settingsAboutAdblock": "Ad blocker (browser)",
+  "settingsAboutAdblockData": "Filter lists, downloaded at runtime: uBlock Origin uAssets (GPLv3, github.com/uBlockOrigin/uAssets), EasyList, EasyPrivacy, EasyList Germany (GPLv3 or CC BY-SA 3.0, easylist.to), Peter Lowe’s Ad and tracking server list (pgl.yoyo.org/adservers). The scriptlets are our own implementations following uBlock Origin’s names and arguments.",
   "systemStartDashboard": "Show Smart Home (wall tablet)",
   "systemStartAppNone": "Start another app …",
   "systemStartApp": "Start app: {app}",
@@ -1133,5 +1614,7 @@
   "tvErrorHttpStatus": "Receiver responded with error {status}",
   "tvErrorUnexpectedResponse": "Unexpected response from the receiver",
   "tvErrorZapFailed": "Receiver won't switch channels: {message}",
-  "tvSettingsButton": "TV settings"
+  "tvSettingsButton": "TV settings",
+  "tvBannerLaterHint": "Programme {index} of {count} - → next, ← back",
+  "tvRowReceiver": "Receiver"
 }

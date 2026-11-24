@@ -170,6 +170,219 @@ class AppLocalizationsDe extends AppLocalizations {
       'Der Zugriff auf die Kamera muss einmal am Gerät erlaubt werden: Einstellungen → Haussteuerung.';
 
   @override
+  String get browserTitle => 'Browser';
+
+  @override
+  String get browserAndroidOnly =>
+      'Den Browser gibt es nur auf Android (TV-Box, Tablet, Handy).';
+
+  @override
+  String get browserAddress => 'Adresse oder Suche';
+
+  @override
+  String get browserAddressHint => 'z. B. orf.at oder ein Suchbegriff';
+
+  @override
+  String get browserBack => 'Zurück';
+
+  @override
+  String get browserForward => 'Vor';
+
+  @override
+  String get browserReload => 'Neu laden';
+
+  @override
+  String get browserHome => 'Startseite';
+
+  @override
+  String get browserBookmarks => 'Lesezeichen';
+
+  @override
+  String get browserBookmarkAdd => 'Lesezeichen setzen';
+
+  @override
+  String get browserBookmarkRemove => 'Lesezeichen entfernen';
+
+  @override
+  String get browserBookmarksEmpty =>
+      'Noch keine Lesezeichen - im Menü einer Seite mit dem Stern setzen.';
+
+  @override
+  String browserBlockedCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count blockiert',
+      one: '1 blockiert',
+      zero: 'nichts blockiert',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get browserBlockerSiteOn => 'Werbefilter auf dieser Seite an';
+
+  @override
+  String get browserBlockerSiteOff => 'Werbefilter auf dieser Seite aus';
+
+  @override
+  String get browserBlockerOff => 'Werbefilter aus';
+
+  @override
+  String get browserDesktop => 'Desktop-Ansicht';
+
+  @override
+  String browserTextSize(int percent) {
+    return 'Textgröße $percent %';
+  }
+
+  @override
+  String get browserSmaller => 'Kleiner';
+
+  @override
+  String get browserLarger => 'Größer';
+
+  @override
+  String get browserSettings => 'Einstellungen';
+
+  @override
+  String get browserClose => 'Browser schließen';
+
+  @override
+  String get browserLeaveTitle => 'Browser schließen?';
+
+  @override
+  String get browserLeave => 'Schließen';
+
+  @override
+  String get browserStay => 'Bleiben';
+
+  @override
+  String get browserEnterText => 'Text eingeben';
+
+  @override
+  String get browserTextInsert => 'Einfügen';
+
+  @override
+  String get browserTextSend => 'Senden';
+
+  @override
+  String get browserNoField =>
+      'Hier ist kein Textfeld ausgewählt - zuerst mit OK in ein Feld klicken.';
+
+  @override
+  String get browserFieldHint =>
+      'Textfeld: OK zeigt die Tastatur, Menü-Taste: Text eingeben, Zurück: fertig';
+
+  @override
+  String get browserPointerHint =>
+      'Steuerkreuz bewegt den Zeiger, OK klickt, am Rand wird geblättert. Menü-Taste: Adresse, Lesezeichen, Werbefilter.';
+
+  @override
+  String get browserDownloadUnsupported =>
+      'Downloads werden im Browser nicht unterstützt.';
+
+  @override
+  String get browserSettingsTitle => 'Browser-Einstellungen';
+
+  @override
+  String get browserAreaSubtitle => 'Werbefilter, Suchmaschine, Startseite';
+
+  @override
+  String get browserBlocker => 'Werbe- und Trackerfilter';
+
+  @override
+  String get browserBlockerHelp =>
+      'Blockiert Werbung und Tracker mit den Filterlisten von uBlock Origin und EasyList - auch die Werbung auf YouTube, so weit es geht. Für einzelne Seiten im Menü der Seite abschaltbar.';
+
+  @override
+  String get browserFilterLists => 'Filterlisten';
+
+  @override
+  String browserListSource(String license, String homepage) {
+    return 'Lizenz $license - $homepage';
+  }
+
+  @override
+  String browserListsUpdated(String date, int rules) {
+    return 'Stand $date, $rules Regeln';
+  }
+
+  @override
+  String get browserListsNever => 'Noch nicht geladen';
+
+  @override
+  String get browserListsUpdating => 'Filterlisten werden geladen …';
+
+  @override
+  String get browserListsUpdateNow => 'Jetzt aktualisieren';
+
+  @override
+  String browserListsFailed(String lists) {
+    return 'Nicht geladen (ältere Fassung benutzt): $lists';
+  }
+
+  @override
+  String get browserListsError =>
+      'Die Filterlisten konnten nicht geladen werden.';
+
+  @override
+  String get browserListsCredit =>
+      'Filterlisten: uBlock Origin uAssets (GPLv3), EasyList und EasyPrivacy (GPLv3 / CC BY-SA 3.0), Peter Lowe (McRae GPL). Die Skripte gegen Werbung (Scriptlets) sind eine eigene Umsetzung.';
+
+  @override
+  String get browserAllowlist => 'Seiten ohne Werbefilter';
+
+  @override
+  String get browserAllowlistEmpty =>
+      'Keine - im Menü einer Seite abschaltbar.';
+
+  @override
+  String get browserSearchEngine => 'Suchmaschine';
+
+  @override
+  String get browserHomePage => 'Startseite';
+
+  @override
+  String get browserHomePageDefault => 'Seite der Suchmaschine';
+
+  @override
+  String get browserDesktopDefault => 'Seiten in der Desktop-Ansicht öffnen';
+
+  @override
+  String get browserDesktopHelp => 'Seiten wie am PC statt der Handy-Fassung.';
+
+  @override
+  String get browserTextZoom => 'Textgröße';
+
+  @override
+  String get browserClearCookies => 'Cookies und Anmeldungen löschen';
+
+  @override
+  String get browserClearCookiesConfirm =>
+      'Alle Cookies und Anmeldungen des Browsers löschen?';
+
+  @override
+  String get browserClearCache => 'Zwischenspeicher leeren';
+
+  @override
+  String get browserCleared => 'Gelöscht.';
+
+  @override
+  String get browserDelete => 'Löschen';
+
+  @override
+  String get browserRemove => 'Entfernen';
+
+  @override
+  String browserWebView(String version) {
+    return 'Browser-Engine: $version';
+  }
+
+  @override
+  String get browserAdminPart => 'Browser eingeschaltet';
+
+  @override
   String get commonOk => 'OK';
 
   @override
@@ -619,6 +832,94 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String get iptvChipMine => 'Meine Sender';
+
+  @override
+  String get iptvChipSearch => 'Suchen';
+
+  @override
+  String get launcherAddToGroup => 'Zu Gruppe hinzufügen …';
+
+  @override
+  String launcherAddToGroupTitle(String app) {
+    return '„$app“ zu Gruppe hinzufügen';
+  }
+
+  @override
+  String get launcherMoveToGroup => 'In andere Gruppe verschieben …';
+
+  @override
+  String launcherMoveToGroupTitle(String app) {
+    return '„$app“ verschieben nach';
+  }
+
+  @override
+  String get launcherRemoveFromGroup => 'Aus der Gruppe entfernen';
+
+  @override
+  String get launcherNewGroup => 'Neue Gruppe …';
+
+  @override
+  String get launcherNewGroupTitle => 'Name der neuen Gruppe';
+
+  @override
+  String get launcherGroupNameHint => 'z. B. System-Tools';
+
+  @override
+  String get launcherGroupUnnamed => 'Gruppe';
+
+  @override
+  String launcherGroupOptions(String group) {
+    return 'Gruppe „$group“ …';
+  }
+
+  @override
+  String get launcherGroupRename => 'Umbenennen';
+
+  @override
+  String get launcherGroupRenameTitle => 'Gruppe umbenennen';
+
+  @override
+  String get launcherGroupMoveUp => 'Gruppe nach oben';
+
+  @override
+  String get launcherGroupMoveDown => 'Gruppe nach unten';
+
+  @override
+  String get launcherGroupDelete => 'Gruppe löschen';
+
+  @override
+  String launcherGroupDeleteTitle(String group) {
+    return 'Gruppe „$group“ löschen?';
+  }
+
+  @override
+  String get launcherGroupDeleteBody =>
+      'Nur die Zeile verschwindet - die Apps bleiben installiert, in den Favoriten und in anderen Gruppen.';
+
+  @override
+  String get launcherGroupEmpty => 'Noch leer';
+
+  @override
+  String launcherGroupEmptyHint(String key) {
+    return '$key  Optionen der Gruppe';
+  }
+
+  @override
+  String launcherAddedToGroup(String app, String group) {
+    return '„$app“ ist jetzt in „$group“';
+  }
+
+  @override
+  String launcherRemovedFromGroup(String app, String group) {
+    return '„$app“ aus „$group“ entfernt';
+  }
+
+  @override
+  String get launcherAllAppsHelp =>
+      'OK: App öffnen  ·  ☰ oder OK lange drücken: Favorit, Gruppe, App-Info (beenden, deinstallieren)';
+
+  @override
   String get miscApply => 'Übernehmen';
 
   @override
@@ -1035,6 +1336,404 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String get moviesTitle => 'Filme';
+
+  @override
+  String get moviesNotSetUpTitle => 'Noch kein Film-Ordner';
+
+  @override
+  String get moviesNotSetUp =>
+      'Die Filme kommen vom NAS. Unter Einstellungen → NAS den Server eintragen und die Ordner „Filme“ und/oder „Videos“ wählen.';
+
+  @override
+  String get moviesOpenNasSettings => 'NAS einrichten';
+
+  @override
+  String get moviesEmpty => 'In diesem Ordner sind keine Filme.';
+
+  @override
+  String moviesListError(String error) {
+    return 'Der Ordner lässt sich nicht lesen: $error';
+  }
+
+  @override
+  String get moviesRetry => 'Nochmal';
+
+  @override
+  String get moviesOpenFolder => 'Ordner öffnen';
+
+  @override
+  String get moviesHoldOkForFolder => 'OK lange drücken: Ordner öffnen';
+
+  @override
+  String get moviesDvd => 'DVD';
+
+  @override
+  String get moviesOpening => 'Film wird geöffnet…';
+
+  @override
+  String get moviesResumeTitle => 'Weiterschauen?';
+
+  @override
+  String moviesResumeFrom(String time) {
+    return 'Fortsetzen ab $time';
+  }
+
+  @override
+  String get moviesFromStart => 'Von vorne';
+
+  @override
+  String get moviesErrorNoDvd =>
+      'Darin ist keine Video-DVD (kein Ordner VIDEO_TS mit Filmdateien).';
+
+  @override
+  String moviesErrorPlay(String error) {
+    return 'Der Film lässt sich nicht abspielen: $error';
+  }
+
+  @override
+  String get moviesErrorTimeout =>
+      'Der Film startet nicht - das Gerät kann dieses Format vermutlich nicht abspielen, oder das NAS liefert zu langsam.';
+
+  @override
+  String get moviesBack => 'Zurück';
+
+  @override
+  String get moviesOptions => 'Optionen';
+
+  @override
+  String get moviesAudio => 'Tonspur';
+
+  @override
+  String get moviesSubtitles => 'Untertitel';
+
+  @override
+  String get moviesSubtitlesOff => 'Aus';
+
+  @override
+  String get moviesNoAudioChoice => 'Dieser Film hat nur eine Tonspur.';
+
+  @override
+  String get moviesAudioComments => 'Kommentar';
+
+  @override
+  String get moviesAudioDescription => 'Hörfilm';
+
+  @override
+  String moviesChapter(int number, int count) {
+    return 'Kapitel $number von $count';
+  }
+
+  @override
+  String moviesKeyHint(String jump, String options) {
+    return 'OK: Pause · ◀ ▶: spulen · ▲ ▼: $jump · $options: Ton & Untertitel';
+  }
+
+  @override
+  String get moviesJumpChapters => 'Kapitel';
+
+  @override
+  String get moviesJumpMinutes => '±5 Min.';
+
+  @override
+  String get moviesDvdNote => 'DVD ohne Menü und ohne DVD-Untertitel';
+
+  @override
+  String get moviesAdminPart => 'Filme eingeschaltet';
+
+  @override
+  String get musicTitle => 'Musik';
+
+  @override
+  String get musicAreaSubtitle => 'Wiedergabe, Visualisierung, Index';
+
+  @override
+  String get musicAdminPart => 'Musik (vom NAS)';
+
+  @override
+  String get musicAdminIndex => 'Musik-Index';
+
+  @override
+  String get musicAllShuffled => 'Alles zufällig';
+
+  @override
+  String get musicSearch => 'Suchen';
+
+  @override
+  String get musicNowPlaying => 'Wiedergabe';
+
+  @override
+  String get musicSettingsTitle => 'Musik';
+
+  @override
+  String get musicPlayFolder => 'Abspielen';
+
+  @override
+  String get musicShuffleFolder => 'Zufällig abspielen';
+
+  @override
+  String get musicRefreshFolderIndex => 'Ordner neu einlesen (Index)';
+
+  @override
+  String musicFolderIndexed(int count) {
+    return '$count Titel neu eingelesen.';
+  }
+
+  @override
+  String musicFolderSummary(int folders, int tracks) {
+    return '$folders Ordner · $tracks Titel';
+  }
+
+  @override
+  String get musicEmptyFolder => 'In diesem Ordner ist keine Musik.';
+
+  @override
+  String get musicNoFolder =>
+      'Noch kein Musikordner gewählt.\nWähle ihn in Einstellungen → NAS.';
+
+  @override
+  String get musicOpenNasSettings => 'NAS-Einstellungen öffnen';
+
+  @override
+  String get musicRetry => 'Nochmal versuchen';
+
+  @override
+  String get musicErrorNoFolder =>
+      'Kein Musikordner gewählt (Einstellungen → NAS).';
+
+  @override
+  String get musicErrorNoMusic => 'Hier ist keine Musik zu finden.';
+
+  @override
+  String musicErrorUnplayable(String name) {
+    return '„$name“ lässt sich nicht abspielen - weiter mit dem nächsten Titel.';
+  }
+
+  @override
+  String get musicNothingPlaying => 'Gerade läuft keine Musik.';
+
+  @override
+  String get musicPaused => 'Pausiert';
+
+  @override
+  String get musicCollecting => 'Ordner werden noch durchsucht …';
+
+  @override
+  String musicQueuePosition(int index, int count) {
+    return 'Titel $index von $count';
+  }
+
+  @override
+  String get musicQueue => 'Warteschlange';
+
+  @override
+  String musicQueueTitle(int count) {
+    return 'Warteschlange ($count)';
+  }
+
+  @override
+  String musicNowPlayingHint(String menu) {
+    return 'OK Pause · ←/→ spulen (halten: schneller) · ↑ Visualisierung · ↓ Tasten · $menu Warteschlange';
+  }
+
+  @override
+  String get musicControlsHint =>
+      '←/→ Taste wählen · OK drücken · ↑ zurück zum Spulen';
+
+  @override
+  String get musicPlay => 'Abspielen';
+
+  @override
+  String get musicPause => 'Pause';
+
+  @override
+  String get musicStop => 'Stopp';
+
+  @override
+  String get musicNext => 'Nächster Titel';
+
+  @override
+  String get musicPrevious => 'Voriger Titel';
+
+  @override
+  String get musicShuffleOn => 'Zufällig: an';
+
+  @override
+  String get musicShuffleOff => 'Zufällig: aus';
+
+  @override
+  String get musicRepeatOff => 'Nicht wiederholen';
+
+  @override
+  String get musicRepeatAll => 'Alle wiederholen';
+
+  @override
+  String get musicRepeatOne => 'Titel wiederholen';
+
+  @override
+  String get musicVisualizer => 'Visualisierung';
+
+  @override
+  String get musicSearchLabel => 'Titel, Interpret oder Ordner';
+
+  @override
+  String get musicSearchHint => 'z. B. Queen Bohemian';
+
+  @override
+  String get musicSearchIntro =>
+      'Sucht in den Datei- und Ordnernamen der ganzen Sammlung.';
+
+  @override
+  String get musicSearchNothing => 'Nichts gefunden.';
+
+  @override
+  String musicSearchResults(String query) {
+    return 'Suche: $query';
+  }
+
+  @override
+  String get musicSearchNeedsIndex =>
+      'Für die Suche braucht es den Index - eine Liste aller Musikdateien, einmal vom NAS eingelesen (dauert bei vielen Titeln eine Weile, läuft im Hintergrund).';
+
+  @override
+  String get musicIndexBuild => 'Index erstellen';
+
+  @override
+  String get musicIndexRefresh => 'Index aktualisieren';
+
+  @override
+  String get musicIndexContinue => 'Index fortsetzen';
+
+  @override
+  String get musicIndexStop => 'Anhalten';
+
+  @override
+  String get musicIndexDelete => 'Index löschen';
+
+  @override
+  String get musicIndexNone =>
+      'Kein Index - Ordner werden direkt vom NAS gelesen.';
+
+  @override
+  String musicIndexRunning(int folders, int tracks) {
+    return 'Wird eingelesen: $folders Ordner, $tracks Titel …';
+  }
+
+  @override
+  String musicIndexInterrupted(int tracks) {
+    return 'Unterbrochen nach $tracks Titeln - geht beim nächsten Öffnen von Musik weiter.';
+  }
+
+  @override
+  String musicIndexState(int tracks, int folders, String date) {
+    return '$tracks Titel in $folders Ordnern · Stand $date';
+  }
+
+  @override
+  String musicIndexSummary(int tracks, int folders) {
+    return '$tracks Titel · $folders Ordner';
+  }
+
+  @override
+  String get musicSettingsFolder => 'Musikordner';
+
+  @override
+  String get musicSettingsNoFolder =>
+      'Nicht gewählt - in den NAS-Einstellungen';
+
+  @override
+  String get musicSettingsPlayback => 'Wiedergabe';
+
+  @override
+  String get musicSettingsShuffle => 'Zufällige Reihenfolge';
+
+  @override
+  String get musicSettingsShuffleHelp =>
+      'Gilt für das Abspielen eines Titels und bleibt bis zum Umschalten.';
+
+  @override
+  String get musicSettingsRepeat => 'Wiederholen';
+
+  @override
+  String get musicSettingsPreferTags => 'Titel und Interpret aus den Dateien';
+
+  @override
+  String get musicSettingsPreferTagsHelp =>
+      'Aus den Tags der Datei (ID3, MP4, FLAC …), sonst aus dem Dateinamen. Aus: immer der Dateiname.';
+
+  @override
+  String get musicSettingsVisualizer => 'Visualisierung';
+
+  @override
+  String get musicVisualizerOff => 'Aus';
+
+  @override
+  String get musicVisualizerManual => 'Mit ↑ in der Wiedergabe';
+
+  @override
+  String get musicVisualizerAuto =>
+      'Auch von selbst nach einer Minute ohne Taste';
+
+  @override
+  String get musicSettingsQuality => 'Bildqualität';
+
+  @override
+  String get musicQualityAuto => 'Automatisch';
+
+  @override
+  String get musicQualityLow => 'Schonend (schwache Boxen)';
+
+  @override
+  String get musicQualityHigh => 'Hoch';
+
+  @override
+  String get musicSettingsReactive => 'Folgt der Musik';
+
+  @override
+  String get musicSettingsReactiveHelp =>
+      'Bewegt sich im Takt der Musik. Braucht unter Android die Berechtigung „Audio aufnehmen“ - ohne sie pulsiert das Bild ruhig von selbst.';
+
+  @override
+  String get musicSettingsReactivePermission =>
+      'Damit die Visualisierung der Musik folgen kann, liest sie das Frequenzspektrum der eigenen Wiedergabe. Android verlangt dafür die Berechtigung „Audio aufnehmen“ und fragt nach dem Mikrofon - das Mikrofon wird dabei aber nicht benutzt, es wird nichts aufgenommen oder gespeichert.';
+
+  @override
+  String get musicSettingsReactiveAllow => 'Erlauben';
+
+  @override
+  String get musicSettingsReactiveDenied =>
+      'Ohne die Berechtigung pulsiert die Visualisierung von selbst.';
+
+  @override
+  String get musicSettingsIndex => 'Index (optional)';
+
+  @override
+  String get musicSettingsIndexHelp =>
+      'Eine Liste aller Musikdateien (nur Namen, keine Tags) für die Suche und „Alles zufällig“ ohne Wartezeit. Ordner durchstöbern und abspielen geht auch ohne. Das Einlesen läuft im Hintergrund und setzt nach einer Unterbrechung fort.';
+
+  @override
+  String get musicWithSubfolders => 'Mit Unterordnern';
+
+  @override
+  String get musicWithSubfoldersHelp =>
+      '„Abspielen“ und „Zufällig abspielen“ nehmen auch alle Unterordner des Ordners mit.';
+
+  @override
+  String get musicSettingsInterval => 'Wechsel zur nächsten Visualisierung';
+
+  @override
+  String musicIntervalSeconds(int seconds) {
+    return 'Alle $seconds s';
+  }
+
+  @override
+  String get musicIntervalManual => 'Nur mit ↑';
+
+  @override
+  String get musicVisualizerHint =>
+      '↑ nächste Visualisierung · ←/→ Titel · ↓ zurück';
+
+  @override
   String get nasTitle => 'NAS (Netzwerkspeicher)';
 
   @override
@@ -1281,13 +1980,6 @@ class AppLocalizationsDe extends AppLocalizations {
       'Zuerst unter Einstellungen → System → NAS-Server einen Ordner für Hintergrundbilder wählen.';
 
   @override
-  String get nasBgFromUrl => 'Adresse (http)';
-
-  @override
-  String get nasBgFromUrlHint =>
-      'Ein Webserver, der Bilder liefert (siehe unten).';
-
-  @override
   String get nasBgSyncNow => 'Jetzt abgleichen';
 
   @override
@@ -1310,6 +2002,317 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get nasFolderBackgrounds => 'Hintergrundbilder (Home)';
+
+  @override
+  String get nasBgSyncListing => 'Ordner wird gelesen …';
+
+  @override
+  String get nasBgSyncNothingNew => 'Keine neuen Bilder - wird abgeschlossen …';
+
+  @override
+  String nasBgSyncProgress(int loaded, int total) {
+    return 'Bild $loaded von $total wird geladen …';
+  }
+
+  @override
+  String get permissionsTitle => 'Berechtigungen';
+
+  @override
+  String get permissionsIntro =>
+      'Home System fragt nur nach dem, was eine Funktion wirklich braucht - und jede Erlaubnis ist freiwillig. Ohne sie läuft alles andere ganz normal, nur die jeweilige Funktion fehlt.';
+
+  @override
+  String permissionsSummary(int granted, int total) {
+    return '$granted von $total erteilt';
+  }
+
+  @override
+  String get permissionsNoneNeeded =>
+      'Auf diesem Gerät braucht Home System keine besonderen Berechtigungen.';
+
+  @override
+  String get permissionsStatusGranted => 'Erteilt';
+
+  @override
+  String get permissionsStatusMissing => 'Nicht erteilt';
+
+  @override
+  String get permissionsStatusNotNeeded => 'Nicht nötig';
+
+  @override
+  String get permissionsStatusUsb => 'Android fragt beim Einstecken';
+
+  @override
+  String get permissionsStatusNotifications => 'Keine Erlaubnis nötig';
+
+  @override
+  String get permissionsStatusAdb => 'Nur per adb';
+
+  @override
+  String get permissionsAllow => 'Erlauben';
+
+  @override
+  String get permissionsSetUp => 'Einrichten';
+
+  @override
+  String get permissionsChange => 'Ändern';
+
+  @override
+  String get permissionsLater => 'Später';
+
+  @override
+  String get permissionsNotNeededHeading => 'Gerade nicht nötig';
+
+  @override
+  String get permissionsNotNeededDevice => 'Auf diesem Gerät nicht nötig.';
+
+  @override
+  String permissionsNotNeededPart(String part) {
+    return 'Nicht nötig, solange „$part“ ausgeschaltet ist.';
+  }
+
+  @override
+  String get permissionsNotNeededNoCamera => 'Dieses Gerät hat keine Kamera.';
+
+  @override
+  String get permissionsBlocked =>
+      'Android fragt nicht mehr nach. Auf der App-Seite, die sich geöffnet hat, unter „Berechtigungen“ erlauben.';
+
+  @override
+  String get permissionsDenied =>
+      'Nicht erlaubt - die Funktion bleibt aus. Das lässt sich jederzeit hier nachholen.';
+
+  @override
+  String get permissionsMusicOn => '„Folgt der Musik“ ist jetzt eingeschaltet.';
+
+  @override
+  String get permissionsHomeKeyTitle => 'Home-Taste';
+
+  @override
+  String get permissionsHomeKeyWhy =>
+      'Damit die Home-Taste der Fernbedienung Home System öffnet, wird Home System Standard-Launcher - oder, wo das nicht geht (z. B. Fire TV, Google TV), wird der Dienst „Home System: Home-Taste“ eingeschaltet, eine Bedienungshilfe. Der Dienst sieht nur, welche App gerade vorne ist - keine Bildschirminhalte, keine Eingaben, keine Passwörter.';
+
+  @override
+  String get permissionsHomeKeyWhyDashboard =>
+      'Für die Haussteuerung schaltet derselbe Dienst außerdem das Display aus und wischt einen Sperrbildschirm ohne PIN weg, wenn das Display wieder angeht.';
+
+  @override
+  String get permissionsCameraTitle => 'Kamera';
+
+  @override
+  String get permissionsCameraWhy =>
+      'Für die Haussteuerung („Display per Kamera ein- und ausschalten“): Die Kamera erkennt nur, ob sich vor dem Gerät etwas bewegt. Es werden keine Bilder gespeichert oder verschickt.';
+
+  @override
+  String get permissionsInstallTitle => 'Apps installieren';
+
+  @override
+  String get permissionsInstallWhy =>
+      'Damit Home System seine eigenen Updates einspielen kann. Android fragt vor jedem Update trotzdem noch einmal nach, und andere Apps installiert Home System nie.';
+
+  @override
+  String get permissionsStorageTitle => 'Speicher';
+
+  @override
+  String get permissionsStorageWhy =>
+      'Für Backups: Sie liegen im Ordner Download/HomeSystem und überstehen so auch ein Deinstallieren der App. Home System liest und schreibt dort nur seine eigenen Backup-Dateien.';
+
+  @override
+  String get permissionsAllFilesTitle => 'Zugriff auf alle Dateien';
+
+  @override
+  String get permissionsAllFilesWhy =>
+      'Nur für Backups: Neue Backups im Ordner Download/HomeSystem gehen auch ohne. Diesen Zugriff braucht Home System erst, um nach einer Neuinstallation die Backups der früheren Installation zu finden - es liest dort nur seine eigenen Backup-Dateien.';
+
+  @override
+  String get permissionsRecordAudioTitle => 'Audio aufnehmen';
+
+  @override
+  String get permissionsRecordAudioWhy =>
+      'Nur für die Musik-Visualisierung („Folgt der Musik“): Sie liest das Frequenzspektrum der eigenen Wiedergabe. Android nennt das „Audio aufnehmen“ und spricht vom Mikrofon - das Mikrofon wird aber nie benutzt, es wird nichts aufgenommen oder gespeichert.';
+
+  @override
+  String get permissionsUsbTitle => 'USB-Stick für DAB+ und UKW';
+
+  @override
+  String get permissionsUsbWhy =>
+      'Steckt man einen RTL-SDR-Stick an, fragt Android einmal, ob Home System ihn verwenden darf. Einfach „OK“ wählen (wenn angeboten, mit „Immer“) - Home System verwendet nur diesen Stick.';
+
+  @override
+  String get permissionsNotificationsTitle => 'Benachrichtigungen';
+
+  @override
+  String get permissionsNotificationsWhy =>
+      'Home System fragt nicht danach und schickt keine Mitteilungen. Während Radio oder Musik spielt, zeigt Android die Wiedergabe-Steuerung an - dafür ist keine Erlaubnis nötig.';
+
+  @override
+  String get permissionsAdvanced => 'Für Fortgeschrittene';
+
+  @override
+  String get permissionsSecureSettingsTitle => 'Systemeinstellungen ändern';
+
+  @override
+  String get permissionsSecureSettingsWhy =>
+      'Lässt sich nur vom Computer aus per adb erteilen und ist nicht nötig. Damit schaltet Home System den Dienst für die Home-Taste selbst ein - auch wenn Android ihn nach einem Update abgeschaltet hat. Sonst ändert Home System damit nichts.';
+
+  @override
+  String get permissionsRestrictedWhy =>
+      'Ab Android 13 sperrt Android Bedienungshilfen von Apps, die nicht aus einem App-Store kommen („eingeschränkte Einstellungen“). Das hebt dieser Befehl auf:';
+
+  @override
+  String get permissionsWizardTitle => 'Berechtigungen (freiwillig)';
+
+  @override
+  String get permissionsWizardHint =>
+      'Hier steht, wofür Home System welche Erlaubnis braucht. Nichts davon ist Pflicht - „Später“ geht immer, und alles lässt sich unter Einstellungen → System → Berechtigungen nachholen.';
+
+  @override
+  String permissionsWizardCounter(int index, int count) {
+    return 'Berechtigung $index von $count';
+  }
+
+  @override
+  String get permissionsWizardNoneLeft => 'Das war\'s mit den Berechtigungen.';
+
+  @override
+  String get permissionsWizardNoneLeftHint =>
+      'Später findet sich alles unter Einstellungen → System → Berechtigungen.';
+
+  @override
+  String get picturesTitle => 'Bilder';
+
+  @override
+  String get picturesAreaSubtitle => 'Fotos vom NAS, Diashow';
+
+  @override
+  String get picturesSettingsTitle => 'Bilder-Einstellungen';
+
+  @override
+  String get picturesAdminPart => 'Bilder eingeschaltet';
+
+  @override
+  String get picturesNoFolder =>
+      'Noch kein Bilder-Ordner gewählt. Lege in den NAS-Einstellungen fest, wo deine Fotos liegen.';
+
+  @override
+  String get picturesOpenNasSettings => 'NAS-Einstellungen öffnen';
+
+  @override
+  String picturesLoadError(String message) {
+    return 'Der Ordner lässt sich nicht lesen.\n$message';
+  }
+
+  @override
+  String picturesSlideshowWithSubfolders(String folder) {
+    return 'Diashow: $folder (mit Unterordnern)';
+  }
+
+  @override
+  String picturesSlideshow(String folder) {
+    return 'Diashow: $folder';
+  }
+
+  @override
+  String picturesCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Bilder',
+      one: '1 Bild',
+      zero: 'keine Bilder',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String picturesFolderCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Ordner',
+      one: '1 Ordner',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get picturesEmptyFolder => 'In diesem Ordner sind keine Bilder.';
+
+  @override
+  String picturesBrowserHint(String options) {
+    return 'OK öffnet · OK auf einem Bild: Diashow ab diesem Bild · ⏯ oder $options startet die Diashow des Ordners · Zurück geht eine Ebene hoch';
+  }
+
+  @override
+  String get picturesSearching => 'Suche Bilder …';
+
+  @override
+  String get picturesNoneFound =>
+      'Hier sind keine Bilder - auch nicht in den Unterordnern.';
+
+  @override
+  String get picturesStillSearching => 'sucht weiter …';
+
+  @override
+  String get picturesPaused => 'Pause';
+
+  @override
+  String picturesSlideshowHint(String options) {
+    return '← → zurück/vor · OK Pause · $options Einstellungen · Zurück beendet';
+  }
+
+  @override
+  String get picturesInterval => 'Bild wechselt alle';
+
+  @override
+  String picturesIntervalSeconds(int seconds) {
+    return '$seconds Sekunden';
+  }
+
+  @override
+  String get picturesOrder => 'Reihenfolge';
+
+  @override
+  String get picturesOrderFolders => 'Ordner für Ordner, nach Namen';
+
+  @override
+  String get picturesOrderShuffled => 'Gemischt';
+
+  @override
+  String get picturesOrderNextTime =>
+      'Die Reihenfolge gilt ab der nächsten Diashow.';
+
+  @override
+  String get picturesBlur => 'Ränder mit dem unscharfen Bild füllen';
+
+  @override
+  String get picturesFolder => 'Bilder-Ordner';
+
+  @override
+  String get picturesMusicHelp =>
+      'Radio und Musik laufen während der Diashow einfach weiter.';
+
+  @override
+  String get picturesSlideshowHeading => 'Diashow';
+
+  @override
+  String picturesInThisFolder(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Bilder in diesem Ordner',
+      one: '1 Bild in diesem Ordner',
+    );
+    return '$_temp0 - OK auf einem Bild startet die Diashow ab dort';
+  }
+
+  @override
+  String picturesResumeFrom(int position, String name) {
+    return 'Fortsetzen ab Bild $position ($name)';
+  }
+
+  @override
+  String get picturesResumeRestart => 'Von vorne';
 
   @override
   String get radioErrorConnectionLost =>
@@ -3536,7 +4539,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsAreaSystemSubtitle =>
-      'Radio & TV ein/aus, Gerätename, NAS, Start, Home, Home-Taste, Anzeige, Backup, Updates';
+      'Radio & TV ein/aus, Gerätename, NAS, Start, Home, Home-Taste, Berechtigungen, Anzeige, Backup, Updates';
 
   @override
   String get settingsAreaSystemSubtitleNoHomeKey =>
@@ -3713,21 +4716,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get settingsWizardNext => 'Weiter';
 
   @override
-  String get settingsWizardHomeKeyTitle =>
-      'Home-Taste der Fernbedienung (freiwillig)';
-
-  @override
-  String get settingsWizardHomeKeyHint =>
-      'Wer möchte, dass die Home-Taste der Fernbedienung Home System öffnet, richtet das hier ein - Home System wird dafür Standard-Launcher, oder eine Bedienungshilfe wird eingeschaltet. Wer das nicht will, geht einfach weiter; es lässt sich jederzeit unter Einstellungen → System → Home-Taste nachholen.';
-
-  @override
-  String get settingsWizardHomeKeySetUp => 'Home-Taste einrichten';
-
-  @override
-  String get settingsWizardHomeKeySkip =>
-      'Weiter (ohne bzw. nach dem Einrichten)';
-
-  @override
   String settingsWizardDone(String name) {
     return 'Fertig - „$name“ ist eingerichtet.';
   }
@@ -3743,6 +4731,251 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get settingsWizardStart => 'Los geht\'s';
+
+  @override
+  String get settingsOpenSourceLicenses => 'Open-Source-Lizenzen';
+
+  @override
+  String get settingsAboutInternetTv => 'Internet-TV';
+
+  @override
+  String get settingsAboutInternetTvData =>
+      'Senderliste, Streams und Logos aus dem offenen Verzeichnis iptv-org (github.com/iptv-org/iptv) - nur frei verfügbare Sender; die Streams kommen von den Sendern selbst';
+
+  @override
+  String get settingsAboutMaps => 'Karten (Funk)';
+
+  @override
+  String get settingsAboutMapsData =>
+      'Kartenkacheln © OpenStreetMap-Mitwirkende, Daten unter der Open Database License (ODbL), über tile.openstreetmap.org';
+
+  @override
+  String get settingsAboutAircraft => 'Flugzeugdaten (ADS-B)';
+
+  @override
+  String get settingsAboutAircraftData =>
+      'Flugzeugtypen, Halter und Flugrouten über adsbdb.com';
+
+  @override
+  String get settingsBgTitle => 'Hintergrund von Home';
+
+  @override
+  String get settingsBgGradientsHint =>
+      'Mitgelieferte Farbverläufe (Nordlicht, Abendrot, Ozean, …) - ohne Internet.';
+
+  @override
+  String get settingsBgPhotos => 'Landschaftsfotos aus dem Internet';
+
+  @override
+  String get settingsBgPhotosHint =>
+      'Landschafts- und Naturfotos - die Bing-Bilder des Tages der letzten zwei Wochen, abwechselnd. Ort und Fotograf stehen klein rechts oben.';
+
+  @override
+  String get settingsBgBand => 'Band hinter den Favoriten';
+
+  @override
+  String get settingsBgBandHint =>
+      'Wie stark das Band das Bild abdeckt - wirkt sofort.';
+
+  @override
+  String get settingsBgBandNone => 'Keines';
+
+  @override
+  String get settingsBgInterval => 'Neues Bild alle';
+
+  @override
+  String get settingsBgOneHour => '1 Stunde';
+
+  @override
+  String get settingsIconPackTitle => 'Icon-Paket für die App-Kacheln';
+
+  @override
+  String get settingsIconPackNoneOriginal => 'Keines - Original-Logos der Apps';
+
+  @override
+  String get settingsIconPackNoneInstalled =>
+      'Kein Icon-Paket installiert. Icon-Pakete für Android-Launcher (ADW-/Nova-Format) werden unterstützt - als App installieren, dann hier auswählen.\nEinzelne Kacheln bekommen ein eigenes Bild über ☰ auf der Kachel → „Bild ändern“.';
+
+  @override
+  String get settingsHomeKeyIntro =>
+      'Mit der Home-Taste der Fernbedienung öffnet sich Home System mit Home (den Kacheln).';
+
+  @override
+  String get settingsHomeKeyIsDefault =>
+      'Home System ist der Standard-Launcher.';
+
+  @override
+  String get settingsHomeKeyNotDefault =>
+      'Home System ist noch nicht der Standard-Launcher.';
+
+  @override
+  String get settingsHomeKeyDefaultHelp =>
+      'Auf Android-TV-Boxen Home System als Startbildschirm („Home-App“) wählen. Fragt das Gerät beim Drücken der Home-Taste nach, „Home System“ und „Immer“ wählen.';
+
+  @override
+  String get settingsHomeKeyChooseDefault => 'Standard-Launcher wählen';
+
+  @override
+  String get settingsHomeKeyServiceFallback =>
+      'Lässt das Gerät keinen anderen Launcher zu (z. B. Google TV), hilft der Dienst unten - wie beim Fire TV.';
+
+  @override
+  String get settingsHomeKeyServiceOn =>
+      'Dienst „Home System: Home-Taste“ ist eingeschaltet.';
+
+  @override
+  String get settingsHomeKeyServiceOff =>
+      'Dienst „Home System: Home-Taste“ ist ausgeschaltet.';
+
+  @override
+  String get settingsHomeKeyServiceFireTv =>
+      'Der Fire TV zeigt mit der Home-Taste immer den Amazon-Startbildschirm. Der Dienst (eine Bedienungshilfe) holt Home System dann sofort nach vorne. Er sieht nur, welche App im Vordergrund ist - keine Inhalte, keine Tasten und keine Eingaben.';
+
+  @override
+  String get settingsHomeKeyServiceOther =>
+      'Der Dienst (eine Bedienungshilfe) holt Home System nach vorne, sobald der Startbildschirm des Geräts erscheint. Er sieht nur, welche App im Vordergrund ist.';
+
+  @override
+  String get settingsHomeKeyEnable => 'Dienst einschalten';
+
+  @override
+  String get settingsHomeKeyOpenA11y => 'Bedienungshilfen öffnen';
+
+  @override
+  String get settingsHomeKeyBlocked =>
+      'Android hat den Dienst gesperrt („eingeschränkte Einstellungen“ - ab Android 13 bei Apps, die nicht aus einem App-Store kommen). Einmalig vom Computer aus per adb erlauben, dann noch einmal „Dienst einschalten“:';
+
+  @override
+  String get settingsHomeKeyEnableThere =>
+      'Dort „Home System: Home-Taste“ einschalten. Zeigt das Gerät den Dienst nicht an oder ist er ausgegraut, einmalig vom Computer aus per adb freischalten - danach schaltet ihn dieser Knopf selbst ein:';
+
+  @override
+  String get settingsHomeKeyRedirect => 'Home-Taste öffnet Home System';
+
+  @override
+  String get settingsHomeKeyRedirectHint =>
+      'Aus: der Startbildschirm des Geräts bleibt, Home System öffnet man wie jede App.';
+
+  @override
+  String settingsBackupSaved(String location) {
+    return 'Backup gespeichert: $location';
+  }
+
+  @override
+  String settingsBackupDownloadAlso(String urls) {
+    return 'Zum Herunterladen auch unter $urls';
+  }
+
+  @override
+  String get settingsBackupNoPermission =>
+      'Ohne Speicher-Berechtigung kann kein Backup gespeichert werden.';
+
+  @override
+  String settingsBackupFailed(String message) {
+    return 'Backup fehlgeschlagen: $message';
+  }
+
+  @override
+  String get settingsRestoreNoPermission =>
+      'Ohne Speicher-Berechtigung können keine Backups gelesen werden.';
+
+  @override
+  String settingsRestoreReadFailed(String message) {
+    return 'Backups konnten nicht gelesen werden ($message).';
+  }
+
+  @override
+  String get settingsRestoreBusy =>
+      'Das Gerät spielt gerade schon ein Backup ein.';
+
+  @override
+  String get settingsRestoreFromWebDone =>
+      'Backup von der Verwaltungsseite eingespielt - App startet neu …';
+
+  @override
+  String get settingsRestoreConfirmTitle => 'Backup wiederherstellen?';
+
+  @override
+  String settingsRestoreConfirmText(String what) {
+    return '$what\n\nAlle aktuellen Favoriten, DAB+ Sender und Einstellungen werden ersetzt. Danach startet die App neu.';
+  }
+
+  @override
+  String get settingsRestoreButton => 'Wiederherstellen';
+
+  @override
+  String get settingsRestoreDone =>
+      'Backup wiederhergestellt - App startet neu …';
+
+  @override
+  String get settingsRestoreNoPicker =>
+      'Dieses Gerät hat keine Dateiauswahl. Bitte stattdessen „Zugriff auf alle Dateien“ erlauben.';
+
+  @override
+  String settingsRestoreFailed(String message) {
+    return 'Wiederherstellen fehlgeschlagen: $message';
+  }
+
+  @override
+  String get settingsRestorePickedFile =>
+      'Die ausgewählte Datei wird eingespielt.';
+
+  @override
+  String get settingsRestoreNoAllFilesSetting =>
+      'Dieses Gerät bietet die Einstellung „Zugriff auf alle Dateien“ nicht an.';
+
+  @override
+  String get settingsRestoreViaAdmin => 'Über die Verwaltungsseite';
+
+  @override
+  String get settingsRestoreNoNetwork =>
+      'Keine Netzwerkverbindung - die Verwaltungsseite ist nicht erreichbar.';
+
+  @override
+  String get settingsRestoreOpenInBrowser =>
+      'Auf einem Computer oder Handy im selben Netz im Browser öffnen:';
+
+  @override
+  String settingsRestoreHostname(String name) {
+    return 'Hostname dieses Geräts: $name';
+  }
+
+  @override
+  String get settingsRestoreAdminHint =>
+      'Dort die Backup-Datei auswählen und einspielen. Solange diese Seite hier offen ist, nimmt das Gerät ein Backup an. Danach startet die App neu.';
+
+  @override
+  String get settingsRestoreOnDevice => 'Backups auf diesem Gerät';
+
+  @override
+  String settingsRestoreOnDeviceHint(String folder) {
+    return 'Aus dem Ordner „$folder/HomeSystem“ (und HomeRadio der früheren App).';
+  }
+
+  @override
+  String get settingsRestoreFolderDocuments => 'Dokumente';
+
+  @override
+  String get settingsRestoreNone => 'Keine Backups gefunden.';
+
+  @override
+  String get settingsRestoreAllFilesHint =>
+      'Backups von einer früheren Installation der App sind erst sichtbar, wenn der „Zugriff auf alle Dateien“ erlaubt wurde. Alternativ die Datei direkt auswählen.';
+
+  @override
+  String get settingsRestoreAllowAllFiles =>
+      'Zugriff auf alle Dateien erlauben';
+
+  @override
+  String get settingsRestorePickFile =>
+      'Backup-Datei auswählen … (z. B. vom USB-Stick)';
+
+  @override
+  String get settingsAboutAdblock => 'Werbefilter (Browser)';
+
+  @override
+  String get settingsAboutAdblockData =>
+      'Filterlisten, zur Laufzeit geladen: uBlock Origin uAssets (GPLv3, github.com/uBlockOrigin/uAssets), EasyList, EasyPrivacy, EasyList Germany (GPLv3 oder CC BY-SA 3.0, easylist.to), Peter Lowe’s Ad and tracking server list (pgl.yoyo.org/adservers). Die Scriptlets sind eigene Umsetzungen nach den Namen und Argumenten von uBlock Origin.';
 
   @override
   String get systemStartDashboard => 'Haussteuerung anzeigen (Wandtablet)';
@@ -4087,4 +5320,12 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get tvSettingsButton => 'TV-Einstellungen';
+
+  @override
+  String tvBannerLaterHint(int index, int count) {
+    return 'Sendung $index von $count - → weiter, ← zurück';
+  }
+
+  @override
+  String get tvRowReceiver => 'Receiver';
 }

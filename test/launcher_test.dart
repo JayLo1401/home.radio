@@ -3,52 +3,6 @@ import 'package:home_system/data/models/launcher_tile.dart';
 import 'package:home_system/data/services/launcher_background_service.dart';
 
 void main() {
-  group('extractImageUrls', () {
-    final base = Uri.parse('http://nas.local/wallpapers/');
-
-    test('nginx directory listing', () {
-      const html = '''
-<html><head><title>Index of /wallpapers/</title></head><body>
-<h1>Index of /wallpapers/</h1><hr><pre><a href="../">../</a>
-<a href="alpen.jpg">alpen.jpg</a>     22-Nov-2026 10:00   2.1M
-<a href="meer%20blau.JPEG">meer blau.JPEG</a>
-<a href="readme.txt">readme.txt</a>
-<a href="sub/">sub/</a>
-</pre></body></html>''';
-      expect(extractImageUrls(html, 'text/html', base), [
-        Uri.parse('http://nas.local/wallpapers/alpen.jpg'),
-        Uri.parse('http://nas.local/wallpapers/meer%20blau.JPEG'),
-      ]);
-    });
-
-    test('JSON list, relative and absolute', () {
-      const json = '["a.png", "https://cdn.example.org/b.webp", "a.png"]';
-      expect(extractImageUrls(json, 'application/json', base), [
-        Uri.parse('http://nas.local/wallpapers/a.png'),
-        Uri.parse('https://cdn.example.org/b.webp'),
-      ]);
-    });
-
-    test('JSON object with url entries', () {
-      const json = '{"images": [{"url": "/img/1.jpg"}, {"src": "2.jpg"}, 5]}';
-      expect(extractImageUrls(json, 'application/json; charset=utf-8', base), [
-        Uri.parse('http://nas.local/img/1.jpg'),
-        Uri.parse('http://nas.local/wallpapers/2.jpg'),
-      ]);
-    });
-
-    test('nothing usable', () {
-      expect(extractImageUrls('<p>leer</p>', 'text/html', base), isEmpty);
-      expect(extractImageUrls('{"x": 1}', 'application/json', base), isEmpty);
-    });
-
-    test('folder address without slash counts as folder', () {
-      expect(directoryBase(Uri.parse('http://nas/wallpapers')), Uri.parse('http://nas/wallpapers/'));
-      expect(directoryBase(Uri.parse('http://nas/list.json')), Uri.parse('http://nas/list.json'));
-      expect(directoryBase(Uri.parse('http://nas/')), Uri.parse('http://nas/'));
-    });
-  });
-
   test('Bing archive: landscapes kept, people and events left out', () {
     const body = '{"images": ['
         '{"urlbase": "/th?id=OHR.Abraham", "copyright": "Abraham Lake in Alberta, Kanada (© Guang Cao/Getty Images)"},'

@@ -76,6 +76,17 @@ class UpdateService {
     }
   }
 
+  /// Android: the app may "install unknown apps" (always true below
+  /// Android 8 and elsewhere).
+  Future<bool> canInstall() async =>
+      !Platform.isAndroid || (await _channel.invokeMethod<bool>('canInstall') ?? false);
+
+  /// Android: opens the system page where "install unknown apps" is allowed
+  /// for this app.
+  Future<void> openInstallPermission() async {
+    if (Platform.isAndroid) await _channel.invokeMethod('openInstallPermission');
+  }
+
   /// Downloads and installs [update]. On Windows/Linux the app quits when
   /// the installer has taken over (doesn't return then). Throws on failure.
   ///

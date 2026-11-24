@@ -7,6 +7,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'app.dart';
+import 'core/third_party_licenses.dart';
 import 'features/tv/tv_player.dart';
 
 // Closing the window shuts the receiver down (stick / rtl_tcp connection) in
@@ -14,6 +15,8 @@ import 'features/tv/tv_player.dart';
 // linux/runner/my_application.cc.
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // The licence list (Settings → System) - also the parts outside Dart packages.
+  registerThirdPartyLicenses();
   // just_audio has no own player on Windows/Linux - libmpv (media_kit) plays
   // the streams there.
   if (Platform.isWindows || Platform.isLinux) {

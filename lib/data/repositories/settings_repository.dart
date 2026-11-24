@@ -1,8 +1,10 @@
 import 'dart:convert';
 
 import '../db/database.dart';
+import '../models/launcher_group.dart';
 import '../models/launcher_tile.dart';
 import '../services/enigma2_service.dart' show Enigma2Config;
+import '../services/picture_library.dart' show SlideshowOrder;
 import '../services/secret_store.dart';
 
 /// One configured rtl_tcp server (Settings → Radio-Empfänger).
@@ -599,6 +601,60 @@ class SettingsRepository {
   Future<bool> getDashboardEnabled() async => await _db.getSetting('part_dashboard_enabled') == 'true';
   Future<void> setDashboardEnabled(bool value) => _db.setSetting('part_dashboard_enabled', '$value');
 
+  /// Bilder (the NAS's pictures, slideshows) - null while never switched
+  /// on or off: then it's on as soon as a NAS pictures folder is chosen
+  /// (see SystemPartsNotifier).
+  Future<bool?> getPicturesEnabled() async => switch (await _db.getSetting('part_pictures_enabled')) {
+        'true' => true,
+        'false' => false,
+        _ => null,
+      };
+  Future<void> setPicturesEnabled(bool value) => _db.setSetting('part_pictures_enabled', '$value');
+
+  /// Filme (the NAS's films and videos) - null while never switched on or
+  /// off: then it's on as soon as a NAS films or videos folder is chosen.
+  Future<bool?> getMoviesEnabled() async => switch (await _db.getSetting('part_movies_enabled')) {
+        'true' => true,
+        'false' => false,
+        _ => null,
+      };
+  Future<void> setMoviesEnabled(bool value) => _db.setSetting('part_movies_enabled', '$value');
+
+  /// Musik (the NAS's music) - null while never switched on or off: then
+  /// it's on as soon as a NAS music folder is chosen.
+  Future<bool?> getMusicEnabled() async => switch (await _db.getSetting('part_music_enabled')) {
+        'true' => true,
+        'false' => false,
+        _ => null,
+      };
+  Future<void> setMusicEnabled(bool value) => _db.setSetting('part_music_enabled', '$value');
+
+  /// The Browser (Android) - on until switched off.
+  Future<bool> getBrowserEnabled() async => await _db.getSetting('part_browser_enabled') != 'false';
+  Future<void> setBrowserEnabled(bool value) => _db.setSetting('part_browser_enabled', '$value');
+
+  // --- Bilder ---
+
+  /// Seconds a slideshow shows each picture.
+  static const slideshowIntervals = [5, 8, 12, 20, 30, 60];
+  static const defaultSlideshowInterval = 8;
+
+  Future<SlideshowSettings> getSlideshowSettings() async {
+    final interval = int.tryParse(await _db.getSetting('slideshow_interval') ?? '');
+    final order = await _db.getSetting('slideshow_order');
+    return SlideshowSettings(
+      intervalSeconds: slideshowIntervals.contains(interval) ? interval! : defaultSlideshowInterval,
+      order: SlideshowOrder.values.firstWhere((o) => o.name == order, orElse: () => SlideshowOrder.folders),
+      blurredBackground: await _db.getSetting('slideshow_blur') != 'false',
+    );
+  }
+
+  Future<void> setSlideshowSettings(SlideshowSettings value) async {
+    await _db.setSetting('slideshow_interval', '${value.intervalSeconds}');
+    await _db.setSetting('slideshow_order', value.order.name);
+    await _db.setSetting('slideshow_blur', '${value.blurredBackground}');
+  }
+
   // --- Haussteuerung ---
 
   /// The dashboard's address, e.g. http://homeassistant.local:8123/lovelace/0
@@ -665,10 +721,21 @@ class SettingsRepository {
   Future<void> setLauncherTiles(List<LauncherTile> tiles) =>
       _db.setSetting('launcher_tiles', encodeLauncherTiles(tiles));
 
+  /// The launcher's groups - rows of apps under the favourites (see
+  /// LauncherGroup); none until the first one is made.
+  Future<List<LauncherGroup>> getLauncherGroups() async => decodeLauncherGroups(await _db.getSetting('launcher_groups'));
+
+  Future<void> setLauncherGroups(List<LauncherGroup> groups) =>
+      _db.setSetting('launcher_groups', encodeLauncherGroups(groups));
+
   /// TV's tile was put into an existing row once (rows from before
   /// TV) - afterwards removing it stays removed.
   Future<bool> getLauncherTvAdded() async => await _db.getSetting('launcher_tv_added') == 'true';
   Future<void> setLauncherTvAdded() => _db.setSetting('launcher_tv_added', 'true');
+
+  /// Own tiles were put in front, by media type, once (see ownTilesToFront).
+  Future<bool> getLauncherOwnTilesMoved() async => await _db.getSetting('launcher_own_tiles_sorted') == 'true';
+  Future<void> setLauncherOwnTilesMoved() => _db.setSetting('launcher_own_tiles_sorted', 'true');
 
   Future<LauncherBackgroundSource> getLauncherBackgroundSource() async {
     final v = await _db.getSetting('launcher_bg_source');
@@ -799,6 +866,30 @@ class SettingsRepository {
   /// The channel last watched (service reference) - TV starts with it.
   Future<String?> getTvLastChannel() => _db.getSetting('tv_last_channel');
   Future<void> setTvLastChannel(String ref) => _db.setSetting('tv_last_channel', ref);
+}
+
+/// Bilder: how a slideshow runs (Einstellungen → Bilder).
+class SlideshowSettings {
+  const SlideshowSettings({
+    this.intervalSeconds = SettingsRepository.defaultSlideshowInterval,
+    this.order = SlideshowOrder.folders,
+    this.blurredBackground = true,
+  });
+
+  /// Seconds per picture, one of [SettingsRepository.slideshowIntervals].
+  final int intervalSeconds;
+  final SlideshowOrder order;
+
+  /// The free space beside a picture shows it once more, blurred and
+  /// darkened (from a tiny copy - cheap, also on the Fire TV Stick).
+  final bool blurredBackground;
+
+  SlideshowSettings copyWith({int? intervalSeconds, SlideshowOrder? order, bool? blurredBackground}) =>
+      SlideshowSettings(
+        intervalSeconds: intervalSeconds ?? this.intervalSeconds,
+        order: order ?? this.order,
+        blurredBackground: blurredBackground ?? this.blurredBackground,
+      );
 }
 
 /// The Haussteuerung's display: on/off by motion in front of the camera.

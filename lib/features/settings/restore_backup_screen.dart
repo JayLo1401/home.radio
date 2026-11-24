@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../../core/nas_providers.dart';
 import '../../core/providers.dart';
@@ -16,13 +17,15 @@ import '../../l10n/l10n.dart';
 /// and says where it went - Settings → System → "Backup erstellen".
 Future<void> createBackupWithFeedback(BuildContext context, WidgetRef ref) async {
   final messenger = ScaffoldMessenger.of(context);
+  final l = context.l10n;
   try {
     final location = await ref.read(backupServiceProvider).createBackup();
     final urls = await AdminServer.urls();
     messenger.showSnackBar(
       SnackBar(
         content: Text(
-          'Backup gespeichert: $location${urls.isEmpty ? '' : '\nZum Herunterladen auch unter ${urls.join(' oder ')}'}',
+          '${l.settingsBackupSaved(location)}'
+          '${urls.isEmpty ? '' : '\n${l.settingsBackupDownloadAlso(urls.join(' ${l.settingsOr} '))}'}',
         ),
       ),
     );
@@ -30,9 +33,7 @@ Future<void> createBackupWithFeedback(BuildContext context, WidgetRef ref) async
     messenger.showSnackBar(
       SnackBar(
         content: Text(
-          e.code == 'PERMISSION_DENIED'
-              ? 'Ohne Speicher-Berechtigung kann kein Backup gespeichert werden.'
-              : 'Backup fehlgeschlagen: ${e.message}',
+          e.code == 'PERMISSION_DENIED' ? l.settingsBackupNoPermission : l.settingsBackupFailed('${e.message}'),
         ),
       ),
     );
@@ -140,8 +141,8 @@ class _RestoreBackupScreenState extends ConsumerState<RestoreBackupScreen> with 
         _urls = urls;
         _backups = const [];
         _loadError = e.code == 'PERMISSION_DENIED'
-            ? 'Ohne Speicher-Berechtigung können keine Backups gelesen werden.'
-            : 'Backups konnten nicht gelesen werden (${e.message}).';
+            ? context.l10n.settingsRestoreNoPermission
+            : context.l10n.settingsRestoreReadFailed('${e.message}');
         _loading = false;
       });
     }
@@ -154,7 +155,7 @@ class _RestoreBackupScreenState extends ConsumerState<RestoreBackupScreen> with 
 
   /// An upload from the admin page - the confirmation happened there.
   Future<void> _restoreFromWeb(String content) async {
-    if (_busy) throw const BackupFormatException('Das Gerät spielt gerade schon ein Backup ein.');
+    if (_busy) throw BackupFormatException(l10n.settingsRestoreBusy);
     setState(() => _busy = true);
     try {
       await ref.read(backupServiceProvider).restoreJson(content);
@@ -162,7 +163,7 @@ class _RestoreBackupScreenState extends ConsumerState<RestoreBackupScreen> with 
       if (mounted) setState(() => _busy = false);
       rethrow;
     }
-    _snack('Backup von der Verwaltungsseite eingespielt - App startet neu …');
+    _snack(l10n.settingsRestoreFromWebDone);
     // Lets the page's answer go out first.
     Future<void>.delayed(const Duration(milliseconds: 1500), () => ref.read(backupServiceProvider).restartApp());
   }
@@ -171,17 +172,14 @@ class _RestoreBackupScreenState extends ConsumerState<RestoreBackupScreen> with 
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Backup wiederherstellen?'),
-        content: Text(
-          '$what\n\nAlle aktuellen Favoriten, DAB+ Sender und Einstellungen werden ersetzt. '
-          'Danach startet die App neu.',
-        ),
+        title: Text(context.l10n.settingsRestoreConfirmTitle),
+        content: Text(context.l10n.settingsRestoreConfirmText(what)),
         actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Abbrechen')),
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: Text(context.l10n.commonCancel)),
           FilledButton(
             autofocus: true,
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Wiederherstellen'),
+            child: Text(context.l10n.settingsRestoreButton),
           ),
         ],
       ),
@@ -193,16 +191,14 @@ class _RestoreBackupScreenState extends ConsumerState<RestoreBackupScreen> with 
     setState(() => _busy = true);
     try {
       if (!await restore()) return;
-      _snack('Backup wiederhergestellt - App startet neu …');
+      _snack(l10n.settingsRestoreDone);
       await Future<void>.delayed(const Duration(milliseconds: 1200));
       await ref.read(backupServiceProvider).restartApp();
     } on BackupFormatException catch (e) {
       _snack(e.message);
     } on PlatformException catch (e) {
       _snack(
-        e.code == 'NO_PICKER'
-            ? 'Dieses Gerät hat keine Dateiauswahl. Bitte stattdessen „Zugriff auf alle Dateien“ erlauben.'
-            : 'Wiederherstellen fehlgeschlagen: ${e.message}',
+        e.code == 'NO_PICKER' ? l10n.settingsRestoreNoPicker : l10n.settingsRestoreFailed('${e.message}'),
       );
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -234,18 +230,20 @@ class _RestoreBackupScreenState extends ConsumerState<RestoreBackupScreen> with 
   }
 
   Future<void> _restoreFromPicker() async {
-    if (!await _confirmRestore('Die ausgewählte Datei wird eingespielt.')) return;
+    if (!await _confirmRestore(context.l10n.settingsRestorePickedFile)) return;
     await _runRestore(() => ref.read(backupServiceProvider).restoreFromPicker());
   }
 
   Future<void> _requestAllFilesAccess() async {
     final opened = await ref.read(backupServiceProvider).requestAllFilesAccess();
     if (!opened) {
-      _snack('Dieses Gerät bietet die Einstellung „Zugriff auf alle Dateien“ nicht an.');
+      _snack(l10n.settingsRestoreNoAllFilesSetting);
     }
   }
 
   String _formatDate(DateTime t) {
+    final locale = context.l10n.localeName;
+    if (locale != 'de') return DateFormat.yMd(locale).add_Hm().format(t);
     String two(int v) => v.toString().padLeft(2, '0');
     return '${two(t.day)}.${two(t.month)}.${t.year}, ${two(t.hour)}:${two(t.minute)}';
   }
@@ -255,24 +253,25 @@ class _RestoreBackupScreenState extends ConsumerState<RestoreBackupScreen> with 
     final titleStyle = Theme.of(context).textTheme.titleLarge;
     const hintStyle = TextStyle(color: Colors.white54, fontSize: 13);
     final primary = Theme.of(context).colorScheme.primary;
+    final l = context.l10n;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Backup wiederherstellen')),
+      appBar: AppBar(title: Text(l.settingsBackupRestore)),
       body: AbsorbPointer(
         absorbing: _busy,
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            Text('Über die Verwaltungsseite', style: titleStyle),
+            Text(l.settingsRestoreViaAdmin, style: titleStyle),
             const SizedBox(height: 8),
             if (_loading)
               const SizedBox.shrink()
             else if (_urls.isEmpty)
-              const Text('Keine Netzwerkverbindung - die Verwaltungsseite ist nicht erreichbar.', style: hintStyle)
+              Text(l.settingsRestoreNoNetwork, style: hintStyle)
             else ...[
-              const Text(
-                'Auf einem Computer oder Handy im selben Netz im Browser öffnen:',
-                style: TextStyle(fontSize: 16),
+              Text(
+                l.settingsRestoreOpenInBrowser,
+                style: const TextStyle(fontSize: 16),
               ),
               const SizedBox(height: 6),
               for (final u in _urls)
@@ -283,21 +282,17 @@ class _RestoreBackupScreenState extends ConsumerState<RestoreBackupScreen> with 
               if (_hostname != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 4),
-                  child: Text('Hostname dieses Geräts: $_hostname', style: const TextStyle(fontSize: 16)),
+                  child: Text(l.settingsRestoreHostname(_hostname!), style: const TextStyle(fontSize: 16)),
                 ),
               const SizedBox(height: 6),
-              const Text(
-                'Dort die Backup-Datei auswählen und einspielen. Solange diese Seite hier offen ist, nimmt das Gerät '
-                'ein Backup an. Danach startet die App neu.',
-                style: hintStyle,
-              ),
+              Text(l.settingsRestoreAdminHint, style: hintStyle),
             ],
             if (_busy) const Padding(padding: EdgeInsets.only(top: 12), child: LinearProgressIndicator()),
             const Divider(height: 32),
-            Text('Backups auf diesem Gerät', style: titleStyle),
+            Text(l.settingsRestoreOnDevice, style: titleStyle),
             const SizedBox(height: 4),
             Text(
-              'Aus dem Ordner „${Platform.isAndroid ? 'Download' : 'Dokumente'}/HomeSystem“ (und HomeRadio der früheren App).',
+              l.settingsRestoreOnDeviceHint(Platform.isAndroid ? 'Download' : l.settingsRestoreFolderDocuments),
               style: hintStyle,
             ),
             const SizedBox(height: 8),
@@ -309,7 +304,7 @@ class _RestoreBackupScreenState extends ConsumerState<RestoreBackupScreen> with 
             else if (_loadError != null)
               Text(_loadError!, style: hintStyle)
             else if (_backups.isEmpty)
-              const Text('Keine Backups gefunden.', style: hintStyle)
+              Text(l.settingsRestoreNone, style: hintStyle)
             else
               for (final (i, b) in _backups.indexed)
                 ActionTile(
@@ -321,15 +316,11 @@ class _RestoreBackupScreenState extends ConsumerState<RestoreBackupScreen> with 
                 ),
             if (_canRequestAllFilesAccess) ...[
               const SizedBox(height: 16),
-              const Text(
-                'Backups von einer früheren Installation der App sind erst sichtbar, wenn der '
-                '„Zugriff auf alle Dateien“ erlaubt wurde. Alternativ die Datei direkt auswählen.',
-                style: hintStyle,
-              ),
+              Text(l.settingsRestoreAllFilesHint, style: hintStyle),
               const SizedBox(height: 8),
               ActionTile(
                 icon: Icons.folder_open,
-                label: 'Zugriff auf alle Dateien erlauben',
+                label: l.settingsRestoreAllowAllFiles,
                 autofocus: _backups.isEmpty,
                 onTap: _requestAllFilesAccess,
               ),
@@ -337,7 +328,7 @@ class _RestoreBackupScreenState extends ConsumerState<RestoreBackupScreen> with 
             const SizedBox(height: 8),
             ActionTile(
               icon: Icons.file_open_outlined,
-              label: 'Backup-Datei auswählen … (z. B. vom USB-Stick)',
+              label: l.settingsRestorePickFile,
               autofocus: _backups.isEmpty && !_canRequestAllFilesAccess,
               onTap: _restoreFromPicker,
             ),

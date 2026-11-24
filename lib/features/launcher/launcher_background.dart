@@ -117,7 +117,7 @@ class _LauncherBackgroundState extends ConsumerState<LauncherBackground> with Wi
         bytes = photo?.bytes;
         caption = photo?.caption;
       } else {
-        bytes = await service.fromServer(settings.backgroundUrl);
+        bytes = await service.fromNas();
       }
     } catch (e) {
       debugPrint('launcher background: $e');

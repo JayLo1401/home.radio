@@ -171,8 +171,6 @@
     }
   },
   "nasBgNoFolder": "Zuerst unter Einstellungen → System → NAS-Server einen Ordner für Hintergrundbilder wählen.",
-  "nasBgFromUrl": "Adresse (http)",
-  "nasBgFromUrlHint": "Ein Webserver, der Bilder liefert (siehe unten).",
   "nasBgSyncNow": "Jetzt abgleichen",
   "nasBgSyncing": "Wird abgeglichen …",
   "nasBgStatus": "{count} Bilder auf dem Gerät",
@@ -202,5 +200,18 @@
       }
     }
   },
-  "nasFolderBackgrounds": "Hintergrundbilder (Home)"
+  "nasFolderBackgrounds": "Hintergrundbilder (Home)",
+  "nasBgSyncListing": "Ordner wird gelesen …",
+  "nasBgSyncNothingNew": "Keine neuen Bilder - wird abgeschlossen …",
+  "nasBgSyncProgress": "Bild {loaded} von {total} wird geladen …",
+  "@nasBgSyncProgress": {
+    "placeholders": {
+      "loaded": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  }
 }
