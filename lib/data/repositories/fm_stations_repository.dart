@@ -1,3 +1,6 @@
+import 'package:intl/intl.dart';
+
+import '../../l10n/l10n.dart';
 import '../db/database.dart';
 
 /// Persisted FM (UKW) stations - found by a scan or saved while tuning
@@ -35,11 +38,8 @@ class FmStationsRepository {
   }
 }
 
-/// "99,9 MHz" / "88,85 MHz" - German decimal comma, no trailing zero.
-String formatFmFrequency(int freqKhz) {
-  final mhz = (freqKhz / 1000).toStringAsFixed(2).replaceFirst(RegExp(r'0$'), '');
-  return '${mhz.replaceAll('.', ',')} MHz';
-}
+/// "99,9 MHz" / "88,85 MHz" - the language's decimal separator, no trailing zero.
+String formatFmFrequency(int freqKhz) => '${NumberFormat('0.0#', l10n.localeName).format(freqKhz / 1000)} MHz';
 
 extension FmStationDisplay on FmStation {
   /// The user's own name, else the RDS name, else just the frequency.
@@ -67,9 +67,11 @@ String? sameProgrammeHint(FmStation station, List<FmStation> all) {
   if (others.isEmpty) return null;
   final best = others.first;
   final mine = station.levelDb, theirs = best.levelDb;
-  final compare = mine == null || theirs == null ? '' : (theirs > mine ? ' (stärker)' : ' (schwächer)');
+  final compare = mine == null || theirs == null
+      ? ''
+      : ' ${theirs > mine ? l10n.radioFmSameProgrammeStronger : l10n.radioFmSameProgrammeWeaker}';
   final more = others.length > 1 ? ' +${others.length - 1}' : '';
-  return 'auch auf ${best.frequencyLabel}$compare$more';
+  return '${l10n.radioFmSameProgrammeAlsoOn(best.frequencyLabel)}$compare$more';
 }
 
 extension FmStationDetails on FmStation {

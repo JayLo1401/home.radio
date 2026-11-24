@@ -117,6 +117,7 @@ class SettingsRepository {
   static const _keySunEnabled = 'sun_enabled';
   static const _keySunTileScale = 'sun_tile_scale';
   static const _keyUiScale = 'ui_scale';
+  static const _keyLanguage = 'language';
   static const _keyFtpHost = 'ftp_host';
   static const _keyFtpUser = 'ftp_user';
   static const _keyFtpPass = 'ftp_pass';
@@ -340,6 +341,11 @@ class SettingsRepository {
       double.tryParse(await _db.getSetting(_keyUiScale) ?? '') ?? defaultUiScale;
 
   Future<void> setUiScale(double scale) => _db.setSetting(_keyUiScale, '$scale');
+
+  /// The app's language - "system" (the device's: German if it's German,
+  /// English otherwise), "de" or "en".
+  Future<String> getLanguage() async => await _db.getSetting(_keyLanguage) ?? 'system';
+  Future<void> setLanguage(String value) => _db.setSetting(_keyLanguage, value);
 
   Future<Map<String, String?>> getFtpConfig() async => {
         'host': await _db.getSetting(_keyFtpHost),
@@ -603,6 +609,31 @@ class SettingsRepository {
   Future<bool> getTvEnabled() async => await _db.getSetting('part_tv_enabled') != 'false';
   Future<void> setTvEnabled(bool value) => _db.setSetting('part_tv_enabled', '$value');
 
+  /// The Haussteuerung (Home Assistant dashboard) - off until switched on,
+  /// most devices don't need it.
+  Future<bool> getDashboardEnabled() async => await _db.getSetting('part_dashboard_enabled') == 'true';
+  Future<void> setDashboardEnabled(bool value) => _db.setSetting('part_dashboard_enabled', '$value');
+
+  // --- Haussteuerung ---
+
+  /// The dashboard's address, e.g. http://homeassistant.local:8123/lovelace/0
+  Future<String> getDashboardUrl() async => await _db.getSetting('dashboard_url') ?? '';
+  Future<void> setDashboardUrl(String value) => _db.setSetting('dashboard_url', value.trim());
+
+  Future<DashboardDisplaySettings> getDashboardDisplay() async => DashboardDisplaySettings(
+        motion: await _db.getSetting('motion_enabled') == 'true',
+        sensitivity: int.tryParse(await _db.getSetting('motion_sensitivity') ?? '') ?? 5,
+        timeoutMinutes: int.tryParse(await _db.getSetting('motion_timeout_min') ?? '') ?? 5,
+        webhookUrl: await _db.getSetting('motion_webhook') ?? '',
+      );
+
+  Future<void> setDashboardDisplay(DashboardDisplaySettings value) async {
+    await _db.setSetting('motion_enabled', '${value.motion}');
+    await _db.setSetting('motion_sensitivity', '${value.sensitivity}');
+    await _db.setSetting('motion_timeout_min', '${value.timeoutMinutes}');
+    await _db.setSetting('motion_webhook', value.webhookUrl.trim());
+  }
+
   // --- Home (the launcher) ---
 
   /// What shows on start (see [StartScreen]) - Radio by default, as
@@ -612,6 +643,10 @@ class SettingsRepository {
     return StartScreen.values.firstWhere((s) => s.name == v, orElse: () => StartScreen.radio);
   }
   Future<void> setStartScreen(StartScreen value) => _db.setSetting('start_screen', value.name);
+
+  /// The app started with [StartScreen.app] (its package name), '' = none.
+  Future<String> getStartApp() async => await _db.getSetting('start_app') ?? '';
+  Future<void> setStartApp(String package) => _db.setSetting('start_app', package);
 
   /// The launcher's row; null until it was first set up (see
   /// LauncherTilesNotifier - then the installed streaming apps go in).
@@ -752,4 +787,34 @@ class SettingsRepository {
   /// The channel last watched (service reference) - TV starts with it.
   Future<String?> getTvLastChannel() => _db.getSetting('tv_last_channel');
   Future<void> setTvLastChannel(String ref) => _db.setSetting('tv_last_channel', ref);
+}
+
+/// The Haussteuerung's display: on/off by motion in front of the camera.
+class DashboardDisplaySettings {
+  const DashboardDisplaySettings({
+    this.motion = false,
+    this.sensitivity = 5,
+    this.timeoutMinutes = 5,
+    this.webhookUrl = '',
+  });
+
+  /// Display by motion (camera) on.
+  final bool motion;
+
+  /// 1 (only big movements) .. 10 (the slightest).
+  final int sensitivity;
+
+  /// Display off after this long without motion (0 = never).
+  final int timeoutMinutes;
+
+  /// Home Assistant webhook for motion on/off, '' = none.
+  final String webhookUrl;
+
+  DashboardDisplaySettings copyWith({bool? motion, int? sensitivity, int? timeoutMinutes, String? webhookUrl}) =>
+      DashboardDisplaySettings(
+        motion: motion ?? this.motion,
+        sensitivity: sensitivity ?? this.sensitivity,
+        timeoutMinutes: timeoutMinutes ?? this.timeoutMinutes,
+        webhookUrl: webhookUrl ?? this.webhookUrl,
+      );
 }

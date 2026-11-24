@@ -1,6 +1,7 @@
 import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart' as just_audio;
 
+import '../../l10n/l10n.dart';
 import '../db/database.dart' show DabStation, FmStation;
 import '../models/favorite_channel.dart';
 import '../repositories/dab_stations_repository.dart' show DabStationDisplay;
@@ -82,8 +83,8 @@ class RadioAudioHandler extends BaseAudioHandler {
         title: channel.displayName,
         album: switch (channel.sourceType) {
           FavoriteSourceType.dab => 'DAB+',
-          FavoriteSourceType.fm => 'UKW',
-          FavoriteSourceType.internet => 'Internetradio',
+          FavoriteSourceType.fm => l10n.radioSourceFm,
+          FavoriteSourceType.internet => l10n.radioSourceInternet,
         },
         artUri: channel.logoUrl != null ? Uri.tryParse(channel.logoUrl!) : null,
       ),
@@ -126,7 +127,7 @@ class RadioAudioHandler extends BaseAudioHandler {
       MediaItem(
         id: 'fm_${station.freqKhz}',
         title: station.displayLabel,
-        album: 'UKW · ${station.frequencyLabel}',
+        album: '${l10n.radioSourceFm} · ${station.frequencyLabel}',
       ),
     );
     playbackState.add(

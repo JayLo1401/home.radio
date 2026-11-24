@@ -9,6 +9,7 @@ import '../../core/popup_text_field.dart';
 import '../../core/providers.dart';
 import '../../data/models/internet_radio_station.dart';
 import '../../data/services/dab_rtlsdr_service.dart' show DabRtlSdrService;
+import '../../l10n/l10n.dart';
 
 /// Points the receiver at the configured RTL-SDR source (USB stick or
 /// rtl_tcp server) - needed before anything that tunes on its own: DAB+ or
@@ -118,13 +119,14 @@ class _LogoPickerDialogState extends ConsumerState<_LogoPickerDialog> {
 
   Widget _dabSection() {
     const hint = TextStyle(color: Colors.white54, fontSize: 13);
+    final l10n = context.l10n;
     final status = switch (_dabState) {
-      _DabLogoState.idle => const Text('Holt das Bild, das der Sender selbst ausstrahlt.', style: hint),
-      _DabLogoState.waiting => const Row(
+      _DabLogoState.idle => Text(l10n.radioLogoDabIdle, style: hint),
+      _DabLogoState.waiting => Row(
           children: [
-            SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
-            SizedBox(width: 8),
-            Expanded(child: Text('Warte auf ein Bild vom Sender (bis etwa 30 s)…', style: hint)),
+            const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+            const SizedBox(width: 8),
+            Expanded(child: Text(l10n.radioLogoDabWaiting, style: hint)),
           ],
         ),
       _DabLogoState.found => Row(
@@ -133,12 +135,12 @@ class _LogoPickerDialogState extends ConsumerState<_LogoPickerDialog> {
             const SizedBox(width: 12),
             FilledButton(
               onPressed: () => Navigator.of(context).pop((url: null, localPath: _dabPath) as LogoChoice),
-              child: const Text('Dieses Bild übernehmen'),
+              child: Text(l10n.radioLogoDabUseImage),
             ),
           ],
         ),
-      _DabLogoState.none => const Text('Der Sender hat in der Zeit kein Bild gesendet.', style: hint),
-      _DabLogoState.failed => const Text('DAB+-Decoder konnte nicht gestartet werden.', style: hint),
+      _DabLogoState.none => Text(l10n.radioLogoDabNone, style: hint),
+      _DabLogoState.failed => Text(l10n.radioDabDecoderFailed, style: hint),
     };
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -146,7 +148,7 @@ class _LogoPickerDialogState extends ConsumerState<_LogoPickerDialog> {
         OutlinedButton.icon(
           onPressed: _dabState == _DabLogoState.waiting ? null : _fetchDabLogo,
           icon: const Icon(Icons.settings_input_antenna),
-          label: const Text('DAB-Logo holen'),
+          label: Text(l10n.radioLogoDabFetch),
         ),
         const SizedBox(height: 8),
         status,
@@ -158,7 +160,7 @@ class _LogoPickerDialogState extends ConsumerState<_LogoPickerDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Logo wählen'),
+      title: Text(context.l10n.radioLogoTitle),
       content: SizedBox(
         width: 460,
         height: widget.dabStation != null ? 540 : 440,
@@ -168,7 +170,7 @@ class _LogoPickerDialogState extends ConsumerState<_LogoPickerDialog> {
             if (widget.dabStation != null) _dabSection(),
             PopupTextField(
               controller: _queryController,
-              label: 'Im Internet suchen (Sendername)',
+              label: context.l10n.radioLogoSearchInternet,
               icon: Icons.search,
               onSubmitted: (_) => _search(),
             ),
@@ -179,7 +181,7 @@ class _LogoPickerDialogState extends ConsumerState<_LogoPickerDialog> {
                   : _results.isEmpty
                       ? Center(
                           child: Text(
-                            _searched ? 'Keine Treffer mit Logo.' : '',
+                            _searched ? context.l10n.radioLogoNoResults : '',
                             style: const TextStyle(color: Colors.white54),
                           ),
                         )
@@ -200,7 +202,7 @@ class _LogoPickerDialogState extends ConsumerState<_LogoPickerDialog> {
             // Entering an address takes it right away.
             PopupTextField(
               controller: _urlController,
-              label: 'oder eigene Bild-Adresse (URL)',
+              label: context.l10n.radioLogoOwnUrl,
               hint: 'https://…',
               keyboardType: TextInputType.url,
               onSubmitted: (url) {
@@ -211,7 +213,7 @@ class _LogoPickerDialogState extends ConsumerState<_LogoPickerDialog> {
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Abbrechen')),
+        TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(context.l10n.commonCancel)),
       ],
     );
   }

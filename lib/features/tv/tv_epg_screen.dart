@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../../core/theme.dart';
 import '../../data/services/enigma2_service.dart';
+import '../../l10n/l10n.dart';
 import 'tv_providers.dart';
 import 'tv_widgets.dart';
 
@@ -21,17 +23,16 @@ class TvEpgScreen extends ConsumerStatefulWidget {
 class _TvEpgScreenState extends ConsumerState<TvEpgScreen> {
   E2Event? _focused;
 
-  static const _weekdays = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
-
   String _day(DateTime t) {
+    final l10n = context.l10n;
     final today = DateTime.now();
     final d = DateTime(t.year, t.month, t.day);
     final diff = d.difference(DateTime(today.year, today.month, today.day)).inDays;
-    final date = '${t.day.toString().padLeft(2, '0')}.${t.month.toString().padLeft(2, '0')}.';
+    final date = DateFormat(l10n.tvDayMonthPattern, l10n.localeName).format(t);
     return switch (diff) {
-      0 => 'Heute, $date',
-      1 => 'Morgen, $date',
-      _ => '${_weekdays[t.weekday - 1]}, $date',
+      0 => '${l10n.tvToday}, $date',
+      1 => '${l10n.tvTomorrow}, $date',
+      _ => '${DateFormat.EEEE(l10n.localeName).format(t)}, $date',
     };
   }
 
@@ -59,7 +60,8 @@ class _TvEpgScreenState extends ConsumerState<TvEpgScreen> {
                     Text('${widget.channel.number} · ${widget.channel.name}',
                         style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                     const SizedBox(width: 12),
-                    const Text('Programm', style: TextStyle(color: brandGreen, fontSize: 16, fontWeight: FontWeight.w600)),
+                    Text(context.l10n.tvSchedule,
+                        style: const TextStyle(color: brandGreen, fontSize: 16, fontWeight: FontWeight.w600)),
                     const Spacer(),
                     const TvClock(),
                   ],
@@ -73,9 +75,9 @@ class _TvEpgScreenState extends ConsumerState<TvEpgScreen> {
                 data: (list) {
                   final upcoming = list.where((e) => e.end.isAfter(now)).toList();
                   if (upcoming.isEmpty) {
-                    return const Center(
-                      child: Text('Für diesen Sender hat der Receiver keine Programminformation.',
-                          style: TextStyle(color: Colors.white70, fontSize: 18)),
+                    return Center(
+                      child: Text(context.l10n.tvScheduleNoInfo,
+                          style: const TextStyle(color: Colors.white70, fontSize: 18)),
                     );
                   }
                   final shown = _focused ?? upcoming.first;
@@ -147,12 +149,13 @@ class _TvEpgScreenState extends ConsumerState<TvEpgScreen> {
                                     style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold)),
                                 const SizedBox(height: 8),
                                 Text(
-                                  '${_day(shown.begin)}  ${hhmm(shown.begin)} – ${hhmm(shown.end)}  ·  ${shown.duration.inMinutes} Min.',
+                                  '${_day(shown.begin)}  ${hhmm(shown.begin)} – ${hhmm(shown.end)}  ·  '
+                                  '${context.l10n.tvMinutes(shown.duration.inMinutes)}',
                                   style: const TextStyle(color: brandGreen, fontSize: 16),
                                 ),
                                 const SizedBox(height: 18),
                                 Text(
-                                  shown.description.isEmpty ? 'Keine Beschreibung.' : shown.description,
+                                  shown.description.isEmpty ? context.l10n.tvNoDescription : shown.description,
                                   style: const TextStyle(color: Colors.white70, fontSize: 18, height: 1.4),
                                 ),
                               ],

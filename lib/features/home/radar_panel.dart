@@ -8,6 +8,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:webview_flutter/webview_flutter.dart';
 
+import '../../l10n/l10n.dart';
+
 /// Weather radar from a configurable URL - the radar itself is no longer
 /// drawn in the app (it runs as its own server, see
 /// github.com/JayLo1401/weather.radar), so any radar source works: a plain
@@ -144,11 +146,11 @@ class _RadarPanelState extends State<RadarPanel> {
           .timeout(const Duration(seconds: 60));
       if (response.statusCode != 200) {
         throw Exception(response.statusCode == 401 || response.statusCode == 403
-            ? 'Anmeldung abgelehnt (HTTP ${response.statusCode})'
+            ? l10n.radioRadarLoginRejected(response.statusCode)
             : 'HTTP ${response.statusCode}');
       }
       if ((response.headers['content-type'] ?? '').contains('text/html')) {
-        throw Exception('die Adresse ist eine Webseite, kein Bild - als Art „Webseite“ wählen');
+        throw Exception(l10n.radioRadarIsWebPage);
       }
       final codec = await ui.instantiateImageCodec(response.bodyBytes);
       final image = (await codec.getNextFrame()).image;
@@ -191,13 +193,13 @@ class _RadarPanelState extends State<RadarPanel> {
   Widget build(BuildContext context) {
     const hint = TextStyle(color: Colors.white54, fontSize: 12);
     if (widget.urlTemplate.trim().isEmpty) {
-      return const ColoredBox(
+      return ColoredBox(
         color: Colors.black54,
         child: Center(
           child: Padding(
-            padding: EdgeInsets.all(16),
+            padding: const EdgeInsets.all(16),
             child: Text(
-              'Kein Wetterradar eingerichtet -\nEinstellungen → Wetterradar → Quelle',
+              context.l10n.radioRadarNotConfigured,
               textAlign: TextAlign.center,
               style: hint,
             ),
@@ -221,13 +223,13 @@ class _RadarPanelState extends State<RadarPanel> {
         );
         // webview_flutter only exists on Android here.
         if (widget.isWebPage && !Platform.isAndroid) {
-          return const ColoredBox(
+          return ColoredBox(
             color: Colors.black54,
             child: Center(
               child: Text(
-                'Webseiten als Radarquelle gibt es nur in der Android-Version.',
+                context.l10n.radioRadarWebPageAndroidOnly,
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white70),
+                style: const TextStyle(color: Colors.white70),
               ),
             ),
           );
@@ -257,7 +259,11 @@ class _RadarPanelState extends State<RadarPanel> {
                   child: error != null
                       ? Padding(
                           padding: const EdgeInsets.all(16),
-                          child: Text('Radar nicht erreichbar: $error', textAlign: TextAlign.center, style: hint),
+                          child: Text(
+                            context.l10n.radioRadarUnreachable(error),
+                            textAlign: TextAlign.center,
+                            style: hint,
+                          ),
                         )
                       : const SizedBox(
                           width: 20,
@@ -275,7 +281,7 @@ class _RadarPanelState extends State<RadarPanel> {
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(6)),
                     child: Text(
-                      'Stand ${_hhmm(_loadedAt!)} · nicht erreichbar',
+                      context.l10n.radioRadarStale(_hhmm(_loadedAt!)),
                       style: const TextStyle(color: Colors.white70, fontSize: 11),
                     ),
                   ),
@@ -328,7 +334,7 @@ class _RadarWebViewState extends State<_RadarWebView> {
         onHttpError: (error) {
           final code = error.response?.statusCode;
           if (code == null || !mounted || error.request?.uri.toString() != widget.url) return;
-          setState(() => _error = code == 401 || code == 403 ? 'Anmeldung abgelehnt (HTTP $code)' : 'HTTP $code');
+          setState(() => _error = code == 401 || code == 403 ? l10n.radioRadarLoginRejected(code) : 'HTTP $code');
         },
       ),
     );
@@ -394,7 +400,7 @@ class _RadarWebViewState extends State<_RadarWebView> {
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(6)),
               child: Text(
-                'Radar nicht erreichbar: $error',
+                context.l10n.radioRadarUnreachable(error),
                 style: const TextStyle(color: Colors.white70, fontSize: 11),
               ),
             ),

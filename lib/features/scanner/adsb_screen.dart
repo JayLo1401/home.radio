@@ -10,9 +10,11 @@ import '../../data/models/adsb.dart';
 import '../../data/repositories/settings_repository.dart';
 import '../../data/services/adsbdb_service.dart';
 import '../../data/services/dab_rtlsdr_service.dart' show DabRtlSdrService;
+import '../../l10n/l10n.dart';
 import '../shared/logo_picker_dialog.dart' show connectDecoder;
 import 'map_tiles.dart';
 import 'reception_status.dart';
+import '../../core/native_messages.dart';
 
 /// Aircraft overhead via ADS-B (1090 MHz): a radar picture around the home
 /// location and a list with flight, altitude, speed and distance. The
@@ -180,7 +182,7 @@ class _AdsbScreenState extends ConsumerState<AdsbScreen> {
       case 'connectionMessage':
         final isError = event['isError'] as bool? ?? false;
         final message = (event['message'] as String?)?.trim() ?? '';
-        if (mounted) setState(() => _sourceWarning = isError && message.isNotEmpty ? message : null);
+        if (mounted) setState(() => _sourceWarning = isError && message.isNotEmpty ? nativeMessageText(message) : null);
     }
   }
 
@@ -230,7 +232,8 @@ class _AdsbScreenState extends ConsumerState<AdsbScreen> {
     final list = _sorted;
     final withPos = list.where((a) => a.hasPosition).length;
     const muted = TextStyle(color: Colors.white70);
-    String db(double v) => v.toStringAsFixed(1).replaceAll('.', ',');
+    final l = context.l10n;
+    String db(double v) => _decimal(l, v, 1);
     // Back hides the route, then folds the details, then leaves.
     return PopScope(
       canPop: _expanded == null && !_showRoute,
@@ -238,9 +241,9 @@ class _AdsbScreenState extends ConsumerState<AdsbScreen> {
         if (!didPop) _onBack();
       },
       child: Scaffold(
-      appBar: AppBar(title: const Text('Flugzeuge (ADS-B 1090 MHz)')),
+      appBar: AppBar(title: Text(l.scannerAdsbTitle)),
       body: _failed
-          ? const Center(child: Text('Empfänger konnte nicht gestartet werden.'))
+          ? Center(child: Text(l.scannerReceiverStartFailed))
           : Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -257,12 +260,12 @@ class _AdsbScreenState extends ConsumerState<AdsbScreen> {
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       Text(
-                        _started ? '${list.length} Flugzeuge · $withPos mit Position' : 'Starte Empfänger…',
+                        _started ? l.scannerAdsbCount(list.length, withPos) : l.scannerReceiverStarting,
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
-                      Text('${_rate.round()} Meldungen/s', style: muted),
+                      Text(l.scannerAdsbRate(_rate.round()), style: muted),
                       const SizedBox(width: 8),
-                      const Text('Verstärkung', style: muted),
+                      Text(l.scannerGain, style: muted),
                       IconButton(
                         autofocus: true,
                         onPressed: () => _stepGain(-1),
@@ -275,7 +278,7 @@ class _AdsbScreenState extends ConsumerState<AdsbScreen> {
                       ),
                       IconButton(onPressed: () => _stepGain(1), icon: const Icon(Icons.add)),
                       FilterChip(
-                        label: const Text('Karte'),
+                        label: Text(l.scannerAdsbMap),
                         selected: _showMap,
                         onSelected: (v) {
                           setState(() => _showMap = v);
@@ -313,10 +316,7 @@ class _AdsbScreenState extends ConsumerState<AdsbScreen> {
                           child: list.isEmpty
                               ? Center(
                                   child: Text(
-                                    _started
-                                        ? 'Noch kein Flugzeug empfangen.\nAntenne: senkrecht, ~6,9 cm (Viertelwelle 1090 MHz), '
-                                              'möglichst am Fenster.'
-                                        : '',
+                                    _started ? l.scannerAdsbNoAircraft : '',
                                     textAlign: TextAlign.center,
                                     style: const TextStyle(color: Colors.white54, fontSize: 16),
                                   ),
@@ -360,21 +360,29 @@ class _AdsbScreenState extends ConsumerState<AdsbScreen> {
   }
 }
 
-String _fmtAlt(Aircraft a) {
-  if (a.onGround) return 'am Boden';
+String _fmtAlt(AppLocalizations l, Aircraft a) {
+  if (a.onGround) return l.scannerAdsbOnGround;
   final ft = a.altitudeFt;
   if (ft == null) return '';
-  return '${_thousands(a.altitudeM!)} m (FL${(ft / 100).round().toString().padLeft(3, '0')})';
+  return '${_thousands(l, a.altitudeM!)} m (FL${(ft / 100).round().toString().padLeft(3, '0')})';
 }
 
-String _thousands(int v) {
+/// "12.500" in German, "12,500" in English.
+String _thousands(AppLocalizations l, int v) {
+  final sep = l.localeName == 'de' ? '.' : ',';
   final s = v.abs().toString();
   final b = StringBuffer(v < 0 ? '-' : '');
   for (var i = 0; i < s.length; i++) {
-    if (i > 0 && (s.length - i) % 3 == 0) b.write('.');
+    if (i > 0 && (s.length - i) % 3 == 0) b.write(sep);
     b.write(s[i]);
   }
   return b.toString();
+}
+
+/// [v] with [decimals] and the language's decimal separator.
+String _decimal(AppLocalizations l, double v, int decimals) {
+  final s = v.toStringAsFixed(decimals);
+  return l.localeName == 'de' ? s.replaceAll('.', ',') : s;
 }
 
 // Column widths, shared by the header and the rows.
@@ -387,18 +395,19 @@ class _AircraftHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const s = TextStyle(color: Colors.white54, fontSize: 13, fontWeight: FontWeight.w600);
+    final l = context.l10n;
     // Same insets as a row: focus frame (3) + card padding (12).
-    return const Padding(
-      padding: EdgeInsets.fromLTRB(15, 0, 15, 6),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(15, 0, 15, 6),
       child: Row(
         children: [
-          SizedBox(width: _wFlight, child: Text('Flug / ICAO', style: s)),
-          SizedBox(width: _wAlt, child: Text('Höhe', style: s)),
-          SizedBox(width: _wSpeed, child: Text('Tempo', style: s)),
-          SizedBox(width: _wClimb, child: Text('Steig/Sink', style: s)),
-          SizedBox(width: _wDist, child: Text('Entfernung', style: s)),
-          Expanded(child: Text('Zulassung', style: s)),
-          Text('Zuletzt', style: s),
+          SizedBox(width: _wFlight, child: Text(l.scannerAdsbColFlight, style: s)),
+          SizedBox(width: _wAlt, child: Text(l.scannerAdsbColAltitude, style: s)),
+          SizedBox(width: _wSpeed, child: Text(l.scannerAdsbColSpeed, style: s)),
+          SizedBox(width: _wClimb, child: Text(l.scannerAdsbColClimb, style: s)),
+          SizedBox(width: _wDist, child: Text(l.scannerAdsbColDistance, style: s)),
+          Expanded(child: Text(l.scannerAdsbColCountry, style: s)),
+          Text(l.scannerAdsbColLastSeen, style: s),
         ],
       ),
     );
@@ -445,7 +454,8 @@ class _AircraftTileState extends State<_AircraftTile> {
     final a = widget.aircraft;
     final info = widget.info;
     final km = a.distanceKm(widget.homeLat, widget.homeLon);
-    String n(double v, int d) => v.toStringAsFixed(d).replaceAll('.', ',');
+    final l = context.l10n;
+    String n(double v, int d) => _decimal(l, v, d);
     String place(Airport p) => '${p.city ?? p.name} (${p.code})${p.country != null ? ', ${p.country}' : ''}';
     const label = TextStyle(color: Colors.white54);
     const value = TextStyle(color: Colors.white);
@@ -463,25 +473,21 @@ class _AircraftTileState extends State<_AircraftTile> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (widget.loading && info == null)
-            const Text('Route wird geladen…', style: label)
+            Text(l.scannerAdsbRouteLoading, style: label)
           else if ((info?.hasRoute ?? false) && !info!.fits(lat: a.lat, lon: a.lon, track: a.track)) ...[
             // A stale route: the callsign flies something else today.
             Text(
               '${info.origin!.code}  →  ${info.destination!.code}  ?',
               style: const TextStyle(color: Colors.white38, fontSize: 18, fontWeight: FontWeight.bold),
             ),
-            const Text(
-              'Passt nicht zur Flugrichtung – die Fluglinie vergibt dieses Rufzeichen offenbar für eine '
-              'andere Strecke; die Routendaten sind veraltet.',
-              style: TextStyle(color: Colors.orangeAccent),
-            ),
+            Text(l.scannerAdsbRouteStale, style: const TextStyle(color: Colors.orangeAccent)),
           ] else if (info?.hasRoute ?? false) ...[
             Text(
               '${info!.origin!.code}  →  ${info.destination!.code}',
               style: const TextStyle(color: Colors.amberAccent, fontSize: 18, fontWeight: FontWeight.bold),
             ),
-            line('Von', place(info.origin!)),
-            line('Nach', place(info.destination!)),
+            line(l.scannerAdsbFrom, place(info.origin!)),
+            line(l.scannerAdsbTo, place(info.destination!)),
             const SizedBox(height: 4),
             // For the mouse; with the remote it's OK on the row (the button
             // stays out of the focus order, so up/down go to the next flight).
@@ -489,30 +495,33 @@ class _AircraftTileState extends State<_AircraftTile> {
               child: OutlinedButton.icon(
                 onPressed: widget.onRoute,
                 icon: Icon(widget.routeShown ? Icons.layers_clear : Icons.route),
-                label: Text(widget.routeShown ? 'Flugroute ausblenden (Zurück)' : 'Flugroute zeigen (OK)'),
+                label: Text(widget.routeShown ? l.scannerAdsbHideRoute : l.scannerAdsbShowRoute),
               ),
             ),
             const SizedBox(height: 4),
           ] else
-            const Text('Keine Routendaten bekannt', style: label),
-          if (info?.airline != null) line('Fluglinie', info!.airline!),
-          if (aircraftText.isNotEmpty) line('Flugzeug', aircraftText),
-          if (info?.registration != null) line('Kennzeichen', info!.registration!),
-          if (info?.owner != null) line('Halter', info!.owner!),
+            Text(l.scannerAdsbNoRoute, style: label),
+          if (info?.airline != null) line(l.scannerAdsbAirline, info!.airline!),
+          if (aircraftText.isNotEmpty) line(l.scannerAdsbAircraft, aircraftText),
+          if (info?.registration != null) line(l.scannerColRegistration, info!.registration!),
+          if (info?.owner != null) line(l.scannerAdsbOwner, info!.owner!),
           const SizedBox(height: 4),
-          if (a.category != AircraftCategory.unknown) line('Art', a.category.label),
-          line('ICAO-Adresse', '${a.icaoHex}${a.country != null ? ' (${a.country})' : ''}'),
+          if (a.category != AircraftCategory.unknown) line(l.scannerColType, a.category.label),
+          line(l.scannerAdsbIcaoAddress, '${a.icaoHex}${a.country != null ? ' (${a.country})' : ''}'),
           if (a.squawk != null) line('Squawk', a.squawk!),
-          if (a.track != null) line('Kurs', '${a.track!.round()}°'),
+          if (a.track != null) line(l.scannerAdsbTrack, '${a.track!.round()}°'),
           if (a.verticalRateFpm != null)
-            line('Steigen/Sinken', '${n(a.verticalRateFpm! * 0.00508, 1)} m/s (${a.verticalRateFpm} ft/min)'),
-          if (a.speedKt != null) line('Geschwindigkeit', '${a.speedKmh} km/h (${a.speedKt!.round()} kn)'),
-          if (a.hasPosition) line('Position', '${n(a.lat!, 4)}° N, ${n(a.lon!, 4)}° O'),
+            line(l.scannerAdsbClimbRate, '${n(a.verticalRateFpm! * 0.00508, 1)} m/s (${a.verticalRateFpm} ft/min)'),
+          if (a.speedKt != null) line(l.scannerAdsbGroundSpeed, '${a.speedKmh} km/h (${a.speedKt!.round()} kn)'),
+          if (a.hasPosition) line('Position', l.scannerAdsbPosition(n(a.lat!, 4), n(a.lon!, 4))),
           if (km != null)
-            line('Richtung', '${bearingDeg(widget.homeLat, widget.homeLon, a.lat!, a.lon!).round()}° in ${n(km, 1)} km'),
-          line('Empfang', '${a.messages} Meldungen · Signal ${n(a.signalDb, 1)} dB'),
+            line(
+              l.scannerAdsbBearing,
+              l.scannerAdsbBearingValue(bearingDeg(widget.homeLat, widget.homeLon, a.lat!, a.lon!).round(), n(km, 1)),
+            ),
+          line(l.scannerAdsbReception, l.scannerAdsbReceptionValue(a.messages, n(a.signalDb, 1))),
           const SizedBox(height: 2),
-          const Text('Route und Flugzeugdaten: adsbdb.com', style: TextStyle(color: Colors.white38, fontSize: 11)),
+          Text(l.scannerAdsbDataSource, style: const TextStyle(color: Colors.white38, fontSize: 11)),
         ],
       ),
     );
@@ -524,6 +533,7 @@ class _AircraftTileState extends State<_AircraftTile> {
     final km = a.distanceKm(widget.homeLat, widget.homeLon);
     final age = DateTime.now().difference(a.lastSeen).inSeconds;
     const dim = TextStyle(color: Colors.white70);
+    final l = context.l10n;
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
       child: TvFocusHighlight(
@@ -565,26 +575,26 @@ class _AircraftTileState extends State<_AircraftTile> {
                       ],
                     ),
                   ),
-                  SizedBox(width: _wAlt, child: Text(_fmtAlt(a), style: dim)),
+                  SizedBox(width: _wAlt, child: Text(_fmtAlt(l, a), style: dim)),
                   SizedBox(width: _wSpeed, child: Text(a.speedKmh != null ? '${a.speedKmh} km/h' : '', style: dim)),
                   SizedBox(
                     width: _wClimb,
                     child: Text(
                       a.verticalRateFpm == null || a.verticalRateFpm!.abs() < 200
                           ? ''
-                          : (a.verticalRateFpm! > 0 ? '↗ steigt' : '↘ sinkt'),
+                          : (a.verticalRateFpm! > 0 ? l.scannerAdsbClimbing : l.scannerAdsbDescending),
                       style: dim,
                     ),
                   ),
                   SizedBox(
                     width: _wDist,
                     child: Text(
-                      km == null ? '' : '${km.toStringAsFixed(km < 10 ? 1 : 0).replaceAll('.', ',')} km',
+                      km == null ? '' : '${_decimal(l, km, km < 10 ? 1 : 0)} km',
                       style: const TextStyle(color: Colors.greenAccent),
                     ),
                   ),
                   Expanded(child: Text(a.country ?? '', style: const TextStyle(color: Colors.white54))),
-                  Text(age <= 1 ? '' : 'vor $age s', style: const TextStyle(color: Colors.white38, fontSize: 12)),
+                  Text(age <= 1 ? '' : l.scannerAgoSeconds(age), style: const TextStyle(color: Colors.white38, fontSize: 12)),
                   Icon(widget.expanded ? Icons.expand_less : Icons.expand_more, color: Colors.white38),
                 ],
               ),
@@ -675,7 +685,7 @@ class _RadarPainter extends CustomPainter {
       canvas.drawCircle(c, r, Paint()..color = Colors.black.withValues(alpha: 0.25));
       canvas.restore();
       final tp = TextPainter(
-        text: const TextSpan(text: MapTiles.attribution, style: TextStyle(color: Colors.white54, fontSize: 10)),
+        text: TextSpan(text: MapTiles.attribution, style: const TextStyle(color: Colors.white54, fontSize: 10)),
         textDirection: TextDirection.ltr,
       )..layout();
       tp.paint(canvas, Offset(size.width - tp.width - 2, size.height - tp.height - 2));

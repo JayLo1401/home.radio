@@ -5,6 +5,8 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
+import '../../l10n/l10n.dart';
+
 /// Map tiles (256 px, Web Mercator) for a background map - OpenStreetMap's
 /// standard tiles, drawn dark ([_darkFilter]). Licence: OSM data is ODbL,
 /// the attribution [attribution] must be visible on the map. The OSM tile
@@ -16,7 +18,7 @@ class MapTiles {
   /// Called when a tile arrived (the painter draws it on the next frame).
   final VoidCallback onLoaded;
 
-  static const attribution = '© OpenStreetMap-Mitwirkende';
+  static String get attribution => l10n.scannerMapAttribution;
   static const _maxCached = 200;
 
   /// Dark mode for the light OSM style: colours inverted, then the hue

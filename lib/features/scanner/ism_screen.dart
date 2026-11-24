@@ -10,8 +10,10 @@ import '../../core/theme.dart' show TvFocusHighlight;
 import '../../data/models/ism.dart';
 import '../../data/repositories/settings_repository.dart';
 import '../../data/services/dab_rtlsdr_service.dart' show DabRtlSdrService;
+import '../../l10n/l10n.dart';
 import '../shared/logo_picker_dialog.dart' show connectDecoder;
 import 'reception_status.dart';
+import '../../core/native_messages.dart';
 
 /// Wireless sensors in the neighbourhood (433,92 / 868,3 MHz): thermometers
 /// and weather stations as cards with their values and a 24 h curve,
@@ -127,7 +129,7 @@ class _IsmScreenState extends ConsumerState<IsmScreen> {
       case 'connectionMessage':
         final isError = event['isError'] as bool? ?? false;
         final message = (event['message'] as String?)?.trim() ?? '';
-        if (mounted) setState(() => _sourceWarning = isError && message.isNotEmpty ? message : null);
+        if (mounted) setState(() => _sourceWarning = isError && message.isNotEmpty ? nativeMessageText(message) : null);
     }
   }
 
@@ -137,9 +139,9 @@ class _IsmScreenState extends ConsumerState<IsmScreen> {
   Future<void> _rename(IsmDevice d) async {
     final name = await showTextInputDialog(
       context,
-      title: 'Name für ${d.last.model}',
+      title: context.l10n.scannerIsmNameFor(d.last.modelName),
       initialValue: _nameOf(d) ?? '',
-      hint: 'z. B. Balkon, Keller, Nachbar Garten',
+      hint: context.l10n.scannerIsmNameHint,
     );
     if (name == null) return;
     setState(() {
@@ -201,11 +203,12 @@ class _IsmScreenState extends ConsumerState<IsmScreen> {
     final switches = _sorted(IsmCategory.switches);
     final hiddenCount = _tracker.devices.values.where(_hidden).length;
     const muted = TextStyle(color: Colors.white70);
-    String db(double v) => v.toStringAsFixed(1).replaceAll('.', ',');
+    final l = context.l10n;
+    String db(double v) => _num(l, v, 1);
     return Scaffold(
-      appBar: AppBar(title: const Text('Funksensoren')),
+      appBar: AppBar(title: Text(l.scannerSensors)),
       body: _failed
-          ? const Center(child: Text('Empfänger konnte nicht gestartet werden.'))
+          ? Center(child: Text(l.scannerReceiverStartFailed))
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
@@ -222,19 +225,19 @@ class _IsmScreenState extends ConsumerState<IsmScreen> {
                     for (final (i, (hz, label)) in _freqs.indexed)
                       ChoiceChip(
                         autofocus: i == 0,
-                        label: Text(label),
+                        label: Text(l.localeName == 'de' ? label : label.replaceAll(',', '.')),
                         selected: _freqHz == hz,
                         onSelected: (_) => _setFrequency(hz),
                       ),
                     const SizedBox(width: 8),
                     Text(
                       _started
-                          ? '${_tracker.devices.length} Geräte · ${_tracker.bursts} Signale'
-                          : 'Starte Empfänger…',
+                          ? '${l.scannerIsmDevices(_tracker.devices.length)} · ${l.scannerIsmSignals(_tracker.bursts)}'
+                          : l.scannerReceiverStarting,
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     const SizedBox(width: 8),
-                    const Text('Verstärkung', style: muted),
+                    Text(l.scannerGain, style: muted),
                     IconButton(onPressed: () => _stepGain(-1), icon: const Icon(Icons.remove)),
                     Text(
                       _gainIndex < 0
@@ -244,7 +247,7 @@ class _IsmScreenState extends ConsumerState<IsmScreen> {
                     IconButton(onPressed: () => _stepGain(1), icon: const Icon(Icons.add)),
                     if (hiddenCount > 0)
                       FilterChip(
-                        label: Text('Ausgeblendete zeigen ($hiddenCount)'),
+                        label: Text(l.scannerIsmShowHidden(hiddenCount)),
                         selected: _showHidden,
                         onSelected: (v) => setState(() => _showHidden = v),
                       ),
@@ -254,16 +257,12 @@ class _IsmScreenState extends ConsumerState<IsmScreen> {
                 ReceptionStatus(status: _status, expectedRate: 1024000, lastSignal: _lastBurst),
                 const SizedBox(height: 16),
                 if (_started && _tracker.devices.isEmpty && _tracker.unknown.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 24),
-                    child: Text(
-                      'Warte auf Funksensoren… Die meisten senden alle 30–60 Sekunden.\n'
-                      'Antenne für 433 MHz: senkrecht, ~17 cm (868 MHz: ~8,6 cm).',
-                      style: TextStyle(color: Colors.white54, fontSize: 16),
-                    ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    child: Text(l.scannerIsmWaiting, style: const TextStyle(color: Colors.white54, fontSize: 16)),
                   ),
                 if (weather.isNotEmpty) ...[
-                  const _Section(icon: Icons.thermostat, title: 'Thermometer & Wetter'),
+                  _Section(icon: Icons.thermostat, title: l.scannerIsmSectionWeather),
                   Wrap(
                     spacing: 12,
                     runSpacing: 12,
@@ -275,18 +274,17 @@ class _IsmScreenState extends ConsumerState<IsmScreen> {
                   const SizedBox(height: 20),
                 ],
                 if (switches.isNotEmpty) ...[
-                  const _Section(icon: Icons.notifications_active_outlined, title: 'Schalter, Klingeln, Fernbedienungen'),
+                  _Section(icon: Icons.notifications_active_outlined, title: l.scannerIsmSectionSwitches),
                   for (final d in switches)
                     _EventRow(device: d, name: _nameOf(d), onTap: () => _details(d)),
                   const SizedBox(height: 20),
                 ],
                 if (_tracker.keyPresses > 0) ...[
-                  const _Section(icon: Icons.key_outlined, title: 'Funkschlüssel (anonym)'),
+                  _Section(icon: Icons.key_outlined, title: l.scannerIsmSectionKeys),
                   Padding(
                     padding: const EdgeInsets.only(left: 28, bottom: 20),
                     child: Text(
-                      '${_tracker.keyPresses} Tastendrücke in der Umgebung, seit diese Seite offen ist · '
-                      'zuletzt ${_age(_tracker.lastKeyPress!)}',
+                      l.scannerIsmKeyPresses(_tracker.keyPresses, _age(l, _tracker.lastKeyPress!)),
                       style: const TextStyle(color: Colors.white70),
                     ),
                   ),
@@ -294,13 +292,13 @@ class _IsmScreenState extends ConsumerState<IsmScreen> {
                 if (_tracker.unknown.isNotEmpty) ...[
                   Row(
                     children: [
-                      const _Section(icon: Icons.help_outline, title: 'Unbekannt'),
+                      _Section(icon: Icons.help_outline, title: l.scannerIsmSectionUnknown),
                       const SizedBox(width: 12),
-                      Text('${_tracker.unknown.length} Sender', style: muted),
+                      Text(l.scannerIsmTransmitters(_tracker.unknown.length), style: muted),
                       const SizedBox(width: 12),
                       TextButton(
                         onPressed: () => setState(() => _showUnknown = !_showUnknown),
-                        child: Text(_showUnknown ? 'Rohdaten ausblenden' : 'Rohdaten ansehen'),
+                        child: Text(_showUnknown ? l.scannerIsmHideRaw : l.scannerIsmShowRaw),
                       ),
                     ],
                   ),
@@ -313,14 +311,18 @@ class _IsmScreenState extends ConsumerState<IsmScreen> {
   }
 }
 
-String _age(DateTime t) {
+String _age(AppLocalizations l, DateTime t) {
   final s = DateTime.now().difference(t).inSeconds;
-  if (s < 60) return 'vor $s s';
-  if (s < 3600) return 'vor ${s ~/ 60} min';
-  return 'vor ${s ~/ 3600} h';
+  if (s < 60) return l.scannerAgoSeconds(s);
+  if (s < 3600) return l.scannerAgoMinutes(s ~/ 60);
+  return l.scannerAgoHours(s ~/ 3600);
 }
 
-String _num(double v, int d) => v.toStringAsFixed(d).replaceAll('.', ',');
+/// [v] with [d] decimals and the language's decimal separator.
+String _num(AppLocalizations l, double v, int d) {
+  final s = v.toStringAsFixed(d);
+  return l.localeName == 'de' ? s.replaceAll('.', ',') : s;
+}
 
 class _Section extends StatelessWidget {
   final IconData icon;
@@ -391,7 +393,8 @@ class _WeatherCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final r = device.last;
-    final title = name ?? '${r.model}${r.channel != null ? ' · Kanal ${r.channel}' : ''}';
+    final l = context.l10n;
+    final title = name ?? '${r.modelName}${r.channel != null ? ' · ${l.scannerChannel('${r.channel}')}' : ''}';
     return Opacity(
       opacity: hidden ? 0.5 : 1,
       child: _FocusCard(
@@ -416,7 +419,7 @@ class _WeatherCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 if (r.temperatureC != null)
-                  Text('${_num(r.temperatureC!, 1)} °C', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w600)),
+                  Text('${_num(l, r.temperatureC!, 1)} °C', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w600)),
                 const SizedBox(width: 14),
                 if (r.humidity != null)
                   Text('${r.humidity} %', style: const TextStyle(fontSize: 22, color: Colors.lightBlueAccent)),
@@ -428,10 +431,10 @@ class _WeatherCard extends StatelessWidget {
                 child: Text(
                   [
                     if (r.windMs != null)
-                      'Wind ${_num(r.windMs! * 3.6, 0)} km/h'
-                          '${r.windDirection != null ? ' aus ${r.windDirection!.round()}°' : ''}',
-                    if (r.gustMs != null) 'Böen ${_num(r.gustMs! * 3.6, 0)}',
-                    if (r.rainMm != null) 'Regen ${_num(r.rainMm!, 1)} mm',
+                      '${l.scannerWind(_num(l, r.windMs! * 3.6, 0))}'
+                          '${r.windDirection != null ? ' ${l.scannerWindFrom(r.windDirection!.round())}' : ''}',
+                    if (r.gustMs != null) l.scannerGusts(_num(l, r.gustMs! * 3.6, 0)),
+                    if (r.rainMm != null) l.scannerIsmRain(_num(l, r.rainMm!, 1)),
                   ].join(' · '),
                   style: const TextStyle(color: Colors.white70),
                 ),
@@ -447,11 +450,11 @@ class _WeatherCard extends StatelessWidget {
                     size: 16,
                     color: r.batteryOk! ? Colors.white54 : Colors.orangeAccent,
                   ),
-                  Text(r.batteryOk! ? ' ok' : ' schwach',
+                  Text(' ${r.batteryOk! ? l.scannerIsmBatteryOk : l.scannerIsmBatteryLow}',
                       style: TextStyle(color: r.batteryOk! ? Colors.white54 : Colors.orangeAccent, fontSize: 12)),
                   const SizedBox(width: 10),
                 ],
-                Text(_age(device.lastSeen), style: const TextStyle(color: Colors.white54, fontSize: 12)),
+                Text(_age(l, device.lastSeen), style: const TextStyle(color: Colors.white54, fontSize: 12)),
               ],
             ),
           ],
@@ -518,13 +521,14 @@ class _EventRow extends StatelessWidget {
             SizedBox(width: 60, child: Text(e == null ? '' : hhmm(e.at), style: const TextStyle(color: Colors.white54))),
             Expanded(
               child: Text(
-                name ?? '${device.last.model} · ID ${device.last.id}',
+                name ?? '${device.last.modelName} · ID ${device.last.id}',
                 style: const TextStyle(fontWeight: FontWeight.w600),
               ),
             ),
             Text(e?.event ?? '', style: const TextStyle(color: Colors.white70)),
             const SizedBox(width: 16),
-            Text('${device.events.length}× · ${_age(device.lastSeen)}', style: const TextStyle(color: Colors.white54, fontSize: 12)),
+            Text('${device.events.length}× · ${_age(context.l10n, device.lastSeen)}',
+                style: const TextStyle(color: Colors.white54, fontSize: 12)),
           ],
         ),
       ),
@@ -545,12 +549,13 @@ class _UnknownRow extends StatelessWidget {
     final g = b.gaps.toList()..sort();
     String range(List<int> v) => v.isEmpty ? '–' : '${v[v.length ~/ 10]}–${v[v.length * 9 ~/ 10]} µs';
     final band = b.freqHz == 0 ? '' : '${(b.freqHz / 1e6).round()} MHz · ';
+    final l = context.l10n;
     if (u.continuous) {
       return Padding(
         padding: const EdgeInsets.only(bottom: 6),
         child: Text(
-          '${_age(group.lastSeen)} · ${group.count}× · ${band}Dauersender (FSK, ~${u.bitUs} µs/Bit) · '
-          '${_num(b.offsetHz / 1000, 0)} kHz · SNR ${b.snrDb.round()} dB - fortlaufendes Muster, nicht dekodierbar',
+          '${_age(l, group.lastSeen)} · ${group.count}× · $band${l.scannerIsmContinuous('${u.bitUs}')} · '
+          '${_num(l, b.offsetHz / 1000, 0)} kHz · SNR ${b.snrDb.round()} dB - ${l.scannerIsmNotDecodable}',
           style: const TextStyle(fontFamily: 'monospace', fontSize: 12, color: Colors.white38),
         ),
       );
@@ -558,10 +563,10 @@ class _UnknownRow extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Text(
-        '${_age(group.lastSeen)} · ${group.count}× · $band${b.modulation.toUpperCase()} ${u.coding}'
-        '${u.bitUs != null ? ' ~${u.bitUs} µs/Bit' : ''} · ${p.length} Pulse '
-        '(${range(p)}, Pausen ${range(g)}) · ${_num(b.offsetHz / 1000, 0)} kHz · SNR ${b.snrDb.round()} dB'
-        '${u.afterSync != null ? '\n   Nach Sync 2DD4: ${u.afterSync}' : [for (final r in u.rows) '\n   $r'].join()}'
+        '${_age(l, group.lastSeen)} · ${group.count}× · $band${b.modulation.toUpperCase()} ${u.coding}'
+        '${u.bitUs != null ? ' ${l.scannerIsmBitTime('${u.bitUs}')}' : ''} · '
+        '${l.scannerIsmPulses(p.length, range(p), range(g))} · ${_num(l, b.offsetHz / 1000, 0)} kHz · SNR ${b.snrDb.round()} dB'
+        '${u.afterSync != null ? '\n   ${l.scannerIsmAfterSync(u.afterSync!)}' : [for (final r in u.rows) '\n   $r'].join()}'
         '${u.manchesterHex != null ? '\n   Manchester: ${u.manchesterHex}' : ''}',
         style: const TextStyle(fontFamily: 'monospace', fontSize: 12, color: Colors.white60),
       ),
@@ -583,21 +588,23 @@ class _DeviceDialog extends StatelessWidget {
     final r = device.last;
     String hhmm(DateTime t) => '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
     final temps = [for (final h in device.history) if (h.temp != null) h.temp!];
+    final l = context.l10n;
     return AlertDialog(
-      title: Text(name ?? r.model),
+      title: Text(name ?? r.modelName),
       content: SizedBox(
         width: 640,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Gerät: ${r.model} · ID ${r.id}${r.channel != null ? ' · Kanal ${r.channel}' : ''}'),
+            Text('${l.scannerIsmDevice(r.modelName, r.id)}'
+                '${r.channel != null ? ' · ${l.scannerChannel('${r.channel}')}' : ''}'),
             if (r.temperatureC != null)
-              Text('Temperatur: ${_num(r.temperatureC!, 1)} °C'
-                  '${temps.length > 1 ? ' (24 h: ${_num(temps.reduce(math.min), 1)} bis ${_num(temps.reduce(math.max), 1)} °C)' : ''}'),
-            if (r.humidity != null) Text('Luftfeuchte: ${r.humidity} %'),
-            if (r.batteryOk != null) Text('Batterie: ${r.batteryOk! ? 'ok' : 'schwach'}'),
-            Text('Empfangen: ${device.count}× · zuletzt ${_age(device.lastSeen)} · Pegel ${device.levelDb.round()} dB'),
+              Text('${l.scannerIsmTemperature(_num(l, r.temperatureC!, 1))}'
+                  '${temps.length > 1 ? ' (${l.scannerIsmTempRange(_num(l, temps.reduce(math.min), 1), _num(l, temps.reduce(math.max), 1))})' : ''}'),
+            if (r.humidity != null) Text(l.scannerIsmHumidity('${r.humidity}')),
+            if (r.batteryOk != null) Text(l.scannerIsmBattery(r.batteryOk! ? l.scannerIsmBatteryOk : l.scannerIsmBatteryLow)),
+            Text(l.scannerIsmReceived(device.count, _age(l, device.lastSeen), device.levelDb.round())),
             if (device.history.length > 1) ...[
               const SizedBox(height: 12),
               SizedBox(height: 120, child: CustomPaint(size: Size.infinite, painter: _Sparkline(device.history))),
@@ -612,9 +619,9 @@ class _DeviceDialog extends StatelessWidget {
         ),
       ),
       actions: [
-        TextButton(onPressed: onRename, child: Text(name == null ? 'Name vergeben' : 'Umbenennen')),
-        TextButton(onPressed: () => onHide(!hidden), child: Text(hidden ? 'Wieder anzeigen' : 'Ausblenden')),
-        TextButton(autofocus: true, onPressed: () => Navigator.of(context).pop(), child: const Text('Schließen')),
+        TextButton(onPressed: onRename, child: Text(name == null ? l.scannerIsmSetName : l.scannerIsmRename)),
+        TextButton(onPressed: () => onHide(!hidden), child: Text(hidden ? l.scannerIsmShowAgain : l.scannerIsmHide)),
+        TextButton(autofocus: true, onPressed: () => Navigator.of(context).pop(), child: Text(l.commonClose)),
       ],
     );
   }

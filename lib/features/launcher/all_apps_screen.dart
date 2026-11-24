@@ -8,6 +8,7 @@ import '../../core/remote_keys.dart';
 import '../../core/theme.dart';
 import '../../data/models/launcher_tile.dart';
 import '../../data/services/launcher_service.dart';
+import '../../l10n/l10n.dart';
 import 'launcher_providers.dart';
 import 'launcher_screen.dart' show TileArt, launcherMenuOption, openAppInfo;
 
@@ -51,14 +52,14 @@ class _AllAppsScreenState extends ConsumerState<AllAppsScreen> with WidgetsBindi
       builder: (context) => SimpleDialog(
         title: Text(app.label),
         children: [
-          launcherMenuOption(context, 'open', Icons.open_in_new, 'Öffnen', autofocus: true),
+          launcherMenuOption(context, 'open', Icons.open_in_new, context.l10n.miscAllAppsOpen, autofocus: true),
           launcherMenuOption(
             context,
             'favorite',
             inRow ? Icons.star : Icons.star_border,
-            inRow ? 'Aus den Favoriten entfernen' : 'Zu den Favoriten hinzufügen',
+            inRow ? context.l10n.miscAllAppsRemoveFavorite : context.l10n.miscAllAppsAddFavorite,
           ),
-          launcherMenuOption(context, 'info', Icons.info_outline, 'App-Info (beenden, deinstallieren …)'),
+          launcherMenuOption(context, 'info', Icons.info_outline, context.l10n.miscAllAppsAppInfo),
         ],
       ),
     );
@@ -93,7 +94,9 @@ class _AllAppsScreenState extends ConsumerState<AllAppsScreen> with WidgetsBindi
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(
         duration: const Duration(seconds: 2),
-        content: Text(inRow ? '„${app.label}“ aus den Favoriten entfernt' : '„${app.label}“ zu den Favoriten hinzugefügt'),
+        content: Text(
+          inRow ? context.l10n.miscAllAppsFavoriteRemoved(app.label) : context.l10n.miscAllAppsFavoriteAdded(app.label),
+        ),
       ));
   }
 
@@ -103,11 +106,12 @@ class _AllAppsScreenState extends ConsumerState<AllAppsScreen> with WidgetsBindi
     final tiles = ref.watch(launcherTilesProvider);
     final query = _search.text.trim().toLowerCase();
     final settingsInRow = tiles.any((t) => t.isSystemSettings);
+    final l = context.l10n;
     return Scaffold(
       backgroundColor: const Color(0xFF05070A),
       appBar: AppBar(
         backgroundColor: Colors.black.withValues(alpha: 0.7),
-        title: const Text('Alle Apps'),
+        title: Text(l.miscAllAppsTitle),
       ),
       body: Padding(
         padding: const EdgeInsets.fromLTRB(32, 16, 32, 0),
@@ -118,14 +122,14 @@ class _AllAppsScreenState extends ConsumerState<AllAppsScreen> with WidgetsBindi
               children: [
                 SizedBox(
                   width: 420,
-                  child: PopupTextField(controller: _search, label: 'App suchen', icon: Icons.search),
+                  child: PopupTextField(controller: _search, label: l.miscAllAppsSearch, icon: Icons.search),
                 ),
                 const SizedBox(width: 16),
                 if (query.isNotEmpty)
                   TextButton.icon(
                     onPressed: () => _search.clear(),
                     icon: const Icon(Icons.clear),
-                    label: const Text('Suche löschen'),
+                    label: Text(l.miscAllAppsClearSearch),
                   ),
                 const Spacer(),
                 TextButton.icon(
@@ -136,27 +140,27 @@ class _AllAppsScreenState extends ConsumerState<AllAppsScreen> with WidgetsBindi
                         : notifier.add(const LauncherTile.systemSettings());
                   },
                   icon: Icon(settingsInRow ? Icons.star : Icons.star_border),
-                  label: Text(settingsInRow ? 'TV-Einstellungen in den Favoriten' : 'TV-Einstellungen als Favorit'),
+                  label: Text(settingsInRow ? l.miscAllAppsSettingsIsFavorite : l.miscAllAppsSettingsAddFavorite),
                 ),
               ],
             ),
             const SizedBox(height: 8),
-            const Text(
-              'OK: App öffnen  ·  ☰ oder OK lange drücken: Favorit, App-Info (beenden, deinstallieren)',
-              style: TextStyle(color: Colors.white54, fontSize: 13),
+            Text(
+              l.miscAllAppsHelp,
+              style: const TextStyle(color: Colors.white54, fontSize: 13),
             ),
             const SizedBox(height: 12),
             Expanded(
               child: apps.when(
                 loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, _) => Center(child: Text('Apps konnten nicht gelesen werden: $e')),
+                error: (e, _) => Center(child: Text(l.miscAllAppsLoadError('$e'))),
                 data: (list) {
                   final shown = query.isEmpty
                       ? list
                       : list.where((a) => a.label.toLowerCase().contains(query) || a.package.contains(query)).toList();
                   if (shown.isEmpty) {
                     return Center(
-                      child: Text(query.isEmpty ? 'Keine Apps gefunden.' : 'Keine App passt zu „${_search.text}“.'),
+                      child: Text(query.isEmpty ? l.miscAllAppsNone : l.miscAllAppsNoMatch(_search.text)),
                     );
                   }
                   return GridView.builder(

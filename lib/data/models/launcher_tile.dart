@@ -1,9 +1,12 @@
 import 'dart:convert';
 
+import '../../l10n/l10n.dart';
+
 /// What Home System shows on start: the launcher, straight Radio with
-/// the autostart station (as before the launcher existed), or TV with
-/// its start channel - e.g. a TV set that should simply show TV.
-enum StartScreen { launcher, radio, tv }
+/// the autostart station (as before the launcher existed), TV with
+/// its start channel - e.g. a TV set that should simply show TV -, the
+/// Haussteuerung (a wall tablet), or another app (see getStartApp).
+enum StartScreen { launcher, radio, tv, dashboard, app }
 
 /// Where the launcher's background pictures come from.
 /// - [builtin]: colour gradients that come with the app (offline).
@@ -17,12 +20,14 @@ class LauncherTile {
 
   const LauncherTile.radio({String? image}) : this._(radioType, image: image);
   const LauncherTile.tv({String? image}) : this._(tvType, image: image);
+  const LauncherTile.dashboard({String? image}) : this._(dashboardType, image: image);
   const LauncherTile.systemSettings({String? image}) : this._(settingsType, image: image);
   const LauncherTile.app({required String package, required String label, String? image})
       : this._(appType, package: package, label: label, image: image);
 
   static const radioType = 'radio';
   static const tvType = 'tv';
+  static const dashboardType = 'dashboard';
   static const settingsType = 'settings';
   static const appType = 'app';
 
@@ -41,12 +46,13 @@ class LauncherTile {
 
   bool get isRadio => type == radioType;
   bool get isTv => type == tvType;
+  bool get isDashboard => type == dashboardType;
   bool get isApp => type == appType;
   bool get isSystemSettings => type == settingsType;
 
   /// A built-in part of Home System (Radio, TV) - can be moved, but
   /// not removed.
-  bool get isBuiltIn => isRadio || isTv;
+  bool get isBuiltIn => isRadio || isTv || isDashboard;
 
   String? get imageUrl => image != null && image!.startsWith('http') ? image : null;
 
@@ -56,7 +62,8 @@ class LauncherTile {
   String get displayLabel => switch (type) {
         radioType => 'Radio',
         tvType => 'TV',
-        settingsType => 'Einstellungen (TV)',
+        dashboardType => l10n.dashboardTitle,
+        settingsType => l10n.systemTileSettings,
         _ => label ?? package ?? '',
       };
 
@@ -77,6 +84,8 @@ class LauncherTile {
         return LauncherTile.radio(image: image);
       case tvType:
         return LauncherTile.tv(image: image);
+      case dashboardType:
+        return LauncherTile.dashboard(image: image);
       case settingsType:
         return LauncherTile.systemSettings(image: image);
       case appType:

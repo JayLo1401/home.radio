@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme.dart';
 import '../../data/services/enigma2_discovery.dart';
+import '../../l10n/l10n.dart';
 
 /// "Receiver suchen": scans the home network for Enigma2 receivers
 /// (OpenWebif) and lists them as they turn up - OK picks one.
@@ -67,7 +68,7 @@ class _ReceiverSearchDialogState extends State<_ReceiverSearchDialog> {
   Widget build(BuildContext context) {
     final searching = !_finished;
     return AlertDialog(
-      title: const Text('Receiver suchen'),
+      title: Text(context.l10n.tvSearchReceiver),
       content: SizedBox(
         width: 520,
         child: Column(
@@ -76,11 +77,12 @@ class _ReceiverSearchDialogState extends State<_ReceiverSearchDialog> {
           children: [
             Text(
               searching
-                  ? 'Durchsuche das Heimnetz${_networks.isEmpty ? '' : ' (${_networks.map((n) => '$n.x').join(', ')})'} …'
+                  ? _networks.isEmpty
+                      ? context.l10n.tvSearchScanning
+                      : context.l10n.tvSearchScanningNetworks(_networks.map((n) => '$n.x').join(', '))
                   : _found.isEmpty
-                      ? 'Kein Receiver gefunden. Ist er eingeschaltet und im selben Netz? '
-                          'Sonst die Adresse bitte von Hand eintragen.'
-                      : '${_found.length == 1 ? 'Ein Receiver' : '${_found.length} Receiver'} gefunden - OK übernimmt ihn.',
+                      ? context.l10n.tvSearchNoneFound
+                      : context.l10n.tvSearchFound(_found.length),
               style: const TextStyle(color: Colors.white70),
             ),
             if (searching) ...[
@@ -94,7 +96,10 @@ class _ReceiverSearchDialogState extends State<_ReceiverSearchDialog> {
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(searching ? 'Abbrechen' : 'Schließen')),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(searching ? context.l10n.commonCancel : context.l10n.commonClose),
+        ),
       ],
     );
   }
@@ -117,7 +122,9 @@ class _ReceiverRowState extends State<_ReceiverRow> {
   @override
   Widget build(BuildContext context) {
     final r = widget.receiver;
-    final name = r.needsLogin ? 'Enigma2-Receiver (Anmeldung nötig)' : (r.model.isEmpty ? 'Enigma2-Receiver' : r.model);
+    final name = r.needsLogin
+        ? context.l10n.tvReceiverNeedsLogin
+        : (r.model.isEmpty ? context.l10n.tvEnigma2Receiver : r.model);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: TvFocusHighlight(

@@ -4,6 +4,9 @@ import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
+import 'nas_picture_cache.dart';
+import '../../l10n/l10n.dart';
+
 /// Fetches the launcher's next background picture (as bytes - shown via
 /// MemoryImage, so a server answering one address with a different picture
 /// each time isn't stuck in Flutter's image cache).
@@ -15,13 +18,24 @@ import 'package:http/http.dart' as http;
 /// - an HTML page linking pictures, e.g. a plain directory listing of nginx,
 ///   Apache or `python -m http.server` on a folder of wallpapers.
 /// Relative addresses count from the server's address.
+///
+/// The address [nasAddress] stands for the NAS pictures folder (Settings →
+/// NAS) instead: pictures from [nasPictures]' local cache.
 class LauncherBackgroundService {
-  LauncherBackgroundService({http.Client? client, Random? random})
+  LauncherBackgroundService({http.Client? client, Random? random, this.nasPictures})
       : _client = client ?? http.Client(),
         _random = random ?? Random();
 
   final http.Client _client;
   final Random _random;
+
+  /// The NAS pictures folder's cache - for the address [nasAddress].
+  final NasPictureCache? nasPictures;
+
+  /// The own server's address meaning "the NAS pictures folder".
+  static const nasAddress = 'nas:';
+
+  static bool isNasAddress(String address) => address.trim() == nasAddress;
   static const _timeout = Duration(seconds: 20);
 
   List<({String url, String caption})> _bingImages = const [];
@@ -35,7 +49,9 @@ class LauncherBackgroundService {
     if (_bingImages.isEmpty || loadedAt == null || DateTime.now().difference(loadedAt) > const Duration(hours: 6)) {
       final images = <({String url, String caption})>[];
       for (final idx in const [0, 7]) {
-        final uri = Uri.parse('https://www.bing.com/HPImageArchive.aspx?format=js&idx=$idx&n=8&mkt=de-DE');
+        // The pictures' captions in the app's language.
+        final market = l10n.localeName == 'de' ? 'de-DE' : 'en-US';
+        final uri = Uri.parse('https://www.bing.com/HPImageArchive.aspx?format=js&idx=$idx&n=8&mkt=$market');
         final response = await _client.get(uri).timeout(_timeout);
         if (response.statusCode != 200) continue;
         for (final image in parseBingArchive(utf8.decode(response.bodyBytes, allowMalformed: true))) {
@@ -54,6 +70,7 @@ class LauncherBackgroundService {
   }
 
   Future<Uint8List?> fromServer(String address) async {
+    if (isNasAddress(address)) return nasPictures?.next();
     final uri = Uri.tryParse(address.trim());
     if (uri == null || !uri.scheme.startsWith('http')) return null;
     final response = await _client.get(uri).timeout(_timeout);

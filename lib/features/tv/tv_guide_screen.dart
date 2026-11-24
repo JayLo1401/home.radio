@@ -4,10 +4,12 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../../core/remote_keys.dart';
 import '../../core/theme.dart';
 import '../../data/services/enigma2_service.dart';
+import '../../l10n/l10n.dart';
 import 'tv_epg_screen.dart';
 import 'tv_providers.dart';
 import 'tv_widgets.dart';
@@ -271,7 +273,7 @@ class _TvGuideScreenState extends ConsumerState<TvGuideScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _TopBar(title: bouquet?.name ?? 'Programmführer'),
+              _TopBar(title: bouquet?.name ?? context.l10n.tvGuide),
               Expanded(
                 child: config == null || (_loadedUntil == null && _error == null)
                     ? const Center(child: CircularProgressIndicator())
@@ -359,13 +361,14 @@ class _TopBar extends ConsumerWidget {
               child: Image.asset('assets/icon/tv_logo.png', width: 36, height: 36),
             ),
             const SizedBox(width: 10),
-            const Text('Programmführer', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+            Text(context.l10n.tvGuide,
+                style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(width: 12),
             Text(title, style: const TextStyle(color: brandGreen, fontSize: 16, fontWeight: FontWeight.w600)),
             const Spacer(),
             Text(
               // ‹‹ ›› rather than ⏪⏩, which Android draws as coloured emoji.
-              'OK umschalten  ·  ${remoteKeyHint(keys, RemoteAction.options)} alle Sendungen  ·  ‹‹ ›› ±3 Std.',
+              context.l10n.tvGuideKeyHint(remoteKeyHint(keys, RemoteAction.options)),
               style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 14),
             ),
             const SizedBox(width: 20),
@@ -398,7 +401,9 @@ class _TimeAxis extends StatelessWidget {
             left: 16,
             top: 10,
             child: Text(
-              otherDay ? '${start.day.toString().padLeft(2, '0')}.${start.month.toString().padLeft(2, '0')}.' : 'Heute',
+              otherDay
+                  ? DateFormat(context.l10n.tvDayMonthPattern, context.l10n.localeName).format(start)
+                  : context.l10n.tvToday,
               style: const TextStyle(color: brandGreen, fontSize: 16, fontWeight: FontWeight.w600),
             ),
           ),
@@ -480,7 +485,7 @@ class _GuideRow extends StatelessWidget {
                 if (shown.isEmpty)
                   Positioned.fill(
                     child: _Cell(
-                      title: 'Keine Programminformation',
+                      title: context.l10n.tvNoProgramInfo,
                       subtitle: null,
                       focused: focusedRow && focusedEvent == null,
                       running: false,
@@ -595,7 +600,8 @@ class _Details extends StatelessWidget {
                           style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
                     ),
                     Text(
-                      '${channel?.name ?? ''}  ·  ${hhmm(e.begin)} – ${hhmm(e.end)}  ·  ${e.duration.inMinutes} Min.',
+                      '${channel?.name ?? ''}  ·  ${hhmm(e.begin)} – ${hhmm(e.end)}  ·  '
+                      '${context.l10n.tvMinutes(e.duration.inMinutes)}',
                       style: const TextStyle(color: brandGreen, fontSize: 16),
                     ),
                   ],
@@ -607,7 +613,7 @@ class _Details extends StatelessWidget {
                 const SizedBox(height: 8),
                 Expanded(
                   child: Text(
-                    e.description.isEmpty ? 'Keine Beschreibung.' : e.description,
+                    e.description.isEmpty ? context.l10n.tvNoDescription : e.description,
                     maxLines: 3,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(color: Colors.white70, fontSize: 16, height: 1.35),

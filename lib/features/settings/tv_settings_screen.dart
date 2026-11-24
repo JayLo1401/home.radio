@@ -3,7 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/popup_text_field.dart';
 import '../../data/services/enigma2_service.dart';
+import '../../l10n/l10n.dart';
+import '../tv/iptv_providers.dart';
 import '../tv/tv_providers.dart';
+import 'iptv_settings_screen.dart';
 import 'receiver_search_dialog.dart';
 
 /// TV's receiver: an Enigma2 box with OpenWebif (GigaBlue, VU+,
@@ -56,7 +59,7 @@ class _TvSettingsScreenState extends ConsumerState<TvSettingsScreen> {
 
   Future<void> _test() async {
     if (_host.text.trim().isEmpty) {
-      setState(() => _result = 'Bitte die Adresse des Receivers eintragen.');
+      setState(() => _result = context.l10n.tvSettingsEnterAddress);
       return;
     }
     setState(() {
@@ -72,8 +75,9 @@ class _TvSettingsScreenState extends ConsumerState<TvSettingsScreen> {
         _ok = true;
         _bouquets = bouquets;
         _bouquet ??= bouquets.firstOrNull?.ref;
-        _result = 'Verbunden: ${about.model.isEmpty ? 'Enigma2-Receiver' : about.model}'
-            '${about.image.isEmpty ? '' : ' (${about.image})'} · ${bouquets.length} Senderlisten';
+        final model = about.model.isEmpty ? context.l10n.tvEnigma2Receiver : about.model;
+        _result = context.l10n
+            .tvSettingsConnected('$model${about.image.isEmpty ? '' : ' (${about.image})'}', bouquets.length);
       });
     } catch (e) {
       if (mounted) {
@@ -109,24 +113,19 @@ class _TvSettingsScreenState extends ConsumerState<TvSettingsScreen> {
   Widget build(BuildContext context) {
     const help = TextStyle(color: Colors.white54, fontSize: 13);
     return Scaffold(
-      appBar: AppBar(title: const Text('TV: Receiver')),
+      appBar: AppBar(title: Text(context.l10n.tvSettingsTitle)),
       body: FocusTraversalGroup(
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            const Text(
-              'Ein Enigma2-Sat-Receiver mit OpenWebif im Heimnetz (z. B. GigaBlue, VU+, Dreambox mit teamBlue, '
-              'OpenATV oder OpenPLi). Senderlisten, Senderlogos (Picons) und der Programmführer kommen vom '
-              'Receiver, das Bild über seinen Streaming-Port.',
-              style: help,
-            ),
+            Text(context.l10n.tvSettingsIntro, style: help),
             const SizedBox(height: 16),
             Row(
               children: [
                 Expanded(
                   child: PopupTextField(
                     controller: _host,
-                    label: 'Adresse des Receivers (IP oder Name)',
+                    label: context.l10n.tvSettingsAddress,
                     hint: '192.168.1.50',
                     keyboardType: TextInputType.url,
                   ),
@@ -136,7 +135,7 @@ class _TvSettingsScreenState extends ConsumerState<TvSettingsScreen> {
                   autofocus: _initial.host.isEmpty,
                   onPressed: _search,
                   icon: const Icon(Icons.search),
-                  label: const Text('Receiver suchen'),
+                  label: Text(context.l10n.tvSearchReceiver),
                 ),
               ],
             ),
@@ -144,27 +143,37 @@ class _TvSettingsScreenState extends ConsumerState<TvSettingsScreen> {
             Row(
               children: [
                 Expanded(
-                  child: PopupTextField(controller: _webPort, label: 'Web-Port (OpenWebif)', keyboardType: TextInputType.number),
+                  child: PopupTextField(
+                    controller: _webPort,
+                    label: context.l10n.tvSettingsWebPort,
+                    keyboardType: TextInputType.number,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: PopupTextField(controller: _streamPort, label: 'Streaming-Port', keyboardType: TextInputType.number),
+                  child: PopupTextField(
+                    controller: _streamPort,
+                    label: context.l10n.tvSettingsStreamPort,
+                    keyboardType: TextInputType.number,
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: 6),
-            const Text('Üblich: Web 80, Streaming 8001 (8002 = umgewandelt, falls der Receiver das kann).', style: help),
+            Text(context.l10n.tvSettingsPortsHelp, style: help),
             const SizedBox(height: 12),
             SwitchListTile(
-              title: const Text('HTTPS für die Weboberfläche'),
+              title: Text(context.l10n.tvSettingsHttps),
               value: _https,
               onChanged: (v) => setState(() => _https = v),
             ),
             Row(
               children: [
-                Expanded(child: PopupTextField(controller: _user, label: 'Benutzer (falls Anmeldung aktiv)')),
+                Expanded(child: PopupTextField(controller: _user, label: context.l10n.tvSettingsUser)),
                 const SizedBox(width: 12),
-                Expanded(child: PopupTextField(controller: _password, label: 'Passwort', obscureText: true)),
+                Expanded(
+                  child: PopupTextField(controller: _password, label: context.l10n.tvSettingsPassword, obscureText: true),
+                ),
               ],
             ),
             const SizedBox(height: 16),
@@ -173,7 +182,7 @@ class _TvSettingsScreenState extends ConsumerState<TvSettingsScreen> {
                 OutlinedButton.icon(
                   onPressed: _testing ? null : _test,
                   icon: const Icon(Icons.network_check),
-                  label: const Text('Verbindung testen'),
+                  label: Text(context.l10n.tvSettingsTestConnection),
                 ),
                 const SizedBox(width: 12),
                 if (_testing) const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
@@ -192,7 +201,7 @@ class _TvSettingsScreenState extends ConsumerState<TvSettingsScreen> {
             ),
             if (_bouquets.isNotEmpty) ...[
               const SizedBox(height: 20),
-              Text('Senderliste für TV', style: Theme.of(context).textTheme.titleMedium),
+              Text(context.l10n.tvSettingsChannelList, style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 6),
               Wrap(
                 spacing: 8,
@@ -207,12 +216,25 @@ class _TvSettingsScreenState extends ConsumerState<TvSettingsScreen> {
                 ],
               ),
               const SizedBox(height: 6),
-              const Text('Im TV wechseln ← / → in der Senderliste zwischen den Listen.', style: help),
+              Text(context.l10n.tvSettingsChannelListHelp, style: help),
             ],
             const SizedBox(height: 24),
             Align(
               alignment: Alignment.centerLeft,
-              child: FilledButton.icon(onPressed: _save, icon: const Icon(Icons.check), label: const Text('Speichern')),
+              child: FilledButton.icon(
+                onPressed: _save,
+                icon: const Icon(Icons.check),
+                label: Text(context.l10n.commonSave),
+              ),
+            ),
+            // Internet-TV: TV's other source, without a receiver.
+            const Divider(height: 40),
+            ListTile(
+              leading: const Icon(Icons.public),
+              title: Text(context.l10n.iptvSettingsTitle),
+              subtitle: Text((ref.watch(iptvProvider)?.enabled ?? true) ? context.l10n.commonOn : context.l10n.commonOff),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const IptvSettingsScreen())),
             ),
           ],
         ),

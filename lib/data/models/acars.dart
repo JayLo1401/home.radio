@@ -1,5 +1,7 @@
 import 'dart:typed_data';
 
+import '../../l10n/l10n.dart';
+
 /// One ACARS message (ARINC 618) as the receiver's decoder delivers it:
 /// SOH, mode, registration, ack, label, block id, [STX text] ETX/ETB, BCS.
 class AcarsMessage {
@@ -38,14 +40,14 @@ class AcarsMessage {
 }
 
 String acarsLabelName(String label) => switch (label) {
-      '_\x7f' => 'Quittung (ohne Inhalt)',
-      'Q0' => 'Verbindungstest',
-      'H1' => 'Bordrechner (FMS/Wartung)',
-      'SA' => 'Systemstatus',
-      '5Z' => 'Airline-Meldung',
-      '10' || '11' || '12' || '13' || '14' || '15' || '16' || '17' => 'Flugdaten',
-      '80' || '81' || '82' || '83' => 'Airline-Meldung',
-      _ => 'Meldung',
+      '_' => l10n.modelsAcarsAckNoContent,
+      'Q0' => l10n.modelsAcarsLinkTest,
+      'H1' => l10n.modelsAcarsOnboardComputer,
+      'SA' => l10n.modelsAcarsSystemStatus,
+      '5Z' => l10n.modelsAcarsAirlineMessage,
+      '10' || '11' || '12' || '13' || '14' || '15' || '16' || '17' => l10n.modelsAcarsFlightData,
+      '80' || '81' || '82' || '83' => l10n.modelsAcarsAirlineMessage,
+      _ => l10n.modelsAcarsMessage,
     };
 
 /// The frame bytes of an ACARS `nbPacket` event (kind 2).

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../../core/ok_long_press.dart';
 import '../../core/popup_text_field.dart';
@@ -12,6 +13,8 @@ import '../../core/system_providers.dart';
 import '../../core/theme.dart';
 import '../../data/models/launcher_tile.dart';
 import '../../data/services/launcher_service.dart';
+import '../../l10n/l10n.dart';
+import '../dashboard/dashboard_screen.dart';
 import '../settings/settings_screen.dart';
 import '../tv/tv_screen.dart';
 import 'all_apps_screen.dart';
@@ -52,14 +55,15 @@ class _LauncherScreenState extends ConsumerState<LauncherScreen> {
       await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SettingsScreen()));
       return;
     }
+    final l = context.l10n;
     final choice = await showDialog<String>(
       context: context,
       builder: (context) => SimpleDialog(
-        title: const Text('Einstellungen'),
+        title: Text(l.systemTileSettingsShort),
         children: [
-          _option(context, 'app', Icons.tune, 'Home System (App-Einstellungen)', autofocus: true),
-          _option(context, 'android', Icons.settings_applications_outlined, 'Android-Einstellungen'),
-          _option(context, 'apps', Icons.apps, 'Alle Apps'),
+          _option(context, 'app', Icons.tune, l.settingsLauncherMenuApp, autofocus: true),
+          _option(context, 'android', Icons.settings_applications_outlined, l.settingsLauncherMenuAndroid),
+          _option(context, 'apps', Icons.apps, l.miscAllAppsTitle),
         ],
       ),
     );
@@ -112,6 +116,10 @@ class _LauncherScreenState extends ConsumerState<LauncherScreen> {
       await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const TvScreen()));
       return;
     }
+    if (tile.isDashboard) {
+      await openDashboard(context, ref);
+      return;
+    }
     if (tile.isSystemSettings) {
       await service.openSystemSettings();
       return;
@@ -122,7 +130,7 @@ class _LauncherScreenState extends ConsumerState<LauncherScreen> {
       final ok = await service.launchApp(tile.package!);
       if (!ok && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('„${tile.displayLabel}“ ist nicht (mehr) installiert.')),
+          SnackBar(content: Text(context.l10n.settingsLauncherNotInstalled(tile.displayLabel))),
         );
       }
     }
@@ -137,20 +145,21 @@ class _LauncherScreenState extends ConsumerState<LauncherScreen> {
     final tiles = ref.read(launcherTilesProvider);
     final index = tiles.indexWhere((t) => t.id == tile.id);
     final notifier = ref.read(launcherTilesProvider.notifier);
+    final l = context.l10n;
     final action = await showDialog<String>(
       context: context,
       builder: (context) => SimpleDialog(
         title: Text(tile.displayLabel),
         children: [
-          if (index > 0) _option(context, 'left', Icons.arrow_back, 'Nach links verschieben', autofocus: true),
+          if (index > 0) _option(context, 'left', Icons.arrow_back, l.settingsLauncherMoveLeft, autofocus: true),
           if (index < tiles.length - 1)
-            _option(context, 'right', Icons.arrow_forward, 'Nach rechts verschieben', autofocus: index == 0),
-          _option(context, 'image', Icons.image_outlined, 'Bild ändern'),
+            _option(context, 'right', Icons.arrow_forward, l.settingsLauncherMoveRight, autofocus: index == 0),
+          _option(context, 'image', Icons.image_outlined, l.settingsLauncherChangeImage),
           if (tile.isApp && LauncherService.supported)
-            _option(context, 'info', Icons.info_outline, 'App-Info (beenden, deinstallieren …)'),
+            _option(context, 'info', Icons.info_outline, l.miscAllAppsAppInfo),
           // TV comes back through "Alle Apps" - there is none on the PC.
           if (!tile.isRadio && (LauncherService.supported || !tile.isBuiltIn))
-            _option(context, 'remove', Icons.delete_outline, 'Aus der Startleiste entfernen'),
+            _option(context, 'remove', Icons.delete_outline, l.settingsLauncherRemove),
         ],
       ),
     );
@@ -187,10 +196,11 @@ class _LauncherScreenState extends ConsumerState<LauncherScreen> {
   Widget build(BuildContext context) {
     // Switched-off parts (Settings → System) keep their place in the row,
     // they're just not shown.
-    final parts = ref.watch(systemPartsProvider);
+    ref.watch(systemPartsProvider);
+    final parts = ref.read(systemPartsProvider.notifier);
     final tiles = [
       for (final t in ref.watch(launcherTilesProvider))
-        if (!(t.isRadio && !parts.radio) && !(t.isTv && !parts.tv)) t,
+        if (parts.showsTile(t)) t,
     ];
     return PopScope(
       canPop: false,
@@ -232,12 +242,13 @@ class _LauncherScreenState extends ConsumerState<LauncherScreen> {
                             children: [
                               const Icon(Icons.favorite, color: brandGreen, size: 20),
                               const SizedBox(width: 8),
-                              const Text('Favoriten',
-                                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600)),
+                              Text(context.l10n.radioFavorites,
+                                  style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600)),
                               const Spacer(),
                               Text(
-                                '${_keyHint(ref, RemoteAction.options)}'
-                                '${LauncherService.supported ? '' : ' oder Rechtsklick'}  Optionen der Kachel',
+                                LauncherService.supported
+                                    ? context.l10n.settingsLauncherOptionsHint(_keyHint(ref, RemoteAction.options))
+                                    : context.l10n.settingsLauncherOptionsHintMouse(_keyHint(ref, RemoteAction.options)),
                                 style: const TextStyle(color: Colors.white38, fontSize: 13),
                               ),
                             ],
@@ -315,7 +326,7 @@ Future<void> openAppInfo(BuildContext context, WidgetRef ref, String package, St
   final ok = await ref.read(launcherServiceProvider).openAppInfo(package);
   if (!ok && context.mounted) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Die App-Info von „$label“ lässt sich nicht öffnen.')),
+      SnackBar(content: Text(context.l10n.settingsLauncherAppInfoFailed(label))),
     );
   }
 }
@@ -361,20 +372,21 @@ class _DialogRowState extends State<_DialogRow> {
 Future<void> chooseTileImage(BuildContext context, WidgetRef ref, LauncherTile tile) async {
   final notifier = ref.read(launcherTilesProvider.notifier);
   final hasPack = ref.read(launcherSettingsProvider).iconPack != null;
+  final l = context.l10n;
   final choice = await showDialog<String>(
     context: context,
     builder: (context) => SimpleDialog(
-      title: Text('Bild für „${tile.displayLabel}“'),
+      title: Text(l.settingsLauncherImageTitle(tile.displayLabel)),
       children: [
         _LauncherScreenState._option(
           context,
           'auto',
           Icons.auto_awesome_outlined,
-          tile.isApp && hasPack ? 'Automatisch (Icon-Paket, sonst Original)' : 'Standard',
+          tile.isApp && hasPack ? l.settingsLauncherImageAuto : l.settingsLauncherImageDefault,
           autofocus: true,
         ),
-        if (tile.isApp && hasPack) _LauncherScreenState._option(context, 'original', Icons.apps, 'Original der App'),
-        _LauncherScreenState._option(context, 'url', Icons.link, 'Bild von einer Adresse (URL) …'),
+        if (tile.isApp && hasPack) _LauncherScreenState._option(context, 'original', Icons.apps, l.settingsLauncherImageOriginal),
+        _LauncherScreenState._option(context, 'url', Icons.link, l.settingsLauncherImageFromUrl),
       ],
     ),
   );
@@ -387,7 +399,7 @@ Future<void> chooseTileImage(BuildContext context, WidgetRef ref, LauncherTile t
       if (!context.mounted) return;
       final url = await showTextInputDialog(
         context,
-        title: 'Bild-Adresse (PNG/JPG, am besten 16:9)',
+        title: l.settingsLauncherImageUrlTitle,
         initialValue: tile.imageUrl ?? '',
         hint: 'http://…',
         keyboardType: TextInputType.url,
@@ -400,7 +412,7 @@ Future<void> chooseTileImage(BuildContext context, WidgetRef ref, LauncherTile t
         await notifier.setImage(tile.id, url);
       } else if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Bitte eine vollständige Adresse mit http:// oder https:// eingeben.')),
+          SnackBar(content: Text(l.miscRadarInvalidUrl)),
         );
       }
   }
@@ -460,7 +472,12 @@ class _MenuBar extends StatelessWidget {
                   }
                   return KeyEventResult.ignored;
                 },
-                child: _BarButton(focusNode: menuFocus, icon: Icons.settings, label: 'Einstellungen', onTap: onMenu),
+                child: _BarButton(
+                  focusNode: menuFocus,
+                  icon: Icons.settings,
+                  label: context.l10n.systemTileSettingsShort,
+                  onTap: onMenu,
+                ),
               ),
             ),
           ],
@@ -529,7 +546,6 @@ class _LauncherClock extends StatefulWidget {
 }
 
 class _LauncherClockState extends State<_LauncherClock> {
-  static const _weekdays = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
   late DateTime _now = DateTime.now();
   Timer? _timer;
 
@@ -551,11 +567,13 @@ class _LauncherClockState extends State<_LauncherClock> {
   @override
   Widget build(BuildContext context) {
     String two(int v) => v.toString().padLeft(2, '0');
+    final locale = context.l10n.localeName;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
-          '${_weekdays[_now.weekday - 1]} ${two(_now.day)}.${two(_now.month)}.${_now.year}',
+          // "Montag 24.11.2026" / "Monday, Nov 24, 2026" - as Radio's clock.
+          DateFormat(locale == 'de' ? 'EEEE dd.MM.yyyy' : 'EEEE, MMM d, y', locale).format(_now),
           style: const TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.w600),
         ),
         const SizedBox(width: 12),
@@ -700,7 +718,7 @@ class _AppsTileState extends State<_AppsTile> {
   Widget build(BuildContext context) {
     return _TileFrame(
       focused: _focused,
-      label: 'Alle Apps',
+      label: context.l10n.miscAllAppsTitle,
       child: InkWell(
         focusNode: widget.focusNode,
         borderRadius: BorderRadius.circular(14),
@@ -709,12 +727,12 @@ class _AppsTileState extends State<_AppsTile> {
         onTap: widget.onOpen,
         child: Container(
           color: Colors.white.withValues(alpha: 0.12),
-          child: const Column(
+          child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.apps, color: Colors.white, size: 48),
-              SizedBox(height: 6),
-              Text('Apps suchen & hinzufügen', style: TextStyle(color: Colors.white70, fontSize: 13)),
+              const Icon(Icons.apps, color: Colors.white, size: 48),
+              const SizedBox(height: 6),
+              Text(context.l10n.settingsLauncherFindApps, style: const TextStyle(color: Colors.white70, fontSize: 13)),
             ],
           ),
         ),
@@ -748,7 +766,10 @@ class TileArt extends ConsumerWidget {
   Widget _builtInArt(BuildContext context, WidgetRef ref) {
     if (tile.isRadio) return const _RadioArt();
     if (tile.isTv) return const _PartArt(logo: 'assets/icon/tv_logo.png', title: 'TV');
-    if (tile.isSystemSettings) return const _BrandArt(icon: Icons.settings_outlined, title: 'Einstellungen');
+    if (tile.isDashboard) return _PartArt(logo: 'assets/icon/dashboard_logo.png', title: tile.displayLabel);
+    if (tile.isSystemSettings) {
+      return _BrandArt(icon: Icons.settings_outlined, title: context.l10n.systemTileSettingsShort);
+    }
     final package = tile.package!;
     final pack = ref.watch(launcherSettingsProvider).iconPack;
     if (pack != null && tile.image != LauncherTile.originalImage) {

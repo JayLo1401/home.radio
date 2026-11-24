@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/popup_text_field.dart';
 import '../../core/providers.dart';
+import '../../l10n/l10n.dart';
 
 /// Where the weather radar tile comes from: an image URL (PNG/JPG, e.g. a
 /// private radar server, optionally with a token) or a web page such as an
@@ -37,9 +38,7 @@ class _RadarSourceSettingsScreenState extends ConsumerState<RadarSourceSettingsS
     final url = _urlController.text.trim();
     final uri = Uri.tryParse(url);
     if (url.isNotEmpty && (uri == null || !uri.hasScheme || !uri.scheme.startsWith('http'))) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Bitte eine vollständige Adresse mit http:// oder https:// eingeben.')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.l10n.miscRadarInvalidUrl)));
       return;
     }
     await ref.read(weatherDisplaySettingsProvider.notifier).setRadarSource(
@@ -70,63 +69,46 @@ class _RadarSourceSettingsScreenState extends ConsumerState<RadarSourceSettingsS
   @override
   Widget build(BuildContext context) {
     const help = TextStyle(color: Colors.white54, fontSize: 13);
+    final l = context.l10n;
     return Scaffold(
-      appBar: AppBar(title: const Text('Wetterradar einrichten')),
+      appBar: AppBar(title: Text(l.miscRadarTitle)),
       body: FocusTraversalGroup(
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            Text('Art der Quelle', style: Theme.of(context).textTheme.titleMedium),
-            _typeOption(
-              title: 'Bild',
-              subtitle: 'PNG oder JPG, z. B. vom eigenen Radar-Server - wird alle 2½ Minuten neu geladen.',
-              webPage: false,
-            ),
-            _typeOption(
-              title: 'Webseite',
-              subtitle: 'Eine Radar-Webseite, z. B. eine interaktive Karte. Braucht mehr Speicher und '
-                  'Grafikleistung als ein Bild - auf schwachen TV-Boxen besser ein Bild verwenden.',
-              webPage: true,
-            ),
+            Text(l.miscRadarSourceType, style: Theme.of(context).textTheme.titleMedium),
+            _typeOption(title: l.miscRadarImage, subtitle: l.miscRadarImageHint, webPage: false),
+            _typeOption(title: l.miscRadarWebPage, subtitle: l.miscRadarWebPageHint, webPage: true),
             const SizedBox(height: 16),
             PopupTextField(
               controller: _urlController,
               keyboardType: TextInputType.url,
-              label: _isWebPage ? 'Adresse der Webseite (URL)' : 'Bild-Adresse (URL)',
+              label: _isWebPage ? l.miscRadarWebPageUrl : l.miscRadarImageUrl,
               hint: 'https://…',
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Platzhalter werden automatisch ersetzt: {lat} {lon} = Standort, {r} = Umkreis in km, '
-              '{zoom} = Kartenzoom passend zum Umkreis, {w} {h} = Kachelgröße in Pixeln, '
-              '{scale} = Bildschirmdichte.\n'
-              'Bild: https://example.org/radar.png?lat={lat}&lon={lon}&r={r}&w={w}&h={h}&scale={scale}\n'
-              'Webseite: https://example.org/radar?lat={lat}&lon={lon}&zoom={zoom}',
+            Text(
+              // The placeholders are the literal tokens the user types into the address.
+              '${l.miscRadarPlaceholders('{lat}', '{lon}', '{r}', '{zoom}', '{w}', '{h}', '{scale}')}\n'
+              '${l.miscRadarImage}: https://example.org/radar.png?lat={lat}&lon={lon}&r={r}&w={w}&h={h}&scale={scale}\n'
+              '${l.miscRadarWebPage}: https://example.org/radar?lat={lat}&lon={lon}&zoom={zoom}',
               style: help,
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Die App bringt selbst keine Radarquelle mit. Rechte und Nutzungsbedingungen liegen beim '
-              'jeweiligen Anbieter - bitte nur Quellen eintragen, die so genutzt werden dürfen.',
-              style: help,
-            ),
+            Text(l.miscRadarDisclaimer, style: help),
             if (_isWebPage) ...[
               const SizedBox(height: 20),
               PopupTextField(
                 controller: _cssController,
-                label: 'Eigenes CSS für die Webseite (optional)',
+                label: l.miscRadarCssLabel,
               ),
               const SizedBox(height: 8),
-              const Text(
-                'Wird nach jedem Laden in die Seite eingefügt, wie ein eigenes Stylesheet im Browser - '
-                'z. B. um Teile der Seite für die eigene Anzeige auszublenden.',
-                style: help,
-              ),
+              Text(l.miscRadarCssHint, style: help),
             ],
             const SizedBox(height: 20),
             SwitchListTile(
-              title: const Text('Mit Anmeldung (Token)'),
-              subtitle: const Text('Wird als „Authorization: Bearer …“ mitgeschickt.'),
+              title: Text(l.miscRadarAuth),
+              subtitle: Text(l.miscRadarAuthHint),
               value: _authEnabled,
               onChanged: (v) => setState(() => _authEnabled = v),
             ),
@@ -142,7 +124,7 @@ class _RadarSourceSettingsScreenState extends ConsumerState<RadarSourceSettingsS
               child: FilledButton.icon(
                 onPressed: _save,
                 icon: const Icon(Icons.check),
-                label: const Text('Speichern'),
+                label: Text(l.commonSave),
               ),
             ),
           ],

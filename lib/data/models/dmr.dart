@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import '../../l10n/l10n.dart';
+
 /// One TDMA time slot of a DMR channel, from the receiver's `nbDmr` event
 /// (see dmrStatusJson in android/app/src/main/cpp/hrdab/dmr.cpp).
 class DmrSlot {
@@ -60,10 +62,10 @@ class DmrSlot {
   /// with idle bursts, which ends it for the decoder - not worth a flicker.
   bool get talking => active || (heard && secondsAgo < 1.5);
 
-  /// "TG 262", "an 2620001", or '' while unknown.
+  /// "TG 262", "an 2620001" ("to 2620001"), or '' while unknown.
   String get target => switch (callType) {
     'group' => 'TG $dst',
-    'private' => 'an $dst',
+    'private' => l10n.scannerAprsTo('$dst'),
     _ => '',
   };
 
@@ -122,9 +124,9 @@ class DmrStatus {
   }
 
   String get sourceLabel => switch (source) {
-    'repeater' => 'Relais',
-    'radio' => 'Funkgerät',
-    'direct' => 'Direktverbindung',
+    'repeater' => l10n.scannerAprsSymbolRepeater,
+    'radio' => l10n.modelsDmrRadio,
+    'direct' => l10n.modelsDmrDirect,
     _ => '',
   };
 }

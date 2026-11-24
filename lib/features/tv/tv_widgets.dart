@@ -1,8 +1,10 @@
 import 'dart:async';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/theme.dart';
+import '../../data/models/iptv_channel.dart';
 import '../../data/services/enigma2_service.dart';
 
 String hhmm(DateTime t) => '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
@@ -46,6 +48,51 @@ class Picon extends StatelessWidget {
               fit: BoxFit.contain,
               errorBuilder: (_, _, _) => name,
               loadingBuilder: (_, child, progress) => progress == null ? child : name,
+            ),
+    );
+  }
+}
+
+/// An Internet-TV channel's logo (from the iptv-org catalogue) in the
+/// picon's place - its name's initials while loading or without one.
+class IptvLogo extends StatelessWidget {
+  const IptvLogo({super.key, required this.channel, this.width = 96, this.height = 58});
+
+  final IptvChannel channel;
+  final double width;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = Center(
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(
+          shortChannelName(channel.name),
+          textAlign: TextAlign.center,
+          maxLines: 2,
+          style: TextStyle(color: Colors.white70, fontSize: height * 0.3, fontWeight: FontWeight.bold, height: 1.1),
+        ),
+      ),
+    );
+    final logo = channel.logo;
+    // Decoded no bigger than shown - some logos are 2000 px wide, and the
+    // Fire TV Stick has little memory.
+    final cacheWidth = (width * MediaQuery.devicePixelRatioOf(context)).round();
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(8)),
+      padding: const EdgeInsets.all(4),
+      child: logo == null
+          ? name
+          : CachedNetworkImage(
+              imageUrl: logo,
+              fit: BoxFit.contain,
+              memCacheWidth: cacheWidth,
+              fadeInDuration: const Duration(milliseconds: 150),
+              placeholder: (_, _) => name,
+              errorWidget: (_, _, _) => name,
             ),
     );
   }

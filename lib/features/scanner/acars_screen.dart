@@ -9,8 +9,10 @@ import '../../data/models/acars.dart';
 import '../../data/models/band_plan.dart' show formatMhz;
 import '../../data/repositories/settings_repository.dart';
 import '../../data/services/dab_rtlsdr_service.dart' show DabRtlSdrService;
+import '../../l10n/l10n.dart';
 import '../shared/logo_picker_dialog.dart' show connectDecoder;
 import 'reception_status.dart';
+import '../../core/native_messages.dart';
 
 /// ACARS: short text messages between aircraft and their airlines on the
 /// VHF airband. Two ways they travel: classic ACARS (AM, 2400 bit/s, around
@@ -151,7 +153,7 @@ class _AcarsScreenState extends ConsumerState<AcarsScreen> {
       case 'connectionMessage':
         final isError = event['isError'] as bool? ?? false;
         final message = (event['message'] as String?)?.trim() ?? '';
-        setState(() => _sourceWarning = isError && message.isNotEmpty ? message : null);
+        setState(() => _sourceWarning = isError && message.isNotEmpty ? nativeMessageText(message) : null);
     }
   }
 
@@ -163,11 +165,12 @@ class _AcarsScreenState extends ConsumerState<AcarsScreen> {
   @override
   Widget build(BuildContext context) {
     const muted = TextStyle(color: Colors.white70);
-    String db(double v) => v.toStringAsFixed(1).replaceAll('.', ',');
+    final t = context.l10n;
+    String db(double v) => t.localeName == 'de' ? v.toStringAsFixed(1).replaceAll('.', ',') : v.toStringAsFixed(1);
     return Scaffold(
-      appBar: AppBar(title: const Text('ACARS (Textmeldungen von Flugzeugen)')),
+      appBar: AppBar(title: Text(t.scannerAcarsTitle)),
       body: _failed
-          ? const Center(child: Text('Empfänger konnte nicht gestartet werden.'))
+          ? Center(child: Text(t.scannerReceiverStartFailed))
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
@@ -180,12 +183,12 @@ class _AcarsScreenState extends ConsumerState<AcarsScreen> {
                   spacing: 8,
                   children: [
                     ChoiceChip(
-                      label: const Text('VDL2 · 136,9 MHz'),
+                      label: Text(t.scannerAcarsVdl2Chip),
                       selected: _vdl2,
                       onSelected: (_) => _setVdl2(true),
                     ),
                     ChoiceChip(
-                      label: const Text('ACARS klassisch · 131 MHz'),
+                      label: Text(t.scannerAcarsClassicChip),
                       selected: !_vdl2,
                       onSelected: (_) => _setVdl2(false),
                     ),
@@ -197,7 +200,7 @@ class _AcarsScreenState extends ConsumerState<AcarsScreen> {
                   runSpacing: 8,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    Text(_started ? '${_messages.length} Meldungen' : 'Starte Empfänger…',
+                    Text(_started ? t.scannerAcarsMessageCount(_messages.length) : t.scannerReceiverStarting,
                         style: Theme.of(context).textTheme.titleMedium),
                     // All channels at once: per channel how much came in.
                     for (final hz in _channels)
@@ -212,7 +215,7 @@ class _AcarsScreenState extends ConsumerState<AcarsScreen> {
                         ],
                       ),
                     const SizedBox(width: 8),
-                    const Text('Verstärkung', style: muted),
+                    Text(t.scannerGain, style: muted),
                     IconButton(
                       autofocus: true,
                       onPressed: () => _stepGain(-1),
@@ -230,10 +233,7 @@ class _AcarsScreenState extends ConsumerState<AcarsScreen> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Alle ${_channels.length} Kanäle werden gleichzeitig dekodiert. Punkt grün = Meldung in den '
-                  'letzten 10 s, Balken grün = auf dem Kanal wird gerade gesendet.'
-                  '${_vdl2 ? ' VDL2 ist digital: Bodenstationen und Flugzeuge senden kurze Datenpakete, '
-                            'Textmeldungen (ACARS) sind ein Teil davon.' : ''}',
+                  '${t.scannerAcarsHint(_channels.length)}${_vdl2 ? ' ${t.scannerAcarsVdl2Hint}' : ''}',
                   style: const TextStyle(color: Colors.white38, fontSize: 12),
                 ),
                 const SizedBox(height: 16),
@@ -241,11 +241,8 @@ class _AcarsScreenState extends ConsumerState<AcarsScreen> {
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 24),
                     child: Text(
-                      'Warte auf Meldungen… Bei Flugverkehr in der Nähe kommen meist mehrere pro Minute.\n'
-                      'Antenne für ${_vdl2 ? '137 MHz: senkrecht, ~55 cm' : '131 MHz: senkrecht, ~57 cm'} '
-                      '(Viertelwelle) - möglichst frei, am Fenster.'
-                      '${_vdl2 ? '' : '\nIn Europa senden die meisten Flugzeuge inzwischen über VDL2 - kommt hier '
-                                'nichts, oben auf VDL2 umschalten.'}',
+                      '${t.scannerAcarsWaiting(_vdl2 ? t.scannerAcarsAntenna('137', '55') : t.scannerAcarsAntenna('131', '57'))}'
+                      '${_vdl2 ? '' : '\n${t.scannerAcarsTryVdl2}'}',
                       style: const TextStyle(color: Colors.white54, fontSize: 16),
                     ),
                   ),
@@ -265,15 +262,16 @@ class _Header extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const s = TextStyle(color: Colors.white54, fontSize: 13, fontWeight: FontWeight.w600);
-    return const Padding(
-      padding: EdgeInsets.fromLTRB(15, 0, 15, 6),
+    final t = context.l10n;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(15, 0, 15, 6),
       child: Row(
         children: [
-          SizedBox(width: _wTime, child: Text('Zeit', style: s)),
-          SizedBox(width: _wFlight, child: Text('Flug', style: s)),
-          SizedBox(width: _wReg, child: Text('Kennzeichen', style: s)),
-          SizedBox(width: _wLabel, child: Text('Art', style: s)),
-          Expanded(child: Text('Text', style: s)),
+          SizedBox(width: _wTime, child: Text(t.scannerColTime, style: s)),
+          SizedBox(width: _wFlight, child: Text(t.scannerColFlight, style: s)),
+          SizedBox(width: _wReg, child: Text(t.scannerColRegistration, style: s)),
+          SizedBox(width: _wLabel, child: Text(t.scannerColType, style: s)),
+          const Expanded(child: Text('Text', style: s)),
         ],
       ),
     );
@@ -300,6 +298,7 @@ class _MessageTileState extends State<_MessageTile> {
 
   void _details() {
     final m = widget.message;
+    final t = context.l10n;
     showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
@@ -310,21 +309,23 @@ class _MessageTileState extends State<_MessageTile> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Empfangen $_time auf ${formatMhz(m.freqHz)} MHz'),
-              Text('Richtung: ${m.downlink ? 'vom Flugzeug' : 'zum Flugzeug'}'),
-              Text('Kennzeichen: ${m.registration}${m.flight != null ? ' · Flug ${m.flight}' : ''}'),
+              Text(t.scannerAcarsReceived(_time, formatMhz(m.freqHz))),
+              Text(t.scannerAcarsDirection(m.downlink ? t.scannerAcarsFromAircraft : t.scannerAcarsToAircraft)),
+              Text('${t.scannerAcarsRegistration(m.registration)}'
+                  '${m.flight != null ? ' · ${t.scannerAcarsFlight(m.flight!)}' : ''}'),
               Text('Label: ${m.label.replaceAll('\x7f', '␡')} · Block ${m.blockId}'
-                  '${m.messageNo != null ? ' · Nr. ${m.messageNo}' : ''}${m.more ? ' · Fortsetzung folgt' : ''}'),
+                  '${m.messageNo != null ? ' · ${t.scannerAcarsMessageNo(m.messageNo!)}' : ''}'
+                  '${m.more ? ' · ${t.scannerAcarsContinued}' : ''}'),
               const SizedBox(height: 12),
               SelectableText(
-                m.text.isEmpty ? '(kein Text)' : m.text,
+                m.text.isEmpty ? t.scannerAcarsNoText : m.text,
                 style: const TextStyle(fontFamily: 'monospace', fontSize: 14),
               ),
             ],
           ),
         ),
         actions: [
-          TextButton(autofocus: true, onPressed: () => Navigator.of(context).pop(), child: const Text('Schließen')),
+          TextButton(autofocus: true, onPressed: () => Navigator.of(context).pop(), child: Text(t.commonClose)),
         ],
       ),
     );

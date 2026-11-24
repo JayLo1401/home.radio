@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../l10n/l10n.dart';
 import 'dpad_text_field.dart';
 import 'theme.dart';
 
@@ -181,8 +182,8 @@ class _TextInputDialogState extends State<_TextInputDialog> {
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Abbrechen')),
-        FilledButton(onPressed: _accept, child: const Text('Übernehmen')),
+        TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(context.l10n.commonCancel)),
+        FilledButton(onPressed: _accept, child: Text(context.l10n.miscApply)),
       ],
     );
   }

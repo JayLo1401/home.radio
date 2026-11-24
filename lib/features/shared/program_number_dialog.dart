@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../l10n/l10n.dart';
+
 /// Assigns a favorite's preset "program number" via a plain +/- stepper
 /// instead of a text field - entering digits with a direction-keys-only
 /// remote is painful, stepping through numbers isn't. Shared by the
@@ -22,7 +24,7 @@ class _ProgramNumberDialogState extends State<ProgramNumberDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Programmnummer vergeben'),
+      title: Text(context.l10n.radioProgramNumberTitle),
       content: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -47,11 +49,11 @@ class _ProgramNumberDialogState extends State<ProgramNumberDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Abbrechen'),
+          child: Text(context.l10n.commonCancel),
         ),
         FilledButton(
           onPressed: () => Navigator.of(context).pop(_value),
-          child: const Text('Speichern'),
+          child: Text(context.l10n.commonSave),
         ),
       ],
     );

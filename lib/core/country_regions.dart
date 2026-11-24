@@ -1,16 +1,26 @@
+import '../l10n/l10n.dart';
+
 /// World regions for narrowing the internet radio search's country list -
 /// otherwise one dropdown of ~200 countries, a long way down with a remote.
 enum WorldRegion {
-  europe('Europa'),
-  northAmerica('Nord- & Mittelamerika'),
-  southAmerica('Südamerika'),
-  asia('Asien & Nahost'),
-  africa('Afrika'),
-  oceania('Ozeanien'),
-  other('Andere');
+  europe,
+  northAmerica,
+  southAmerica,
+  asia,
+  africa,
+  oceania,
+  other;
 
-  const WorldRegion(this.label);
-  final String label;
+  /// The region's name in the app's language.
+  String get label => switch (this) {
+        WorldRegion.europe => l10n.miscRegionEurope,
+        WorldRegion.northAmerica => l10n.miscRegionNorthAmerica,
+        WorldRegion.southAmerica => l10n.miscRegionSouthAmerica,
+        WorldRegion.asia => l10n.miscRegionAsia,
+        WorldRegion.africa => l10n.miscRegionAfrica,
+        WorldRegion.oceania => l10n.miscRegionOceania,
+        WorldRegion.other => l10n.miscRegionOther,
+      };
 }
 
 const _codesByRegion = <WorldRegion, String>{

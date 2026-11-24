@@ -30,6 +30,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  intl: any
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
@@ -104,6 +107,8 @@ flutter_launcher_icons:
 
 # The following section is specific to Flutter packages.
 flutter:
+  # lib/l10n (gen-l10n, see l10n.yaml)
+  generate: true
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
@@ -114,6 +119,7 @@ flutter:
     - assets/icon/home_system_logo.png
     - assets/icon/radio_logo.png
     - assets/icon/tv_logo.png
+    - assets/icon/dashboard_logo.png
 
   # To add assets to your application, add an assets section, like this:
   # assets:

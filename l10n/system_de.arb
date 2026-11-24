@@ -1,0 +1,27 @@
+{
+  "systemStartDashboard": "Haussteuerung anzeigen (Wandtablet)",
+  "systemStartAppNone": "Andere App starten …",
+  "systemStartApp": "App starten: {app}",
+  "@systemStartApp": {
+    "placeholders": {
+      "app": {
+        "type": "String"
+      }
+    }
+  },
+  "systemStartAppPick": "Welche App beim Start?",
+  "systemStartAppMissing": "Die Start-App „{app}“ ist nicht installiert.",
+  "@systemStartAppMissing": {
+    "placeholders": {
+      "app": {
+        "type": "String"
+      }
+    }
+  },
+  "systemSettingsAll": "Alle Einstellungen",
+  "systemTileSettings": "Einstellungen (TV)",
+  "systemTileSettingsShort": "Einstellungen",
+  "systemSettingsTitleSystem": "System-Einstellungen",
+  "systemSettingsTitleRadio": "Radio-Einstellungen",
+  "systemSettingsTitleTv": "TV-Einstellungen"
+}

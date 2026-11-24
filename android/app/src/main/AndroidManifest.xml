@@ -7,6 +7,11 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <!-- Haussteuerung: display on/off by motion in front of the camera (MotionService). -->
+    <uses-feature android:name="android.hardware.camera.any" android:required="false" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
 
     <!-- Backups in Download/HomeSystem (see BackupPlugin.kt): legacy storage
          permissions for Android 9/10, and "All files access" so that from
@@ -97,6 +102,12 @@
         <meta-data
             android:name="io.flutter.embedding.android.EnableImpeller"
             android:value="false" />
+
+        <!-- Haussteuerung: the camera watches for motion (display on/off), see MotionService.kt. -->
+        <service
+            android:name=".MotionService"
+            android:exported="false"
+            android:foregroundServiceType="camera" />
 
         <!-- audio_service: MediaSession/notification so the current station
              shows up as a media card for Home Assistant and the TV launcher. -->

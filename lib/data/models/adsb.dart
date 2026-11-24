@@ -1,25 +1,56 @@
 import 'dart:math' as math;
 import 'dart:typed_data';
 
+import '../../core/country_names_de.dart';
+import '../../l10n/l10n.dart';
+
 /// What kind of aircraft (ADS-B emitter category, sent with the callsign):
 /// by weight class for aeroplanes, else the type of craft.
 enum AircraftCategory {
-  unknown('', ''),
-  light('Leichtflugzeug', 'leicht'),
-  small('Kleinflugzeug', 'klein'),
-  large('Verkehrsflugzeug', 'groß'),
-  heavy('Großraumflugzeug', 'schwer'),
-  highPerformance('Hochleistungs-/Militärjet', 'Jet'),
-  rotorcraft('Hubschrauber', 'Heli'),
-  glider('Segelflugzeug', 'Segler'),
-  balloon('Ballon / Luftschiff', 'Ballon'),
-  ultralight('Ultraleicht / Gleitschirm', 'UL'),
-  uav('Drohne', 'Drohne'),
-  surface('Bodenfahrzeug', 'Boden');
+  unknown,
+  light,
+  small,
+  large,
+  heavy,
+  highPerformance,
+  rotorcraft,
+  glider,
+  balloon,
+  ultralight,
+  uav,
+  surface;
 
-  final String label;
-  final String short;
-  const AircraftCategory(this.label, this.short);
+  /// E.g. "Verkehrsflugzeug" / "Airliner".
+  String get label => switch (this) {
+    unknown => '',
+    light => l10n.modelsAircraftLight,
+    small => l10n.modelsAircraftSmall,
+    large => l10n.modelsAircraftLarge,
+    heavy => l10n.modelsAircraftHeavy,
+    highPerformance => l10n.modelsAircraftHighPerformance,
+    rotorcraft => l10n.scannerAprsSymbolHelicopter,
+    glider => l10n.modelsAircraftGlider,
+    balloon => l10n.modelsAircraftBalloon,
+    ultralight => l10n.modelsAircraftUltralight,
+    uav => l10n.modelsAircraftUav,
+    surface => l10n.modelsAircraftSurface,
+  };
+
+  /// Short form for the list's type column, e.g. "groß" / "large".
+  String get short => switch (this) {
+    unknown => '',
+    light => l10n.modelsAircraftLightShort,
+    small => l10n.modelsAircraftSmallShort,
+    large => l10n.modelsAircraftLargeShort,
+    heavy => l10n.modelsAircraftHeavyShort,
+    highPerformance => 'Jet',
+    rotorcraft => 'Heli',
+    glider => l10n.modelsAircraftGliderShort,
+    balloon => l10n.scannerAprsSymbolBalloon,
+    ultralight => 'UL',
+    uav => l10n.modelsAircraftUav,
+    surface => l10n.modelsAircraftSurfaceShort,
+  };
 
   /// From the identification message's type code (1-4) and category (CA).
   static AircraftCategory from(int typeCode, int ca) => switch ((typeCode, ca)) {
@@ -285,47 +316,49 @@ Uint8List? adsbFrameFromEvent(Map<String, dynamic> event) {
 }
 
 /// Registration country by ICAO 24-bit address block (Europe and a few
-/// frequent others).
+/// frequent others), in the app's language.
 String? icaoCountry(int icao) {
+  // German names as they were (short forms like "VAE"); English ones from
+  // the ISO code.
   const blocks = [
-    (0x440000, 0x447FFF, 'Österreich'),
-    (0x3C0000, 0x3FFFFF, 'Deutschland'),
-    (0x4B0000, 0x4B7FFF, 'Schweiz'),
-    (0x300000, 0x33FFFF, 'Italien'),
-    (0x380000, 0x3BFFFF, 'Frankreich'),
-    (0x400000, 0x43FFFF, 'Großbritannien'),
-    (0x480000, 0x487FFF, 'Niederlande'),
-    (0x448000, 0x44FFFF, 'Belgien'),
-    (0x340000, 0x37FFFF, 'Spanien'),
-    (0x490000, 0x497FFF, 'Tschechien'),
-    (0x488000, 0x48FFFF, 'Polen'),
-    (0x470000, 0x477FFF, 'Ungarn'),
-    (0x505C00, 0x505FFF, 'Slowenien'),
-    (0x501C00, 0x501FFF, 'Kroatien'),
-    (0x505800, 0x505BFF, 'Slowakei'),
-    (0x4CA000, 0x4CAFFF, 'Irland'),
-    (0x4A0000, 0x4A7FFF, 'Rumänien'),
-    (0x4B8000, 0x4BFFFF, 'Türkei'),
-    (0x468000, 0x46FFFF, 'Griechenland'),
-    (0x458000, 0x45FFFF, 'Dänemark'),
-    (0x4A8000, 0x4AFFFF, 'Schweden'),
-    (0x478000, 0x47FFFF, 'Norwegen'),
-    (0x460000, 0x467FFF, 'Finnland'),
-    (0x490000, 0x497FFF, 'Tschechien'),
-    (0x4D0000, 0x4D03FF, 'Luxemburg'),
-    (0x4D2000, 0x4D23FF, 'Malta'),
-    (0x510000, 0x5103FF, 'Weißrussland'),
-    (0x508000, 0x50FFFF, 'Ukraine'),
-    (0x100000, 0x1FFFFF, 'Russland'),
-    (0x896000, 0x896FFF, 'VAE'),
-    (0x06A000, 0x06AFFF, 'Katar'),
-    (0x710000, 0x717FFF, 'Saudi-Arabien'),
-    (0xA00000, 0xAFFFFF, 'USA'),
-    (0xC00000, 0xC3FFFF, 'Kanada'),
-    (0x780000, 0x7BFFFF, 'China'),
+    (0x440000, 0x447FFF, 'AT', 'Österreich'),
+    (0x3C0000, 0x3FFFFF, 'DE', 'Deutschland'),
+    (0x4B0000, 0x4B7FFF, 'CH', 'Schweiz'),
+    (0x300000, 0x33FFFF, 'IT', 'Italien'),
+    (0x380000, 0x3BFFFF, 'FR', 'Frankreich'),
+    (0x400000, 0x43FFFF, 'GB', 'Großbritannien'),
+    (0x480000, 0x487FFF, 'NL', 'Niederlande'),
+    (0x448000, 0x44FFFF, 'BE', 'Belgien'),
+    (0x340000, 0x37FFFF, 'ES', 'Spanien'),
+    (0x490000, 0x497FFF, 'CZ', 'Tschechien'),
+    (0x488000, 0x48FFFF, 'PL', 'Polen'),
+    (0x470000, 0x477FFF, 'HU', 'Ungarn'),
+    (0x505C00, 0x505FFF, 'SI', 'Slowenien'),
+    (0x501C00, 0x501FFF, 'HR', 'Kroatien'),
+    (0x505800, 0x505BFF, 'SK', 'Slowakei'),
+    (0x4CA000, 0x4CAFFF, 'IE', 'Irland'),
+    (0x4A0000, 0x4A7FFF, 'RO', 'Rumänien'),
+    (0x4B8000, 0x4BFFFF, 'TR', 'Türkei'),
+    (0x468000, 0x46FFFF, 'GR', 'Griechenland'),
+    (0x458000, 0x45FFFF, 'DK', 'Dänemark'),
+    (0x4A8000, 0x4AFFFF, 'SE', 'Schweden'),
+    (0x478000, 0x47FFFF, 'NO', 'Norwegen'),
+    (0x460000, 0x467FFF, 'FI', 'Finnland'),
+    (0x490000, 0x497FFF, 'CZ', 'Tschechien'),
+    (0x4D0000, 0x4D03FF, 'LU', 'Luxemburg'),
+    (0x4D2000, 0x4D23FF, 'MT', 'Malta'),
+    (0x510000, 0x5103FF, 'BY', 'Weißrussland'),
+    (0x508000, 0x50FFFF, 'UA', 'Ukraine'),
+    (0x100000, 0x1FFFFF, 'RU', 'Russland'),
+    (0x896000, 0x896FFF, 'AE', 'VAE'),
+    (0x06A000, 0x06AFFF, 'QA', 'Katar'),
+    (0x710000, 0x717FFF, 'SA', 'Saudi-Arabien'),
+    (0xA00000, 0xAFFFFF, 'US', 'USA'),
+    (0xC00000, 0xC3FFFF, 'CA', 'Kanada'),
+    (0x780000, 0x7BFFFF, 'CN', 'China'),
   ];
-  for (final (lo, hi, name) in blocks) {
-    if (icao >= lo && icao <= hi) return name;
+  for (final (lo, hi, iso, german) in blocks) {
+    if (icao >= lo && icao <= hi) return l10n.localeName == 'de' ? german : countryName(iso, german);
   }
   return null;
 }

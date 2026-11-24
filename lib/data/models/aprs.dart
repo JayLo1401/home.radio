@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
+import '../../l10n/l10n.dart';
+
 /// An APRS packet as decoded from an AX.25 frame (see the receiver's AFSK
 /// 1200 packet decoder): who sent it, the path it took, and what it says -
 /// position (plain, compressed or Mic-E), object, message, status, weather.
@@ -16,8 +18,8 @@ class AprsPacket {
   /// The raw information field, as text.
   final String info;
 
-  /// What kind of packet ("Position", "Mic-E", "Objekt", "Nachricht", ...).
-  final String kind;
+  /// What kind of packet.
+  final AprsKind type;
   final double? lat;
   final double? lon;
 
@@ -39,7 +41,7 @@ class AprsPacket {
     required this.destination,
     required this.path,
     required this.info,
-    required this.kind,
+    required this.type,
     this.lat,
     this.lon,
     this.symbol,
@@ -51,6 +53,9 @@ class AprsPacket {
   });
 
   bool get hasPosition => lat != null && lon != null;
+
+  /// What kind of packet in a word ("Position", "Mic-E", "Objekt", ...).
+  String get kind => type.label;
 
   /// "OE6XYZ-9>APRS,WIDE1-1*:info" - like a TNC shows it.
   String get tnc2 => '$source>$destination${path.isEmpty ? '' : ',${path.join(',')}'}:$info';
@@ -65,14 +70,14 @@ class AprsPacket {
     return 2 * r * math.asin(math.sqrt(a));
   }
 
-  /// Compass direction from ([homeLat], [homeLon]), e.g. "NO".
+  /// Compass direction from ([homeLat], [homeLon]), e.g. "NO" (German) / "NE".
   String? bearingFrom(double homeLat, double homeLon) {
     if (!hasPosition) return null;
     final y = math.sin(_rad(lon! - homeLon)) * math.cos(_rad(lat!));
     final x = math.cos(_rad(homeLat)) * math.sin(_rad(lat!)) -
         math.sin(_rad(homeLat)) * math.cos(_rad(lat!)) * math.cos(_rad(lon! - homeLon));
     final deg = (math.atan2(y, x) * 180 / math.pi + 360) % 360;
-    const names = ['N', 'NO', 'O', 'SO', 'S', 'SW', 'W', 'NW'];
+    final names = l10n.scannerAprsCompass.split(' ');
     return names[((deg + 22.5) ~/ 45) % 8];
   }
 
@@ -80,6 +85,43 @@ class AprsPacket {
 
   /// What the symbol shows, in a word ("Auto", "Wetterstation", ...).
   String? get symbolName => symbol == null ? null : aprsSymbolName(symbol!);
+}
+
+/// What kind of APRS packet; [label] names it in the current language.
+enum AprsKind {
+  position,
+  weather,
+  micE,
+  object,
+  objectDeleted,
+  item,
+  message,
+  bulletin,
+  ack,
+  status,
+  telemetry,
+  capabilities,
+  thirdParty,
+  data,
+  empty;
+
+  String get label => switch (this) {
+        AprsKind.position => l10n.scannerAprsKindPosition,
+        AprsKind.weather => l10n.scannerAprsKindWeather,
+        AprsKind.micE => 'Mic-E',
+        AprsKind.object => l10n.scannerAprsKindObject,
+        AprsKind.objectDeleted => l10n.scannerAprsKindObjectDeleted,
+        AprsKind.item => 'Item',
+        AprsKind.message => l10n.scannerAprsKindMessage,
+        AprsKind.bulletin => 'Bulletin',
+        AprsKind.ack => l10n.scannerAprsKindAck,
+        AprsKind.status => 'Status',
+        AprsKind.telemetry => l10n.scannerAprsKindTelemetry,
+        AprsKind.capabilities => l10n.scannerAprsKindCapabilities,
+        AprsKind.thirdParty => l10n.scannerAprsKindThirdParty,
+        AprsKind.data => l10n.scannerAprsKindData,
+        AprsKind.empty => l10n.scannerAprsKindEmpty,
+      };
 }
 
 /// Weather from a weather station's report, metric.
@@ -111,16 +153,18 @@ class AprsWeather {
       rain1hMm == null;
 
   String describe() {
-    String n(double v, int d) => v.toStringAsFixed(d).replaceAll('.', ',');
+    final t = l10n;
+    // Decimal comma in German, point in English.
+    String n(double v, int d) => t.localeName == 'de' ? v.toStringAsFixed(d).replaceAll('.', ',') : v.toStringAsFixed(d);
     return [
       if (temperatureC != null) '${n(temperatureC!, 1)} °C',
       if (humidity != null) '$humidity %',
       if (pressureHpa != null) '${n(pressureHpa!, 1)} hPa',
       if (windKmh != null)
-        'Wind ${n(windKmh!, 0)} km/h'
-            '${windDirection != null ? ' aus ${windDirection!}°' : ''}'
-            '${gustKmh != null ? ', Böen ${n(gustKmh!, 0)}' : ''}',
-      if (rain1hMm != null && rain1hMm! > 0) 'Regen ${n(rain1hMm!, 1)} mm/h',
+        '${t.scannerWind(n(windKmh!, 0))}'
+            '${windDirection != null ? ' ${t.scannerWindFrom(windDirection!)}' : ''}'
+            '${gustKmh != null ? ', ${t.scannerGusts(n(gustKmh!, 0))}' : ''}',
+      if (rain1hMm != null && rain1hMm! > 0) t.scannerAprsRain(n(rain1hMm!, 1)),
     ].join(' · ');
   }
 }
@@ -177,7 +221,7 @@ AprsPacket parseAprs({
   required DateTime at,
 }) {
   AprsPacket packet(
-    String kind, {
+    AprsKind type, {
     double? lat,
     double? lon,
     String? symbol,
@@ -193,7 +237,7 @@ AprsPacket parseAprs({
         destination: destination,
         path: path,
         info: info,
-        kind: kind,
+        type: type,
         lat: lat,
         lon: lon,
         symbol: symbol,
@@ -204,7 +248,7 @@ AprsPacket parseAprs({
         weather: weather == null || weather.isEmpty ? null : weather,
       );
 
-  if (info.isEmpty) return packet('Leer');
+  if (info.isEmpty) return packet(AprsKind.empty);
   final type = info[0];
   try {
     switch (type) {
@@ -212,10 +256,10 @@ AprsPacket parseAprs({
         // With a timestamp (/ @) the position starts after 7 characters.
         final body = (type == '/' || type == '@') && info.length > 8 ? info.substring(8) : info.substring(1);
         final pos = _position(body);
-        if (pos == null) return packet('Position', comment: body);
+        if (pos == null) return packet(AprsKind.position, comment: body);
         final weather = pos.symbol.endsWith('_') ? _weather(pos.rest) : null;
         return packet(
-          weather != null ? 'Wetter' : 'Position',
+          weather != null ? AprsKind.weather : AprsKind.position,
           lat: pos.lat,
           lon: pos.lon,
           symbol: pos.symbol,
@@ -223,15 +267,15 @@ AprsPacket parseAprs({
           weather: weather,
         );
       case '`' || "'" || '\x1c' || '\x1d':
-        return _micE(destination, info, packet) ?? packet('Mic-E', comment: info.substring(1));
+        return _micE(destination, info, packet) ?? packet(AprsKind.micE, comment: info.substring(1));
       case ';':
         // ;NAME_____*DDHHMMzposition
-        if (info.length < 18) return packet('Objekt', comment: info.substring(1));
+        if (info.length < 18) return packet(AprsKind.object, comment: info.substring(1));
         final name = info.substring(1, 10).trim();
         final alive = info[10] == '*';
         final pos = _position(info.substring(18));
         return packet(
-          alive ? 'Objekt' : 'Objekt (gelöscht)',
+          alive ? AprsKind.object : AprsKind.objectDeleted,
           name: name,
           lat: pos?.lat,
           lon: pos?.lon,
@@ -240,28 +284,28 @@ AprsPacket parseAprs({
         );
       case ')':
         final end = info.indexOf(RegExp('[!_]'), 1);
-        if (end < 0) return packet('Item', comment: info.substring(1));
+        if (end < 0) return packet(AprsKind.item, comment: info.substring(1));
         final pos = _position(info.substring(end + 1));
-        return packet('Item', name: info.substring(1, end), lat: pos?.lat, lon: pos?.lon, symbol: pos?.symbol, comment: pos?.rest);
+        return packet(AprsKind.item, name: info.substring(1, end), lat: pos?.lat, lon: pos?.lon, symbol: pos?.symbol, comment: pos?.rest);
       case ':':
         // :ADDRESSEE:text{id
-        if (info.length < 11) return packet('Nachricht', comment: info.substring(1));
+        if (info.length < 11) return packet(AprsKind.message, comment: info.substring(1));
         final to = info.substring(1, 10).trim();
         var text = info.substring(11);
         final id = text.lastIndexOf('{');
         if (id >= 0) text = text.substring(0, id);
-        if (to.startsWith('BLN')) return packet('Bulletin', name: to, comment: text);
-        if (RegExp(r'^(ack|rej)\w+$').hasMatch(text)) return packet('Bestätigung', name: to, comment: text);
-        return packet('Nachricht', name: to, comment: text);
+        if (to.startsWith('BLN')) return packet(AprsKind.bulletin, name: to, comment: text);
+        if (RegExp(r'^(ack|rej)\w+$').hasMatch(text)) return packet(AprsKind.ack, name: to, comment: text);
+        return packet(AprsKind.message, name: to, comment: text);
       case '>':
-        return packet('Status', comment: info.substring(1));
+        return packet(AprsKind.status, comment: info.substring(1));
       case '_':
         // Positionless weather: _MMDDHHMM then the data.
-        return packet('Wetter', weather: _weather(info.length > 9 ? info.substring(9) : ''));
+        return packet(AprsKind.weather, weather: _weather(info.length > 9 ? info.substring(9) : ''));
       case 'T':
-        return packet('Telemetrie', comment: info.substring(1));
+        return packet(AprsKind.telemetry, comment: info.substring(1));
       case '<':
-        return packet('Fähigkeiten', comment: info.substring(1));
+        return packet(AprsKind.capabilities, comment: info.substring(1));
       case '}':
         // Third party (e.g. from the internet via a gateway): the inner packet.
         final inner = info.substring(1);
@@ -277,18 +321,18 @@ AprsPacket parseAprs({
           );
           return p;
         }
-        return packet('Weitergeleitet', comment: inner);
+        return packet(AprsKind.thirdParty, comment: inner);
       default:
         // Some send a position without the '!' (it may start further in).
         final bang = info.indexOf('!');
         if (bang > 0 && bang < 40) {
           final pos = _position(info.substring(bang + 1));
-          if (pos != null) return packet('Position', lat: pos.lat, lon: pos.lon, symbol: pos.symbol, comment: pos.rest);
+          if (pos != null) return packet(AprsKind.position, lat: pos.lat, lon: pos.lon, symbol: pos.symbol, comment: pos.rest);
         }
-        return packet('Daten', comment: info);
+        return packet(AprsKind.data, comment: info);
     }
   } catch (_) {
-    return packet('Daten', comment: info);
+    return packet(AprsKind.data, comment: info);
   }
 }
 
@@ -323,7 +367,7 @@ _Pos? _position(String s) {
 AprsPacket? _micE(
   String destination,
   String info,
-  AprsPacket Function(String kind, {double? lat, double? lon, String? symbol, String? comment, double? speedKmh, int? course})
+  AprsPacket Function(AprsKind type, {double? lat, double? lon, String? symbol, String? comment, double? speedKmh, int? course})
       packet,
 ) {
   final dest = destination.split('-').first;
@@ -367,7 +411,7 @@ AprsPacket? _micE(
   comment = comment.replaceFirst(RegExp(r'[=^~_\]]$'), '');
   if (lat.abs() > 90 || lon.abs() > 180) return null;
   return packet(
-    'Mic-E',
+    AprsKind.micE,
     lat: lat,
     lon: lon,
     symbol: symbol,
@@ -415,55 +459,56 @@ String? _clean(String? s) {
 /// The common APRS symbols in a word.
 String aprsSymbolName(String symbol) {
   if (symbol.length < 2) return '';
+  final t = l10n;
   final alt = symbol[0] != '/';
   final code = symbol[1];
   if (alt) {
     return switch (code) {
       '#' => 'Digipeater',
       '&' => 'Gateway',
-      '_' => 'Wetterstation',
-      '-' => 'Haus',
-      '>' => 'Auto',
-      'a' => 'Rettung',
-      'n' => 'Knoten',
+      '_' => t.scannerAprsSymbolWeatherStation,
+      '-' => t.scannerAprsSymbolHouse,
+      '>' => t.scannerAprsSymbolCar,
+      'a' => t.scannerAprsSymbolAmbulance,
+      'n' => t.scannerAprsSymbolNode,
       'k' => 'SUV',
-      'u' => 'LKW',
+      'u' => t.scannerAprsSymbolTruck,
       'v' => 'Bus/Van',
-      '^' => 'Flugzeug',
-      'O' => 'Ballon',
-      'r' => 'Relais',
+      '^' => t.scannerAprsSymbolAircraft,
+      'O' => t.scannerAprsSymbolBalloon,
+      'r' => t.scannerAprsSymbolRepeater,
       'D' => 'DMR/D-Star',
       _ => 'Symbol $symbol',
     };
   }
   return switch (code) {
-    '>' => 'Auto',
-    '-' => 'Haus',
-    '_' => 'Wetterstation',
+    '>' => t.scannerAprsSymbolCar,
+    '-' => t.scannerAprsSymbolHouse,
+    '_' => t.scannerAprsSymbolWeatherStation,
     '#' => 'Digipeater',
     '&' => 'Gateway',
-    'k' => 'LKW',
-    'u' => 'LKW',
+    'k' => t.scannerAprsSymbolTruck,
+    'u' => t.scannerAprsSymbolTruck,
     'v' => 'Van',
     'j' => 'Jeep',
-    'R' => 'Wohnmobil',
-    '<' => 'Motorrad',
-    'b' => 'Fahrrad',
-    '[' => 'Fußgänger',
-    'y' => 'Station mit Antenne',
-    'r' => 'Relais',
+    'R' => t.scannerAprsSymbolRv,
+    '<' => t.scannerAprsSymbolMotorcycle,
+    'b' => t.scannerAprsSymbolBicycle,
+    '[' => t.scannerAprsSymbolPedestrian,
+    'y' => t.scannerAprsSymbolAntennaStation,
+    'r' => t.scannerAprsSymbolRepeater,
     'Y' => 'Yacht',
-    's' => 'Schiff',
-    'O' => 'Ballon',
-    '^' => 'Flugzeug',
-    "'" => 'Kleinflugzeug',
-    'X' => 'Hubschrauber',
-    'f' => 'Feuerwehr',
-    'a' => 'Rettung',
-    'P' => 'Polizei',
-    'S' => 'Satellit',
+    's' => t.scannerAprsSymbolShip,
+    'O' => t.scannerAprsSymbolBalloon,
+    '^' => t.scannerAprsSymbolAircraft,
+    "'" => t.scannerAprsSymbolSmallAircraft,
+    'X' => t.scannerAprsSymbolHelicopter,
+    'f' => t.scannerAprsSymbolFireTruck,
+    'a' => t.scannerAprsSymbolAmbulance,
+    'P' => t.scannerAprsSymbolPolice,
+    'S' => t.scannerAprsSymbolSatellite,
     'U' => 'Bus',
-    '=' => 'Zug',
+    '=' => t.scannerAprsSymbolTrain,
     _ => 'Symbol $symbol',
   };
 }

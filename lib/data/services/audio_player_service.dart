@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:audio_session/audio_session.dart';
 import 'package:just_audio/just_audio.dart';
 
+import '../../l10n/l10n.dart';
 import '../models/audio_quality.dart';
 import 'icy_metadata_service.dart';
 
@@ -31,7 +32,7 @@ class AudioPlayerService {
       // While _start() is running, a failure is already handled by its own
       // setUrl() catch - don't schedule a second retry for the same error.
       if (url == null || _starting) return;
-      _errorController.add('Verbindung zum Sender verloren - versuche erneut…');
+      _errorController.add(l10n.radioErrorConnectionLost);
       _scheduleRetry(url);
     });
   }
@@ -168,7 +169,7 @@ class AudioPlayerService {
       await _player.setUrl(url);
     } catch (e) {
       if (_currentUrl != url) return;
-      _errorController.add('Sender nicht erreichbar - versuche erneut…');
+      _errorController.add(l10n.radioErrorStationUnreachable);
       _scheduleRetry(url);
       return;
     } finally {
@@ -179,7 +180,7 @@ class AudioPlayerService {
     _errorController.add(null);
     unawaited(
       _player.play().catchError((Object e) {
-        _errorController.add('Wiedergabefehler: $e');
+        _errorController.add(l10n.radioErrorPlayback('$e'));
       }),
     );
   }

@@ -8,6 +8,8 @@ out first and stored as the source. Writes
 - assets/icon/home_system_logo.png       the tile, transparent corners (in the app)
 - assets/icon/home_system_foreground.png the house alone, for adaptive icons
 - android/app/src/main/res/drawable/tv_banner.png  the Android TV banner
+- assets/icon/tv_logo.png, dashboard_logo.png  the parts' tiles
+- android/app/src/main/res/drawable-nodpi/launch_logo.png  Android's launch screen
 then `dart run flutter_launcher_icons` makes the app icons from them.
 Needs Pillow; the banner text uses Segoe UI (Windows).
 """
@@ -96,6 +98,48 @@ def tv_logo(size: int) -> Image.Image:
     return out
 
 
+def dashboard_logo(size: int) -> Image.Image:
+    """Haussteuerung in the same style: a light bulb as a green ribbon with
+    its screw base, and short rays - "the house's lights and switches"."""
+    s = 4
+    n = size * s
+    k = n / 1000
+    shape = Image.new('L', (n, n), 0)
+    d = ImageDraw.Draw(shape)
+    t = 82
+    # Bulb: a circle running into a neck - outer minus inner area.
+    d.ellipse((300 * k, 210 * k, 700 * k, 610 * k), fill=255)
+    d.polygon([(330 * k, 500 * k), (670 * k, 500 * k), (610 * k, 700 * k), (390 * k, 700 * k)], fill=255)
+    d.ellipse(((300 + t) * k, (210 + t) * k, (700 - t) * k, (610 - t) * k), fill=0)
+    d.polygon([((330 + t) * k, 500 * k), ((670 - t) * k, 500 * k), ((610 - t) * k, (700 - t) * k),
+               ((390 + t) * k, (700 - t) * k)], fill=0)
+    # Screw base: two rounded bars.
+    for y in (725, 800):
+        d.rounded_rectangle((405 * k, y * k, 595 * k, (y + 50) * k), radius=25 * k, fill=255)
+    accent = Image.new('L', (n, n), 0)
+    ad = ImageDraw.Draw(accent)
+    # Rays around the top.
+    for x0, y0, x1, y1 in ((500, 95, 500, 150), (245, 200, 285, 240), (755, 200, 715, 240),
+                           (165, 410, 220, 410), (835, 410, 780, 410)):
+        ad.line((x0 * k, y0 * k, x1 * k, y1 * k), fill=255, width=round(46 * k))
+        for x, y in ((x0, y0), (x1, y1)):
+            ad.ellipse(((x - 23) * k, (y - 23) * k, (x + 23) * k, (y + 23) * k), fill=255)
+    # Filament: a small zigzag inside the bulb.
+    pts = [(430, 470), (470, 400), (500, 470), (530, 400), (570, 470)]
+    ad.line([(x * k, y * k) for x, y in pts], fill=255, width=round(34 * k), joint='curve')
+    for x, y in (pts[0], pts[-1]):
+        ad.ellipse(((x - 17) * k, (y - 17) * k, (x + 17) * k, (y + 17) * k), fill=255)
+
+    out = tile_background(n)
+    fold = ImageChops.offset(shape, round(16 * k), round(16 * k)).filter(ImageFilter.GaussianBlur(6 * k))
+    out = Image.composite(Image.new('RGBA', (n, n), (0, 95, 35, 255)), out, fold)
+    out = Image.composite(gradient(n), out, shape)
+    out = Image.composite(gradient(n, start=(170, 255, 60), end=(20, 200, 70)), out, accent)
+    out = out.resize((size, size), Image.LANCZOS)
+    out.putalpha(ImageChops.multiply(out.getchannel('A'), rounded_mask(size, inset=0.0, radius=0.19)))
+    return out
+
+
 def rounded_mask(size: int, inset: float, radius: float) -> Image.Image:
     s = 4
     m = Image.new('L', (size * s, size * s), 0)
@@ -157,6 +201,9 @@ if __name__ == '__main__':
     logo(1024).save(ROOT / 'assets/icon/home_system_logo.png')
     logo(512, RADIO_SOURCE).save(ROOT / 'assets/icon/radio_logo.png')
     tv_logo(512).save(ROOT / 'assets/icon/tv_logo.png')
+    dashboard_logo(512).save(ROOT / 'assets/icon/dashboard_logo.png')
     foreground(1024).save(ROOT / 'assets/icon/home_system_foreground.png')
     banner().save(ROOT / 'android/app/src/main/res/drawable/tv_banner.png')
+    # Android's launch screen (launch_background.xml shows it at 144dp).
+    logo(432).save(ROOT / 'android/app/src/main/res/drawable-nodpi/launch_logo.png')
     print('ok')

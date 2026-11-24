@@ -4,10 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/nas_providers.dart';
 import '../../core/providers.dart';
 import '../../core/theme.dart';
 import '../../data/services/admin_server.dart';
 import '../../data/services/backup_service.dart';
+import '../../data/services/nas_service.dart';
+import '../../l10n/l10n.dart';
 
 /// Saves a backup into Download/HomeSystem (Documents/HomeSystem on the PC)
 /// and says where it went - Settings → System → "Backup erstellen".
@@ -59,12 +62,48 @@ class _RestoreBackupScreenState extends ConsumerState<RestoreBackupScreen> with 
   String? _loadError;
   late final AdminServer _server = ref.read(adminServerProvider);
 
+  /// The NAS backup folder (Settings → NAS), null if none is set.
+  String? _nasFolder;
+  List<NasEntry> _nasBackups = const [];
+  bool _nasLoading = false;
+  String? _nasError;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _server.restoreHandler = _restoreFromWeb;
     _reload();
+    _reloadNas();
+  }
+
+  /// The backups in the NAS backup folder - once when the screen opens
+  /// (not on every return to the foreground like the device's).
+  Future<void> _reloadNas() async {
+    final settings = await ref.read(nasSettingsRepositoryProvider).load();
+    final folder = settings.folder(NasFolder.backups);
+    if (!mounted) return;
+    setState(() {
+      _nasFolder = folder;
+      _nasLoading = folder != null;
+      _nasError = null;
+    });
+    if (folder == null) return;
+    try {
+      final backups = await ref.read(nasBackupServiceProvider).listBackups();
+      if (!mounted) return;
+      setState(() {
+        _nasBackups = backups;
+        _nasLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _nasBackups = const [];
+        _nasError = e is NasException ? e.message : '$e';
+        _nasLoading = false;
+      });
+    }
   }
 
   @override
@@ -178,6 +217,22 @@ class _RestoreBackupScreenState extends ConsumerState<RestoreBackupScreen> with 
     });
   }
 
+  Future<void> _restoreFromNas(NasEntry file) async {
+    final l = context.l10n;
+    if (!await _confirmRestore(file.name)) return;
+    await _runRestore(() async {
+      final String content;
+      try {
+        content = await ref.read(nasBackupServiceProvider).download(file);
+      } on NasException catch (e) {
+        _snack(l.nasRestoreDownloadFailed(e.message));
+        return false;
+      }
+      await ref.read(backupServiceProvider).restoreJson(content);
+      return true;
+    });
+  }
+
   Future<void> _restoreFromPicker() async {
     if (!await _confirmRestore('Die ausgewählte Datei wird eingespielt.')) return;
     await _runRestore(() => ref.read(backupServiceProvider).restoreFromPicker());
@@ -286,6 +341,30 @@ class _RestoreBackupScreenState extends ConsumerState<RestoreBackupScreen> with 
               autofocus: _backups.isEmpty && !_canRequestAllFilesAccess,
               onTap: _restoreFromPicker,
             ),
+            if (_nasFolder != null) ...[
+              const Divider(height: 32),
+              Text(context.l10n.nasRestoreSection, style: titleStyle),
+              const SizedBox(height: 4),
+              Text(context.l10n.nasRestoreHint(_nasFolder!), style: hintStyle),
+              const SizedBox(height: 8),
+              if (_nasLoading)
+                const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (_nasError != null)
+                Text(context.l10n.nasRestoreLoadFailed(_nasError!), style: hintStyle)
+              else if (_nasBackups.isEmpty)
+                Text(context.l10n.nasRestoreNone, style: hintStyle)
+              else
+                for (final b in _nasBackups)
+                  ActionTile(
+                    icon: Icons.cloud_download_outlined,
+                    label: b.modified == null ? b.name : _formatDate(b.modified!.toLocal()),
+                    subtitle: b.modified == null ? null : b.name,
+                    onTap: () => _restoreFromNas(b),
+                  ),
+            ],
           ],
         ),
       ),

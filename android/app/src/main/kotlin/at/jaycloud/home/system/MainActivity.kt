@@ -21,6 +21,7 @@ class MainActivity : AudioServiceActivity() {
         flutterEngine.plugins.add(BackupPlugin())
         flutterEngine.plugins.add(UpdatePlugin())
         flutterEngine.plugins.add(launcher)
+        flutterEngine.plugins.add(DisplayPlugin())
     }
 
     private var createdAt = 0L
@@ -42,9 +43,20 @@ class MainActivity : AudioServiceActivity() {
         HomeButtonService.restoreAfterUpdate(this)
     }
 
+    /** Keys and touches count as presence for the Haussteuerung's display timeout. */
+    override fun onUserInteraction() {
+        super.onUserInteraction()
+        MotionService.onUserInteraction()
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        // The display came back on by motion (MotionService.wake).
+        if (intent.getBooleanExtra(EXTRA_WAKE, false)) {
+            DisplayPlugin.dismissKeyguard(this)
+            return
+        }
         // Right after the start the system's home screen can still flash up
         // (boot, an update) and HomeButtonService sends us here again - that
         // must not close what the start setting opened (e.g. TV).
@@ -59,6 +71,7 @@ class MainActivity : AudioServiceActivity() {
 
     companion object {
         const val EXTRA_SHOW_LAUNCHER = "at.jaycloud.home.system.SHOW_LAUNCHER"
+        const val EXTRA_WAKE = "at.jaycloud.home.system.WAKE"
         private const val BOOT_GRACE_MS = 180_000L
     }
 }

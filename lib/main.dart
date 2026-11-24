@@ -7,6 +7,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'app.dart';
+import 'features/tv/tv_player.dart';
 
 // Closing the window shuts the receiver down (stick / rtl_tcp connection) in
 // the native runner: windows/runner/flutter_window.cpp,
@@ -22,5 +23,7 @@ Future<void> main() async {
     // Full screen and monitor choice (applyDisplayMode).
     await windowManager.ensureInitialized();
   }
+  // Which picture path TV takes on this device (Android version).
+  await TvPlayer.prepare();
   runApp(const ProviderScope(child: HomeSystemApp()));
 }

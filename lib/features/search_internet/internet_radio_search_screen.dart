@@ -7,7 +7,24 @@ import '../../core/country_regions.dart';
 import '../../core/popup_text_field.dart';
 import '../../core/providers.dart';
 import '../../data/models/internet_radio_station.dart';
+import '../../l10n/l10n.dart';
 import '../shared/program_number_dialog.dart';
+
+/// Country names in German from our own table, otherwise Radio-Browser's
+/// English name.
+String _countryName(Map<String, String> c, String localeName) => localeName == 'de'
+    ? germanCountryName(c['code'] ?? '', c['name'] ?? '')
+    : ((c['name'] ?? '').isNotEmpty ? c['name']! : c['code'] ?? '');
+
+String _regionLabel(AppLocalizations l10n, WorldRegion region) => switch (region) {
+      WorldRegion.europe => l10n.radioRegionEurope,
+      WorldRegion.northAmerica => l10n.radioRegionNorthAmerica,
+      WorldRegion.southAmerica => l10n.radioRegionSouthAmerica,
+      WorldRegion.asia => l10n.radioRegionAsia,
+      WorldRegion.africa => l10n.radioRegionAfrica,
+      WorldRegion.oceania => l10n.radioRegionOceania,
+      WorldRegion.other => l10n.radioRegionOther,
+    };
 
 /// Sender search screen. Genre/country filtering uses ordinary dropdowns
 /// (alphabetically sorted; countries shown in German), and the free-text
@@ -52,8 +69,8 @@ class _InternetRadioSearchScreenState
     final tags = await api.topTags(limit: 150);
     final countries = await api.countries(limit: 250);
     tags.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
-    countries.sort((a, b) => germanCountryName(a['code'] ?? '', a['name'] ?? '')
-        .compareTo(germanCountryName(b['code'] ?? '', b['name'] ?? '')));
+    final localeName = l10n.localeName;
+    countries.sort((a, b) => _countryName(a, localeName).compareTo(_countryName(b, localeName)));
     if (mounted) {
       setState(() {
         _tags = tags;
@@ -105,7 +122,7 @@ class _InternetRadioSearchScreenState
     await repo.addInternetStation(programNumber: programNumber, station: station);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('"${station.name}" als Nr. $programNumber gespeichert.')),
+        SnackBar(content: Text(context.l10n.radioSavedAsNumber(station.name, programNumber))),
       );
     }
   }
@@ -128,9 +145,10 @@ class _InternetRadioSearchScreenState
     // avoids Flutter's geometric guess picking the wrong next widget.
     var order = 0.0;
     double nextOrder() => order += 1;
+    final l10n = context.l10n;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Internetradio suchen')),
+      appBar: AppBar(title: Text(l10n.radioSearchInternetTitle)),
       body: FocusTraversalGroup(
         policy: OrderedTraversalPolicy(),
         child: Column(
@@ -149,7 +167,7 @@ class _InternetRadioSearchScreenState
                       order: NumericFocusOrder(nextOrder()),
                       child: PopupTextField(
                         controller: _nameController,
-                        label: 'Sendername',
+                        label: l10n.radioSearchStationName,
                         icon: Icons.search,
                         onSubmitted: (_) => _runSearch(),
                       ),
@@ -161,11 +179,11 @@ class _InternetRadioSearchScreenState
                       order: NumericFocusOrder(nextOrder()),
                       child: DropdownButtonFormField<String>(
                         initialValue: _selectedTag,
-                        decoration: const InputDecoration(
-                            labelText: 'Genre', border: OutlineInputBorder()),
+                        decoration:
+                            InputDecoration(labelText: l10n.radioSearchGenre, border: const OutlineInputBorder()),
                         isExpanded: true,
                         items: [
-                          const DropdownMenuItem(value: null, child: Text('Alle Genres')),
+                          DropdownMenuItem(value: null, child: Text(l10n.radioSearchAllGenres)),
                           ..._tags.map((t) => DropdownMenuItem(value: t, child: Text(t))),
                         ],
                         onChanged: (v) {
@@ -181,11 +199,13 @@ class _InternetRadioSearchScreenState
                       order: NumericFocusOrder(nextOrder()),
                       child: DropdownButtonFormField<WorldRegion?>(
                         initialValue: _region,
-                        decoration: const InputDecoration(labelText: 'Region', border: OutlineInputBorder()),
+                        decoration:
+                            InputDecoration(labelText: l10n.radioSearchRegion, border: const OutlineInputBorder()),
                         isExpanded: true,
                         items: [
-                          const DropdownMenuItem(value: null, child: Text('Alle Regionen')),
-                          for (final r in WorldRegion.values) DropdownMenuItem(value: r, child: Text(r.label)),
+                          DropdownMenuItem(value: null, child: Text(l10n.radioSearchAllRegions)),
+                          for (final r in WorldRegion.values)
+                            DropdownMenuItem(value: r, child: Text(_regionLabel(l10n, r))),
                         ],
                         onChanged: (r) {
                           final keep = _selectedCountryCode != null && (r == null || regionOf(_selectedCountryCode!) == r);
@@ -206,15 +226,15 @@ class _InternetRadioSearchScreenState
                         // Rebuilt per region, so a reset selection shows.
                         key: ValueKey(_region),
                         initialValue: _selectedCountryCode,
-                        decoration: const InputDecoration(
-                            labelText: 'Land', border: OutlineInputBorder()),
+                        decoration:
+                            InputDecoration(labelText: l10n.radioSearchCountry, border: const OutlineInputBorder()),
                         isExpanded: true,
                         items: [
-                          const DropdownMenuItem(value: null, child: Text('Alle Länder')),
+                          DropdownMenuItem(value: null, child: Text(l10n.radioSearchAllCountries)),
                           ..._countries.where((c) => _region == null || regionOf(c['code'] ?? '') == _region).map(
                             (c) => DropdownMenuItem(
                               value: c['code'],
-                              child: Text(germanCountryName(c['code'] ?? '', c['name'] ?? '')),
+                              child: Text(_countryName(c, l10n.localeName)),
                             ),
                           ),
                         ],
@@ -230,7 +250,7 @@ class _InternetRadioSearchScreenState
                     child: FilledButton.icon(
                       onPressed: _loading ? null : _runSearch,
                       icon: const Icon(Icons.search),
-                      label: const Text('Suchen'),
+                      label: Text(l10n.radioSearchButton),
                     ),
                   ),
                 ],
@@ -245,7 +265,7 @@ class _InternetRadioSearchScreenState
             const Divider(height: 24),
             Expanded(
               child: _results.isEmpty && !_loading
-                  ? const Center(child: Text('Keine Ergebnisse.'))
+                  ? Center(child: Text(l10n.radioSearchNoResults))
                   : ListView.builder(
                       itemCount: _results.length,
                       itemBuilder: (context, index) {
@@ -279,7 +299,7 @@ class _InternetRadioSearchScreenState
                               FocusTraversalOrder(
                                 order: NumericFocusOrder(nextOrder()),
                                 child: IconButton(
-                                  tooltip: isPreviewing ? 'Stopp' : 'Probehören',
+                                  tooltip: isPreviewing ? l10n.radioStop : l10n.radioSearchPreview,
                                   onPressed: () => _togglePreview(station),
                                   icon: Icon(
                                     isPreviewing ? Icons.stop_circle : Icons.play_circle_outline,
@@ -292,7 +312,7 @@ class _InternetRadioSearchScreenState
                                 child: FilledButton.tonalIcon(
                                   onPressed: () => _addToFavorites(station),
                                   icon: const Icon(Icons.star_border),
-                                  label: const Text('Favorit'),
+                                  label: Text(l10n.radioSearchAddFavorite),
                                 ),
                               ),
                             ],

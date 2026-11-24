@@ -23,7 +23,9 @@ class SecretStore {
 
   /// Every secret the app keeps (for backups). Older backups may still carry
   /// 'rtl_tcp_password' - ignored.
-  static const keys = <String>[enigma2PasswordKey];
+  /// Everything a backup carries (see exportAll) - 'nas_password' is
+  /// NasSettingsRepository.passwordKey.
+  static const keys = <String>[enigma2PasswordKey, 'nas_password'];
 
   Future<String?> read(String key) async {
     try {

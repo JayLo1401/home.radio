@@ -7,6 +7,7 @@ import 'package:weather_svg_icons/weather_svg_icons.dart';
 import '../../data/models/hourly_forecast.dart';
 import '../../data/services/geosphere_weather_service.dart';
 import '../../data/services/sun_moon_service.dart';
+import '../../l10n/l10n.dart';
 
 /// Vertical (top-to-bottom) hourly forecast for the rest of today, sourced
 /// from GeoSphere Austria (see GeoSphereWeatherService's doc comment for
@@ -147,9 +148,9 @@ class _WeatherPanelState extends State<WeatherPanel> {
             child: hours == null
                 ? Center(
                     child: _error != null
-                        ? const Text(
-                            'Wetter nicht verfügbar - versuche erneut…',
-                            style: TextStyle(color: Colors.white54, fontSize: 12),
+                        ? Text(
+                            context.l10n.radioWeatherUnavailable,
+                            style: const TextStyle(color: Colors.white54, fontSize: 12),
                           )
                         : const SizedBox(
                             width: 20,
@@ -158,8 +159,11 @@ class _WeatherPanelState extends State<WeatherPanel> {
                           ),
                   )
                 : hours.isEmpty
-                    ? const Center(
-                        child: Text('Keine Daten', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                    ? Center(
+                        child: Text(
+                          context.l10n.radioWeatherNoData,
+                          style: const TextStyle(color: Colors.white54, fontSize: 12),
+                        ),
                       )
                     // A row per hour used to carry its own "10:00" label,
                     // which reads as the weather *at* 10:00 rather than what
@@ -257,12 +261,12 @@ class _HeaderRow extends StatelessWidget {
             ],
           ),
         ),
-        SizedBox(width: metrics.tempColWidth, child: Text('Temp', style: style)),
+        SizedBox(width: metrics.tempColWidth, child: Text(context.l10n.radioWeatherTemp, style: style)),
         // Wind centered in whatever space is left between Temp and Regen,
         // Regen flush against the card's right edge - matches how the
         // badges themselves are now laid out below (see _HourRow).
-        Expanded(child: Center(child: Text('Wind km/h', style: style))),
-        SizedBox(width: metrics.badgeColWidth, child: Center(child: Text('Regen l/m²', style: style))),
+        Expanded(child: Center(child: Text(context.l10n.radioWeatherWind, style: style))),
+        SizedBox(width: metrics.badgeColWidth, child: Center(child: Text(context.l10n.radioWeatherRain, style: style))),
       ],
     );
   }
@@ -432,7 +436,7 @@ class _RainBadge extends StatelessWidget {
         children: [
           Icon(Icons.water_drop_rounded, color: Colors.white, size: metrics.badgeIconSize),
           const SizedBox(width: 4),
-          Text('${mmPerHour.toStringAsFixed(1)} l', style: metrics.badgeTextStyle),
+          Text(context.l10n.radioWeatherRainAmount(mmPerHour.toStringAsFixed(1)), style: metrics.badgeTextStyle),
         ],
       ),
     );

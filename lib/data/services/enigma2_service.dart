@@ -3,6 +3,8 @@ import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
+import '../../l10n/l10n.dart';
+
 /// Connection to an Enigma2 satellite receiver (GigaBlue, VU+, Dreambox, ...
 /// with OpenWebif - teamBlue, OpenATV, OpenPLi images all have it).
 class Enigma2Config {
@@ -198,17 +200,17 @@ class Enigma2Service {
   static const _timeout = Duration(seconds: 15);
 
   Future<Map<String, dynamic>> _get(String path, [Map<String, String>? query]) async {
-    if (!config.configured) throw Enigma2Exception('Kein Receiver eingerichtet');
+    if (!config.configured) throw Enigma2Exception(l10n.tvErrorNoReceiver);
     final http.Response response;
     try {
       response = await _client.get(config.webUri(path, query), headers: config.authHeaders).timeout(_timeout);
     } catch (e) {
-      throw Enigma2Exception('Receiver nicht erreichbar (${config.host}): $e');
+      throw Enigma2Exception(l10n.tvErrorUnreachable(config.host, '$e'));
     }
-    if (response.statusCode == 401) throw Enigma2Exception('Anmeldung abgelehnt - Benutzer/Passwort prüfen');
-    if (response.statusCode != 200) throw Enigma2Exception('Receiver antwortet mit Fehler ${response.statusCode}');
+    if (response.statusCode == 401) throw Enigma2Exception(l10n.tvErrorLoginRejected);
+    if (response.statusCode != 200) throw Enigma2Exception(l10n.tvErrorHttpStatus('${response.statusCode}'));
     final decoded = jsonDecode(utf8.decode(response.bodyBytes, allowMalformed: true));
-    if (decoded is! Map<String, dynamic>) throw Enigma2Exception('Unerwartete Antwort vom Receiver');
+    if (decoded is! Map<String, dynamic>) throw Enigma2Exception(l10n.tvErrorUnexpectedResponse);
     return decoded;
   }
 
@@ -270,7 +272,7 @@ class Enigma2Service {
   /// any other encrypted channel stays scrambled.
   Future<void> zap(String serviceRef) async {
     final j = await _get('/api/zap', {'sRef': serviceRef});
-    if (j['result'] == false) throw Enigma2Exception('Receiver schaltet nicht um: ${j['message'] ?? ''}');
+    if (j['result'] == false) throw Enigma2Exception(l10n.tvErrorZapFailed('${j['message'] ?? ''}'));
   }
 
   /// The channel the receiver shows itself, null if unknown.

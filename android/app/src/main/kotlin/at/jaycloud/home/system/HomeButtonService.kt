@@ -47,6 +47,7 @@ class HomeButtonService : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
+        instance = this
         homePackages = findHomePackages()
         homeActivities = findHomeActivities()
         if (FILTER_HOME_KEY) {
@@ -147,6 +148,11 @@ class HomeButtonService : AccessibilityService() {
 
     override fun onInterrupt() = Unit
 
+    override fun onDestroy() {
+        if (instance === this) instance = null
+        super.onDestroy()
+    }
+
     private fun activitiesOf(pkg: String): Set<String> = launcherActivities.getOrPut(pkg) {
         try {
             packageManager.getPackageInfo(pkg, PackageManager.GET_ACTIVITIES).activities
@@ -183,6 +189,11 @@ class HomeButtonService : AccessibilityService() {
 
     companion object {
         const val TAG = "HomeButtonService"
+
+        /** The connected service - the Haussteuerung switches the display off through it (MotionService). */
+        @Volatile
+        var instance: HomeButtonService? = null
+            private set
 
         /** Only Fire TV holds other apps back for 5 s after Home (see onKeyEvent). */
         private val FILTER_HOME_KEY = Build.MANUFACTURER.equals("Amazon", ignoreCase = true)

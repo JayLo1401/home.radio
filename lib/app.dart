@@ -4,13 +4,20 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart' show kBackMouseButton;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'core/dashboard_providers.dart';
 import 'core/providers.dart';
+import 'core/system_providers.dart';
+import 'data/services/display_service.dart';
+import 'features/admin/admin_settings.dart';
+import 'features/dashboard/dashboard_screen.dart' show dashboardReloadProvider;
 import 'core/theme.dart';
 import 'features/launcher/launcher_navigation.dart';
 import 'features/launcher/launcher_providers.dart' show appNavigatorKey;
 import 'features/splash/splash_screen.dart';
+import 'l10n/l10n.dart';
 
 /// Home System: the launcher with Radio and TV as its parts (and
 /// the device's apps on Android).
@@ -20,13 +27,36 @@ class HomeSystemApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final uiScale = ref.watch(uiScaleProvider);
-    // The admin page http://<ip>:1401/ runs as long as the app does.
-    ref.watch(adminServerProvider);
+    final language = ref.watch(languageProvider);
+    // The admin page http://<ip>:1401/ runs as long as the app does - with
+    // the settings it can change and the Haussteuerung's display.
+    final admin = ref.watch(adminServerProvider);
+    if (admin.settings == null) {
+      final container = ProviderScope.containerOf(context, listen: false);
+      admin.settings = AdminSettings(container);
+      final display = container.read(displayServiceProvider);
+      admin.display = (
+        on: display.screenOn,
+        off: display.screenOff,
+        reload: () => container.read(dashboardReloadProvider.notifier).reload(),
+        available: () => DisplayService.supported && container.read(systemPartsProvider).dashboard,
+      );
+    }
+    // Haussteuerung: the display by motion (camera), when switched on.
+    ref.watch(motionControllerProvider);
     return MaterialApp(
       title: 'Home System',
       navigatorKey: appNavigatorKey,
       debugShowCheckedModeBanner: false,
       theme: buildTvTheme(),
+      locale: language.locale,
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
       builder: (context, child) => _PcKeys(child: _UiScaleWrapper(scale: uiScale, child: child!)),
       home: const SplashScreen(),
     );

@@ -1,0 +1,13 @@
+{
+  "systemStartDashboard": "Show Smart Home (wall tablet)",
+  "systemStartAppNone": "Start another app …",
+  "systemStartApp": "Start app: {app}",
+  "systemStartAppPick": "Which app on start?",
+  "systemStartAppMissing": "The start app \"{app}\" isn't installed.",
+  "systemSettingsAll": "All settings",
+  "systemTileSettings": "Settings (TV)",
+  "systemTileSettingsShort": "Settings",
+  "systemSettingsTitleSystem": "System settings",
+  "systemSettingsTitleRadio": "Radio settings",
+  "systemSettingsTitleTv": "TV settings"
+}

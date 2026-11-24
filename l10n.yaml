@@ -1,0 +1,9 @@
+# App texts: German (template) and English. Don't edit lib/l10n/app_*.arb -
+# they're merged from l10n/<area>_de.arb / l10n/<area>_en.arb by
+#   dart run tool/l10n_merge.dart
+# which then runs `flutter gen-l10n`.
+arb-dir: lib/l10n
+template-arb-file: app_de.arb
+output-localization-file: app_localizations.dart
+output-class: AppLocalizations
+nullable-getter: false

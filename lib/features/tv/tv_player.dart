@@ -3,9 +3,13 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show MethodChannel;
 import 'package:media_kit/media_kit.dart' as mk;
 import 'package:media_kit_video/media_kit_video.dart' as mkv;
 import 'package:video_player/video_player.dart';
+
+import '../../data/models/iptv_channel.dart' show IptvStreamFormat;
+import '../../l10n/l10n.dart';
 
 /// One sound track of the channel ("Deutsch", "Originalton", ...).
 @immutable
@@ -65,7 +69,7 @@ class TvPlayerInfo {
     if (height == null || height == 0) return null;
     final scan = interlaced == null ? '' : (interlaced! ? 'i' : 'p');
     // Without the width as sent (Android): the lines.
-    if (width == null || width == 0) return scan.isEmpty ? '$height Zeilen' : '$height$scan';
+    if (width == null || width == 0) return scan.isEmpty ? l10n.tvResolutionLines(height!) : '$height$scan';
     return '$width×$height$scan';
   }
 
@@ -92,8 +96,28 @@ class TvPlayerInfo {
 /// sound tracks and what the picture is. On Android ExoPlayer (video_player),
 /// on the PC libmpv (media_kit) - with deinterlacing for 1080i.
 abstract class TvPlayer {
-  factory TvPlayer(Uri uri, Map<String, String> headers) =>
-      !kIsWeb && Platform.isAndroid ? _ExoTvPlayer(uri, headers) : _MpvTvPlayer(uri, headers);
+  /// Android's API level (0 elsewhere) - [prepare] reads it once.
+  static int _androidSdk = 0;
+
+  /// Called once on start (main): what [TvPlayer] needs to know about the
+  /// device before the first channel.
+  static Future<void> prepare() async {
+    if (kIsWeb || !Platform.isAndroid) return;
+    try {
+      _androidSdk = await const MethodChannel('home_system/launcher').invokeMethod<int>('sdkInt') ?? 0;
+    } catch (e) {
+      debugPrint('TvPlayer.prepare: $e');
+    }
+  }
+
+  /// [format]: how the stream is packaged, if the address doesn't say
+  /// (Internet-TV's HLS / DASH) - ExoPlayer needs it, libmpv finds out.
+  /// [broadcast]: the receiver's DVB stream (576/1080 lines at 25 frames
+  /// are interlaced there) - not Internet-TV's.
+  factory TvPlayer(Uri uri, Map<String, String> headers, {IptvStreamFormat? format, bool broadcast = true}) =>
+      !kIsWeb && Platform.isAndroid
+          ? _ExoTvPlayer(uri, headers, format)
+          : _MpvTvPlayer(uri, headers, broadcast);
 
   /// Opens the stream; completes with the first picture, throws if none
   /// comes within [timeout].
@@ -112,10 +136,11 @@ abstract class TvPlayer {
 /// The PC: libmpv straight (media_kit) - every detail of the stream and its
 /// tracks is there.
 class _MpvTvPlayer implements TvPlayer {
-  _MpvTvPlayer(this._uri, this._headers);
+  _MpvTvPlayer(this._uri, this._headers, this._broadcast);
 
   final Uri _uri;
   final Map<String, String> _headers;
+  final bool _broadcast;
   final _player = mk.Player(configuration: const mk.PlayerConfiguration(title: 'TV'));
   late final _video = mkv.VideoController(_player);
   final _info = ValueNotifier(const TvPlayerInfo());
@@ -168,7 +193,8 @@ class _MpvTvPlayer implements TvPlayer {
       fps = double.tryParse(await native.getProperty('container-fps'));
     } catch (_) {}
     final h = _player.state.videoParams.h ?? _player.state.height;
-    final broadcastInterlaced = fps != null && fps > 0 && fps < 31 && (h == 576 || h == 480 || h == 1080 || h == 1088);
+    final broadcastInterlaced = _broadcast &&
+        fps != null && fps > 0 && fps < 31 && (h == 576 || h == 480 || h == 1080 || h == 1088);
     _interlaced = flag == 'yes' || broadcastInterlaced;
     // Linux: the system's libmpv has FFmpeg's deinterlacers. The libmpv
     // media_kit brings for Windows has none (no software filter, and its
@@ -251,15 +277,24 @@ class _MpvTvPlayer implements TvPlayer {
 
 /// Android: ExoPlayer (video_player) - its sound tracks, the picture size.
 class _ExoTvPlayer implements TvPlayer {
-  _ExoTvPlayer(Uri uri, Map<String, String> headers)
+  _ExoTvPlayer(Uri uri, Map<String, String> headers, IptvStreamFormat? format)
       : _controller = VideoPlayerController.networkUrl(
           uri,
           httpHeaders: headers,
-          // ExoPlayer straight into a SurfaceView. The default texture
+          formatHint: switch (format) {
+            IptvStreamFormat.hls => VideoFormat.hls,
+            IptvStreamFormat.dash => VideoFormat.dash,
+            null => null,
+          },
+          // Android 10+: ExoPlayer straight into a SurfaceView. The texture
           // (ImageReader) froze the picture on the Xiaomi box (Amlogic) when
           // the channel list or the guide opened: Flutter stopped taking its
           // frames, the decoder ran out of buffers - the sound played on.
-          viewType: VideoViewType.platformView,
+          // Android 9 and older (Fire TV Stick, Fire OS 7) keep the texture:
+          // there a platform view copies every frame of the whole UI through
+          // main memory (everything crawled), and a full-screen page over it
+          // (the guide) stayed hidden behind the picture.
+          viewType: TvPlayer._androidSdk >= 29 ? VideoViewType.platformView : VideoViewType.textureView,
         );
 
   final VideoPlayerController _controller;
@@ -353,7 +388,7 @@ String? audioDetails(String? codec, int? channels) {
     6 => '5.1',
     8 => '7.1',
     null || <= 0 => null,
-    _ => '$channels Kanäle',
+    _ => l10n.tvAudioChannels(channels),
   };
   final parts = [?name, ?layout];
   return parts.isEmpty ? null : parts.join(' ');
@@ -364,20 +399,20 @@ String? audioDetails(String? codec, int? channels) {
 String audioTrackName(String? language, String? title, int index) {
   final lang = language?.toLowerCase().trim();
   final named = switch (lang) {
-    'deu' || 'ger' || 'de' => 'Deutsch',
-    'eng' || 'en' => 'Englisch',
-    'fra' || 'fre' || 'fr' => 'Französisch',
-    'ita' || 'it' => 'Italienisch',
-    'spa' || 'es' => 'Spanisch',
-    'tur' || 'tr' => 'Türkisch',
-    'pol' || 'pl' => 'Polnisch',
-    'hrv' || 'srp' || 'bos' => 'Kroatisch/Serbisch',
-    'qaa' || 'mul' || 'orig' || 'org' => 'Originalton',
-    'qad' || 'dsc' => 'Audiodeskription',
+    'deu' || 'ger' || 'de' => l10n.tvAudioLanguageGerman,
+    'eng' || 'en' => l10n.tvAudioLanguageEnglish,
+    'fra' || 'fre' || 'fr' => l10n.tvAudioLanguageFrench,
+    'ita' || 'it' => l10n.tvAudioLanguageItalian,
+    'spa' || 'es' => l10n.tvAudioLanguageSpanish,
+    'tur' || 'tr' => l10n.tvAudioLanguageTurkish,
+    'pol' || 'pl' => l10n.tvAudioLanguagePolish,
+    'hrv' || 'srp' || 'bos' => l10n.tvAudioLanguageCroatianSerbian,
+    'qaa' || 'mul' || 'orig' || 'org' => l10n.tvAudioOriginal,
+    'qad' || 'dsc' => l10n.tvAudioDescription,
     'mis' || 'und' || '' || null => null,
     _ => lang.toUpperCase(),
   };
   final t = title?.trim();
   if (named != null && t != null && t.isNotEmpty && t.toLowerCase() != lang) return '$named ($t)';
-  return named ?? (t != null && t.isNotEmpty ? t : 'Tonspur ${index + 1}');
+  return named ?? (t != null && t.isNotEmpty ? t : l10n.tvAudioTrackNumber(index + 1));
 }

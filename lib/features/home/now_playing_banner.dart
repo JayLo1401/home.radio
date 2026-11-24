@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/retrying_network_image.dart';
 import '../../data/models/audio_quality.dart';
+import '../../l10n/l10n.dart';
 import 'audio_level_bars.dart';
 
 /// Bottom banner showing the currently playing station, logo and metadata.
@@ -67,9 +68,9 @@ class NowPlayingBanner extends StatelessWidget {
       color: Colors.black.withValues(alpha: 0.7),
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
       child: displayName == null
-          ? const Center(
-              child: Text('Kein Sender ausgewählt',
-                  style: TextStyle(color: Colors.white54, fontSize: 20)),
+          ? Center(
+              child: Text(context.l10n.radioNoStationSelected,
+                  style: const TextStyle(color: Colors.white54, fontSize: 20)),
             )
           : Row(
               children: [
@@ -122,8 +123,10 @@ class NowPlayingBanner extends StatelessWidget {
                       else
                         Text(
                           stopped
-                              ? 'Gestoppt - Verbindung getrennt'
-                              : (errorMessage ?? subtitle ?? (isPlaying ? 'Wiedergabe läuft' : 'Pausiert')),
+                              ? context.l10n.radioStoppedDisconnected
+                              : (errorMessage ??
+                                  subtitle ??
+                                  (isPlaying ? context.l10n.radioNowPlaying : context.l10n.radioPaused)),
                           style: TextStyle(
                             color: errorMessage != null ? Colors.redAccent : Colors.white70,
                             fontSize: 22,
@@ -152,7 +155,7 @@ class NowPlayingBanner extends StatelessWidget {
                     padding: const EdgeInsets.only(left: 16),
                     child: IconButton.filledTonal(
                       iconSize: 36,
-                      tooltip: onStop != null ? 'Stopp' : 'Abspielen',
+                      tooltip: onStop != null ? context.l10n.radioStop : context.l10n.radioPlay,
                       onPressed: onPressed,
                       icon: Icon(onStop != null ? Icons.stop : Icons.play_arrow),
                     ),

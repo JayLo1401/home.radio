@@ -1,3 +1,6 @@
+import '../l10n/l10n.dart';
+import 'country_names_en.dart';
+
 /// German display names for ISO 3166-1 alpha-2 country codes, as returned by
 /// the Radio-Browser API (which only gives English names). Falls back to the
 /// English name for any code not covered here (mostly small/rare territories
@@ -254,7 +257,13 @@ const Map<String, String> countryNamesDe = {
   'ZW': 'Simbabwe',
 };
 
-String germanCountryName(String iso2, String englishFallback) {
-  return countryNamesDe[iso2.toUpperCase()] ??
-      (englishFallback.isNotEmpty ? englishFallback : iso2);
+/// The country's name in the app's language (German or English), e.g. for
+/// the internet radio search's country list.
+String countryName(String iso2, String englishFallback) {
+  final names = l10n.localeName == 'de' ? countryNamesDe : countryNamesEn;
+  return names[iso2.toUpperCase()] ?? (englishFallback.isNotEmpty ? englishFallback : iso2);
 }
+
+/// Kept for existing callers - despite its name it follows the app's
+/// language like [countryName] (German only when the app is in German).
+String germanCountryName(String iso2, String englishFallback) => countryName(iso2, englishFallback);

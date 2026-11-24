@@ -2,9 +2,11 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
+import 'dart:ui' show Locale;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:home_system/data/services/rtl_sdr_service.dart';
+import 'package:home_system/l10n/l10n.dart';
 
 const _hello = [0xF2, 0x52, 0x54, 0x4C, 0x32];
 const _helloInfo = [0xF2, 0x52, 0x54, 0x4C, 0x49];
@@ -64,6 +66,9 @@ Future<ServerSocket> _server(void Function(Socket s) script, {Completer<List<int
 }
 
 void main() {
+  // The tests check the German texts; `flutter test` runs in English.
+  setUpAll(() => applyAppLocale(const Locale('de')));
+
   test('inspect: info HELLO lists all sticks without taking one', () async {
     final hellos = <List<int>>[];
     final server = await _multiServer((s, hello) {

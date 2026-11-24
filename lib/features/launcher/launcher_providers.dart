@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/nas_providers.dart';
 import '../../core/providers.dart';
 import '../../data/models/launcher_tile.dart';
 import '../../data/repositories/settings_repository.dart';
@@ -9,7 +10,8 @@ import '../../data/services/launcher_service.dart';
 
 final launcherServiceProvider = Provider<LauncherService>((ref) => LauncherService());
 
-final launcherBackgroundServiceProvider = Provider<LauncherBackgroundService>((ref) => LauncherBackgroundService());
+final launcherBackgroundServiceProvider = Provider<LauncherBackgroundService>(
+    (ref) => LauncherBackgroundService(nasPictures: ref.read(nasPictureCacheProvider)));
 
 /// The app's navigator - the launcher is pushed over Radio from
 /// anywhere (Home key, start, Back on the radio screen).

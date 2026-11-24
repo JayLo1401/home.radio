@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../../l10n/l10n.dart';
+
 class PlaceResult {
   const PlaceResult({required this.name, required this.region, required this.lat, required this.lon});
 
@@ -28,10 +30,10 @@ class PlaceSearchService {
       'format': 'jsonv2',
       'addressdetails': '1',
       'limit': '8',
-      'accept-language': 'de',
+      'accept-language': l10n.localeName,
     });
     final r = await http.get(uri, headers: {'User-Agent': 'HomeSystem/1.0 (github.com/JayLo1401/home.system)'});
-    if (r.statusCode != 200) throw Exception('Ortssuche: HTTP ${r.statusCode}');
+    if (r.statusCode != 200) throw Exception(l10n.radioPlaceSearchFailed(r.statusCode));
     final list = jsonDecode(utf8.decode(r.bodyBytes)) as List;
     final results = <PlaceResult>[];
     final seen = <String>{};

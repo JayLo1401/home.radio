@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/remote_keys.dart';
+import '../../l10n/l10n.dart';
 
 /// Einstellungen → Tasten der Fernbedienung: which key does what - e.g. when
 /// ☰ does something else on the remote (a key mapper app).
@@ -19,18 +20,14 @@ class RemoteKeysSettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final keys = ref.watch(remoteKeysProvider);
     const help = TextStyle(color: Colors.white60, fontSize: 14);
+    final l = context.l10n;
     return Scaffold(
-      appBar: AppBar(title: const Text('Tasten der Fernbedienung')),
+      appBar: AppBar(title: Text(l.miscRemoteKeysTitle)),
       body: FocusTraversalGroup(
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            const Text(
-              'Eine Aktion wählen und dann die Taste drücken, die sie auslösen soll - sie ersetzt die bisherigen '
-              'Tasten der Aktion. So bleibt z. B. ☰ frei, wenn sie auf der Fernbedienung etwas anderes tut. '
-              'Pfeiltasten, Zurück und Home lassen sich nicht belegen.',
-              style: help,
-            ),
+            Text(l.miscRemoteKeysIntro, style: help),
             const SizedBox(height: 12),
             for (final (i, action) in RemoteAction.values.indexed)
               ListTile(
@@ -39,13 +36,14 @@ class RemoteKeysSettingsScreen extends ConsumerWidget {
                 title: Text(action.label),
                 subtitle: Text(
                   keys.keysOf(action).isEmpty
-                      ? 'keine Taste'
-                      : keys.keysOf(action).map(remoteKeyLabel).join(', ') + (keys.isCustom(action) ? '' : '  (Standard)'),
+                      ? l.miscRemoteKeysNone
+                      : keys.keysOf(action).map(remoteKeyLabel).join(', ') +
+                            (keys.isCustom(action) ? '' : '  (${l.miscRemoteKeysStandard})'),
                 ),
                 focusColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.35),
                 trailing: keys.isCustom(action)
                     ? IconButton(
-                        tooltip: 'Standard',
+                        tooltip: l.miscRemoteKeysStandard,
                         icon: const Icon(Icons.restart_alt),
                         onPressed: () => ref.read(remoteKeysProvider.notifier).reset(action),
                       )
@@ -54,7 +52,7 @@ class RemoteKeysSettingsScreen extends ConsumerWidget {
                 onLongPress: () => ref.read(remoteKeysProvider.notifier).reset(action),
               ),
             const SizedBox(height: 8),
-            const Text('Langer Druck auf OK bei einer Aktion: wieder die Standard-Tasten.', style: help),
+            Text(l.miscRemoteKeysResetHint, style: help),
           ],
         ),
       ),
@@ -83,7 +81,7 @@ class _KeyCatcherState extends State<_KeyCatcher> {
       return KeyEventResult.handled;
     }
     if (unassignableKeys.contains(key)) {
-      setState(() => _refused = '${remoteKeyLabel(key)} lässt sich nicht belegen.');
+      setState(() => _refused = context.l10n.miscRemoteKeysNotAssignable(remoteKeyLabel(key)));
       return KeyEventResult.handled;
     }
     Navigator.of(context).pop(key);
@@ -102,9 +100,9 @@ class _KeyCatcherState extends State<_KeyCatcher> {
           children: [
             const Icon(Icons.keyboard, size: 48),
             const SizedBox(height: 12),
-            const Text('Jetzt die Taste drücken …', style: TextStyle(fontSize: 18)),
+            Text(context.l10n.miscRemoteKeysPressNow, style: const TextStyle(fontSize: 18)),
             const SizedBox(height: 6),
-            Text(_refused ?? 'Zurück bricht ab.', style: const TextStyle(color: Colors.white60)),
+            Text(_refused ?? context.l10n.miscRemoteKeysBackCancels, style: const TextStyle(color: Colors.white60)),
           ],
         ),
       ),

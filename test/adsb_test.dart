@@ -1,12 +1,17 @@
 import 'dart:typed_data';
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:home_system/data/models/adsb.dart';
+import 'package:home_system/l10n/l10n.dart';
 
 Uint8List hex(String h) =>
     Uint8List.fromList([for (var i = 0; i < h.length; i += 2) int.parse(h.substring(i, i + 2), radix: 16)]);
 
 void main() {
+  // The expected texts are the German ones.
+  setUpAll(() => applyAppLocale(const Locale('de')));
+
   test('identification (callsign)', () {
     final t = AircraftTracker(homeLat: 52, homeLon: 4);
     t.update(hex('8D4840D6202CC371C32CE0576098'), 0x4840D6, -20);
@@ -39,5 +44,12 @@ void main() {
   test('country', () {
     expect(icaoCountry(0x440123), 'Österreich');
     expect(icaoCountry(0x3C6589), 'Deutschland');
+  });
+
+  test('country and category in English', () {
+    applyAppLocale(const Locale('en'));
+    addTearDown(() => applyAppLocale(const Locale('de')));
+    expect(icaoCountry(0x440123), 'Austria');
+    expect(AircraftCategory.heavy.label, 'Wide-body airliner');
   });
 }

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/models/launcher_tile.dart';
+import '../../l10n/l10n.dart';
 import 'launcher_providers.dart';
 
 /// The launcher's full-screen background: a new picture every few minutes
@@ -193,12 +194,27 @@ class _LauncherBackgroundState extends ConsumerState<LauncherBackground> with Wi
   }
 }
 
+/// The built-in backgrounds' names (see [Backdrop.name]).
+enum BackdropId { aurora, sunset, ocean, forest, lavender, embers, night, desert }
+
 /// A built-in background: a base gradient with soft glows of light, like
 /// an aurora or a sky at dusk.
 class Backdrop {
-  const Backdrop(this.name, this.base, this.glows);
+  const Backdrop(this.id, this.base, this.glows);
 
-  final String name;
+  final BackdropId id;
+
+  /// The name in the app's language.
+  String get name => switch (id) {
+        BackdropId.aurora => l10n.miscBackdropAurora,
+        BackdropId.sunset => l10n.miscBackdropSunset,
+        BackdropId.ocean => l10n.miscBackdropOcean,
+        BackdropId.forest => l10n.miscBackdropForest,
+        BackdropId.lavender => l10n.miscBackdropLavender,
+        BackdropId.embers => l10n.miscBackdropEmbers,
+        BackdropId.night => l10n.miscBackdropNight,
+        BackdropId.desert => l10n.miscBackdropDesert,
+      };
   final List<Color> base;
 
   /// Glow colour and its centre (-1..1).
@@ -206,42 +222,42 @@ class Backdrop {
 }
 
 const builtinBackdrops = [
-  Backdrop('Nordlicht', [Color(0xFF020B1A), Color(0xFF06243A)], [
+  Backdrop(BackdropId.aurora, [Color(0xFF020B1A), Color(0xFF06243A)], [
     (Color(0xFF1DE9B6), Alignment(-0.6, -0.4), 0.9),
     (Color(0xFF7C4DFF), Alignment(0.7, -0.7), 0.8),
     (Color(0xFF00B8D4), Alignment(0.2, 0.9), 0.7),
   ]),
-  Backdrop('Abendrot', [Color(0xFF1A0526), Color(0xFF3A0B2E)], [
+  Backdrop(BackdropId.sunset, [Color(0xFF1A0526), Color(0xFF3A0B2E)], [
     (Color(0xFFFF6E40), Alignment(-0.3, 0.8), 1.0),
     (Color(0xFFFF4081), Alignment(0.6, 0.2), 0.8),
     (Color(0xFFFFC400), Alignment(-0.8, 0.95), 0.6),
   ]),
-  Backdrop('Ozean', [Color(0xFF00111F), Color(0xFF002B4A)], [
+  Backdrop(BackdropId.ocean, [Color(0xFF00111F), Color(0xFF002B4A)], [
     (Color(0xFF00E5FF), Alignment(0.6, -0.5), 0.8),
     (Color(0xFF2962FF), Alignment(-0.7, 0.4), 0.9),
     (Color(0xFF64FFDA), Alignment(0.1, 1.0), 0.5),
   ]),
-  Backdrop('Wald', [Color(0xFF03140A), Color(0xFF0B2A18)], [
+  Backdrop(BackdropId.forest, [Color(0xFF03140A), Color(0xFF0B2A18)], [
     (Color(0xFF76FF03), Alignment(-0.5, -0.7), 0.6),
     (Color(0xFF00C853), Alignment(0.6, 0.3), 0.9),
     (Color(0xFFFFD740), Alignment(0.9, -0.9), 0.4),
   ]),
-  Backdrop('Lavendel', [Color(0xFF120A24), Color(0xFF261447)], [
+  Backdrop(BackdropId.lavender, [Color(0xFF120A24), Color(0xFF261447)], [
     (Color(0xFFB388FF), Alignment(-0.4, -0.3), 0.9),
     (Color(0xFFFF80AB), Alignment(0.7, 0.6), 0.7),
     (Color(0xFF8C9EFF), Alignment(0.5, -0.9), 0.6),
   ]),
-  Backdrop('Glut', [Color(0xFF140400), Color(0xFF2E0A00)], [
+  Backdrop(BackdropId.embers, [Color(0xFF140400), Color(0xFF2E0A00)], [
     (Color(0xFFFF3D00), Alignment(0.0, 0.9), 1.0),
     (Color(0xFFFF9100), Alignment(-0.7, 0.3), 0.6),
     (Color(0xFFD50000), Alignment(0.8, -0.2), 0.6),
   ]),
-  Backdrop('Nacht', [Color(0xFF02030A), Color(0xFF0A0F2C)], [
+  Backdrop(BackdropId.night, [Color(0xFF02030A), Color(0xFF0A0F2C)], [
     (Color(0xFF304FFE), Alignment(0.5, -0.6), 0.7),
     (Color(0xFF6200EA), Alignment(-0.8, 0.7), 0.6),
     (Color(0xFF00B0FF), Alignment(-0.2, -1.0), 0.4),
   ]),
-  Backdrop('Wüste', [Color(0xFF1C1006), Color(0xFF3B2410)], [
+  Backdrop(BackdropId.desert, [Color(0xFF1C1006), Color(0xFF3B2410)], [
     (Color(0xFFFFAB40), Alignment(0.4, -0.5), 0.9),
     (Color(0xFFFF7043), Alignment(-0.6, 0.6), 0.7),
     (Color(0xFFFFE57F), Alignment(0.9, 0.9), 0.5),

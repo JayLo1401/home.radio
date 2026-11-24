@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:just_audio/just_audio.dart';
 
 import '../../core/providers.dart';
@@ -26,6 +27,7 @@ import '../launcher/launcher_navigation.dart';
 import '../launcher/launcher_providers.dart';
 import '../settings/settings_screen.dart';
 import '../settings/update_settings_screen.dart';
+import '../../l10n/l10n.dart';
 import 'background_layer.dart';
 import 'connection_chain.dart';
 import 'favorites_sidebar.dart';
@@ -33,6 +35,7 @@ import 'now_playing_banner.dart';
 import 'radar_panel.dart';
 import 'sun_moon_panel.dart';
 import 'weather_panel.dart';
+import '../../core/native_messages.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -139,23 +142,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       );
     }
     if (playing) {
-      return const LinkView.internet(
+      return LinkView.internet(
         connection: LinkState.done,
         station: LinkState.done,
-        message: 'Sender verbunden',
+        message: l10n.radioLinkConnected,
       );
     }
     if (_netReached) {
-      return const LinkView.internet(
+      return LinkView.internet(
         connection: LinkState.done,
         station: LinkState.active,
-        message: 'Stream wird gepuffert…',
+        message: l10n.radioLinkBuffering,
       );
     }
-    return const LinkView.internet(
+    return LinkView.internet(
       connection: LinkState.active,
       station: LinkState.pending,
-      message: 'Verbinde mit dem Sender…',
+      message: l10n.radioLinkConnectingStation,
     );
   }
 
@@ -388,7 +391,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         // "playing" while nothing is actually coming out of the speaker.
         setState(() {
           _dabTuned = false;
-          _dabStatusText = 'Pausiert - eine andere App spielt Audio ab.';
+          _dabStatusText = l10n.radioPausedOtherApp;
           _link.reset();
         });
       case 'connectionMessage':
@@ -408,8 +411,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           _dabConnectionWarning = !isError
               ? null
               : (message.isEmpty || message.startsWith('Verbindung zur rtl_tcp-Quelle verloren'))
-                  ? 'Verbindung zur RTL-SDR-Quelle verloren - versuche erneut zu verbinden…'
-                  : message;
+                  ? l10n.radioSourceLostReconnecting
+                  : nativeMessageText(message);
         });
     }
   }
@@ -439,7 +442,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           _dabTuned = false;
           _link.setServerReady(false);
           if (wasDabPlaying) {
-            _dabStatusText = 'USB-Stick getrennt - warte auf Wiederanschluss…';
+            _dabStatusText = l10n.radioUsbStickDetached;
             _link.tuned(false);
             _link.fail(LinkStage.stick, _dabStatusText!, retrying: true);
             _link.visible = true;
@@ -836,7 +839,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final myGeneration = ++_dabPlayGeneration;
     _receiverWanted = true;
     if (ref.read(receiverModeProvider) == ReceiverMode.none) {
-      if (mounted) setState(() => _dabStatusText = 'Kein Radio-Empfänger eingerichtet (Einstellungen)');
+      if (mounted) setState(() => _dabStatusText = l10n.radioNoReceiverConfigured);
       return;
     }
     // Shown from the start: reopening a released receiver is the first hop.
@@ -858,11 +861,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       _dabStatusText = ok
           ? null
           : (_dabConnectionWarning ??
-              (_dabServerReady ? 'UKW-Empfang fehlgeschlagen.' : 'RTL-SDR-Quelle nicht erreichbar - versuche erneut…'));
+              (_dabServerReady ? l10n.radioFmReceptionFailedDot : l10n.radioSourceUnreachableRetrying));
       _link.tuned(ok);
       if (!ok && _dabConnectionWarning == null) {
         if (_dabServerReady) {
-          _link.fail(LinkStage.station, 'UKW-Empfang fehlgeschlagen', retrying: false);
+          _link.fail(LinkStage.station, l10n.radioFmReceptionFailed, retrying: false);
         } else {
           _failSourceUnreachable(retrying: true);
         }
@@ -909,11 +912,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (_link.viaServer) {
       _link.fail(
         LinkStage.server,
-        retrying ? 'RTL-Server nicht erreichbar - versuche erneut…' : 'RTL-Server nicht erreichbar',
+        retrying ? l10n.radioRtlServerUnreachableRetrying : l10n.radioRtlServerUnreachable,
         retrying: retrying,
       );
     } else {
-      _link.fail(LinkStage.stick, 'USB-Stick nicht gefunden oder kein Zugriff', retrying: retrying);
+      _link.fail(LinkStage.stick, l10n.radioUsbStickNotFound, retrying: retrying);
     }
   }
 
@@ -929,7 +932,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     _receiverWanted = true;
     // E.g. a DAB+ favorite left over from before "Kein Empfänger" was chosen.
     if (ref.read(receiverModeProvider) == ReceiverMode.none) {
-      if (mounted) setState(() => _dabStatusText = 'Kein Radio-Empfänger eingerichtet (Einstellungen)');
+      if (mounted) setState(() => _dabStatusText = l10n.radioNoReceiverConfigured);
       return;
     }
     // Shown from the start: reopening a released receiver is the first hop.
@@ -970,17 +973,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ? null
           : (_dabConnectionWarning ??
                 (_dabServerReady
-                    ? (noSignal ? 'Kein Signal! - Versuche erneut…' : 'Kein Signal!')
+                    ? (noSignal ? l10n.radioNoSignalRetrying : l10n.radioNoSignal)
                     : (sourceUnreachable
-                          ? 'RTL-SDR-Quelle nicht erreichbar - versuche erneut…'
-                          : 'RTL-SDR-Quelle nicht erreichbar.')));
+                          ? l10n.radioSourceUnreachableRetrying
+                          : l10n.radioSourceUnreachable)));
       _link.tuned(ok);
       // A source message (_dabConnectionWarning) has already marked its hop.
       if (!ok && _dabConnectionWarning == null) {
         if (!_dabServerReady) {
           _failSourceUnreachable(retrying: sourceUnreachable);
         } else if (noSignal) {
-          _link.fail(LinkStage.station, 'Kein Signal - versuche erneut…', retrying: true);
+          _link.fail(LinkStage.station, l10n.radioLinkNoSignalRetrying, retrying: true);
         }
       }
     });
@@ -1250,7 +1253,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       if (shown.funk)
                         (
                           Icons.settings_input_antenna,
-                          'Funk',
+                          context.l10n.radioMenuListening,
                           () async {
                             await _prepareReceiverScreen();
                             if (!context.mounted) return;
@@ -1633,7 +1636,7 @@ class _MenuBar extends StatelessWidget {
                   if (onOpenDabStations case final onOpen?) ...[
                     _MenuBarButton(
                       icon: Icons.radio,
-                      label: 'DAB Sender suchen',
+                      label: context.l10n.radioMenuDabStations,
                       onPressed: onOpen,
                     ),
                     const SizedBox(width: 4),
@@ -1641,7 +1644,7 @@ class _MenuBar extends StatelessWidget {
                   if (onOpenFmStations case final onOpen?) ...[
                     _MenuBarButton(
                       icon: Icons.graphic_eq,
-                      label: 'UKW-Sender (FM)',
+                      label: context.l10n.radioFmTitle,
                       onPressed: onOpen,
                     ),
                     const SizedBox(width: 4),
@@ -1649,20 +1652,20 @@ class _MenuBar extends StatelessWidget {
                   if (onOpenAmStations case final onOpen?) ...[
                     _MenuBarButton(
                       icon: Icons.waves,
-                      label: 'LW/MW/KW',
+                      label: context.l10n.radioMenuAmBands,
                       onPressed: onOpen,
                     ),
                     const SizedBox(width: 4),
                   ],
                   _MenuBarButton(
                     icon: Icons.public,
-                    label: 'Internetradio suchen',
+                    label: context.l10n.radioSearchInternetTitle,
                     onPressed: onOpenInternetSearch,
                   ),
                   const SizedBox(width: 4),
                   _MenuBarButton(
                     icon: Icons.settings,
-                    label: 'Einstellungen',
+                    label: context.l10n.radioMenuSettings,
                     onPressed: onOpenSettings,
                     focusNode: settingsFocusNode,
                   ),
@@ -1687,23 +1690,18 @@ class _Clock extends ConsumerStatefulWidget {
 }
 
 class _ClockState extends ConsumerState<_Clock> {
-  late String _timeText = _formatTime(DateTime.now());
-  late String _dateText = _formatDate(DateTime.now());
+  /// The shown minute - formatted in build, so a language change shows at once.
+  DateTime _shown = _minuteOf(DateTime.now());
   Timer? _timer;
+
+  static DateTime _minuteOf(DateTime t) => DateTime(t.year, t.month, t.day, t.hour, t.minute);
 
   @override
   void initState() {
     super.initState();
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      final now = DateTime.now();
-      final time = _formatTime(now);
-      final date = _formatDate(now);
-      if (time != _timeText || date != _dateText) {
-        setState(() {
-          _timeText = time;
-          _dateText = date;
-        });
-      }
+      final minute = _minuteOf(DateTime.now());
+      if (minute != _shown) setState(() => _shown = minute);
     });
   }
 
@@ -1716,22 +1714,9 @@ class _ClockState extends ConsumerState<_Clock> {
   static String _formatTime(DateTime t) =>
       '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
 
-  static const _weekdays = [
-    'Montag',
-    'Dienstag',
-    'Mittwoch',
-    'Donnerstag',
-    'Freitag',
-    'Samstag',
-    'Sonntag',
-  ];
-
-  static String _formatDate(DateTime t) {
-    final weekday = _weekdays[t.weekday - 1];
-    final day = t.day.toString().padLeft(2, '0');
-    final month = t.month.toString().padLeft(2, '0');
-    return '$weekday $day.$month.${t.year}';
-  }
+  /// "Montag 24.11.2026" / "Monday, Nov 24, 2026".
+  static String _formatDate(DateTime t, String localeName) =>
+      DateFormat(localeName == 'de' ? 'EEEE dd.MM.yyyy' : 'EEEE, MMM d, y', localeName).format(t);
 
   @override
   Widget build(BuildContext context) {
@@ -1741,7 +1726,7 @@ class _ClockState extends ConsumerState<_Clock> {
       children: [
         if (showDate) ...[
           Text(
-            _dateText,
+            _formatDate(_shown, context.l10n.localeName),
             style: const TextStyle(
               color: Colors.white70,
               fontSize: 16,
@@ -1751,7 +1736,7 @@ class _ClockState extends ConsumerState<_Clock> {
           const SizedBox(width: 12),
         ],
         Text(
-          _timeText,
+          _formatTime(_shown),
           style: const TextStyle(
             color: Colors.white,
             fontSize: 20,

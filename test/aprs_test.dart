@@ -1,7 +1,9 @@
 import 'dart:typed_data';
+import 'dart:ui' show Locale;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:home_system/data/models/aprs.dart';
+import 'package:home_system/l10n/l10n.dart';
 
 /// AX.25 UI frame as the receiver's packet decoder delivers it (no FCS).
 Uint8List frame(String dest, String src, List<String> path, String info) {
@@ -25,6 +27,9 @@ Uint8List frame(String dest, String src, List<String> path, String info) {
 }
 
 void main() {
+  // The tests check the German texts; `flutter test` runs in English.
+  setUpAll(() => applyAppLocale(const Locale('de')));
+
   test('plain position with path', () {
     final p = parseAx25(frame('APRS', 'OE6ABC-9', ['WIDE1-1*', 'WIDE2-1'], '!4807.38N/01131.00E>Unterwegs'))!;
     expect(p.source, 'OE6ABC-9');

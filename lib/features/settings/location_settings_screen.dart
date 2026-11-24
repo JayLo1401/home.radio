@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/popup_text_field.dart';
 import '../../core/providers.dart';
 import '../../data/services/place_search_service.dart';
+import '../../l10n/l10n.dart';
 
 /// Location used by the weather forecast, radar and sun/moon tiles: search a
 /// place by name (OpenStreetMap / Nominatim) and pick it from the results -
@@ -25,7 +26,7 @@ class _LocationSettingsScreenState extends ConsumerState<LocationSettingsScreen>
   final _firstResultFocus = FocusNode();
   List<PlaceResult>? _results;
   bool _searching = false;
-  String? _error;
+  bool _failed = false;
 
   @override
   void dispose() {
@@ -38,7 +39,7 @@ class _LocationSettingsScreenState extends ConsumerState<LocationSettingsScreen>
     if (_searching || _queryController.text.trim().isEmpty) return;
     setState(() {
       _searching = true;
-      _error = null;
+      _failed = false;
     });
     try {
       final results = await _service.search(_queryController.text);
@@ -48,7 +49,7 @@ class _LocationSettingsScreenState extends ConsumerState<LocationSettingsScreen>
         WidgetsBinding.instance.addPostFrameCallback((_) => _firstResultFocus.requestFocus());
       }
     } catch (e) {
-      if (mounted) setState(() => _error = 'Suche fehlgeschlagen - Internetverbindung prüfen.');
+      if (mounted) setState(() => _failed = true);
     } finally {
       if (mounted) setState(() => _searching = false);
     }
@@ -57,7 +58,7 @@ class _LocationSettingsScreenState extends ConsumerState<LocationSettingsScreen>
   Future<void> _pick(PlaceResult p) async {
     await ref.read(weatherDisplaySettingsProvider.notifier).setLocation(p.lat, p.lon, p.name);
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Standort: ${p.name}')));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.l10n.miscLocationPicked(p.name))));
     Navigator.of(context).pop();
   }
 
@@ -65,19 +66,16 @@ class _LocationSettingsScreenState extends ConsumerState<LocationSettingsScreen>
   Widget build(BuildContext context) {
     final current = ref.watch(weatherDisplaySettingsProvider);
     final results = _results;
+    final l = context.l10n;
     return Scaffold(
-      appBar: AppBar(title: const Text('Standort einrichten')),
+      appBar: AppBar(title: Text(l.miscLocationTitle)),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          const Text(
-            'Gemeinsamer Standort für Wetterprognose, Wetterradar und Sonne & Mond.',
-            style: TextStyle(color: Colors.white54, fontSize: 13),
-          ),
+          Text(l.miscLocationIntro, style: const TextStyle(color: Colors.white54, fontSize: 13)),
           const SizedBox(height: 8),
           Text(
-            'Aktuell: ${current.locationName} '
-            '(${current.lat.toStringAsFixed(4)}, ${current.lon.toStringAsFixed(4)})',
+            l.miscLocationCurrent(current.locationName, current.lat.toStringAsFixed(4), current.lon.toStringAsFixed(4)),
             style: Theme.of(context).textTheme.bodyLarge,
           ),
           const SizedBox(height: 20),
@@ -87,7 +85,7 @@ class _LocationSettingsScreenState extends ConsumerState<LocationSettingsScreen>
                 child: PopupTextField(
                   controller: _queryController,
                   autofocus: true,
-                  label: 'Ort suchen, z. B. Graz oder Gleisdorf',
+                  label: l.miscLocationSearchLabel,
                   icon: Icons.place_outlined,
                   onSubmitted: (_) => _search(),
                 ),
@@ -98,14 +96,14 @@ class _LocationSettingsScreenState extends ConsumerState<LocationSettingsScreen>
                 icon: _searching
                     ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
                     : const Icon(Icons.search),
-                label: const Text('Suchen'),
+                label: Text(l.miscLocationSearch),
               ),
             ],
           ),
           const SizedBox(height: 16),
-          if (_error != null) Text(_error!, style: const TextStyle(color: Colors.redAccent)),
+          if (_failed) Text(l.miscLocationSearchFailed, style: const TextStyle(color: Colors.redAccent)),
           if (results != null && results.isEmpty)
-            const Text('Kein Ort gefunden.', style: TextStyle(color: Colors.white54)),
+            Text(l.miscLocationNoResults, style: const TextStyle(color: Colors.white54)),
           if (results != null)
             for (var i = 0; i < results.length; i++)
               Card(
@@ -125,10 +123,7 @@ class _LocationSettingsScreenState extends ConsumerState<LocationSettingsScreen>
                 ),
               ),
           const SizedBox(height: 12),
-          const Text(
-            'Ortssuche: © OpenStreetMap-Mitwirkende (ODbL), über Nominatim.',
-            style: TextStyle(color: Colors.white38, fontSize: 11),
-          ),
+          Text(l.miscLocationAttribution, style: const TextStyle(color: Colors.white38, fontSize: 11)),
         ],
       ),
     );

@@ -20,6 +20,7 @@ import '../data/services/radio_browser_api_service.dart';
 import '../data/services/rtl_sdr_service.dart';
 import '../data/services/rtl_sdr_usb_service.dart';
 import '../data/services/update_service.dart';
+import '../l10n/l10n.dart';
 
 /// The admin page `http://<ip>:1401/` (see AdminServer) - started with the
 /// app, runs as long as it does.
@@ -263,7 +264,7 @@ final radioAudioHandlerProvider = FutureProvider<RadioAudioHandler>((ref) async 
     builder: () => RadioAudioHandler(player),
     config: AudioServiceConfig(
       androidNotificationChannelId: 'at.jaycloud.home.system.audio',
-      androidNotificationChannelName: 'Radio-Wiedergabe',
+      androidNotificationChannelName: l10n.settingsAudioChannelName,
       androidNotificationOngoing: true,
     ),
   );
@@ -396,6 +397,29 @@ class UiScale extends Notifier<double> {
 }
 
 final uiScaleProvider = NotifierProvider<UiScale, double>(UiScale.new);
+
+/// The app's language (Settings → System, the setup wizard, the admin
+/// page) - the device's until the setting is loaded.
+class Language extends Notifier<AppLanguage> {
+  @override
+  AppLanguage build() {
+    ref.watch(settingsRepositoryProvider).getLanguage().then((v) => _apply(AppLanguage.parse(v)));
+    applyAppLocale(AppLanguage.system.locale);
+    return AppLanguage.system;
+  }
+
+  void _apply(AppLanguage value) {
+    applyAppLocale(value.locale);
+    state = value;
+  }
+
+  Future<void> set(AppLanguage value) async {
+    _apply(value);
+    await ref.read(settingsRepositoryProvider).setLanguage(value.name);
+  }
+}
+
+final languageProvider = NotifierProvider<Language, AppLanguage>(Language.new);
 
 class WeatherDisplaySettings {
   const WeatherDisplaySettings({

@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 
+import '../../l10n/l10n.dart';
 import '../db/database.dart';
 import 'settings_repository.dart' show DabSortMode;
 
@@ -116,4 +117,4 @@ List<DabStation> sortDabStations(List<DabStation> stations, DabSortMode mode) {
 
 /// Heading of a station's group in [DabSortMode.groupedByEnsemble] - also
 /// the group key: an ensemble is identified by its label and channel.
-String dabEnsembleHeading(DabStation s) => '${s.ensembleLabel ?? 'Ensemble unbekannt'} · ${s.channelLabel}';
+String dabEnsembleHeading(DabStation s) => '${s.ensembleLabel ?? l10n.radioDabEnsembleUnknown} · ${s.channelLabel}';

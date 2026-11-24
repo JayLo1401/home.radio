@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../l10n/l10n.dart';
+
 /// What the receiver reports twice a second in the data modes (ADS-B,
 /// sensors, ACARS) - see the `rxStatus` event.
 class RxStatus {
@@ -65,12 +67,14 @@ class _ReceptionStatusState extends State<ReceptionStatus> with SingleTickerProv
     final alive = s != null && age! < const Duration(seconds: 3) && s.samplesPerSecond > widget.expectedRate * 0.5;
     final slow = s != null && age! < const Duration(seconds: 3) && !alive;
     final color = alive ? Colors.greenAccent : Colors.orangeAccent;
+    final t = context.l10n;
+    final rate = (s?.samplesPerSecond ?? 0) / 1e6;
     final text = s == null
-        ? 'Warte auf Daten vom Stick…'
+        ? t.scannerRxWaiting
         : !alive && !slow
-            ? 'Keine Daten vom Stick'
-            : '${slow ? 'Daten kommen zu langsam' : 'Empfang läuft'} · '
-                '${(s.samplesPerSecond / 1e6).toStringAsFixed(2).replaceAll('.', ',')} MS/s';
+            ? t.scannerRxNoData
+            : '${slow ? t.scannerRxSlow : t.scannerRxRunning} · '
+                '${t.localeName == 'de' ? rate.toStringAsFixed(2).replaceAll('.', ',') : rate.toStringAsFixed(2)} MS/s';
     final flash = widget.lastSignal != null && DateTime.now().difference(widget.lastSignal!) < const Duration(milliseconds: 700);
     // Input level as a bar: -60 dBFS (quiet) .. 0 dBFS (full).
     final level = s == null ? 0.0 : ((s.levelDb + 60) / 60).clamp(0.0, 1.0);
@@ -86,7 +90,7 @@ class _ReceptionStatusState extends State<ReceptionStatus> with SingleTickerProv
         ),
         Text(text, style: TextStyle(color: alive ? Colors.white70 : Colors.orangeAccent)),
         if (s != null) ...[
-          const Text('Pegel', style: TextStyle(color: Colors.white54)),
+          Text(t.scannerRxLevel, style: const TextStyle(color: Colors.white54)),
           SizedBox(
             width: 120,
             height: 8,
@@ -100,7 +104,7 @@ class _ReceptionStatusState extends State<ReceptionStatus> with SingleTickerProv
             ),
           ),
           if (clipping)
-            const Text('übersteuert – Verstärkung senken', style: TextStyle(color: Colors.redAccent))
+            Text(t.scannerRxClipping, style: const TextStyle(color: Colors.redAccent))
           else
             Text('${s.levelDb.round()} dBFS', style: const TextStyle(color: Colors.white54)),
         ],

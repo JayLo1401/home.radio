@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import '../../l10n/l10n.dart';
 import '../db/database.dart';
 import 'desktop/hrdab_desktop.dart';
 import 'secret_store.dart';
@@ -173,13 +174,13 @@ class BackupService {
     try {
       decoded = jsonDecode(content);
     } on FormatException {
-      throw const BackupFormatException('Die Datei ist kein gültiges Backup.');
+      throw BackupFormatException(l10n.adminFileInvalid);
     }
     if (decoded is! Map<String, dynamic> || decoded['app'] != _app) {
-      throw const BackupFormatException('Die Datei ist kein Home-System-Backup.');
+      throw BackupFormatException(l10n.settingsBackupNotHomeSystem);
     }
     if ((decoded['format'] as num? ?? 0) > _format) {
-      throw const BackupFormatException('Das Backup stammt von einer neueren App-Version.');
+      throw BackupFormatException(l10n.settingsBackupNewerVersion);
     }
 
     List<Map<String, dynamic>> rows(String key) =>
@@ -205,7 +206,7 @@ class BackupService {
       }).toList();
       settings = rows('settings').map(Setting.fromJson).toList();
     } catch (_) {
-      throw const BackupFormatException('Das Backup ist beschädigt oder unvollständig.');
+      throw BackupFormatException(l10n.settingsBackupCorrupt);
     }
 
     await _db.transaction(() async {

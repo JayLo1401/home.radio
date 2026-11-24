@@ -11,6 +11,7 @@ import '../../data/models/favorite_channel.dart';
 import '../../data/repositories/dab_stations_repository.dart' show DabStationDisplay, dabEnsembleHeading;
 import '../../data/repositories/settings_repository.dart' show DabSortMode, ReceiverMode;
 import '../../data/services/dab_rtlsdr_service.dart' show DabRtlSdrService;
+import '../../l10n/l10n.dart';
 import '../shared/program_number_dialog.dart';
 import '../shared/logo_picker_dialog.dart';
 import '../shared/station_edit_dialog.dart';
@@ -32,19 +33,16 @@ class _DabStationsScreenState extends ConsumerState<DabStationsScreen> {
     final confirmed = await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text('Alle DAB-Sender löschen?'),
-            content: const Text(
-              'Entfernt alle bisher gefundenen DAB+-Sender aus der Liste "Alle DAB+ Sender" '
-              'und alle DAB+-Favoriten. Kann nicht rückgängig gemacht werden.',
-            ),
+            title: Text(context.l10n.radioDabClearAllTitle),
+            content: Text(context.l10n.radioDabClearAllMessage),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Abbrechen'),
+                child: Text(context.l10n.commonCancel),
               ),
               FilledButton(
                 onPressed: () => Navigator.of(context).pop(true),
-                child: const Text('Löschen'),
+                child: Text(context.l10n.commonDelete),
               ),
             ],
           ),
@@ -66,22 +64,23 @@ class _DabStationsScreenState extends ConsumerState<DabStationsScreen> {
     final favorites = ref.watch(favoritesStreamProvider).value ?? const <FavoriteChannel>[];
     final dabFavorites = favorites.where((c) => c.sourceType == FavoriteSourceType.dab).toList();
     final sortMode = ref.watch(dabSortModeProvider);
+    final l10n = context.l10n;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('DAB+ Sender')),
+      appBar: AppBar(title: Text(l10n.radioDabTitle)),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           Row(
             children: [
               Expanded(
-                child: Text('Sendersuchlauf', style: Theme.of(context).textTheme.titleLarge),
+                child: Text(l10n.radioScanTitle, style: Theme.of(context).textTheme.titleLarge),
               ),
               if (dabFavorites.isNotEmpty || stations.isNotEmpty)
                 TextButton.icon(
                   onPressed: _clearAllStations,
                   icon: const Icon(Icons.delete_sweep_outlined),
-                  label: const Text('Alle DAB-Sender löschen'),
+                  label: Text(l10n.radioDabClearAll),
                 ),
             ],
           ),
@@ -89,24 +88,24 @@ class _DabStationsScreenState extends ConsumerState<DabStationsScreen> {
           const _ScanPanel(),
           if (dabFavorites.isNotEmpty || stations.isNotEmpty) ...[
             const Divider(height: 32),
-            Text('Favoriten', style: Theme.of(context).textTheme.titleLarge),
+            Text(l10n.radioFavorites, style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 8),
             if (dabFavorites.isEmpty)
-              const Text('Noch keine DAB+-Favoriten.', style: TextStyle(color: Colors.white54))
+              Text(l10n.radioDabNoFavorites, style: const TextStyle(color: Colors.white54))
             else
               ...dabFavorites.map((c) => _FavoriteRow(channel: c)),
             const SizedBox(height: 24),
-            Text('Alle DAB+ Sender', style: Theme.of(context).textTheme.titleLarge),
+            Text(l10n.radioDabAllStations, style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 8),
             // Also the order (and grouping) of the home screen's DAB-Sender tab.
             Wrap(
               spacing: 8,
               runSpacing: 4,
               children: [
-                for (final (mode, label) in const [
-                  (DabSortMode.groupedByEnsemble, 'Nach Ensemble gruppiert'),
-                  (DabSortMode.byEnsembleThenAlphabet, 'Nach Ensemble sortiert'),
-                  (DabSortMode.byAlphabet, 'Nach Name'),
+                for (final (mode, label) in [
+                  (DabSortMode.groupedByEnsemble, l10n.radioDabSortGrouped),
+                  (DabSortMode.byEnsembleThenAlphabet, l10n.radioDabSortByEnsemble),
+                  (DabSortMode.byAlphabet, l10n.radioDabSortByName),
                 ])
                   ChoiceChip(
                     label: Text(label),
@@ -117,9 +116,9 @@ class _DabStationsScreenState extends ConsumerState<DabStationsScreen> {
             ),
             const SizedBox(height: 8),
             if (stations.isEmpty)
-              const Text(
-                'Noch keine Sender gefunden. Sendersuchlauf starten.',
-                style: TextStyle(color: Colors.white54),
+              Text(
+                l10n.radioDabNoStations,
+                style: const TextStyle(color: Colors.white54),
               )
             else
               for (final (i, s) in stations.indexed) ...[
@@ -232,23 +231,24 @@ class _LogoReceiveDialogState extends ConsumerState<_LogoReceiveDialog> {
   @override
   Widget build(BuildContext context) {
     const hint = TextStyle(color: Colors.white70);
+    final l10n = context.l10n;
     final total = _missing.length;
     final Widget body;
     if (total == 0) {
-      body = const Text('Alle Sender haben schon ein Logo.', style: hint);
+      body = Text(l10n.radioLogoReceiveAllHaveLogo, style: hint);
     } else if (_failed) {
-      body = const Text('DAB+-Decoder konnte nicht gestartet werden.', style: hint);
+      body = Text(l10n.radioDabDecoderFailed, style: hint);
     } else {
       body = Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (_running) ...[
-            Text('Sender ${_index + 1} von $total - warte auf ein Bild vom Sender…', style: hint),
+            Text(l10n.radioLogoReceiveProgress(_index + 1, total), style: hint),
             const SizedBox(height: 8),
             LinearProgressIndicator(value: (_index + 1) / total),
           ] else
-            Text('Fertig: ${_foundPaths.length} von $total Sendern haben ein Bild gesendet.', style: hint),
+            Text(l10n.radioLogoReceiveDone(_foundPaths.length, total), style: hint),
           const SizedBox(height: 12),
           if (_foundPaths.isNotEmpty)
             Wrap(
@@ -264,12 +264,12 @@ class _LogoReceiveDialogState extends ConsumerState<_LogoReceiveDialog> {
     // Back = Abbrechen; the dialog can't be dismissed by tapping outside.
     return PopScope(
       child: AlertDialog(
-        title: const Text('Fehlende Logos per Empfang'),
+        title: Text(l10n.radioLogoReceiveTitle),
         content: SizedBox(width: 440, child: body),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: Text(_running ? 'Abbrechen' : 'Schließen'),
+            child: Text(_running ? l10n.commonCancel : l10n.commonClose),
           ),
         ],
       ),
@@ -303,17 +303,17 @@ class _FavoriteRow extends ConsumerWidget {
         children: [
           IconButton(
             icon: const Icon(Icons.play_arrow),
-            tooltip: 'Anhören',
+            tooltip: context.l10n.radioListen,
             onPressed: () => ref.read(playRequestProvider.notifier).favorite(channel),
           ),
           IconButton(
             icon: const Icon(Icons.edit_outlined),
-            tooltip: 'Bearbeiten (Name, Logo)',
+            tooltip: context.l10n.radioEditNameLogo,
             onPressed: () => editFavorite(context, ref, channel),
           ),
           IconButton(
             icon: const Icon(Icons.star, color: Colors.amber),
-            tooltip: 'Favorit entfernen',
+            tooltip: context.l10n.radioRemoveFavorite,
             onPressed: () => ref.read(favoritesRepositoryProvider).remove(channel.programNumber),
           ),
         ],
@@ -349,7 +349,7 @@ class _StationRow extends ConsumerWidget {
     );
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('"${station.displayLabel}" als Nr. $programNumber gespeichert.')),
+        SnackBar(content: Text(context.l10n.radioSavedAsNumber(station.displayLabel, programNumber))),
       );
     }
   }
@@ -367,29 +367,29 @@ class _StationRow extends ConsumerWidget {
           : (logoUrl == null ? null : CircleAvatar(backgroundImage: CachedNetworkImageProvider(logoUrl))),
       title: Text(station.displayLabel),
       subtitle: Text(
-        '${station.ensembleLabel ?? "Ensemble unbekannt"} · ${station.channelLabel} · ${station.freqKhz} kHz',
+        '${dabEnsembleHeading(station)} · ${station.freqKhz} kHz',
       ),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           IconButton(
             icon: const Icon(Icons.play_arrow),
-            tooltip: 'Anhören',
+            tooltip: context.l10n.radioListen,
             onPressed: () => ref.read(playRequestProvider.notifier).dab(station),
           ),
           // Name (DAB+ labels can be garbled - see DabStation.customLabel)
           // and logo in one dialog.
           IconButton(
             icon: const Icon(Icons.edit_outlined),
-            tooltip: 'Bearbeiten (Name, Logo)',
+            tooltip: context.l10n.radioEditNameLogo,
             onPressed: () => editDabStation(context, ref, station),
           ),
           if (favorite != null)
-            Chip(label: Text('Nr. ${favorite!.programNumber}'))
+            Chip(label: Text(context.l10n.radioProgramNumberChip(favorite!.programNumber)))
           else
             FilledButton.tonal(
               onPressed: () => _addFavorite(context, ref),
-              child: const Text('Favorit hinzufügen'),
+              child: Text(context.l10n.radioAddFavorite),
             ),
         ],
       ),
@@ -432,15 +432,14 @@ class _ScanPanelState extends ConsumerState<_ScanPanel> {
   @override
   Widget build(BuildContext context) {
     final usb = ref.watch(receiverModeProvider) == ReceiverMode.usb;
+    final l10n = context.l10n;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: Text(
-            usb
-                ? 'Quelle: RTL-SDR-Stick per USB - siehe "Radio-Empfänger" in den Einstellungen.'
-                : 'Quelle: RTL-SDR über Netzwerk - siehe "Radio-Empfänger" in den Einstellungen.',
+            usb ? l10n.radioSourceUsbHint : l10n.radioSourceNetworkHint,
             style: const TextStyle(color: Colors.white54, fontSize: 12),
           ),
         ),
@@ -455,7 +454,7 @@ class _ScanPanelState extends ConsumerState<_ScanPanel> {
                 builder: (_) => const _ScanDialog(),
               ),
               icon: const Icon(Icons.radar),
-              label: const Text('Sendersuchlauf starten'),
+              label: Text(l10n.radioScanStart),
             ),
             FilledButton.tonalIcon(
               onPressed: () => showDialog<void>(
@@ -464,7 +463,7 @@ class _ScanPanelState extends ConsumerState<_ScanPanel> {
                 builder: (_) => const _LogoReceiveDialog(),
               ),
               icon: const Icon(Icons.settings_input_antenna),
-              label: const Text('Fehlende Logos per Empfang holen'),
+              label: Text(l10n.radioLogoReceiveStart),
             ),
           ],
         ),
@@ -476,7 +475,7 @@ class _ScanPanelState extends ConsumerState<_ScanPanel> {
           runSpacing: 8,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            const Text('Einzelnen Kanal suchen:', style: TextStyle(color: Colors.white70)),
+            Text(l10n.radioDabSingleChannel, style: const TextStyle(color: Colors.white70)),
             DropdownButton<(String, int)>(
               value: _channel,
               items: [
@@ -492,7 +491,7 @@ class _ScanPanelState extends ConsumerState<_ScanPanel> {
                 builder: (_) => _ScanDialog(channel: _channel),
               ),
               icon: const Icon(Icons.search),
-              label: Text('${_channel.$1} suchen'),
+              label: Text(l10n.radioDabSearchChannel(_channel.$1)),
             ),
           ],
         ),
@@ -612,7 +611,7 @@ class _ScanDialogState extends ConsumerState<_ScanDialog> {
     if (!ok) {
       setState(() => _playing = null);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Wiedergabe von "$label" fehlgeschlagen.')),
+        SnackBar(content: Text(context.l10n.radioPlaybackOfFailed(label))),
       );
     }
   }
@@ -626,9 +625,10 @@ class _ScanDialogState extends ConsumerState<_ScanDialog> {
   Widget build(BuildContext context) {
     const hint = TextStyle(color: Colors.white54);
     final serviceCount = _found.fold<int>(0, (n, c) => n + c.services.length);
+    final l10n = context.l10n;
     return PopScope(
       child: AlertDialog(
-        title: Text(widget.channel == null ? 'Sendersuchlauf' : 'Kanal ${widget.channel!.$1} suchen'),
+        title: Text(widget.channel == null ? l10n.radioScanTitle : l10n.radioDabSearchChannelTitle(widget.channel!.$1)),
         content: SizedBox(
           width: 560,
           height: 460,
@@ -636,12 +636,14 @@ class _ScanDialogState extends ConsumerState<_ScanDialog> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (_failed)
-                const Text('DAB+-Decoder konnte nicht gestartet werden.', style: hint)
+                Text(l10n.radioDabDecoderFailed, style: hint)
               else if (_scanning) ...[
                 Text(
                   widget.channel != null
-                      ? 'Suche auf ${widget.channel!.$1} (${widget.channel!.$2} kHz), bis zu 15 Sekunden…'
-                      : 'Kanal ${_index + 1}${_total > 0 ? ' von $_total' : ''}: ${_currentLabel ?? '…'}',
+                      ? l10n.radioDabScanningChannel(widget.channel!.$1, widget.channel!.$2)
+                      : _total > 0
+                          ? l10n.radioDabScanProgressOf(_index + 1, _total, _currentLabel ?? '…')
+                          : l10n.radioDabScanProgress(_index + 1, _currentLabel ?? '…'),
                   style: const TextStyle(color: Colors.white70),
                 ),
                 const SizedBox(height: 8),
@@ -650,19 +652,18 @@ class _ScanDialogState extends ConsumerState<_ScanDialog> {
                 ),
               ] else if (widget.channel != null && _found.isEmpty)
                 Text(
-                  'Auf ${widget.channel!.$1} wurde kein DAB+-Ensemble empfangen.',
+                  l10n.radioDabChannelNothingFound(widget.channel!.$1),
                   style: const TextStyle(color: Colors.white70),
                 )
               else
                 Text(
-                  'Fertig: ${_found.length} Ensemble(s) mit $serviceCount Sender(n) gefunden. '
-                  'Alle gefundenen Sender stehen unter "Alle DAB+ Sender".',
+                  l10n.radioDabScanDone(_found.length, serviceCount),
                   style: const TextStyle(color: Colors.white70),
                 ),
               const SizedBox(height: 12),
               Expanded(
                 child: _found.isEmpty
-                    ? Text(_scanning ? 'Noch keine Ensembles gefunden…' : '', style: hint)
+                    ? Text(_scanning ? l10n.radioDabNoEnsemblesYet : '', style: hint)
                     : ListView(
                         children: [
                           for (final channel in _found)
@@ -673,14 +674,14 @@ class _ScanDialogState extends ConsumerState<_ScanDialog> {
                                 children: [
                                   Text(
                                     '${channel.label} · ${channel.freqKhz} kHz · '
-                                    '${channel.ensembleLabel ?? "Ensemble-Name unbekannt"} · '
+                                    '${channel.ensembleLabel ?? l10n.radioDabEnsembleNameUnknown} · '
                                     'SNR ${channel.snrDb.toStringAsFixed(1)} dB',
                                     style: const TextStyle(fontWeight: FontWeight.bold),
                                   ),
                                   if (channel.services.isEmpty)
-                                    const Text(
-                                      '  Sender in diesem Ensemble noch nicht erkannt (kurz erneut versuchen).',
-                                      style: TextStyle(color: Colors.white54, fontSize: 12),
+                                    Text(
+                                      '  ${l10n.radioDabEnsembleNoServices}',
+                                      style: const TextStyle(color: Colors.white54, fontSize: 12),
                                     )
                                   else
                                     for (final s in channel.services)
@@ -699,8 +700,8 @@ class _ScanDialogState extends ConsumerState<_ScanDialog> {
                                               child: Text(
                                                 _playing?.freqKhz == channel.freqKhz &&
                                                         _playing?.serviceId == s.serviceId
-                                                    ? 'Läuft…'
-                                                    : 'Anhören',
+                                                    ? l10n.radioPlayingShort
+                                                    : l10n.radioListen,
                                               ),
                                             ),
                                           ],
@@ -720,11 +721,11 @@ class _ScanDialogState extends ConsumerState<_ScanDialog> {
             TextButton.icon(
               onPressed: _stopListening,
               icon: const Icon(Icons.stop_circle_outlined),
-              label: const Text('Wiedergabe stoppen'),
+              label: Text(l10n.radioStopPlayback),
             ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: Text(_scanning ? 'Abbrechen' : 'Schließen'),
+            child: Text(_scanning ? l10n.commonCancel : l10n.commonClose),
           ),
         ],
       ),

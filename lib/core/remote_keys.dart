@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../l10n/l10n.dart';
 import 'providers.dart';
 
 /// What a key of the remote (or the PC's keyboard) can do - assignable in
@@ -11,21 +12,25 @@ import 'providers.dart';
 /// on the remote.
 enum RemoteAction {
   /// TV: the channel list.
-  channelList('Senderliste (TV)'),
+  channelList,
 
   /// TV: the programme guide of the channel (also in the channel list).
-  guide('Programmführer (TV)'),
+  guide,
 
   /// The options: of a launcher tile or app, TV's menu (programme
   /// guide, sound track).
-  options('Optionen (Kachel unter Home, TV)'),
+  options,
 
   /// TV: choosing the sound track.
-  audio('Tonspur (TV)');
+  audio;
 
-  const RemoteAction(this.label);
-
-  final String label;
+  /// The action's name in the app's language.
+  String get label => switch (this) {
+        RemoteAction.channelList => l10n.miscActionChannelList,
+        RemoteAction.guide => l10n.miscActionGuide,
+        RemoteAction.options => l10n.miscActionOptions,
+        RemoteAction.audio => l10n.miscActionAudio,
+      };
 
   /// The standard keys: the remote's, plus a letter on the PC's keyboard.
   List<LogicalKeyboardKey> get standard => switch (this) {
@@ -131,24 +136,27 @@ String remoteKeyHint(RemoteKeys keys, RemoteAction action) {
   bool keyboard(LogicalKeyboardKey k) =>
       k == LogicalKeyboardKey.enter || k == LogicalKeyboardKey.contextMenu || k.keyLabel.trim().length == 1;
   final key = pc ? list.where(keyboard).firstOrNull ?? list.first : list.where((k) => !keyboard(k)).firstOrNull ?? list.first;
-  return remoteKeyLabel(key).replaceFirst('☰ Menü', '☰').replaceFirst('Taste ', '');
+  return _keyLabel(key, short: true);
 }
 
 /// A key's name as it's printed on a remote or a keyboard.
-String remoteKeyLabel(LogicalKeyboardKey key) {
+String remoteKeyLabel(LogicalKeyboardKey key) => _keyLabel(key, short: false);
+
+/// [short]: for hints - "☰" without the word "Menu", a letter without "Key".
+String _keyLabel(LogicalKeyboardKey key, {required bool short}) {
   if (key == LogicalKeyboardKey.select) return 'OK';
   if (key == LogicalKeyboardKey.enter || key == LogicalKeyboardKey.numpadEnter) return 'Enter';
-  if (key == LogicalKeyboardKey.contextMenu) return '☰ Menü';
+  if (key == LogicalKeyboardKey.contextMenu) return short ? '☰' : l10n.miscKeyMenu;
   if (key == LogicalKeyboardKey.info) return 'Info';
   if (key == LogicalKeyboardKey.guide) return 'Guide/EPG';
   if (key == LogicalKeyboardKey.mediaAudioTrack) return 'Audio';
-  if (key == LogicalKeyboardKey.browserSearch) return 'Suche';
+  if (key == LogicalKeyboardKey.browserSearch) return l10n.miscKeySearch;
   if (key == LogicalKeyboardKey.gameButtonA) return 'A (Gamepad)';
-  if (key == LogicalKeyboardKey.colorF0Red) return 'Rot';
-  if (key == LogicalKeyboardKey.colorF1Green) return 'Grün';
-  if (key == LogicalKeyboardKey.colorF2Yellow) return 'Gelb';
-  if (key == LogicalKeyboardKey.colorF3Blue) return 'Blau';
+  if (key == LogicalKeyboardKey.colorF0Red) return l10n.miscKeyRed;
+  if (key == LogicalKeyboardKey.colorF1Green) return l10n.miscKeyGreen;
+  if (key == LogicalKeyboardKey.colorF2Yellow) return l10n.miscKeyYellow;
+  if (key == LogicalKeyboardKey.colorF3Blue) return l10n.miscKeyBlue;
   final label = key.keyLabel.trim();
-  if (label.isNotEmpty) return label.length == 1 ? 'Taste $label' : label;
-  return key.debugName ?? 'Taste ${key.keyId}';
+  if (label.isNotEmpty) return label.length == 1 && !short ? l10n.miscKeyNamed(label) : label;
+  return key.debugName ?? (short ? '${key.keyId}' : l10n.miscKeyNamed('${key.keyId}'));
 }

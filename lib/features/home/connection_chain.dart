@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../data/repositories/fm_stations_repository.dart' show formatFmFrequency;
 import '../../data/services/dab_rtlsdr_service.dart';
+import '../../l10n/l10n.dart';
+import '../../core/native_messages.dart';
 
 /// The three hops the receiver has to make before a DAB+/FM station plays:
 /// reach the rtl_tcp server (only with a network source), get samples from
@@ -122,7 +125,7 @@ class ReceiverLink {
           final stage = _stageOf(message);
           fail(
             stage,
-            message.isEmpty ? 'Verbindung zur RTL-SDR-Quelle verloren' : message,
+            message.isEmpty ? l10n.radioLinkSourceLost : nativeMessageText(message),
             retrying: !_isFinal(message),
           );
         } else {
@@ -135,14 +138,14 @@ class ReceiverLink {
         }
       case 'syncChange' when event['sync'] == true:
         _signSeen();
-        _detail = 'DAB-Signal gefunden';
+        _detail = l10n.radioLinkDabSignalFound;
       case 'ensembleLabel':
         _signSeen();
         final label = (event['label'] as String?)?.trim() ?? '';
-        if (label.isNotEmpty) _detail = 'Ensemble „$label“ gefunden';
+        if (label.isNotEmpty) _detail = l10n.radioLinkEnsembleFound(label);
       case 'serviceDetected' when !_fm && event['serviceId'] == _serviceId:
         _signSeen();
-        _detail = 'Sender gefunden - Audio startet…';
+        _detail = l10n.radioLinkStationFound;
       case 'snr' || 'audioFormat':
         _signSeen();
       case 'fmStatus' when _fm && event['freqKhz'] == _freqKhz:
@@ -201,11 +204,11 @@ class ReceiverLink {
     if (_error case final error?) {
       message = error;
     } else if (station == LinkState.done) {
-      message = 'Sender verbunden';
+      message = l10n.radioLinkConnected;
     } else if (server == LinkState.active) {
-      message = 'Verbinde mit dem RTL-Server…';
+      message = l10n.radioLinkConnectingServer;
     } else if (stick == LinkState.active) {
-      message = viaServer ? 'Warte auf den Stick am Server…' : 'USB-Stick wird geöffnet…';
+      message = viaServer ? l10n.radioLinkWaitingForStick : l10n.radioLinkOpeningUsbStick;
     } else {
       message = _detail ?? _tuningText();
     }
@@ -220,13 +223,10 @@ class ReceiverLink {
 
   String _tuningText() {
     final freqKhz = _freqKhz;
-    if (freqKhz == null) return 'Sender wird eingestellt…';
-    if (_fm) {
-      final mhz = (freqKhz / 1000).toStringAsFixed(freqKhz % 100 == 0 ? 1 : 2).replaceAll('.', ',');
-      return '$mhz MHz wird eingestellt…';
-    }
+    if (freqKhz == null) return l10n.radioLinkTuning;
+    if (_fm) return l10n.radioLinkTuningFrequency(formatFmFrequency(freqKhz));
     final channel = DabRtlSdrService.band3Channels.where((c) => c.$2 == freqKhz).firstOrNull?.$1;
-    return channel == null ? 'Sender wird gesucht…' : 'Kanal $channel wird gesucht…';
+    return channel == null ? l10n.radioLinkSearching : l10n.radioLinkSearchingChannel(channel);
   }
 }
 
@@ -386,6 +386,7 @@ class _ConnectionChainState extends State<ConnectionChain> with SingleTickerProv
   @override
   Widget build(BuildContext context) {
     final view = widget.view;
+    final l10n = context.l10n;
     final messageColor = switch ([view.server, view.stick, view.station]) {
       final s when s.contains(LinkState.failed) => Colors.redAccent,
       final s when s.contains(LinkState.retrying) => Colors.orangeAccent,
@@ -398,7 +399,7 @@ class _ConnectionChainState extends State<ConnectionChain> with SingleTickerProv
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _node(Icons.tv, 'App', LinkState.done),
+          _node(Icons.tv, l10n.radioLinkApp, LinkState.done),
           if (view.internet) ...[
             // Internet radio: the stream comes over the internet.
             _segment(view.server),
@@ -410,13 +411,17 @@ class _ConnectionChainState extends State<ConnectionChain> with SingleTickerProv
           ] else ...[
             if (view.viaServer) ...[
               _segment(view.server),
-              _node(Icons.dns_outlined, 'RTL-Server', view.server),
+              _node(Icons.dns_outlined, l10n.radioLinkRtlServer, view.server),
             ],
             _segment(view.stick),
-            _node(Icons.usb, view.viaServer ? 'Stick' : 'USB-Stick', view.stick),
+            _node(Icons.usb, view.viaServer ? l10n.radioLinkStick : l10n.radioLinkUsbStick, view.stick),
           ],
           _segment(view.station),
-          _node(view.tv ? Icons.live_tv : (view.internet ? Icons.radio : Icons.cell_tower), 'Sender', view.station),
+          _node(
+            view.tv ? Icons.live_tv : (view.internet ? Icons.radio : Icons.cell_tower),
+            view.tv ? l10n.radioLinkTvChannel : l10n.radioLinkStation,
+            view.station,
+          ),
           const SizedBox(width: 18),
           Expanded(
             child: SizedBox(

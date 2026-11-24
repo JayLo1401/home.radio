@@ -5,6 +5,7 @@ import '../../core/providers.dart';
 import '../../core/theme.dart' show TvFocusHighlight;
 import '../../data/models/band_plan.dart';
 import '../../data/repositories/settings_repository.dart';
+import '../../l10n/l10n.dart';
 import 'acars_screen.dart';
 import 'adsb_screen.dart';
 import 'ism_screen.dart';
@@ -21,55 +22,56 @@ class ListeningHubScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     void open(Widget Function() screen) => Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen()));
+    final t = context.l10n;
     return _TileGrid(
-      title: 'Funk',
+      title: t.scannerHubTitle,
       tiles: [
         _Tile(
           icon: Icons.forum,
-          title: 'CB-Funk',
-          subtitle: '26,965–27,405 MHz · Kanal 1–40 (80)',
+          title: t.scannerBandCb,
+          subtitle: t.scannerHubCbSubtitle,
           onTap: () => open(() => ScannerScreen(plan: cbBandPlan())),
         ),
         _Tile(
           icon: Icons.settings_remote,
           title: 'PMR446',
-          subtitle: '446,00625–446,19375 MHz · Kanal 1–16',
+          subtitle: t.scannerHubPmrSubtitle,
           onTap: () => open(() => ScannerScreen(plan: pmrBandPlan)),
         ),
         _Tile(
           icon: Icons.cell_tower,
-          title: 'Amateurfunk',
-          subtitle: '160 m bis 23 cm mit Bandplan',
+          title: t.scannerHubHam,
+          subtitle: t.scannerHubHamSubtitle,
           onTap: () => open(() => ScannerScreen(plan: hamBandPlans.first, variants: allHamBandPlans)),
         ),
         _Tile(
           icon: Icons.public,
-          title: 'Kurzwelle',
-          subtitle: 'KW-Rundfunk · Amateurfunk KW · Zeitzeichen & Flugwetter',
+          title: t.scannerHubShortwave,
+          subtitle: t.scannerHubShortwaveSubtitle,
           onTap: () => open(() => const ShortwaveHubScreen()),
         ),
         _Tile(
           icon: Icons.flight,
-          title: 'Flugzeuge',
-          subtitle: 'Flugfunk · ACARS · Radar (ADS-B)',
+          title: t.scannerHubAircraft,
+          subtitle: t.scannerHubAircraftSubtitle,
           onTap: () => open(() => const AircraftHubScreen()),
         ),
         _Tile(
           icon: Icons.shield_outlined,
-          title: 'Militärfunk',
+          title: t.scannerBandMil,
           subtitle: '225–400 MHz · AM',
           onTap: () => open(() => ScannerScreen(plan: milBandPlan)),
         ),
         _Tile(
           icon: Icons.sensors,
-          title: 'Funksensoren',
-          subtitle: '433/868 MHz · Thermometer, Wetterstationen, Schalter',
+          title: t.scannerSensors,
+          subtitle: t.scannerHubSensorsSubtitle,
           onTap: () => open(() => const IsmScreen()),
         ),
         _Tile(
           icon: Icons.manage_search,
-          title: 'Freier Band-Scan',
-          subtitle: '0,5–1766 MHz frei abstimmen, Bänder eingezeichnet',
+          title: t.scannerBandWorld,
+          subtitle: t.scannerHubWorldSubtitle,
           onTap: () => open(() => ScannerScreen(plan: worldBandPlan)),
         ),
       ],
@@ -84,25 +86,26 @@ class AircraftHubScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     void open(Widget Function() screen) => Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen()));
+    final t = context.l10n;
     return _TileGrid(
-      title: 'Flugzeuge',
+      title: t.scannerHubAircraft,
       tiles: [
         _Tile(
           icon: Icons.headset_mic,
-          title: 'Flugfunk',
-          subtitle: '118–137 MHz · Sprechfunk (AM)',
+          title: t.scannerBandAir,
+          subtitle: t.scannerHubAirSubtitle,
           onTap: () => open(() => ScannerScreen(plan: airBandPlan)),
         ),
         _Tile(
           icon: Icons.textsms_outlined,
           title: 'ACARS',
-          subtitle: '131,5–131,9 MHz · Textmeldungen von Flugzeugen',
+          subtitle: t.scannerHubAcarsSubtitle,
           onTap: () => open(() => const AcarsScreen()),
         ),
         _Tile(
           icon: Icons.radar,
           title: 'Radar (ADS-B)',
-          subtitle: '1090 MHz · Flugnummer, Höhe, Position auf der Karte',
+          subtitle: t.scannerHubAdsbSubtitle,
           onTap: () => open(() => const AdsbScreen()),
         ),
       ],
@@ -133,8 +136,8 @@ class _ShortwaveHubScreenState extends ConsumerState<ShortwaveHubScreen> {
     });
   }
 
-  static String _upconverterLabel(int hz) => switch (hz) {
-    0 => 'Keiner – Direct Sampling oder RTL-SDR Blog V4',
+  static String _upconverterLabel(AppLocalizations t, int hz) => switch (hz) {
+    0 => t.scannerUpconverterNone,
     125000000 => '125 MHz (Ham It Up)',
     120000000 => '120 MHz (SpyVerter)',
     _ => '${formatMhzAuto(hz)} MHz',
@@ -145,14 +148,14 @@ class _ShortwaveHubScreenState extends ConsumerState<ShortwaveHubScreen> {
     final hz = await showDialog<int>(
       context: context,
       builder: (context) => SimpleDialog(
-        title: const Text('Aufwärtsmischer vor dem Stick'),
+        title: Text(context.l10n.scannerUpconverterDialogTitle),
         children: [
           for (final choice in SettingsRepository.hfUpconverterChoices)
             ListTile(
               autofocus: choice == current,
               selected: choice == current,
               onTap: () => Navigator.of(context).pop(choice),
-              title: Text(_upconverterLabel(choice)),
+              title: Text(_upconverterLabel(context.l10n, choice)),
             ),
         ],
       ),
@@ -166,34 +169,30 @@ class _ShortwaveHubScreenState extends ConsumerState<ShortwaveHubScreen> {
   Widget build(BuildContext context) {
     void open(Widget Function() screen) => Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen()));
     final upconverter = _upconverterHz;
+    final t = context.l10n;
     return _TileGrid(
-      title: 'Kurzwelle',
+      title: t.scannerHubShortwave,
       tiles: [
         _Tile(
           icon: Icons.cell_tower,
-          title: 'Amateurfunk KW',
-          subtitle: '160 m bis 10 m · SSB, CW, FT8',
+          title: t.scannerHubHfHam,
+          subtitle: t.scannerHubHfHamSubtitle,
           onTap: () => open(() => ScannerScreen(plan: hfHamBandPlans.first, variants: [...hfHamBandPlans, hamBandPlans.first])),
         ),
         _Tile(
           icon: Icons.schedule,
-          title: 'KW-Funkdienste',
-          subtitle: 'Zeitzeichen · VOLMET · Shanwick · Wetterfax',
+          title: t.scannerBandHfUtility,
+          subtitle: t.scannerHubHfUtilitySubtitle,
           onTap: () => open(() => ScannerScreen(plan: hfUtilityBandPlan)),
         ),
         _Tile(
           icon: Icons.settings_input_antenna,
-          title: 'Aufwärtsmischer',
-          subtitle: upconverter == null ? '…' : _upconverterLabel(upconverter),
+          title: t.scannerUpconverter,
+          subtitle: upconverter == null ? '…' : _upconverterLabel(t, upconverter),
           onTap: _pickUpconverter,
         ),
       ],
-      footer: 'Kurzwelle braucht einen Stick mit Kurzwelleneingang: RTL-SDR Blog V3 (Direct Sampling, '
-          'schaltet unter 24 MHz automatisch um), RTL-SDR Blog V4 (eingebauter Aufwärtsmischer; über '
-          'rtl_tcp nur, wenn der Server ihn unterstützt) – oder einen beliebigen Stick mit einem '
-          'Aufwärtsmischer wie dem Ham It Up. Gewöhnliche Sticks (z. B. NooElec NESDR) haben keinen. '
-          'Dazu eine Antenne für Kurzwelle – eine Langdraht- oder Aktivantenne. '
-          'Rundfunk auf Lang-, Mittel- und Kurzwelle: eigener Punkt „LW/MW/KW“ oben.',
+      footer: t.scannerHubShortwaveFooter,
     );
   }
 }

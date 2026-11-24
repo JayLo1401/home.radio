@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/nas_providers.dart';
 import '../../core/popup_text_field.dart';
 import '../../data/models/launcher_tile.dart';
 import '../../data/repositories/settings_repository.dart';
+import '../../data/services/launcher_background_service.dart';
 import '../../data/services/launcher_service.dart';
+import '../../data/services/nas_picture_cache.dart';
+import '../../data/services/nas_service.dart';
+import '../../l10n/l10n.dart';
 import '../launcher/launcher_background.dart';
 import '../launcher/launcher_providers.dart';
 
@@ -35,10 +40,21 @@ class LauncherBackgroundSettingsScreen extends ConsumerStatefulWidget {
 class _LauncherBackgroundSettingsScreenState extends ConsumerState<LauncherBackgroundSettingsScreen> {
   late final _settings = ref.read(launcherSettingsProvider);
   late LauncherBackgroundSource _source = _settings.backgroundSource;
-  late final _url = TextEditingController(text: _settings.backgroundUrl);
+
+  /// "Own server" is the NAS pictures folder (Settings → NAS), not an
+  /// address.
+  late bool _fromNas = LauncherBackgroundService.isNasAddress(_settings.backgroundUrl);
+  late final _url = TextEditingController(text: _fromNas ? '' : _settings.backgroundUrl);
   late int _interval = _settings.backgroundInterval;
   String? _testResult;
   bool _testing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // What's cached from the NAS pictures folder (no sync).
+    ref.read(nasPictureCacheProvider).init();
+  }
 
   @override
   void dispose() {
@@ -73,15 +89,69 @@ class _LauncherBackgroundSettingsScreenState extends ConsumerState<LauncherBackg
     }
   }
 
+  String? get _nasPicturesFolder => ref.watch(nasSettingsProvider).value?.folder(NasFolder.pictures);
+
   Future<void> _save() async {
-    if (_source == LauncherBackgroundSource.server && !_urlValid) {
+    final server = _source == LauncherBackgroundSource.server;
+    if (server && _fromNas && ref.read(nasSettingsProvider).value?.folder(NasFolder.pictures) == null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.l10n.nasBgNoFolder)));
+      return;
+    }
+    if (server && !_fromNas && !_urlValid) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Bitte eine vollständige Adresse mit http:// oder https:// eingeben.')),
       );
       return;
     }
-    await ref.read(launcherSettingsProvider.notifier).setBackground(source: _source, url: _url.text.trim(), interval: _interval);
+    final url = server && _fromNas ? LauncherBackgroundService.nasAddress : _url.text.trim();
+    await ref.read(launcherSettingsProvider.notifier).setBackground(source: _source, url: url, interval: _interval);
     if (mounted) Navigator.of(context).pop();
+  }
+
+  /// "Pictures folder on the NAS": what's cached, and "Sync now".
+  List<Widget> _nasPart(BuildContext context, TextStyle help) {
+    final l = context.l10n;
+    final cache = ref.read(nasPictureCacheProvider);
+    String date(DateTime t) {
+      String two(int v) => v.toString().padLeft(2, '0');
+      return '${two(t.day)}.${two(t.month)}.${t.year}, ${two(t.hour)}:${two(t.minute)}';
+    }
+
+    return [
+      const SizedBox(height: 8),
+      ValueListenableBuilder<NasPictureStatus>(
+        valueListenable: cache.status,
+        builder: (context, status, _) {
+          final lastSync = status.lastSync;
+          final error = status.error;
+          return Padding(
+            padding: const EdgeInsets.only(left: 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  status.syncing
+                      ? l.nasBgSyncing
+                      : lastSync == null
+                          ? l.nasBgStatus(status.count)
+                          : l.nasBgLastSync(status.count, date(lastSync)),
+                  style: help,
+                ),
+                if (error != null && !status.syncing) Text(l.nasBgSyncError(error), style: help),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: status.syncing ? null : cache.sync,
+                  icon: status.syncing
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.sync),
+                  label: Text(l.nasBgSyncNow),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    ];
   }
 
   @override
@@ -117,6 +187,31 @@ class _LauncherBackgroundSettingsScreenState extends ConsumerState<LauncherBackg
               onTap: () => setState(() => _source = LauncherBackgroundSource.server),
             ),
             if (_source == LauncherBackgroundSource.server) ...[
+              Padding(
+                padding: const EdgeInsets.only(left: 24),
+                child: _choice(
+                  context,
+                  title: context.l10n.nasBgFromNas,
+                  subtitle: _nasPicturesFolder == null
+                      ? context.l10n.nasBgNoFolder
+                      : context.l10n.nasBgFromNasHint(_nasPicturesFolder!),
+                  selected: _fromNas,
+                  onTap: () => setState(() => _fromNas = true),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(left: 24),
+                child: _choice(
+                  context,
+                  title: context.l10n.nasBgFromUrl,
+                  subtitle: context.l10n.nasBgFromUrlHint,
+                  selected: !_fromNas,
+                  onTap: () => setState(() => _fromNas = false),
+                ),
+              ),
+              if (_fromNas && _nasPicturesFolder != null) ..._nasPart(context, help),
+            ],
+            if (_source == LauncherBackgroundSource.server && !_fromNas) ...[
               const SizedBox(height: 12),
               PopupTextField(
                 controller: _url,
@@ -441,4 +536,6 @@ String startScreenLabel(StartScreen s) => switch (s) {
       StartScreen.launcher => 'Home',
       StartScreen.radio => 'Radio',
       StartScreen.tv => 'TV',
+      StartScreen.dashboard => l10n.dashboardTitle,
+      StartScreen.app => l10n.adminStartScreenApp,
     };

@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../data/services/sun_moon_service.dart';
+import '../../l10n/l10n.dart';
 
 /// Sun/moon path card - sunrise/sunset, civil dawn/dusk, solar noon, current
 /// moon phase and the current UV index, modeled on Home Assistant's own sun
@@ -120,10 +121,12 @@ class _SunMoonPanelState extends State<SunMoonPanel> {
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(child: _TimeLabel(label: 'Sonnenaufgang', time: times.sunrise, scale: scale)),
+                          Expanded(
+                            child: _TimeLabel(label: context.l10n.radioSunrise, time: times.sunrise, scale: scale),
+                          ),
                           Expanded(
                             child: _TimeLabel(
-                              label: 'Sonnenuntergang',
+                              label: context.l10n.radioSunset,
                               time: times.sunset,
                               scale: scale,
                               alignEnd: true,
@@ -142,10 +145,10 @@ class _SunMoonPanelState extends State<SunMoonPanel> {
                       ),
                       Row(
                         children: [
-                          Expanded(child: _TimeLabel(label: 'Morgendämmerung', time: times.dawn, scale: scale)),
+                          Expanded(child: _TimeLabel(label: context.l10n.radioDawn, time: times.dawn, scale: scale)),
                           Expanded(
                             child: _TimeLabel(
-                              label: 'Mittag',
+                              label: context.l10n.radioSolarNoon,
                               time: times.solarNoon,
                               scale: scale,
                               alignCenter: true,
@@ -153,7 +156,7 @@ class _SunMoonPanelState extends State<SunMoonPanel> {
                           ),
                           Expanded(
                             child: _TimeLabel(
-                              label: 'Abenddämmerung',
+                              label: context.l10n.radioDusk,
                               time: times.dusk,
                               scale: scale,
                               alignEnd: true,

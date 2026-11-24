@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import '../../l10n/l10n.dart';
+
 /// Test connection to an rtl_tcp server (Settings → Radio-Empfänger): connects
 /// to [connect]'s host/port - a driver app on this device, a Raspberry Pi,
 /// rtltcp.server - tunes it and counts the I/Q bytes, enough to verify the
@@ -129,7 +131,7 @@ class _RtlTcpTestClient {
     try {
       socket = await Socket.connect(host, port, timeout: const Duration(seconds: 5));
     } catch (e) {
-      return RtlConnectResult(connected: false, error: 'rtl_tcp-Server $host:$port nicht erreichbar ($e)');
+      return RtlConnectResult(connected: false, error: l10n.scannerRtlUnreachable('$host:$port', '$e'));
     }
     socket.setOption(SocketOption.tcpNoDelay, true);
     final handshake = _handshake = Completer<RtlConnectResult>();
@@ -138,20 +140,18 @@ class _RtlTcpTestClient {
     socket.add(info ? _helloInfo : _helloV2);
     socket.listen(
       _onData,
-      onError: (Object e) => _end('Verbindung zum rtl_tcp-Server unterbrochen ($e)'),
+      onError: (Object e) => _end(l10n.scannerRtlConnectionLost('$e')),
       onDone: () {
         // The info answer ends with the server closing - normal there.
         if (info && _serverInfo != null) _completeV2();
-        _end(_protocol == null
-            ? 'rtl_tcp-Server hat die Verbindung abgelehnt (belegt oder kein Stick bereit)'
-            : 'Verbindung zum rtl_tcp-Server beendet');
+        _end(_protocol == null ? l10n.scannerRtlRefused : l10n.scannerRtlConnectionClosed);
       },
       cancelOnError: true,
     );
     _socket = socket;
     final result = await handshake.future.timeout(
       _handshakeTimeout,
-      onTimeout: () => const RtlConnectResult(connected: false, error: 'rtl_tcp-Server antwortet nicht'),
+      onTimeout: () => RtlConnectResult(connected: false, error: l10n.scannerRtlNoAnswer),
     );
     if (!result.connected || info) {
       await close();
@@ -202,7 +202,7 @@ class _RtlTcpTestClient {
       } else if (magic == 'RTL2') {
         _protocol = RtlTcpProtocol.jayExtended;
       } else {
-        _finishHandshake(const RtlConnectResult(connected: false, error: 'Kein rtl_tcp-Server (unbekannte Begrüßung)'));
+        _finishHandshake(RtlConnectResult(connected: false, error: l10n.scannerRtlNotAServer));
         close();
         return;
       }
@@ -221,7 +221,7 @@ class _RtlTcpTestClient {
         _frameType = head.getUint8(0);
         _frameRemaining = head.getUint32(1);
         if (_frameRemaining > _maxFrame) {
-          _end('rtl_tcp-Server: Datenstrom fehlerhaft');
+          _end(l10n.scannerRtlBadStream);
           return;
         }
         if (_frameRemaining == 0) _frameDone();
@@ -257,14 +257,13 @@ class _RtlTcpTestClient {
 
   String? get _stickLabel => _device?.label;
 
-  String get _stick => _stickLabel == null ? 'USB-Stick am rtl_tcp-Server' : '„$_stickLabel“';
+  String get _stick => _stickLabel == null ? l10n.scannerRtlStickAtServer : l10n.scannerQuoted(_stickLabel!);
 
   void _onMessage(Map<String, dynamic> msg) {
     switch (msg['type']) {
       case 'server_info':
         if (msg['auth'] == 'required') {
-          _end('rtl_tcp-Server verlangt eine Anmeldung, das wird nicht mehr unterstützt. '
-              'Bitte den rtltcp.server im lokalen Netz verwenden.');
+          _end(l10n.scannerRtlAuthUnsupported);
           return;
         }
         _serverInfo = msg;
@@ -278,10 +277,10 @@ class _RtlTcpTestClient {
         final state = msg['state'];
         final ready = state == 'ready' || state == 'device_restored';
         final text = switch (state) {
-          'ready' || 'device_restored' => '$_stick bereit',
-          'starting' => '$_stick startet …',
-          'device_not_ready' => '$_stick nicht bereit',
-          'device_lost' => '$_stick getrennt – der Server verbindet neu …',
+          'ready' || 'device_restored' => l10n.scannerRtlStickReady(_stick),
+          'starting' => l10n.scannerRtlStickStarting(_stick),
+          'device_not_ready' => l10n.scannerRtlStickNotReady(_stick),
+          'device_lost' => l10n.scannerRtlStickLost(_stick),
           _ => null,
         };
         if (_serverInfo != null) _completeV2();
@@ -304,16 +303,13 @@ class _RtlTcpTestClient {
     final code = msg['code'];
     final message = msg['message'] is String ? msg['message'] as String : '';
     final client = msg['client'] is String ? msg['client'] as String : '';
-    final who = _stickLabel == null ? 'rtl_tcp-Server' : '„$_stickLabel“';
+    final who = _stickLabel == null ? l10n.scannerRtlServer : l10n.scannerQuoted(_stickLabel!);
     return switch (code) {
-      'BUSY' => client.isEmpty
-          ? '$who wird bereits von einem anderen Gerät verwendet'
-          : '$who wird bereits von $client verwendet',
-      'AUTH_REQUIRED' || 'AUTH_FAILED' => 'rtl_tcp-Server verlangt eine Anmeldung, das wird nicht mehr unterstützt. '
-          'Bitte den rtltcp.server im lokalen Netz verwenden.',
-      'KICKED' => 'Vom rtl_tcp-Server getrennt',
-      'PROTOCOL_ERROR' => 'rtl_tcp-Server meldet einen Protokollfehler${message.isEmpty ? '' : ': $message'}',
-      _ => 'rtl_tcp-Server: ${message.isEmpty ? '$code' : message}',
+      'BUSY' => client.isEmpty ? l10n.scannerRtlBusy(who) : l10n.scannerRtlBusyBy(who, client),
+      'AUTH_REQUIRED' || 'AUTH_FAILED' => l10n.scannerRtlAuthUnsupported,
+      'KICKED' => l10n.scannerRtlKicked,
+      'PROTOCOL_ERROR' => '${l10n.scannerRtlProtocolError}${message.isEmpty ? '' : ': $message'}',
+      _ => l10n.scannerRtlServerSays(message.isEmpty ? '$code' : message),
     };
   }
 
@@ -468,12 +464,12 @@ class RtlStick {
     );
   }
 
-  /// German text for [state], null when there is nothing to say.
+  /// Text for [state], null when there is nothing to say.
   String? get stateText => switch (state) {
-        'starting' => 'startet',
-        'device_not_ready' => 'nicht bereit',
-        'device_lost' => 'getrennt',
-        'idle' => 'ruht',
+        'starting' => l10n.scannerRtlStateStarting,
+        'device_not_ready' => l10n.scannerRtlStateNotReady,
+        'device_lost' => l10n.scannerRtlStateLost,
+        'idle' => l10n.scannerRtlStateIdle,
         _ => null,
       };
 }

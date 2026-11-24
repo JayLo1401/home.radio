@@ -1,18 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:home_system/features/home/connection_chain.dart';
+import 'package:home_system/l10n/l10n.dart';
 
 void main() {
+  // The expectations are the German texts.
+  setUpAll(() => applyAppLocale(const Locale('de')));
+
   for (final width in [500.0, 1100.0]) {
     testWidgets('the chain lays out without overflow at $width px', (tester) async {
       final link = ReceiverLink()..start(viaServer: true, fm: false, freqKhz: 222064, serviceId: 1);
       link.setServerReady(true);
       await tester.pumpWidget(MaterialApp(
+        locale: const Locale('de'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
         home: Center(child: SizedBox(width: width, child: ConnectionChain(view: link.view))),
       ));
       await tester.pump(const Duration(milliseconds: 500));
       link.fail(LinkStage.stick, 'Ein sehr langer Fehlertext, der nicht in die Zeile passt und gekürzt wird', retrying: false);
       await tester.pumpWidget(MaterialApp(
+        locale: const Locale('de'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
         home: Center(child: SizedBox(width: width, child: ConnectionChain(view: link.view))),
       ));
       expect(tester.takeException(), isNull);

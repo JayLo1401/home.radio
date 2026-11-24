@@ -4,11 +4,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/dashboard_providers.dart';
 import '../../core/display_mode.dart';
 import '../../core/providers.dart';
 import '../../core/system_providers.dart';
 import '../../core/theme.dart';
 import '../../data/services/admin_server.dart';
+import '../../core/nas_providers.dart';
+import '../../data/services/display_service.dart';
+import '../../l10n/l10n.dart';
 import '../setup/setup_wizard_screen.dart' show deviceNameSuggestions;
 import '../../data/models/favorite_channel.dart';
 import '../../data/models/launcher_tile.dart';
@@ -19,25 +23,32 @@ import '../launcher/launcher_providers.dart';
 import '../rtlsdr/rtl_sdr_test_screen.dart';
 import 'restore_backup_screen.dart';
 import '../tv/tv_providers.dart';
+import '../tv/iptv_providers.dart';
+import 'iptv_settings_screen.dart';
+import 'language_picker.dart';
 import 'launcher_settings_screens.dart';
 import 'remote_keys_settings_screen.dart';
 import 'tv_settings_screen.dart';
 import 'update_settings_screen.dart';
 import 'location_settings_screen.dart';
+import 'nas_settings_screen.dart';
 import 'radar_source_settings_screen.dart';
 
 /// The settings' areas - one page each, reached from the overview.
 /// [system]: the device itself - which parts are on, its name, start, Home
 /// (the launcher), display, backup, updates.
-enum SettingsSection { system, radio, tv }
+enum SettingsSection { system, radio, tv, dashboard }
 
 /// Settings: without [section] the overview of the areas (System, Radio,
 /// TV), with it that area's page - Radio's gear opens its own area right
 /// away.
 class SettingsScreen extends ConsumerStatefulWidget {
-  const SettingsScreen({super.key, this.section});
+  const SettingsScreen({super.key, this.section, this.fromOverview = false});
 
   final SettingsSection? section;
+
+  /// Opened from the overview - "Alle Einstellungen" just goes back there.
+  final bool fromOverview;
 
   @override
   ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
@@ -65,7 +76,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _fullscreen = false;
   int _monitor = 1;
   int _monitors = 1;
-  String? _adminUrl;
+  // The admin page's addresses (by IP and, if known, by host name).
+  List<String> _adminUrls = const [];
+  // The app started with StartScreen.app ('' = none) and its name.
+  String _startApp = '';
+  String? _startAppLabel;
   bool _loaded = false;
 
   @override
@@ -93,12 +108,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final monitor = await repo.getFullscreenMonitor();
     final monitors = await monitorCount();
     final tvStartChannel = await repo.getTvStartChannel();
+    final startApp = await repo.getStartApp();
+    final startAppLabel = startApp.isEmpty
+        ? null
+        : (await ref.read(launcherServiceProvider).listApps()).where((a) => a.package == startApp).firstOrNull?.label;
     final adminUrls = await AdminServer.urls();
-    final adminUrl = adminUrls.isEmpty ? null : adminUrls.join(' oder ');
     final scale = ref.read(uiScaleProvider);
     if (!mounted) return;
     setState(() {
-      _adminUrl = adminUrl;
+      _adminUrls = adminUrls;
+      _startApp = startApp;
+      _startAppLabel = startAppLabel;
       _mode = mode;
       _fixedProgramNumber = fixed;
       _showClockDate = showClockDate;
@@ -121,45 +141,136 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     });
   }
 
-  /// Switches Radio or TV on/off. Off: the radio stops, and a start into
-  /// that part becomes a start into Home.
-  Future<void> _setPart({bool? radio, bool? tv}) async {
+  /// Switches a part on/off (SystemPartsNotifier stops the radio and moves
+  /// the start to Home when needed).
+  Future<void> _setPart({bool? radio, bool? tv, bool? dashboard}) async {
     final parts = ref.read(systemPartsProvider.notifier);
-    final launcher = ref.read(launcherSettingsProvider);
-    final launcherNotifier = ref.read(launcherSettingsProvider.notifier);
-    if (radio != null) {
-      await parts.setRadio(radio);
-      if (!radio) {
-        ref.read(radioCommandProvider.notifier).send(RadioCommand.stop);
-        if (launcher.startScreen == StartScreen.radio) await launcherNotifier.setStartScreen(StartScreen.launcher);
-      }
-    }
-    if (tv != null) {
-      await parts.setTv(tv);
-      if (!tv && launcher.startScreen == StartScreen.tv) await launcherNotifier.setStartScreen(StartScreen.launcher);
+    if (radio != null) await parts.setRadio(radio);
+    if (tv != null) await parts.setTv(tv);
+    if (dashboard != null) await parts.setDashboard(dashboard);
+  }
+
+  void _openOverview() {
+    final nav = Navigator.of(context);
+    if (widget.fromOverview) {
+      nav.pop();
+    } else {
+      nav.pushReplacement(MaterialPageRoute(builder: (_) => const SettingsScreen()));
     }
   }
 
+  /// Another app as what starts with Home System (e.g. a TV that should
+  /// simply open the streaming app) - picked from the installed ones.
+  Future<void> _pickStartApp() async {
+    final apps = [...await ref.read(launcherServiceProvider).listApps()]
+      ..sort((a, b) => a.label.toLowerCase().compareTo(b.label.toLowerCase()));
+    if (!mounted) return;
+    final l = context.l10n;
+    final picked = await showDialog<InstalledApp>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: Text(l.systemStartAppPick),
+        children: [
+          for (final (i, a) in apps.indexed)
+            ListTile(
+              autofocus: a.package == _startApp || (i == 0 && _startApp.isEmpty),
+              title: Text(a.label, style: const TextStyle(fontSize: 18)),
+              onTap: () => Navigator.of(context).pop(a),
+            ),
+        ],
+      ),
+    );
+    if (picked == null) return;
+    await ref.read(settingsRepositoryProvider).setStartApp(picked.package);
+    setState(() {
+      _startApp = picked.package;
+      _startAppLabel = picked.label;
+    });
+    await ref.read(launcherSettingsProvider.notifier).setStartScreen(StartScreen.app);
+  }
+
+  /// Display by motion on/off - on asks for the camera first and says when
+  /// the display can't be switched off (no accessibility service).
+  Future<void> _setMotion(bool on) async {
+    final display = ref.read(displayServiceProvider);
+    final notifier = ref.read(dashboardDisplayProvider.notifier);
+    final l = context.l10n;
+    final messenger = ScaffoldMessenger.of(context);
+    if (on) {
+      if (!await display.hasCamera()) {
+        messenger.showSnackBar(SnackBar(content: Text(l.dashboardNoCamera)));
+        return;
+      }
+      if (!await display.requestCameraPermission()) {
+        messenger.showSnackBar(SnackBar(content: Text(l.dashboardCameraDenied)));
+        return;
+      }
+      if (!await display.canSwitchOff()) messenger.showSnackBar(SnackBar(content: Text(l.dashboardNoAccessibility)));
+    }
+    await notifier.set(ref.read(dashboardDisplayProvider).copyWith(motion: on));
+  }
+
+  Future<void> _editDashboardUrl() async {
+    final l = context.l10n;
+    final controller = TextEditingController(text: ref.read(dashboardUrlProvider));
+    final url = await _textDialog(title: l.dashboardAddress, hint: l.dashboardAddressHint, controller: controller);
+    if (url != null) await ref.read(dashboardUrlProvider.notifier).set(url);
+  }
+
+  Future<void> _editWebhook() async {
+    final l = context.l10n;
+    final controller = TextEditingController(text: ref.read(dashboardDisplayProvider).webhookUrl);
+    final url = await _textDialog(title: l.dashboardWebhook, hint: l.dashboardWebhookHint, controller: controller);
+    if (url == null) return;
+    final notifier = ref.read(dashboardDisplayProvider.notifier);
+    await notifier.set(ref.read(dashboardDisplayProvider).copyWith(webhookUrl: url));
+  }
+
+  /// One line of text (an address) - OK takes it, Back cancels.
+  Future<String?> _textDialog({required String title, required String hint, required TextEditingController controller}) {
+    final l = context.l10n;
+    return showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: SizedBox(
+          width: 640,
+          child: TextField(
+            controller: controller,
+            autofocus: true,
+            keyboardType: TextInputType.url,
+            decoration: InputDecoration(hintText: hint, border: const OutlineInputBorder()),
+            onSubmitted: (v) => Navigator.of(context).pop(v),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(l.commonCancel)),
+          FilledButton(onPressed: () => Navigator.of(context).pop(controller.text), child: Text(l.commonSave)),
+        ],
+      ),
+    );
+  }
+
   Future<void> _editDeviceName() async {
+    final l = context.l10n;
     final controller = TextEditingController(text: ref.read(deviceNameProvider));
     final name = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Gerätename'),
+        title: Text(l.adminDeviceName),
         content: SizedBox(
           width: 520,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Eindeutig im Heimnetz - erscheint auf der Verwaltungsseite und im Namen der Backups.',
-                  style: TextStyle(color: Colors.white60)),
+              Text(l.settingsDeviceNameHelp, style: const TextStyle(color: Colors.white60)),
               const SizedBox(height: 12),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  for (final (i, s) in deviceNameSuggestions.indexed)
+                  for (final (i, s) in deviceNameSuggestions(l).indexed)
                     // The remote starts on the first suggestion.
                     OutlinedButton(autofocus: i == 0, onPressed: () => Navigator.of(context).pop(s), child: Text(s)),
                 ],
@@ -168,15 +279,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               TextField(
                 controller: controller,
                 textInputAction: TextInputAction.done,
-                decoration: const InputDecoration(labelText: 'Eigener Name', border: OutlineInputBorder()),
+                decoration: InputDecoration(labelText: l.settingsDeviceNameOwn, border: const OutlineInputBorder()),
                 onSubmitted: (v) => Navigator.of(context).pop(v),
               ),
             ],
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Abbrechen')),
-          FilledButton(onPressed: () => Navigator.of(context).pop(controller.text), child: const Text('Übernehmen')),
+          TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(l.commonCancel)),
+          FilledButton(onPressed: () => Navigator.of(context).pop(controller.text), child: Text(l.miscApply)),
         ],
       ),
     );
@@ -240,6 +351,128 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     await ref.read(weatherDisplaySettingsProvider.notifier).setSunScale(next);
   }
 
+  /// Settings → Haussteuerung: the dashboard's address, display by motion,
+  /// Home Assistant's side.
+  List<Widget> _dashboardSection(
+    BuildContext context,
+    double Function() nextOrder,
+    Widget Function(String, bool, void Function(bool)) tileToggle,
+  ) {
+    final l = context.l10n;
+    final url = ref.watch(dashboardUrlProvider);
+    final display = ref.watch(dashboardDisplayProvider);
+    final notifier = ref.read(dashboardDisplayProvider.notifier);
+    const help = TextStyle(color: Colors.white60);
+    Widget stepper(String label, String value, void Function(int) onChange) => Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: Row(
+            children: [
+              SizedBox(width: 260, child: Text(label, style: Theme.of(context).textTheme.bodyLarge)),
+              FocusTraversalOrder(
+                order: NumericFocusOrder(nextOrder()),
+                child: _TvIconButton(icon: Icons.remove, onTap: () => onChange(-1)),
+              ),
+              SizedBox(
+                width: 140,
+                child: Text(value, textAlign: TextAlign.center, style: const TextStyle(fontSize: 18)),
+              ),
+              FocusTraversalOrder(
+                order: NumericFocusOrder(nextOrder()),
+                child: _TvIconButton(icon: Icons.add, onTap: () => onChange(1)),
+              ),
+            ],
+          ),
+        );
+    const timeouts = [0, 1, 2, 5, 10, 15, 30, 60];
+    final timeoutIndex = timeouts.indexOf(display.timeoutMinutes).clamp(0, timeouts.length - 1);
+    return [
+      FocusTraversalOrder(
+        order: NumericFocusOrder(nextOrder()),
+        child: _TvNavTile(
+          label: l.dashboardAddress,
+          value: url.isEmpty ? l.dashboardNotSet : url,
+          configured: url.isNotEmpty,
+          icon: Icons.link,
+          onTap: _editDashboardUrl,
+        ),
+      ),
+      Padding(padding: const EdgeInsets.fromLTRB(12, 4, 12, 0), child: Text(l.dashboardAddressHelp, style: help)),
+      const Divider(height: 32),
+      Text(l.dashboardDisplayHeading, style: Theme.of(context).textTheme.titleLarge),
+      const SizedBox(height: 8),
+      tileToggle(l.dashboardMotion, display.motion, _setMotion),
+      Padding(padding: const EdgeInsets.fromLTRB(12, 4, 12, 0), child: Text(l.dashboardMotionHelp, style: help)),
+      if (display.motion) ...[
+        stepper(l.dashboardSensitivity, l.dashboardSensitivityValue(display.sensitivity), (d) {
+          notifier.set(display.copyWith(sensitivity: (display.sensitivity + d).clamp(1, 10)));
+        }),
+        stepper(
+          l.dashboardTimeout,
+          display.timeoutMinutes == 0 ? l.dashboardTimeoutNever : l.dashboardTimeoutMinutes(display.timeoutMinutes),
+          (d) => notifier.set(
+            display.copyWith(timeoutMinutes: timeouts[(timeoutIndex + d).clamp(0, timeouts.length - 1)]),
+          ),
+        ),
+        // The camera's view of motion right now - to try out the sensitivity.
+        StreamBuilder(
+          stream: _motionLevels,
+          builder: (context, snapshot) {
+            final v = snapshot.data;
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(12, 16, 12, 0),
+              child: Text(
+                v == null
+                    ? ''
+                    : v.motion
+                        ? l.dashboardLevelMotion
+                        : l.dashboardLevel((v.level * 100).round()),
+                style: TextStyle(fontSize: 18, color: v?.motion == true ? Colors.greenAccent : Colors.white70),
+              ),
+            );
+          },
+        ),
+        Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: FocusTraversalOrder(
+            order: NumericFocusOrder(nextOrder()),
+            child: _TvNavTile(
+              label: l.dashboardTestOff,
+              icon: Icons.power_settings_new,
+              onTap: () async {
+                if (!await ref.read(displayServiceProvider).screenOff() && context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l.dashboardNoAccessibility)));
+                }
+              },
+            ),
+          ),
+        ),
+      ],
+      const Divider(height: 32),
+      Text(l.dashboardHaHeading, style: Theme.of(context).textTheme.titleLarge),
+      const SizedBox(height: 8),
+      FocusTraversalOrder(
+        order: NumericFocusOrder(nextOrder()),
+        child: _TvNavTile(
+          label: l.dashboardWebhook,
+          value: display.webhookUrl.isEmpty ? l.dashboardNotSet : display.webhookUrl,
+          configured: display.webhookUrl.isNotEmpty,
+          icon: Icons.webhook,
+          onTap: _editWebhook,
+        ),
+      ),
+      Padding(padding: const EdgeInsets.fromLTRB(12, 4, 12, 0), child: Text(l.dashboardWebhookHelp, style: help)),
+      if (_adminUrls.isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+          child: Text(l.dashboardRemoteHelp(_adminUrls.first), style: help),
+        ),
+    ];
+  }
+
+  /// The camera's motion level for the test display - one subscription per page.
+  late final Stream<({double level, bool motion})> _motionLevels =
+      ref.read(displayServiceProvider).motionLevels();
+
   @override
   Widget build(BuildContext context) {
     final favorites = ref.watch(favoritesStreamProvider).value ?? const <FavoriteChannel>[];
@@ -249,17 +482,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     // Only the kind of source, not its address - the settings list
     // shouldn't advertise whichever third-party radar is set up.
     final radarSettings = ref.watch(weatherDisplaySettingsProvider);
+    final l = context.l10n;
     final radarSourceLabel = radarSettings.radarUrl.trim().isEmpty
-        ? 'nicht eingerichtet'
-        : (radarSettings.radarIsWebPage ? 'Webseite' : 'Bild');
+        ? l.settingsNotSetUp
+        : (radarSettings.radarIsWebPage ? l.miscRadarWebPage : l.miscRadarImage);
     final repo = ref.read(settingsRepositoryProvider);
     final launcher = ref.watch(launcherSettingsProvider);
     final parts = ref.watch(systemPartsProvider);
     final deviceName = ref.watch(deviceNameProvider);
+    final nasConfig = ref.watch(nasSettingsProvider).value?.config;
+    final adminUrl = _adminUrls.isEmpty ? null : _adminUrls.join(' ${l.settingsOr} ');
 
     if (!_loaded) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Einstellungen')),
+        appBar: AppBar(title: Text(l.systemTileSettingsShort)),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
@@ -365,9 +601,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(switch (section) {
-          SettingsSection.system => 'Einstellungen: System',
-          SettingsSection.radio => 'Einstellungen: Radio',
-          SettingsSection.tv => 'Einstellungen: TV',
+          SettingsSection.system => context.l10n.systemSettingsTitleSystem,
+          SettingsSection.radio => context.l10n.systemSettingsTitleRadio,
+          SettingsSection.tv => context.l10n.systemSettingsTitleTv,
+          SettingsSection.dashboard => context.l10n.dashboardSettingsTitle,
         }),
       ),
       body: FocusTraversalGroup(
@@ -375,19 +612,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            // Up to all settings - also when this page was opened straight
+            // from Radio or TV.
+            FocusTraversalOrder(
+              order: NumericFocusOrder(nextOrder()),
+              child: _TvNavTile(label: context.l10n.systemSettingsAll, icon: Icons.apps, onTap: _openOverview),
+            ),
+            const SizedBox(height: 8),
+            if (section == SettingsSection.dashboard) ..._dashboardSection(context, nextOrder, tileToggle),
             if (section == SettingsSection.radio) ...[
             // First, since it decides whether DAB+ shows up anywhere at all.
-            Text('Empfang', style: Theme.of(context).textTheme.titleLarge),
+            Text(l.settingsReception, style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 8),
             FocusTraversalOrder(
               order: NumericFocusOrder(nextOrder()),
               // "Kein Empfänger" is a valid choice too, not a missing setup.
               child: _TvNavTile(
-                label: 'Radio-Empfänger (DAB+ & UKW)',
+                label: l.scannerRtlReceiverTitle,
                 value: switch (receiverMode) {
-                  ReceiverMode.none => 'Kein Empfänger',
-                  ReceiverMode.usb => 'RTL-SDR per USB',
-                  ReceiverMode.tcp => 'RTL-SDR über Netzwerk',
+                  ReceiverMode.none => l.settingsReceiverNone,
+                  ReceiverMode.usb => l.settingsReceiverUsb,
+                  ReceiverMode.tcp => l.settingsReceiverTcp,
                 },
                 configured: true,
                 onTap: () => Navigator.of(context).push(
@@ -398,39 +643,38 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             // Which parts of the receiver side the app shows: DAB+ and FM
             // (station search, sidebar tab) and the top bar's "Funk" window.
             if (receiverMode != ReceiverMode.none) ...[
-              tileToggle('DAB anzeigen', receiverSections.dab, (v) {
+              tileToggle(l.settingsShowDab, receiverSections.dab, (v) {
                 ref.read(receiverSectionsProvider.notifier).setDab(v);
               }),
-              tileToggle('FM anzeigen', receiverSections.fm, (v) {
+              tileToggle(l.settingsShowFm, receiverSections.fm, (v) {
                 ref.read(receiverSectionsProvider.notifier).setFm(v);
               }),
-              tileToggle('LW/MW/KW anzeigen', receiverSections.am, (v) {
+              tileToggle(l.settingsShowAm, receiverSections.am, (v) {
                 ref.read(receiverSectionsProvider.notifier).setAm(v);
               }),
-              tileToggle('Funk anzeigen', receiverSections.funk, (v) {
+              tileToggle(l.settingsShowFunk, receiverSections.funk, (v) {
                 ref.read(receiverSectionsProvider.notifier).setFunk(v);
               }),
             ],
             ],
             if (section == SettingsSection.system) ...[
               // First: which parts there are decides about everything else.
-              Text('Teile von Home System', style: Theme.of(context).textTheme.titleLarge),
+              Text(l.settingsPartsHeading, style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 4),
-              const Text(
-                'Ausgeschaltete Teile haben keine Kachel unter Home, und ihre Einstellungen sind ausgegraut.',
-                style: TextStyle(color: Colors.white60),
-              ),
+              Text(l.settingsPartsHelp, style: const TextStyle(color: Colors.white60)),
               const SizedBox(height: 8),
               tileToggle('Radio', parts.radio, (v) => _setPart(radio: v)),
               tileToggle('TV', parts.tv, (v) => _setPart(tv: v)),
+              if (DisplayService.supported)
+                tileToggle(context.l10n.dashboardTitle, parts.dashboard, (v) => _setPart(dashboard: v)),
               const Divider(height: 32),
-              Text('Gerät', style: Theme.of(context).textTheme.titleLarge),
+              Text(l.settingsDeviceHeading, style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 8),
               FocusTraversalOrder(
                 order: NumericFocusOrder(nextOrder()),
                 child: _TvNavTile(
-                  label: 'Gerätename',
-                  value: deviceName.isEmpty ? 'nicht vergeben' : deviceName,
+                  label: l.adminDeviceName,
+                  value: deviceName.isEmpty ? l.settingsDeviceNameNotSet : deviceName,
                   configured: deviceName.isNotEmpty,
                   onTap: _editDeviceName,
                 ),
@@ -438,22 +682,34 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
                 child: Text(
-                  _adminUrl == null
-                      ? 'Verwaltungsseite (Backups): ohne Netzwerkverbindung nicht erreichbar'
-                      : 'Verwaltungsseite (Backups) im Browser: $_adminUrl',
+                  adminUrl == null ? l.settingsAdminPageOffline : l.settingsAdminPageAt(adminUrl),
                   style: const TextStyle(color: Colors.white60),
                 ),
               ),
+              // Backups before updates, Home's background pictures.
+              FocusTraversalOrder(
+                order: NumericFocusOrder(nextOrder()),
+                child: _TvNavTile(
+                  label: l.settingsNas,
+                  value: (nasConfig?.isConfigured ?? false) ? nasConfig!.host : l.settingsNotSetUp,
+                  configured: nasConfig?.isConfigured ?? false,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const NasSettingsScreen()),
+                  ),
+                ),
+              ),
               const Divider(height: 32),
-              Text('Beim Start der App', style: Theme.of(context).textTheme.titleLarge),
+              Text(l.adminStartScreen, style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 8),
               FocusTraversalOrder(
                 order: NumericFocusOrder(nextOrder()),
                 child: _TvChoiceTile(
-                  label: 'Home anzeigen',
+                  label: l.settingsStartShowHome,
                   selected: launcher.startScreen == StartScreen.launcher ||
                       (launcher.startScreen == StartScreen.radio && !parts.radio) ||
-                      (launcher.startScreen == StartScreen.tv && !parts.tv),
+                      (launcher.startScreen == StartScreen.tv && !parts.tv) ||
+                      (launcher.startScreen == StartScreen.dashboard && !parts.dashboard) ||
+                      (launcher.startScreen == StartScreen.app && _startApp.isEmpty),
                   onTap: () => ref.read(launcherSettingsProvider.notifier).setStartScreen(StartScreen.launcher),
                 ),
               ),
@@ -461,7 +717,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 FocusTraversalOrder(
                   order: NumericFocusOrder(nextOrder()),
                   child: _TvChoiceTile(
-                    label: 'Radio mit Sender starten (Radio → Autostart)',
+                    label: l.settingsStartRadio,
                     selected: launcher.startScreen == StartScreen.radio,
                     onTap: () => ref.read(launcherSettingsProvider.notifier).setStartScreen(StartScreen.radio),
                   ),
@@ -470,9 +726,29 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 FocusTraversalOrder(
                   order: NumericFocusOrder(nextOrder()),
                   child: _TvChoiceTile(
-                    label: 'TV mit Sender starten (TV → Sender beim Start)',
+                    label: l.settingsStartTv,
                     selected: launcher.startScreen == StartScreen.tv,
                     onTap: () => ref.read(launcherSettingsProvider.notifier).setStartScreen(StartScreen.tv),
+                  ),
+                ),
+              if (parts.dashboard)
+                FocusTraversalOrder(
+                  order: NumericFocusOrder(nextOrder()),
+                  child: _TvChoiceTile(
+                    label: context.l10n.systemStartDashboard,
+                    selected: launcher.startScreen == StartScreen.dashboard,
+                    onTap: () => ref.read(launcherSettingsProvider.notifier).setStartScreen(StartScreen.dashboard),
+                  ),
+                ),
+              if (LauncherService.supported)
+                FocusTraversalOrder(
+                  order: NumericFocusOrder(nextOrder()),
+                  child: _TvChoiceTile(
+                    label: _startApp.isEmpty
+                        ? context.l10n.systemStartAppNone
+                        : context.l10n.systemStartApp(_startAppLabel ?? _startApp),
+                    selected: launcher.startScreen == StartScreen.app && _startApp.isNotEmpty,
+                    onTap: _pickStartApp,
                   ),
                 ),
               const Divider(height: 32),
@@ -481,11 +757,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               FocusTraversalOrder(
                 order: NumericFocusOrder(nextOrder()),
                 child: _TvNavTile(
-                  label: 'Hintergrund',
+                  label: l.settingsBackground,
                   value: switch (launcher.backgroundSource) {
-                    LauncherBackgroundSource.builtin => 'Farbverläufe',
-                    LauncherBackgroundSource.photos => 'Landschaftsfotos',
-                    LauncherBackgroundSource.server => 'Eigener Server',
+                    LauncherBackgroundSource.builtin => l.settingsBackgroundGradients,
+                    LauncherBackgroundSource.photos => l.settingsBackgroundPhotos,
+                    LauncherBackgroundSource.server => l.settingsBackgroundServer,
                   },
                   icon: Icons.wallpaper,
                   onTap: () => Navigator.of(context).push(
@@ -496,7 +772,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               FocusTraversalOrder(
                 order: NumericFocusOrder(nextOrder()),
                 child: _TvNavTile(
-                  label: 'Tasten der Fernbedienung',
+                  label: l.miscRemoteKeysTitle,
                   icon: Icons.keyboard_outlined,
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const RemoteKeysSettingsScreen()),
@@ -508,9 +784,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               FocusTraversalOrder(
                 order: NumericFocusOrder(nextOrder()),
                 child: _TvNavTile(
-                  label: 'Icon-Paket',
+                  label: l.settingsIconPack,
                   value: launcher.iconPack == null
-                      ? 'Original-Logos'
+                      ? l.settingsIconPackNone
                       : (ref.watch(iconPacksProvider).value ?? const [])
                               .where((p) => p.package == launcher.iconPack)
                               .firstOrNull
@@ -523,7 +799,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               FocusTraversalOrder(
                 order: NumericFocusOrder(nextOrder()),
                 child: _TvNavTile(
-                  label: 'Home-Taste',
+                  label: l.settingsHomeKey,
                   icon: Icons.home_outlined,
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const HomeButtonSettingsScreen()),
@@ -533,15 +809,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ],
             ],
             if (section == SettingsSection.tv) ...[
-              Text('Receiver', style: Theme.of(context).textTheme.titleLarge),
+              Text(l.settingsReceiverHeading, style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 8),
               FocusTraversalOrder(
               order: NumericFocusOrder(nextOrder()),
               child: _TvNavTile(
-                label: 'Sat-Receiver (Enigma2)',
+                label: l.settingsSatReceiver,
                 value: (ref.watch(enigma2ConfigProvider)?.configured ?? false)
                     ? ref.watch(enigma2ConfigProvider)!.host
-                    : 'nicht eingerichtet',
+                    : l.settingsNotSetUp,
                 configured: ref.watch(enigma2ConfigProvider)?.configured ?? false,
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const TvSettingsScreen()),
@@ -551,8 +827,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               FocusTraversalOrder(
                 order: NumericFocusOrder(nextOrder()),
                 child: _TvNavTile(
-                  label: 'Tasten der Fernbedienung',
-                  value: 'Senderliste, Programmführer, Optionen, Tonspur',
+                  label: l.iptvSettingsTitle,
+                  value: (ref.watch(iptvProvider)?.enabled ?? false) ? l.commonOn : l.commonOff,
+                  configured: ref.watch(iptvProvider)?.enabled ?? false,
+                  icon: Icons.public,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const IptvSettingsScreen()),
+                  ),
+                ),
+              ),
+              FocusTraversalOrder(
+                order: NumericFocusOrder(nextOrder()),
+                child: _TvNavTile(
+                  label: l.miscRemoteKeysTitle,
+                  value: l.settingsTvKeysValue,
                   icon: Icons.keyboard_outlined,
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const RemoteKeysSettingsScreen()),
@@ -560,24 +848,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
               ),
               const SizedBox(height: 8),
-              tileToggle('Receiver bei Bedarf umschalten', ref.watch(tvZapEncryptedProvider), (v) {
+              tileToggle(l.settingsTvZapEncrypted, ref.watch(tvZapEncryptedProvider), (v) {
                 ref.read(tvZapEncryptedProvider.notifier).set(v);
               }),
-              const Text(
-                'Nur wenn der Receiver eingeschaltet ist: Karte bzw. CI-Modul entschlüsseln dann nur den Sender, den er '
-                'selbst zeigt, und an einem Sat-Kabel empfangen alle Tuner nur dessen Band. Für einen verschlüsselten '
-                'Sender oder einen auf einem anderen Band schaltet die App den Receiver dann um (sein Bild wechselt mit).\n'
-                'Im Standby schaltet die App nie um - der Receiver entschlüsselt dort selbst und bleibt frei. Hält er '
-                'noch einen Sender fest, gibt die App ihn frei.',
-                style: TextStyle(color: Colors.white60),
-              ),
+              Text(l.settingsTvZapEncryptedHelp, style: const TextStyle(color: Colors.white60)),
               const Divider(height: 32),
-              Text('Sender beim Start', style: Theme.of(context).textTheme.titleLarge),
+              Text(l.settingsTvStartHeading, style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 8),
               FocusTraversalOrder(
                 order: NumericFocusOrder(nextOrder()),
                 child: _TvChoiceTile(
-                  label: 'Zuletzt gesehenen Sender',
+                  label: l.settingsTvStartLast,
                   selected: _tvStartChannel == null,
                   onTap: () async {
                     setState(() => _tvStartChannel = null);
@@ -588,7 +869,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               FocusTraversalOrder(
                 order: NumericFocusOrder(nextOrder()),
                 child: _TvChoiceTile(
-                  label: 'Festen Sender',
+                  label: l.settingsTvStartFixed,
                   selected: _tvStartChannel != null || _tvFixedChosen,
                   onTap: () => setState(() => _tvFixedChosen = true),
                 ),
@@ -598,9 +879,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   padding: const EdgeInsets.only(left: 16, top: 8),
                   child: ref.watch(tvChannelsProvider).when(
                         loading: () => const LinearProgressIndicator(),
-                        error: (e, _) => Text('Senderliste nicht erreichbar: $e', style: const TextStyle(color: Colors.amber)),
+                        error: (e, _) => Text(l.settingsTvChannelsError('$e'), style: const TextStyle(color: Colors.amber)),
                         data: (channels) => channels.isEmpty
-                            ? const Text('Erst den Receiver einrichten.', style: TextStyle(color: Colors.white60))
+                            ? Text(l.settingsTvSetUpReceiverFirst, style: const TextStyle(color: Colors.white60))
                             : Wrap(
                                 spacing: 8,
                                 runSpacing: 8,
@@ -623,20 +904,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       ),
                 ),
               const Divider(height: 32),
-              Text('Als Nächstes', style: Theme.of(context).textTheme.titleLarge),
+              Text(l.settingsTvNextUpHeading, style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 4),
-              const Text(
-                'Kurz bevor auf dem laufenden Sender die nächste Sendung beginnt, erscheint ein Hinweis, was als Nächstes kommt.',
-                style: TextStyle(color: Colors.white60),
-              ),
+              Text(l.settingsTvNextUpHelp, style: const TextStyle(color: Colors.white60)),
               const SizedBox(height: 8),
-              tileToggle('Hinweis auf die nächste Sendung', ref.watch(tvNextUpProvider).enabled, (v) {
+              tileToggle(l.settingsTvNextUpToggle, ref.watch(tvNextUpProvider).enabled, (v) {
                 final s = ref.read(tvNextUpProvider);
                 ref.read(tvNextUpProvider.notifier).set((enabled: v, leadMinutes: s.leadMinutes, showSeconds: s.showSeconds));
               }),
               if (ref.watch(tvNextUpProvider).enabled) ...[
                 const SizedBox(height: 8),
-                Text('Wie lange vorher', style: Theme.of(context).textTheme.bodyLarge),
+                Text(l.settingsTvNextUpLead, style: Theme.of(context).textTheme.bodyLarge),
                 Wrap(
                   spacing: 8,
                   children: [
@@ -645,7 +923,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         order: NumericFocusOrder(nextOrder()),
                         child: _TvChoiceTile(
                           compact: true,
-                          label: '$m Min.',
+                          label: l.settingsMinutesShort(m),
                           selected: ref.watch(tvNextUpProvider).leadMinutes == m,
                           onTap: () {
                             final s = ref.read(tvNextUpProvider);
@@ -656,7 +934,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ],
                 ),
                 const SizedBox(height: 8),
-                Text('Wie lange anzeigen', style: Theme.of(context).textTheme.bodyLarge),
+                Text(l.settingsTvNextUpShow, style: Theme.of(context).textTheme.bodyLarge),
                 Wrap(
                   spacing: 8,
                   children: [
@@ -665,7 +943,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         order: NumericFocusOrder(nextOrder()),
                         child: _TvChoiceTile(
                           compact: true,
-                          label: sec == 60 ? '1 Min.' : '$sec Sek.',
+                          label: sec == 60 ? l.settingsMinutesShort(1) : l.settingsSecondsShort(sec),
                           selected: ref.watch(tvNextUpProvider).showSeconds == sec,
                           onTap: () {
                             final s = ref.read(tvNextUpProvider);
@@ -679,12 +957,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ],
             if (section == SettingsSection.radio) ...[
             const Divider(height: 32),
-            Text('Autostart', style: Theme.of(context).textTheme.titleLarge),
+            Text(l.settingsAutostartHeading, style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 8),
             FocusTraversalOrder(
               order: NumericFocusOrder(nextOrder()),
               child: _TvChoiceTile(
-                label: 'Zuletzt gehörten Sender starten',
+                label: l.settingsAutostartLast,
                 selected: _mode == AutostartMode.lastStation,
                 onTap: () async {
                   setState(() => _mode = AutostartMode.lastStation);
@@ -695,7 +973,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             FocusTraversalOrder(
               order: NumericFocusOrder(nextOrder()),
               child: _TvChoiceTile(
-                label: 'Festen Sender starten',
+                label: l.settingsAutostartFixed,
                 selected: _mode == AutostartMode.fixedStation,
                 onTap: () async {
                   setState(() => _mode = AutostartMode.fixedStation);
@@ -726,33 +1004,42 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
               ),
             const Divider(height: 32),
-            Text('Anzeige', style: Theme.of(context).textTheme.titleLarge),
+            Text(l.settingsDisplayHeading, style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 8),
-            tileToggle('Datum neben der Uhrzeit anzeigen', _showClockDate, (v) async {
+            tileToggle(l.settingsShowClockDate, _showClockDate, (v) async {
               setState(() => _showClockDate = v);
               await ref.read(showClockDateProvider.notifier).set(v);
             }),
             ],
             if (section == SettingsSection.system) ...[
             const Divider(height: 32),
-            Text('Anzeige', style: Theme.of(context).textTheme.titleLarge),
+            Text(l.settingsDisplayHeading, style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 8),
-            tileToggle('Vollbild', _fullscreen, (v) => _setFullscreen(fullscreen: v)),
+            FocusTraversalOrder(
+              order: NumericFocusOrder(nextOrder()),
+              child: _TvNavTile(
+                label: context.l10n.commonLanguage,
+                value: languageLabel(context.l10n, ref.watch(languageProvider)),
+                icon: Icons.translate,
+                onTap: () => pickLanguage(context, ref),
+              ),
+            ),
+            tileToggle(l.settingsFullscreen, _fullscreen, (v) => _setFullscreen(fullscreen: v)),
             if (Platform.isWindows && _fullscreen)
               scaleRow(
-                label: 'Monitor für Vollbild',
-                valueLabel: '$_monitor von $_monitors',
+                label: l.settingsFullscreenMonitor,
+                valueLabel: l.settingsMonitorOf(_monitor, _monitors),
                 onChange: (d) => _setFullscreen(monitor: (_monitor + d).clamp(1, _monitors < 1 ? 1 : _monitors)),
               ),
             scaleRow(
-              label: 'Größe der Oberfläche',
-              valueLabel: '${(_uiScale * 100).round()} %',
+              label: l.settingsUiScale,
+              valueLabel: l.settingsPercent((_uiScale * 100).round()),
               onChange: (d) => _changeUiScale(d * 0.1),
             ),
             ],
             if (section == SettingsSection.radio) ...[
             const Divider(height: 32),
-            Text('Kacheln', style: Theme.of(context).textTheme.titleLarge),
+            Text(l.settingsTilesHeading, style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 8),
             // Its own sub-page, not inline text fields here (see
             // LocationSettingsScreen's own doc comment for why: D-Pad down
@@ -761,7 +1048,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             FocusTraversalOrder(
               order: NumericFocusOrder(nextOrder()),
               child: _TvNavTile(
-                label: 'Standort',
+                label: l.settingsLocation,
                 value: locationName,
                 configured: true,
                 onTap: () => Navigator.of(context).push(
@@ -770,34 +1057,34 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ),
             tileGroup(
-              title: 'Wetterprognose',
+              title: l.settingsWeatherForecast,
               enabled: _weatherEnabled,
               onToggleEnabled: (v) async {
                 setState(() => _weatherEnabled = v);
                 await ref.read(weatherDisplaySettingsProvider.notifier).setWeatherEnabled(v);
               },
               children: [
-                tileToggle('Über 2 Kacheln (volle Höhe)', _weatherSpanTwoTiles, (v) async {
+                tileToggle(l.settingsWeatherSpanTwoTiles, _weatherSpanTwoTiles, (v) async {
                   setState(() => _weatherSpanTwoTiles = v);
                   await ref.read(weatherDisplaySettingsProvider.notifier).setWeatherSpanTwoTiles(v);
                 }),
                 scaleRow(
-                  label: 'Größe der Kachel',
-                  valueLabel: '${(_weatherScale * 100).round()} %',
+                  label: l.settingsTileSize,
+                  valueLabel: l.settingsPercent((_weatherScale * 100).round()),
                   onChange: (d) => _changeWeatherScale(d * 0.1),
                 ),
                 scaleRow(
                   // Separate from the tile size above - this scales the
                   // forecast content (icon/text/badges) inside the tile,
                   // independently of how big the tile itself is.
-                  label: 'Größe des Inhalts',
-                  valueLabel: '${(_weatherContentScale * 100).round()} %',
+                  label: l.settingsContentSize,
+                  valueLabel: l.settingsPercent((_weatherContentScale * 100).round()),
                   onChange: (d) => _changeWeatherContentScale(d * 0.1),
                 ),
               ],
             ),
             tileGroup(
-              title: 'Wetterradar',
+              title: l.settingsWeatherRadar,
               enabled: _radarEnabled,
               onToggleEnabled: (v) async {
                 setState(() => _radarEnabled = v);
@@ -807,7 +1094,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 FocusTraversalOrder(
                   order: NumericFocusOrder(nextOrder()),
                   child: _TvNavTile(
-                    label: 'Quelle',
+                    label: l.settingsRadarSource,
                     value: radarSourceLabel,
                     configured: radarSettings.radarUrl.trim().isNotEmpty,
                     onTap: () => Navigator.of(context).push(
@@ -816,27 +1103,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                 ),
                 scaleRow(
-                  label: 'Größe der Kachel',
-                  valueLabel: '${(_radarScale * 100).round()} %',
+                  label: l.settingsTileSize,
+                  valueLabel: l.settingsPercent((_radarScale * 100).round()),
                   onChange: (d) => _changeRadarScale(d * 0.1),
                 ),
                 scaleRow(
                   // Not the tile size above - how much of the map around the
                   // location is shown (distance to the top/bottom edge).
                   // Only takes effect if the source URL uses {r}.
-                  label: 'Umkreis um den Standort ({r} in der Adresse)',
+                  label: l.settingsRadarRadius('{r}'),
                   valueLabel: '$_radarRadiusKm km',
                   onChange: (d) => _changeRadarRadius(d),
                 ),
                 scaleRow(
-                  label: 'Abdunkeln (für abends)',
-                  valueLabel: '${(_radarDimming * 100).round()} %',
+                  label: l.settingsRadarDimming,
+                  valueLabel: l.settingsPercent((_radarDimming * 100).round()),
                   onChange: (d) => _changeRadarDimming(d * 0.1),
                 ),
               ],
             ),
             tileGroup(
-              title: 'Sonne & Mond',
+              title: l.settingsSunMoon,
               enabled: _sunEnabled,
               onToggleEnabled: (v) async {
                 setState(() => _sunEnabled = v);
@@ -844,8 +1131,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               },
               children: [
                 scaleRow(
-                  label: 'Größe der Kachel',
-                  valueLabel: '${(_sunScale * 100).round()} %',
+                  label: l.settingsTileSize,
+                  valueLabel: l.settingsPercent((_sunScale * 100).round()),
                   onChange: (d) => _changeSunScale(d * 0.1),
                 ),
               ],
@@ -855,7 +1142,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             FocusTraversalOrder(
               order: NumericFocusOrder(nextOrder()),
               child: _TvNavTile(
-                label: 'Weitere Einstellungen (System, TV)',
+                label: l.settingsMoreSettings,
                 icon: Icons.settings_outlined,
                 onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SettingsScreen())),
               ),
@@ -866,12 +1153,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             // on the DAB+ stations screen - neither lives here anymore.
             if (section == SettingsSection.system) ...[
             const Divider(height: 32),
-            Text('Weiteres', style: Theme.of(context).textTheme.titleLarge),
+            Text(l.settingsMoreHeading, style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 8),
             FocusTraversalOrder(
               order: NumericFocusOrder(nextOrder()),
               child: _TvNavTile(
-                label: 'Backup erstellen',
+                label: l.settingsBackupCreate,
                 icon: Icons.save_outlined,
                 onTap: () => createBackupWithFeedback(context, ref),
               ),
@@ -879,8 +1166,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             FocusTraversalOrder(
               order: NumericFocusOrder(nextOrder()),
               child: _TvNavTile(
-                label: 'Backup wiederherstellen',
-                value: 'auch über die Verwaltungsseite',
+                label: l.settingsBackupRestore,
+                value: l.settingsBackupRestoreHint,
                 icon: Icons.restore,
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const RestoreBackupScreen()),
@@ -890,7 +1177,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             FocusTraversalOrder(
               order: NumericFocusOrder(nextOrder()),
               child: _TvNavTile(
-                label: 'Updates',
+                label: l.miscUpdatesTitle,
                 icon: Icons.system_update_outlined,
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const UpdateSettingsScreen()),
@@ -898,7 +1185,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ),
             const Divider(height: 32),
-            Text('Über', style: Theme.of(context).textTheme.titleLarge),
+            Text(l.settingsAboutHeading, style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 8),
             // Focusable so the D-Pad can scroll down to it (plain text after
             // the last focusable control would stay out of reach on a TV).
@@ -910,7 +1197,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             FocusTraversalOrder(
               order: NumericFocusOrder(nextOrder()),
               child: _TvNavTile(
-                label: 'Programm beenden',
+                label: l.settingsQuit,
                 icon: Icons.power_settings_new,
                 onTap: _quitApp,
               ),
@@ -928,13 +1215,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   /// stopped first; on desktop the receiver is shut down so rtl_tcp is free
   /// for the next start.
   Future<void> _quitApp() async {
+    final l = context.l10n;
     final quit = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Programm beenden?'),
+        title: Text(l.settingsQuitConfirm),
         actions: [
-          TextButton(autofocus: true, onPressed: () => Navigator.of(context).pop(false), child: const Text('Abbrechen')),
-          FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Beenden')),
+          TextButton(autofocus: true, onPressed: () => Navigator.of(context).pop(false), child: Text(l.commonCancel)),
+          FilledButton(onPressed: () => Navigator.of(context).pop(true), child: Text(l.settingsQuitButton)),
         ],
       ),
     );
@@ -962,15 +1250,16 @@ class _SettingsOverview extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final parts = ref.watch(systemPartsProvider);
+    final l = context.l10n;
     void open(SettingsSection s) =>
-        Navigator.of(context).push(MaterialPageRoute(builder: (_) => SettingsScreen(section: s)));
+        Navigator.of(context).push(MaterialPageRoute(builder: (_) => SettingsScreen(section: s, fromOverview: true)));
     // A switched-off part stays in the list (greyed) - OK says where it's
     // switched on.
     void off(String part) => ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$part ist ausgeschaltet - unter System → Teile von Home System einschalten.')),
+          SnackBar(content: Text(l.settingsPartOff(part))),
         );
     return Scaffold(
-      appBar: AppBar(title: const Text('Einstellungen')),
+      appBar: AppBar(title: Text(l.systemTileSettingsShort)),
       body: ListView(
         padding: const EdgeInsets.all(24),
         children: [
@@ -978,25 +1267,33 @@ class _SettingsOverview extends ConsumerWidget {
             logo: 'assets/icon/home_system_logo.png',
             title: 'System',
             subtitle: LauncherService.supported
-                ? 'Radio & TV ein/aus, Gerätename, Start, Home, Home-Taste, Anzeige, Backup, Updates'
-                : 'Radio & TV ein/aus, Gerätename, Start, Home, Anzeige, Backup, Updates',
+                ? l.settingsAreaSystemSubtitle
+                : l.settingsAreaSystemSubtitleNoHomeKey,
             autofocus: true,
             onTap: () => open(SettingsSection.system),
           ),
           _AreaTile(
             logo: 'assets/icon/radio_logo.png',
             title: 'Radio',
-            subtitle: 'Empfänger (DAB+, UKW, Funk), Autostart-Sender, Wetter, Radar, Sonne & Mond',
+            subtitle: l.settingsAreaRadioSubtitle,
             enabled: parts.radio,
             onTap: () => parts.radio ? open(SettingsSection.radio) : off('Radio'),
           ),
           _AreaTile(
             logo: 'assets/icon/tv_logo.png',
             title: 'TV',
-            subtitle: 'Sat-Receiver (Enigma2, z. B. GigaBlue)',
+            subtitle: l.settingsAreaTvSubtitle,
             enabled: parts.tv,
             onTap: () => parts.tv ? open(SettingsSection.tv) : off('TV'),
           ),
+          if (DisplayService.supported)
+            _AreaTile(
+              logo: 'assets/icon/dashboard_logo.png',
+              title: l.dashboardTitle,
+              subtitle: l.dashboardAreaSubtitle,
+              enabled: parts.dashboard,
+              onTap: () => parts.dashboard ? open(SettingsSection.dashboard) : off(l.dashboardTitle),
+            ),
         ],
       ),
     );
@@ -1059,7 +1356,7 @@ class _AreaTileState extends State<_AreaTile> {
                       Text(widget.title, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 4),
                       Text(
-                        widget.enabled ? widget.subtitle : 'Ausgeschaltet - unter System einschalten',
+                        widget.enabled ? widget.subtitle : context.l10n.settingsAreaOff,
                         style: const TextStyle(color: Colors.white60, fontSize: 15),
                       ),
                     ],
@@ -1092,6 +1389,7 @@ class _AboutBlockState extends State<_AboutBlock> {
   Widget build(BuildContext context) {
     final body = Theme.of(context).textTheme.bodyMedium;
     final small = Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white60);
+    final l = context.l10n;
     Widget line(String title, String text) => Padding(
           padding: const EdgeInsets.only(bottom: 10),
           child: Column(
@@ -1114,37 +1412,13 @@ class _AboutBlockState extends State<_AboutBlock> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            line(
-              'Home System',
-              'PolyForm Noncommercial 1.0.0 - frei für private und nicht-kommerzielle Nutzung. '
-                  '© 2026 Jürgen Laschak, github.com/JayLo1401/home.system',
-            ),
-            line(
-              'Wetterprognose',
-              'Daten: © GeoSphere Austria, lizenziert unter CC BY 4.0 (data.hub.geosphere.at)',
-            ),
-            line(
-              'UV-Index',
-              'Weather data by Open-Meteo.com, lizenziert unter CC BY 4.0',
-            ),
-            line(
-              'Internetradio',
-              'Sendersuche und Logos über das Community-Verzeichnis Radio Browser (radio-browser.info)',
-            ),
-            line(
-              'Ortssuche',
-              '© OpenStreetMap-Mitwirkende, Daten unter der Open Database License (ODbL), über Nominatim.',
-            ),
-            line(
-              'Hintergrundfotos von Home',
-              'Bing-Bilder des Tages, © bei den jeweiligen Fotografen (nur wenn „Landschaftsfotos aus dem '
-                  'Internet“ gewählt ist).',
-            ),
-            line(
-              'Wetterradar',
-              'Das Radarbild kommt von der selbst eingetragenen Quelle; Rechte und Quellenangaben '
-                  'liegen beim jeweiligen Anbieter.',
-            ),
+            line('Home System', l.settingsAboutLicense),
+            line(l.settingsWeatherForecast, l.settingsAboutWeatherData),
+            line(l.settingsAboutUvIndex, l.settingsAboutUvData),
+            line(l.settingsAboutInternetRadio, l.settingsAboutInternetRadioData),
+            line(l.settingsAboutPlaceSearch, l.settingsAboutPlaceSearchData),
+            line(l.settingsAboutBackgroundPhotos, l.settingsAboutBackgroundPhotosData),
+            line(l.settingsWeatherRadar, l.settingsAboutRadarData),
           ],
         ),
       ),

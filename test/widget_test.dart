@@ -5,10 +5,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:home_system/app.dart';
 
 void main() {
-  testWidgets('Home screen shows without crashing', (WidgetTester tester) async {
+  testWidgets('Start screen shows without crashing', (WidgetTester tester) async {
     await tester.pumpWidget(const ProviderScope(child: HomeSystemApp()));
     await tester.pump();
-    expect(find.text('Kein Sender ausgewählt'), findsOneWidget);
+    // The start screen comes first (logo, name, loading wave).
+    expect(find.text('Home System'), findsOneWidget);
 
     // Tear the tree down explicitly so the audio player (and its internal
     // position-polling timer) is disposed before the test framework checks

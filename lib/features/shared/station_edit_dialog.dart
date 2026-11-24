@@ -12,6 +12,7 @@ import '../../data/db/database.dart' show DabStation, FmStation;
 import '../../data/models/favorite_channel.dart';
 import '../../data/repositories/dab_stations_repository.dart' show DabStationDisplay;
 import '../../data/repositories/fm_stations_repository.dart' show FmStationDisplay;
+import '../../l10n/l10n.dart';
 import 'logo_picker_dialog.dart';
 
 /// The result of [showStationEditDialog]: the (possibly unchanged) name and,
@@ -96,14 +97,14 @@ class _StationEditDialogState extends State<_StationEditDialog> {
     final ImageProvider? image =
         path != null ? FileImage(File(path)) : (url != null ? CachedNetworkImageProvider(url) : null);
     return AlertDialog(
-      title: const Text('Sender bearbeiten'),
+      title: Text(context.l10n.radioEditStationTitle),
       content: SizedBox(
         width: 520,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            PopupTextField(controller: _nameController, label: 'Name', autofocus: true),
+            PopupTextField(controller: _nameController, label: context.l10n.radioEditStationName, autofocus: true),
             const SizedBox(height: 20),
             Row(
               children: [
@@ -126,21 +127,21 @@ class _StationEditDialogState extends State<_StationEditDialog> {
                       OutlinedButton.icon(
                         onPressed: _searchLogo,
                         icon: const Icon(Icons.image_search),
-                        label: const Text('Logo suchen'),
+                        label: Text(context.l10n.radioEditStationSearchLogo),
                       ),
                       if (widget.liveImagePath != null) ...[
                         const SizedBox(height: 8),
                         OutlinedButton.icon(
                           onPressed: _takeLiveImage,
                           icon: const Icon(Icons.photo_camera_back_outlined),
-                          label: const Text('Aktuelles Senderbild übernehmen'),
+                          label: Text(context.l10n.radioEditStationUseLiveImage),
                         ),
                       ],
                       if (logo != null)
-                        const Padding(
-                          padding: EdgeInsets.only(top: 8),
-                          child: Text('Neues Logo - wird mit „Speichern“ übernommen.',
-                              style: TextStyle(color: Colors.white54, fontSize: 12)),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(context.l10n.radioEditStationNewLogoHint,
+                              style: const TextStyle(color: Colors.white54, fontSize: 12)),
                         ),
                     ],
                   ),
@@ -151,10 +152,10 @@ class _StationEditDialogState extends State<_StationEditDialog> {
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Abbrechen')),
+        TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(context.l10n.commonCancel)),
         FilledButton(
           onPressed: () => Navigator.of(context).pop((name: _nameController.text.trim(), logo: _logo)),
-          child: const Text('Speichern'),
+          child: Text(context.l10n.commonSave),
         ),
       ],
     );

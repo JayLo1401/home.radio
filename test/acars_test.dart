@@ -1,11 +1,16 @@
 import 'dart:typed_data';
 
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:home_system/data/models/acars.dart';
+import 'package:home_system/l10n/l10n.dart';
 
 Uint8List frame(String s) => Uint8List.fromList([...s.codeUnits, 0x12, 0x34]); // + BCS
 
 void main() {
+  // The expected texts are the German ones.
+  setUpAll(() => applyAppLocale(const Locale('de')));
+
   test('downlink with flight and text', () {
     final m = parseAcars(frame('\x012.D-AIZA\x15H13\x02M01ALH1234Hello from FL350\x03'), freqHz: 131725000)!;
     expect(m.registration, 'D-AIZA');

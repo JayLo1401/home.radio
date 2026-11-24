@@ -1,0 +1,21 @@
+{
+  "commonOk": "OK",
+  "commonCancel": "Abbrechen",
+  "commonSave": "Speichern",
+  "commonDelete": "Löschen",
+  "commonClose": "Schließen",
+  "commonBack": "Zurück",
+  "commonYes": "Ja",
+  "commonNo": "Nein",
+  "commonOn": "Ein",
+  "commonOff": "Aus",
+  "commonEdit": "Bearbeiten",
+  "commonRetry": "Erneut versuchen",
+  "commonLoading": "Wird geladen …",
+  "commonError": "Fehler: {message}",
+  "@commonError": {"placeholders": {"message": {"type": "String"}}},
+  "commonLanguage": "Sprache",
+  "commonLanguageSystem": "Wie das Gerät",
+  "commonLanguageGerman": "Deutsch",
+  "commonLanguageEnglish": "English"
+}

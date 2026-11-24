@@ -7,12 +7,19 @@ import '../../core/theme.dart';
 import '../../data/models/launcher_tile.dart' show StartScreen;
 import '../../data/services/admin_server.dart';
 import '../../data/services/launcher_service.dart';
+import '../../l10n/l10n.dart';
 import '../launcher/launcher_providers.dart';
+import '../settings/language_picker.dart';
 import '../settings/launcher_settings_screens.dart' show HomeButtonSettingsScreen;
 import '../settings/restore_backup_screen.dart';
 
 /// Suggestions for the device's name - picked with the remote, no typing.
-const deviceNameSuggestions = ['Terrassen-Media', 'Wohnzimmer-TV', 'Schlafzimmer-TV', 'Küchen-Tablet'];
+List<String> deviceNameSuggestions(AppLocalizations l) => [
+      l.settingsDeviceNameSuggestionTerrace,
+      l.settingsDeviceNameSuggestionLivingRoom,
+      l.settingsDeviceNameSuggestionBedroom,
+      l.settingsDeviceNameSuggestionKitchen,
+    ];
 
 enum _Step { welcome, name, homeKey, done }
 
@@ -34,14 +41,14 @@ class _SetupWizardScreenState extends ConsumerState<SetupWizardScreen> {
   _Step _step = _Step.welcome;
   final _name = TextEditingController();
   final _nextFocus = FocusNode(debugLabel: 'weiter');
-  String? _url;
+  // The admin page's addresses (by IP and, if known, by host name).
+  List<String> _urls = const [];
 
   @override
   void initState() {
     super.initState();
-    // By IP and, if the network knows it, by host name.
     AdminServer.urls().then((u) {
-      if (mounted) setState(() => _url = u.isEmpty ? null : u.join(' oder '));
+      if (mounted) setState(() => _urls = u);
     });
   }
 
@@ -93,14 +100,14 @@ class _SetupWizardScreenState extends ConsumerState<SetupWizardScreen> {
                           child: Image.asset('assets/icon/home_system_logo.png', width: 56, height: 56),
                         ),
                         const SizedBox(width: 16),
-                        const Column(
+                        Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Home System einrichten',
-                              style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold),
+                              context.l10n.settingsWizardTitle,
+                              style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold),
                             ),
-                            Text(
+                            const Text(
                               'Powered by jaycloud.at',
                               style: TextStyle(color: Colors.green, fontSize: 14, fontWeight: FontWeight.w600),
                             ),
@@ -109,7 +116,7 @@ class _SetupWizardScreenState extends ConsumerState<SetupWizardScreen> {
                         const Spacer(),
                         if (index > 0)
                           Text(
-                            'Schritt $index von ${_steps.length - 1}',
+                            context.l10n.settingsWizardStep(index, _steps.length - 1),
                             style: const TextStyle(color: Colors.white54, fontSize: 15),
                           ),
                       ],
@@ -133,6 +140,8 @@ class _SetupWizardScreenState extends ConsumerState<SetupWizardScreen> {
   }
 
   Widget _content() {
+    final l = context.l10n;
+    final url = _urls.isEmpty ? null : _urls.join(' ${l.settingsOr} ');
     const lead = TextStyle(color: Colors.white, fontSize: 20);
     const hint = TextStyle(color: Colors.white60, fontSize: 15);
     switch (_step) {
@@ -140,35 +149,37 @@ class _SetupWizardScreenState extends ConsumerState<SetupWizardScreen> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Willkommen! Gibt es schon ein Backup von Home System?', style: lead),
+            Text(l.settingsWizardWelcome, style: lead),
             const SizedBox(height: 16),
             ActionTile(
               icon: Icons.restore,
-              label: 'Backup wiederherstellen',
-              subtitle:
-                  'Von diesem Gerät, vom USB-Stick oder über die Verwaltungsseite'
-                  '${_url == null ? '' : ' ($_url)'}',
+              label: l.settingsBackupRestore,
+              subtitle: url == null ? l.settingsWizardRestoreHint : l.settingsWizardRestoreHintUrl(url),
               onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const RestoreBackupScreen())),
             ),
-            ActionTile(icon: Icons.add_circle_outline, label: 'Neu einrichten', autofocus: true, onTap: () => _go(1)),
+            ActionTile(icon: Icons.add_circle_outline, label: l.settingsWizardNew, autofocus: true, onTap: () => _go(1)),
+            const SizedBox(height: 16),
+            // Takes effect at once - this page then reads in the new language.
+            ActionTile(
+              icon: Icons.translate,
+              label: l.settingsWizardLanguage(languageLabel(l, ref.watch(languageProvider))),
+              onTap: () => pickLanguage(context, ref),
+            ),
           ],
         );
       case _Step.name:
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Wie soll dieses Gerät heißen?', style: lead),
+            Text(l.settingsWizardNameQuestion, style: lead),
             const SizedBox(height: 4),
-            const Text(
-              'Ein eindeutiger Name, damit man die Geräte unterscheiden kann - auf der Verwaltungsseite und bei Backups.',
-              style: hint,
-            ),
+            Text(l.settingsWizardNameHint, style: hint),
             const SizedBox(height: 16),
             Wrap(
               spacing: 12,
               runSpacing: 12,
               children: [
-                for (final (i, s) in deviceNameSuggestions.indexed)
+                for (final (i, s) in deviceNameSuggestions(l).indexed)
                   _ChoiceChip(
                     label: s,
                     autofocus: i == 0 && _name.text.isEmpty,
@@ -188,7 +199,7 @@ class _SetupWizardScreenState extends ConsumerState<SetupWizardScreen> {
                 controller: _name,
                 textInputAction: TextInputAction.done,
                 style: const TextStyle(fontSize: 18),
-                decoration: const InputDecoration(labelText: 'Oder eigener Name', border: OutlineInputBorder()),
+                decoration: InputDecoration(labelText: l.settingsWizardNameOwn, border: const OutlineInputBorder()),
                 onChanged: (_) => setState(() {}),
                 onSubmitted: (v) {
                   if (v.trim().isNotEmpty) _go(1);
@@ -198,13 +209,13 @@ class _SetupWizardScreenState extends ConsumerState<SetupWizardScreen> {
             const SizedBox(height: 24),
             Row(
               children: [
-                OutlinedButton(onPressed: () => _go(-1), child: const Text('Zurück')),
+                OutlinedButton(onPressed: () => _go(-1), child: Text(l.commonBack)),
                 const SizedBox(width: 12),
                 FilledButton(
                   focusNode: _nextFocus,
                   autofocus: _name.text.isNotEmpty,
                   onPressed: _name.text.trim().isEmpty ? null : () => _go(1),
-                  child: const Text('Weiter'),
+                  child: Text(l.settingsWizardNext),
                 ),
               ],
             ),
@@ -214,24 +225,19 @@ class _SetupWizardScreenState extends ConsumerState<SetupWizardScreen> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Home-Taste der Fernbedienung (freiwillig)', style: lead),
+            Text(l.settingsWizardHomeKeyTitle, style: lead),
             const SizedBox(height: 4),
-            const Text(
-              'Wer möchte, dass die Home-Taste der Fernbedienung Home System öffnet, richtet das hier ein - Home System '
-              'wird dafür Standard-Launcher, oder eine Bedienungshilfe wird eingeschaltet. Wer das nicht will, geht '
-              'einfach weiter; es lässt sich jederzeit unter Einstellungen → System → Home-Taste nachholen.',
-              style: hint,
-            ),
+            Text(l.settingsWizardHomeKeyHint, style: hint),
             const SizedBox(height: 16),
             ActionTile(
               icon: Icons.home_outlined,
-              label: 'Home-Taste einrichten',
+              label: l.settingsWizardHomeKeySetUp,
               onTap: () =>
                   Navigator.of(context).push(MaterialPageRoute(builder: (_) => const HomeButtonSettingsScreen())),
             ),
             ActionTile(
               icon: Icons.skip_next_outlined,
-              label: 'Weiter (ohne bzw. nach dem Einrichten)',
+              label: l.settingsWizardHomeKeySkip,
               autofocus: true,
               onTap: () => _go(1),
             ),
@@ -241,23 +247,19 @@ class _SetupWizardScreenState extends ConsumerState<SetupWizardScreen> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Fertig - „${_name.text.trim()}“ ist eingerichtet.', style: lead),
+            Text(l.settingsWizardDone(_name.text.trim()), style: lead),
             const SizedBox(height: 8),
-            const Text(
-              'Home System startet mit Home: Radio, TV und die Apps als Kacheln. Weiteres (Radio-Empfänger, '
-              'Sat-Receiver, Hintergrund …) unter Einstellungen.',
-              style: hint,
-            ),
-            if (_url != null) ...[
+            Text(l.settingsWizardDoneHint, style: hint),
+            if (url != null) ...[
               const SizedBox(height: 8),
-              Text('Backups gibt es jederzeit auf der Verwaltungsseite: $_url', style: hint),
+              Text(l.settingsWizardDoneBackups(url), style: hint),
             ],
             const SizedBox(height: 24),
             Row(
               children: [
-                OutlinedButton(onPressed: () => _go(-1), child: const Text('Zurück')),
+                OutlinedButton(onPressed: () => _go(-1), child: Text(l.commonBack)),
                 const SizedBox(width: 12),
-                FilledButton(autofocus: true, onPressed: _finish, child: const Text('Los geht\'s')),
+                FilledButton(autofocus: true, onPressed: _finish, child: Text(l.settingsWizardStart)),
               ],
             ),
           ],

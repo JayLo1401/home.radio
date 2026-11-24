@@ -8,6 +8,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import '../../l10n/l10n.dart';
 import 'desktop/hrdab_desktop.dart';
 
 /// A newer version on the update server, ready to download for this device.
@@ -77,20 +78,28 @@ class UpdateService {
 
   /// Downloads and installs [update]. On Windows/Linux the app quits when
   /// the installer has taken over (doesn't return then). Throws on failure.
-  Future<void> install(AvailableUpdate update, {void Function(double progress)? onProgress}) async {
+  ///
+  /// [beforeInstall] runs once the update is downloaded and can be
+  /// installed, right before installing (e.g. the backup to the NAS) - it
+  /// should not throw; the update goes on when it's done.
+  Future<void> install(
+    AvailableUpdate update, {
+    void Function(double progress)? onProgress,
+    Future<void> Function()? beforeInstall,
+  }) async {
     final file = await _download(update, onProgress);
     if (Platform.isAndroid) {
       if (!(await _channel.invokeMethod<bool>('canInstall') ?? false)) {
         // "Install unknown apps" for this app - once; the user comes back
         // and starts the update again.
         await _channel.invokeMethod('openInstallPermission');
-        throw const UpdateException(
-          'Bitte „Unbekannte Apps installieren“ für Home System erlauben und das Update erneut starten.',
-        );
+        throw UpdateException(l10n.miscUpdateAllowUnknownApps);
       }
+      await beforeInstall?.call();
       await _channel.invokeMethod('install', {'path': file.path});
       return;
     }
+    await beforeInstall?.call();
     if (Platform.isWindows) {
       HrdabDesktop.shutdownIfStarted();
       await Process.start(file.path, const [
@@ -104,7 +113,7 @@ class UpdateService {
     // linux/packaging.
     final result = await Process.run('pkexec', [_linuxApplyScript]);
     if (result.exitCode != 0) {
-      throw UpdateException('Installation abgebrochen (${result.exitCode}).');
+      throw UpdateException(l10n.miscUpdateInstallCancelled(result.exitCode));
     }
     // rtl_tcp takes one client - free it before the new instance connects.
     HrdabDesktop.shutdownIfStarted();
@@ -126,7 +135,7 @@ class UpdateService {
     final client = http.Client();
     try {
       final res = await client.send(http.Request('GET', Uri.parse(update.url)));
-      if (res.statusCode != 200) throw UpdateException('Download fehlgeschlagen (HTTP ${res.statusCode}).');
+      if (res.statusCode != 200) throw UpdateException(l10n.miscUpdateDownloadFailed(res.statusCode));
       final total = res.contentLength ?? 0;
       final file = File(path);
       final sink = file.openWrite();
@@ -144,7 +153,7 @@ class UpdateService {
       final expected = update.sha256?.toLowerCase();
       if (expected != null && hashSink.value.toString() != expected) {
         await file.delete();
-        throw const UpdateException('Die heruntergeladene Datei ist beschädigt.');
+        throw UpdateException(l10n.miscUpdateCorrupt);
       }
       return file;
     } finally {

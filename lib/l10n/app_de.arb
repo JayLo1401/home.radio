@@ -1,0 +1,2743 @@
+{
+  "@@locale": "de",
+  "adminSubtitle": "Verwaltung dieses Geräts im Heimnetz",
+  "adminHostname": "Hostname",
+  "adminIpAddress": "IP-Adresse",
+  "adminNotFound": "Nicht gefunden",
+  "adminSaved": "Gespeichert",
+  "adminOffline": "Keine Verbindung zum Gerät.",
+  "adminInvalidValue": "Ungültiger Wert.",
+  "adminUnknownSetting": "Diese Einstellung gibt es hier nicht.",
+  "adminSecretPlaceholder": "unverändert",
+  "adminSecretHelp": "Wird nie angezeigt - nur ein neues eintragen.",
+  "adminBackupHeading": "Backup",
+  "adminBackupHelp": "Enthält Favoriten, Senderlisten und alle Einstellungen - auch Zugangsdaten. Gut aufbewahren.",
+  "adminBackupDownload": "Backup erstellen & herunterladen",
+  "adminRestoreHeading": "Backup wiederherstellen",
+  "adminRestoreHow": "Zum Wiederherstellen am Gerät Einstellungen → System → Backup wiederherstellen öffnen (oder im Einrichtungsassistenten „Backup wiederherstellen“ wählen). Hier erscheint dann das Hochladen.",
+  "adminRestoreReady": "Das Gerät ist bereit. Alle aktuellen Favoriten, Sender und Einstellungen werden ersetzt, danach startet Home System neu.",
+  "adminRestoreButton": "Backup einspielen",
+  "adminRestoring": "Wird eingespielt …",
+  "adminConfirmRestore": "Backup „{file}“ einspielen? Alle aktuellen Daten des Geräts werden ersetzt.",
+  "@adminConfirmRestore": {
+    "placeholders": {
+      "file": {
+        "type": "String"
+      }
+    }
+  },
+  "adminRestoreLocked": "Wiederherstellen ist gerade nicht freigegeben - am Gerät „Backup wiederherstellen“ öffnen.",
+  "adminFileTooBig": "Die Datei ist zu groß für ein Backup.",
+  "adminFileInvalid": "Die Datei ist kein gültiges Backup.",
+  "adminRestored": "Backup eingespielt - Home System startet neu.",
+  "adminDisplayHeading": "Display (Haussteuerung)",
+  "adminDisplayHelp": "Schaltet das Display des Geräts - dasselbe kann Home Assistant per POST auf /api/display/on, /api/display/off und /api/dashboard/reload.",
+  "adminDisplayOn": "Display an",
+  "adminDisplayOff": "Display aus",
+  "adminDashboardReload": "Dashboard neu laden",
+  "adminDeviceName": "Gerätename",
+  "adminPartRadio": "Radio eingeschaltet",
+  "adminPartTv": "TV eingeschaltet",
+  "adminPartDashboard": "Haussteuerung eingeschaltet",
+  "adminStartScreen": "Beim Start der App",
+  "adminStartScreenApp": "Start-App",
+  "adminStartApp": "Start-App",
+  "adminStartAppFirst": "Zuerst eine Start-App wählen.",
+  "adminUiScale": "Größe der Oberfläche (%)",
+  "adminClockDate": "Datum neben der Uhrzeit",
+  "adminWeather": "Wetter-Kachel",
+  "adminRadar": "Regenradar-Kachel",
+  "adminSun": "Sonne & Mond-Kachel",
+  "adminTvHost": "Receiver: Adresse (IP oder Name)",
+  "adminTvWebPort": "Receiver: Web-Port",
+  "adminTvStreamPort": "Receiver: Streaming-Port",
+  "adminTvHttps": "Receiver: HTTPS",
+  "adminTvUser": "Receiver: Benutzer",
+  "adminTvPassword": "Receiver: Passwort",
+  "adminTvNextUp": "Hinweis „Als Nächstes“",
+  "adminMotionTimeout": "Display aus nach (Minuten)",
+  "adminMotionTimeoutHelp": "0 = nie",
+  "adminCameraOnDevice": "Der Zugriff auf die Kamera muss einmal am Gerät erlaubt werden: Einstellungen → Haussteuerung.",
+  "commonOk": "OK",
+  "commonCancel": "Abbrechen",
+  "commonSave": "Speichern",
+  "commonDelete": "Löschen",
+  "commonClose": "Schließen",
+  "commonBack": "Zurück",
+  "commonYes": "Ja",
+  "commonNo": "Nein",
+  "commonOn": "Ein",
+  "commonOff": "Aus",
+  "commonEdit": "Bearbeiten",
+  "commonRetry": "Erneut versuchen",
+  "commonLoading": "Wird geladen …",
+  "commonError": "Fehler: {message}",
+  "@commonError": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "commonLanguage": "Sprache",
+  "commonLanguageSystem": "Wie das Gerät",
+  "commonLanguageGerman": "Deutsch",
+  "commonLanguageEnglish": "English",
+  "dashboardTitle": "Haussteuerung",
+  "dashboardAndroidOnly": "Die Haussteuerung gibt es nur unter Android (Tablet, TV-Box).",
+  "dashboardNoAddress": "Noch keine Adresse für das Home-Assistant-Dashboard eingetragen.",
+  "dashboardOpenSettings": "Einstellungen öffnen",
+  "dashboardUnreachable": "{url} ist nicht erreichbar - neuer Versuch in 15 Sekunden.",
+  "@dashboardUnreachable": {
+    "placeholders": {
+      "url": {
+        "type": "String"
+      }
+    }
+  },
+  "dashboardSettingsTitle": "Haussteuerungs-Einstellungen",
+  "dashboardAreaSubtitle": "Home-Assistant-Dashboard, Display per Bewegung",
+  "dashboardAddress": "Dashboard-Adresse",
+  "dashboardAddressHint": "http://homeassistant.local:8123/lovelace/0",
+  "dashboardAddressHelp": "Die Seite des Dashboards in Home Assistant. Die Anmeldung bleibt gespeichert. Mit „?kiosk“ am Ende (Integration „kiosk-mode“) ohne Kopf- und Seitenleiste.",
+  "dashboardNotSet": "nicht eingetragen",
+  "dashboardDisplayHeading": "Display per Bewegung",
+  "dashboardMotion": "Display per Kamera ein- und ausschalten",
+  "dashboardMotionHelp": "Die Kamera erkennt Bewegung vor dem Gerät: Das Display geht an und zeigt die Haussteuerung. Ist eine Weile niemand da, geht es aus. Es werden keine Bilder gespeichert oder verschickt.",
+  "dashboardNoCamera": "Dieses Gerät hat keine Kamera.",
+  "dashboardCameraDenied": "Ohne Zugriff auf die Kamera geht das nicht.",
+  "dashboardNoAccessibility": "Zum Ausschalten des Displays braucht Home System die Bedienungshilfe „Home System: Home-Taste“ (Android 9 oder neuer).",
+  "dashboardSensitivity": "Empfindlichkeit",
+  "dashboardSensitivityValue": "{value} von 10",
+  "@dashboardSensitivityValue": {
+    "placeholders": {
+      "value": {
+        "type": "int"
+      }
+    }
+  },
+  "dashboardTimeout": "Display aus nach",
+  "dashboardTimeoutMinutes": "{minutes, plural, =1{1 Minute} other{{minutes} Minuten}}",
+  "@dashboardTimeoutMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "dashboardTimeoutNever": "nie",
+  "dashboardLevel": "Bewegung jetzt: {percent} %",
+  "@dashboardLevel": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "dashboardLevelMotion": "Bewegung erkannt",
+  "dashboardHaHeading": "Home Assistant",
+  "dashboardWebhook": "Webhook für Bewegung",
+  "dashboardWebhookHint": "http://homeassistant.local:8123/api/webhook/flur-tablet",
+  "dashboardWebhookHelp": "Bei Bewegung schickt Home System \"motion\": true, nach einer Minute Ruhe \"motion\": false - als Auslöser für Automationen (Auslöser „Webhook“).",
+  "dashboardRemoteHelp": "Home Assistant kann das Display schalten und das Dashboard neu laden: {url}/api/display/on, …/off, …/api/dashboard/reload (POST, z. B. mit rest_command).",
+  "@dashboardRemoteHelp": {
+    "placeholders": {
+      "url": {
+        "type": "String"
+      }
+    }
+  },
+  "dashboardTestOff": "Display jetzt ausschalten (Test)",
+  "iptvListName": "Internet-TV",
+  "iptvBrowse": "Sender suchen",
+  "iptvBrowseTitle": "Internet-TV – Sender suchen",
+  "iptvSearchName": "Sendername",
+  "iptvCountry": "Land",
+  "iptvMyCountries": "Meine Länder ({countries})",
+  "@iptvMyCountries": {
+    "placeholders": {
+      "countries": {
+        "type": "String"
+      }
+    }
+  },
+  "iptvAllCountries": "Alle Länder",
+  "iptvCategory": "Kategorie",
+  "iptvAllCategories": "Alle Kategorien",
+  "iptvLanguage": "Sprache",
+  "iptvMyLanguages": "Meine Sprachen ({languages})",
+  "@iptvMyLanguages": {
+    "placeholders": {
+      "languages": {
+        "type": "String"
+      }
+    }
+  },
+  "iptvAllLanguages": "Alle Sprachen",
+  "iptvBrowseKeyHint": "OK spielt den Sender  ·  ★ (→) oder Optionen-Taste: in die Internet-TV-Liste aufnehmen bzw. entfernen",
+  "iptvResultCount": "{count, plural, =1{1 Sender} other{{count} Sender}}",
+  "@iptvResultCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "iptvCatalogueDate": "Katalog vom {date}",
+  "@iptvCatalogueDate": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "iptvLoadingCatalogue": "Senderkatalog wird geladen… (beim ersten Mal kann das eine Minute dauern)",
+  "iptvUpdatingCatalogue": "wird aktualisiert…",
+  "iptvUpdateFailed": "Aktualisieren fehlgeschlagen",
+  "iptvCatalogueError": "Senderkatalog nicht ladbar: {error}",
+  "@iptvCatalogueError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "iptvTryAgain": "Nochmal versuchen",
+  "iptvNoResults": "Keine Sender gefunden",
+  "iptvAddFavorite": "In die Internet-TV-Liste",
+  "iptvRemoveFavorite": "Aus der Internet-TV-Liste entfernen",
+  "iptvAddedAsNumber": "„{name}“ ist jetzt Internet-TV Nr. {number}",
+  "@iptvAddedAsNumber": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "iptvRemoved": "„{name}“ aus der Internet-TV-Liste entfernt",
+  "@iptvRemoved": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "iptvFavoriteNumber": "Nr. {number}",
+  "@iptvFavoriteNumber": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "iptvEmptyList": "Noch keine Internet-TV-Sender. Oben „Sender suchen“: dort spielt OK einen Sender, ★ nimmt ihn in diese Liste auf.",
+  "iptvChannelListKeyHint": "OK abspielen (laufender Sender: Info)  ·  → Optionen (verschieben, entfernen)  ·  ← schließen",
+  "iptvMove": "Verschieben",
+  "iptvMoveHint": "↑/↓ verschieben  ·  OK fertig",
+  "iptvChangeNumber": "Nummer ändern…",
+  "iptvPlay": "Abspielen",
+  "iptvLinkConnecting": "Verbinde mit dem Sender…",
+  "iptvLinkTryingOther": "Anderer Stream wird versucht ({attempt} von {count})…",
+  "@iptvLinkTryingOther": {
+    "placeholders": {
+      "attempt": {
+        "type": "int"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "iptvErrorNoPicture": "„{channel}“ sendet gerade nicht oder ist hier gesperrt (Geo-Sperre).",
+  "@iptvErrorNoPicture": {
+    "placeholders": {
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "iptvNoGuide": "Kein Programmführer für Internet-TV",
+  "iptvNoGuideSentence": "Für Internet-TV-Sender gibt es keinen Programmführer.",
+  "iptvBannerKeyHint": "{channelListKey} Senderliste  ·  {optionsKey} Optionen",
+  "@iptvBannerKeyHint": {
+    "placeholders": {
+      "channelListKey": {
+        "type": "String"
+      },
+      "optionsKey": {
+        "type": "String"
+      }
+    }
+  },
+  "iptvGeoBlocked": "Evtl. nur im eigenen Land empfangbar (Geo-Sperre)",
+  "iptvNotAlways": "Sendet nicht rund um die Uhr",
+  "iptvSource": "Quelle: offener Senderkatalog iptv-org (github.com/iptv-org/iptv)",
+  "iptvNotSetUpIntro": "Oder ganz ohne Receiver: frei empfangbare Sender aus dem Internet (Internet-TV).",
+  "iptvSetUp": "Internet-TV-Sender suchen",
+  "iptvSettingsTitle": "Internet-TV",
+  "iptvSettingsIntro": "Frei und legal empfangbare Fernsehsender aus dem Internet – aus dem offenen Senderkatalog iptv-org (github.com/iptv-org/iptv). Internet-TV hat eine eigene Senderliste mit eigenen Nummern; die Liste des Receivers bleibt, wie sie ist. Manche Sender gehen nur in ihrem Land (Geo-Sperre) oder nicht rund um die Uhr.",
+  "iptvSettingsEnabled": "Internet-TV im TV anzeigen",
+  "iptvSettingsCountries": "Meine Länder",
+  "iptvSettingsCountriesHelp": "Mit diesen Ländern beginnt die Sendersuche.",
+  "iptvSettingsLanguages": "Meine Sprachen",
+  "iptvSettingsLanguagesHelp": "Mit diesen Sprachen beginnt die Sendersuche – keine: alle Sprachen.",
+  "iptvSettingsAddCountry": "Land hinzufügen",
+  "iptvSettingsAddLanguage": "Sprache hinzufügen",
+  "iptvSettingsChipHelp": "OK auf ein Land bzw. eine Sprache nimmt es wieder heraus.",
+  "iptvSettingsCatalogue": "Senderkatalog",
+  "iptvSettingsCatalogueHelp": "Wird beim ersten Suchen geladen und danach höchstens einmal am Tag aktualisiert.",
+  "iptvSettingsRefresh": "Jetzt aktualisieren",
+  "iptvSettingsFavorites": "{count, plural, =0{Noch keine Sender in der Internet-TV-Liste} =1{1 Sender in der Internet-TV-Liste} other{{count} Sender in der Internet-TV-Liste}}",
+  "@iptvSettingsFavorites": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "iptvSettingsFavoritesHelp": "Sortieren und entfernen in der Senderliste des TV: dort → auf einem Sender.",
+  "iptvSettingsClearFavorites": "Alle entfernen",
+  "iptvSettingsClearConfirm": "Alle {count} Sender aus der Internet-TV-Liste entfernen?",
+  "@iptvSettingsClearConfirm": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "miscApply": "Übernehmen",
+  "miscLocationTitle": "Standort einrichten",
+  "miscLocationIntro": "Gemeinsamer Standort für Wetterprognose, Wetterradar und Sonne & Mond.",
+  "miscLocationCurrent": "Aktuell: {name} ({lat}, {lon})",
+  "@miscLocationCurrent": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "lat": {
+        "type": "String"
+      },
+      "lon": {
+        "type": "String"
+      }
+    }
+  },
+  "miscLocationSearchLabel": "Ort suchen, z. B. Graz oder Gleisdorf",
+  "miscLocationSearch": "Suchen",
+  "miscLocationSearchFailed": "Suche fehlgeschlagen - Internetverbindung prüfen.",
+  "miscLocationNoResults": "Kein Ort gefunden.",
+  "miscLocationPicked": "Standort: {name}",
+  "@miscLocationPicked": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "miscLocationAttribution": "Ortssuche: © OpenStreetMap-Mitwirkende (ODbL), über Nominatim.",
+  "miscRadarTitle": "Wetterradar einrichten",
+  "miscRadarInvalidUrl": "Bitte eine vollständige Adresse mit http:// oder https:// eingeben.",
+  "miscRadarSourceType": "Art der Quelle",
+  "miscRadarImage": "Bild",
+  "miscRadarImageHint": "PNG oder JPG, z. B. vom eigenen Radar-Server - wird alle 2½ Minuten neu geladen.",
+  "miscRadarWebPage": "Webseite",
+  "miscRadarWebPageHint": "Eine Radar-Webseite, z. B. eine interaktive Karte. Braucht mehr Speicher und Grafikleistung als ein Bild - auf schwachen TV-Boxen besser ein Bild verwenden.",
+  "miscRadarWebPageUrl": "Adresse der Webseite (URL)",
+  "miscRadarImageUrl": "Bild-Adresse (URL)",
+  "miscRadarPlaceholders": "Platzhalter werden automatisch ersetzt: {lat} {lon} = Standort, {r} = Umkreis in km, {zoom} = Kartenzoom passend zum Umkreis, {w} {h} = Kachelgröße in Pixeln, {scale} = Bildschirmdichte.",
+  "@miscRadarPlaceholders": {
+    "description": "The placeholders are filled with the literal tokens {lat}, {lon}, ... the user types into the URL.",
+    "placeholders": {
+      "lat": {
+        "type": "String"
+      },
+      "lon": {
+        "type": "String"
+      },
+      "r": {
+        "type": "String"
+      },
+      "zoom": {
+        "type": "String"
+      },
+      "w": {
+        "type": "String"
+      },
+      "h": {
+        "type": "String"
+      },
+      "scale": {
+        "type": "String"
+      }
+    }
+  },
+  "miscRadarDisclaimer": "Die App bringt selbst keine Radarquelle mit. Rechte und Nutzungsbedingungen liegen beim jeweiligen Anbieter - bitte nur Quellen eintragen, die so genutzt werden dürfen.",
+  "miscRadarCssLabel": "Eigenes CSS für die Webseite (optional)",
+  "miscRadarCssHint": "Wird nach jedem Laden in die Seite eingefügt, wie ein eigenes Stylesheet im Browser - z. B. um Teile der Seite für die eigene Anzeige auszublenden.",
+  "miscRadarAuth": "Mit Anmeldung (Token)",
+  "miscRadarAuthHint": "Wird als „Authorization: Bearer …“ mitgeschickt.",
+  "miscRemoteKeysTitle": "Tasten der Fernbedienung",
+  "miscRemoteKeysIntro": "Eine Aktion wählen und dann die Taste drücken, die sie auslösen soll - sie ersetzt die bisherigen Tasten der Aktion. So bleibt z. B. ☰ frei, wenn sie auf der Fernbedienung etwas anderes tut. Pfeiltasten, Zurück und Home lassen sich nicht belegen.",
+  "miscRemoteKeysNone": "keine Taste",
+  "miscRemoteKeysStandard": "Standard",
+  "miscRemoteKeysResetHint": "Langer Druck auf OK bei einer Aktion: wieder die Standard-Tasten.",
+  "miscRemoteKeysNotAssignable": "{key} lässt sich nicht belegen.",
+  "@miscRemoteKeysNotAssignable": {
+    "placeholders": {
+      "key": {
+        "type": "String"
+      }
+    }
+  },
+  "miscRemoteKeysPressNow": "Jetzt die Taste drücken …",
+  "miscRemoteKeysBackCancels": "Zurück bricht ab.",
+  "miscActionChannelList": "Senderliste (TV)",
+  "miscActionGuide": "Programmführer (TV)",
+  "miscActionOptions": "Optionen (Kachel unter Home, TV)",
+  "miscActionAudio": "Tonspur (TV)",
+  "miscKeyMenu": "☰ Menü",
+  "miscKeySearch": "Suche",
+  "miscKeyRed": "Rot",
+  "miscKeyGreen": "Grün",
+  "miscKeyYellow": "Gelb",
+  "miscKeyBlue": "Blau",
+  "miscKeyNamed": "Taste {key}",
+  "@miscKeyNamed": {
+    "placeholders": {
+      "key": {
+        "type": "String"
+      }
+    }
+  },
+  "miscRegionEurope": "Europa",
+  "miscRegionNorthAmerica": "Nord- & Mittelamerika",
+  "miscRegionSouthAmerica": "Südamerika",
+  "miscRegionAsia": "Asien & Nahost",
+  "miscRegionAfrica": "Afrika",
+  "miscRegionOceania": "Ozeanien",
+  "miscRegionOther": "Andere",
+  "miscUpdatesTitle": "Updates",
+  "miscUpdateDialogTitle": "Update auf {version}",
+  "@miscUpdateDialogTitle": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "miscUpdateDownloading": "Wird geladen…",
+  "miscUpdateDownloadingPercent": "Wird geladen… {percent} %",
+  "@miscUpdateDownloadingPercent": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "miscUpdateFailed": "Update fehlgeschlagen: {error}",
+  "@miscUpdateFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "miscUpdateInstalledVersion": "Installierte Version: {version}",
+  "@miscUpdateInstalledVersion": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "miscUpdateLocalBuild": "Diese Version wurde lokal gebaut und aktualisiert sich nicht selbst.",
+  "miscUpdateAuto": "Beim Start automatisch aktualisieren",
+  "miscUpdateAutoHint": "Neue Versionen werden beim Start geladen und installiert.",
+  "miscUpdateChecking": "Suche nach Updates…",
+  "miscUpdateAvailable": "Neue Version {version} verfügbar.",
+  "@miscUpdateAvailable": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "miscUpdateNow": "Jetzt aktualisieren",
+  "miscUpdateUpToDate": "Die App ist aktuell (oder der Update-Server ist nicht erreichbar).",
+  "miscUpdateCheckAgain": "Erneut suchen",
+  "miscUpdateAllowUnknownApps": "Bitte „Unbekannte Apps installieren“ für Home System erlauben und das Update erneut starten.",
+  "miscUpdateInstallCancelled": "Installation abgebrochen ({code}).",
+  "@miscUpdateInstallCancelled": {
+    "placeholders": {
+      "code": {
+        "type": "int"
+      }
+    }
+  },
+  "miscUpdateDownloadFailed": "Download fehlgeschlagen (HTTP {status}).",
+  "@miscUpdateDownloadFailed": {
+    "placeholders": {
+      "status": {
+        "type": "int"
+      }
+    }
+  },
+  "miscUpdateCorrupt": "Die heruntergeladene Datei ist beschädigt.",
+  "miscAllAppsTitle": "Alle Apps",
+  "miscAllAppsOpen": "Öffnen",
+  "miscAllAppsAddFavorite": "Zu den Favoriten hinzufügen",
+  "miscAllAppsRemoveFavorite": "Aus den Favoriten entfernen",
+  "miscAllAppsAppInfo": "App-Info (beenden, deinstallieren …)",
+  "miscAllAppsFavoriteAdded": "„{app}“ zu den Favoriten hinzugefügt",
+  "@miscAllAppsFavoriteAdded": {
+    "placeholders": {
+      "app": {
+        "type": "String"
+      }
+    }
+  },
+  "miscAllAppsFavoriteRemoved": "„{app}“ aus den Favoriten entfernt",
+  "@miscAllAppsFavoriteRemoved": {
+    "placeholders": {
+      "app": {
+        "type": "String"
+      }
+    }
+  },
+  "miscAllAppsSearch": "App suchen",
+  "miscAllAppsClearSearch": "Suche löschen",
+  "miscAllAppsSettingsIsFavorite": "TV-Einstellungen in den Favoriten",
+  "miscAllAppsSettingsAddFavorite": "TV-Einstellungen als Favorit",
+  "miscAllAppsHelp": "OK: App öffnen  ·  ☰ oder OK lange drücken: Favorit, App-Info (beenden, deinstallieren)",
+  "miscAllAppsLoadError": "Apps konnten nicht gelesen werden: {error}",
+  "@miscAllAppsLoadError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "miscAllAppsNone": "Keine Apps gefunden.",
+  "miscAllAppsNoMatch": "Keine App passt zu „{query}“.",
+  "@miscAllAppsNoMatch": {
+    "placeholders": {
+      "query": {
+        "type": "String"
+      }
+    }
+  },
+  "miscBackdropAurora": "Nordlicht",
+  "miscBackdropSunset": "Abendrot",
+  "miscBackdropOcean": "Ozean",
+  "miscBackdropForest": "Wald",
+  "miscBackdropLavender": "Lavendel",
+  "miscBackdropEmbers": "Glut",
+  "miscBackdropNight": "Nacht",
+  "miscBackdropDesert": "Wüste",
+  "modelsAcarsAckNoContent": "Quittung (ohne Inhalt)",
+  "modelsAcarsLinkTest": "Verbindungstest",
+  "modelsAcarsOnboardComputer": "Bordrechner (FMS/Wartung)",
+  "modelsAcarsSystemStatus": "Systemstatus",
+  "modelsAcarsAirlineMessage": "Airline-Meldung",
+  "modelsAcarsFlightData": "Flugdaten",
+  "modelsAcarsMessage": "Meldung",
+  "modelsAircraftLight": "Leichtflugzeug",
+  "modelsAircraftLightShort": "leicht",
+  "modelsAircraftSmall": "Kleinflugzeug",
+  "modelsAircraftSmallShort": "klein",
+  "modelsAircraftLarge": "Verkehrsflugzeug",
+  "modelsAircraftLargeShort": "groß",
+  "modelsAircraftHeavy": "Großraumflugzeug",
+  "modelsAircraftHeavyShort": "schwer",
+  "modelsAircraftHighPerformance": "Hochleistungs-/Militärjet",
+  "modelsAircraftGlider": "Segelflugzeug",
+  "modelsAircraftGliderShort": "Segler",
+  "modelsAircraftBalloon": "Ballon / Luftschiff",
+  "modelsAircraftUltralight": "Ultraleicht / Gleitschirm",
+  "modelsAircraftUav": "Drohne",
+  "modelsAircraftSurface": "Bodenfahrzeug",
+  "modelsAircraftSurfaceShort": "Boden",
+  "modelsDmrRadio": "Funkgerät",
+  "modelsDmrDirect": "Direktverbindung",
+  "modelsIsmRemoteSwitch": "Funkschalter (EV1527)",
+  "modelsIsmButton": "Taste {code}",
+  "@modelsIsmButton": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "nasTitle": "NAS (Netzwerkspeicher)",
+  "nasIntro": "Der Netzwerkspeicher im eigenen Netz: Backups vor jedem Update, Hintergrundbilder für Home - und später Musik, Videos und Filme vom Server.",
+  "nasServerSection": "Server",
+  "nasProtocolWebdav": "WebDAV",
+  "nasProtocolWebdavHint": "Synology, QNAP, Nextcloud, Apache/nginx … - über http oder https.",
+  "nasProtocolFtp": "FTP",
+  "nasProtocolFtpHint": "Unverschlüsselt - nur im eigenen Netz verwenden.",
+  "nasHost": "Server-Adresse (IP oder Name)",
+  "nasHostHint": "z. B. 192.168.1.10",
+  "nasPort": "Port (leer = {port})",
+  "@nasPort": {
+    "placeholders": {
+      "port": {
+        "type": "int"
+      }
+    }
+  },
+  "nasHttps": "Verschlüsselt (https)",
+  "nasHttpsHint": "Das Zertifikat des NAS wird akzeptiert, auch wenn es selbst signiert ist.",
+  "nasBasePath": "WebDAV-Pfad",
+  "nasBasePathHint": "leer, oder z. B. /remote.php/dav/files/NAME",
+  "nasUser": "Benutzername",
+  "nasPassword": "Passwort",
+  "nasTest": "Verbindung testen",
+  "nasTestOk": "Verbindung OK - {count} Einträge im Hauptordner.",
+  "@nasTestOk": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "nasTestFailed": "Keine Verbindung: {message}",
+  "@nasTestFailed": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "nasFoldersSection": "Ordner",
+  "nasFoldersHint": "OK wählt einen Ordner auf dem NAS. Musik, Videos und Filme sind für später (Abspielen vom Server).",
+  "nasNeedServer": "Zuerst die Server-Adresse eintragen.",
+  "nasFolderPictures": "Bilder",
+  "nasFolderMusic": "Musik",
+  "nasFolderVideos": "Videos",
+  "nasFolderMovies": "Filme",
+  "nasFolderBackups": "Backups",
+  "nasFolderNotChosen": "Nicht gewählt",
+  "nasFolderClear": "Auswahl entfernen",
+  "nasBackupsHint": "Vor jedem Update wird ein Backup in den Backup-Ordner gelegt; die {count} neuesten dieses Geräts bleiben.",
+  "@nasBackupsHint": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "nasPicturesHint": "Die Bilder können der Hintergrund von Home sein (Einstellungen → Home → Hintergrund → Eigener Server).",
+  "nasBrowseTitle": "Ordner für {folder}",
+  "@nasBrowseTitle": {
+    "placeholders": {
+      "folder": {
+        "type": "String"
+      }
+    }
+  },
+  "nasChooseThisFolder": "Diesen Ordner wählen",
+  "nasUp": "Eine Ebene höher",
+  "nasNoSubfolders": "Keine Unterordner.",
+  "nasFilesInFolder": "{count} Dateien in diesem Ordner",
+  "@nasFilesInFolder": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "nasBrowseBackHint": "Zurück: eine Ebene höher",
+  "nasErrorTimeout": "Der Server antwortet nicht (Zeitüberschreitung).",
+  "nasErrorTls": "Die verschlüsselte Verbindung klappt nicht - stimmen https und der Port?",
+  "nasErrorRefused": "Der Server lehnt die Verbindung ab - stimmen Protokoll und Port?",
+  "nasErrorHostNotFound": "Server-Name nicht gefunden.",
+  "nasErrorUnreachable": "Server nicht erreichbar.",
+  "nasErrorOther": "Fehler: {message}",
+  "@nasErrorOther": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "nasErrorLogin": "Anmeldung fehlgeschlagen - Benutzername oder Passwort falsch, oder keine Berechtigung.",
+  "nasErrorNotFound": "Ordner oder Datei nicht gefunden.",
+  "nasErrorNoWebDav": "Der Server antwortet nicht wie ein WebDAV-Server - stimmt der WebDAV-Pfad?",
+  "nasErrorFull": "Auf dem NAS ist kein Platz mehr.",
+  "nasErrorHttp": "Der Server meldet den HTTP-Fehler {status}.",
+  "@nasErrorHttp": {
+    "placeholders": {
+      "status": {
+        "type": "int"
+      }
+    }
+  },
+  "nasErrorTooBig": "Die Datei ist zu groß.",
+  "nasErrorFtp": "Der FTP-Server meldet: {reply}",
+  "@nasErrorFtp": {
+    "placeholders": {
+      "reply": {
+        "type": "String"
+      }
+    }
+  },
+  "nasBackupRunning": "Backup auf das NAS …",
+  "nasBackupFailed": "Backup auf das NAS fehlgeschlagen ({message}) - das Update läuft trotzdem.",
+  "@nasBackupFailed": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "nasRestoreSection": "Backups auf dem NAS",
+  "nasRestoreHint": "Aus dem Backup-Ordner {folder} - auch die anderer Geräte.",
+  "@nasRestoreHint": {
+    "placeholders": {
+      "folder": {
+        "type": "String"
+      }
+    }
+  },
+  "nasRestoreNone": "Keine Backups im NAS-Ordner.",
+  "nasRestoreLoadFailed": "Die Backups auf dem NAS konnten nicht gelesen werden: {message}",
+  "@nasRestoreLoadFailed": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "nasRestoreDownloadFailed": "Das Backup konnte nicht vom NAS geladen werden: {message}",
+  "@nasRestoreDownloadFailed": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "nasBgFromNas": "Bilderordner vom NAS",
+  "nasBgFromNasHint": "{folder} (mit Unterordnern) - davon jedes Mal ein zufälliges Bild. Bis zu 30 Bilder liegen verkleinert auf dem Gerät; abgeglichen wird beim App-Start und mit „Jetzt abgleichen“.",
+  "@nasBgFromNasHint": {
+    "placeholders": {
+      "folder": {
+        "type": "String"
+      }
+    }
+  },
+  "nasBgNoFolder": "Zuerst unter Einstellungen → System → NAS einen Bilderordner wählen.",
+  "nasBgFromUrl": "Adresse (http)",
+  "nasBgFromUrlHint": "Ein Webserver, der Bilder liefert (siehe unten).",
+  "nasBgSyncNow": "Jetzt abgleichen",
+  "nasBgSyncing": "Wird abgeglichen …",
+  "nasBgStatus": "{count} Bilder auf dem Gerät",
+  "@nasBgStatus": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "nasBgLastSync": "{count} Bilder auf dem Gerät, abgeglichen am {date}",
+  "@nasBgLastSync": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "nasBgSyncError": "Abgleich fehlgeschlagen: {message}",
+  "@nasBgSyncError": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "radioErrorConnectionLost": "Verbindung zum Sender verloren - versuche erneut…",
+  "radioErrorStationUnreachable": "Sender nicht erreichbar - versuche erneut…",
+  "radioErrorPlayback": "Wiedergabefehler: {message}",
+  "@radioErrorPlayback": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "radioSourceFm": "UKW",
+  "radioSourceInternet": "Internetradio",
+  "radioMoonNew": "Neumond",
+  "radioMoonWaxingCrescent": "Zunehmende Sichel",
+  "radioMoonFirstQuarter": "Zunehmender Halbmond",
+  "radioMoonWaxingGibbous": "Zunehmender Dreiviertelmond",
+  "radioMoonFull": "Vollmond",
+  "radioMoonWaningGibbous": "Abnehmender Dreiviertelmond",
+  "radioMoonLastQuarter": "Abnehmender Halbmond",
+  "radioMoonWaningCrescent": "Abnehmende Sichel",
+  "radioFmSameProgrammeStronger": "(stärker)",
+  "radioFmSameProgrammeWeaker": "(schwächer)",
+  "radioFmSameProgrammeAlsoOn": "auch auf {frequency}",
+  "@radioFmSameProgrammeAlsoOn": {
+    "placeholders": {
+      "frequency": {
+        "type": "String"
+      }
+    }
+  },
+  "radioDabEnsembleUnknown": "Ensemble unbekannt",
+  "radioPlaceSearchFailed": "Ortssuche: HTTP {code}",
+  "@radioPlaceSearchFailed": {
+    "placeholders": {
+      "code": {
+        "type": "int"
+      }
+    }
+  },
+  "radioProgramNumberTitle": "Programmnummer vergeben",
+  "radioEditStationTitle": "Sender bearbeiten",
+  "radioEditStationName": "Name",
+  "radioEditStationSearchLogo": "Logo suchen",
+  "radioEditStationUseLiveImage": "Aktuelles Senderbild übernehmen",
+  "radioEditStationNewLogoHint": "Neues Logo - wird mit „Speichern“ übernommen.",
+  "radioLogoDabIdle": "Holt das Bild, das der Sender selbst ausstrahlt.",
+  "radioLogoDabWaiting": "Warte auf ein Bild vom Sender (bis etwa 30 s)…",
+  "radioLogoDabUseImage": "Dieses Bild übernehmen",
+  "radioLogoDabNone": "Der Sender hat in der Zeit kein Bild gesendet.",
+  "radioDabDecoderFailed": "DAB+-Decoder konnte nicht gestartet werden.",
+  "radioLogoDabFetch": "DAB-Logo holen",
+  "radioLogoTitle": "Logo wählen",
+  "radioLogoSearchInternet": "Im Internet suchen (Sendername)",
+  "radioLogoNoResults": "Keine Treffer mit Logo.",
+  "radioLogoOwnUrl": "oder eigene Bild-Adresse (URL)",
+  "radioRegionEurope": "Europa",
+  "radioRegionNorthAmerica": "Nord- & Mittelamerika",
+  "radioRegionSouthAmerica": "Südamerika",
+  "radioRegionAsia": "Asien & Nahost",
+  "radioRegionAfrica": "Afrika",
+  "radioRegionOceania": "Ozeanien",
+  "radioRegionOther": "Andere",
+  "radioSavedAsNumber": "\"{name}\" als Nr. {number} gespeichert.",
+  "@radioSavedAsNumber": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "radioSearchInternetTitle": "Internetradio suchen",
+  "radioSearchStationName": "Sendername",
+  "radioSearchGenre": "Genre",
+  "radioSearchAllGenres": "Alle Genres",
+  "radioSearchRegion": "Region",
+  "radioSearchAllRegions": "Alle Regionen",
+  "radioSearchCountry": "Land",
+  "radioSearchAllCountries": "Alle Länder",
+  "radioSearchButton": "Suchen",
+  "radioSearchNoResults": "Keine Ergebnisse.",
+  "radioStop": "Stopp",
+  "radioSearchPreview": "Probehören",
+  "radioSearchAddFavorite": "Favorit",
+  "radioDabClearAllTitle": "Alle DAB-Sender löschen?",
+  "radioDabClearAllMessage": "Entfernt alle bisher gefundenen DAB+-Sender aus der Liste \"Alle DAB+ Sender\" und alle DAB+-Favoriten. Kann nicht rückgängig gemacht werden.",
+  "radioDabTitle": "DAB+ Sender",
+  "radioScanTitle": "Sendersuchlauf",
+  "radioDabClearAll": "Alle DAB-Sender löschen",
+  "radioFavorites": "Favoriten",
+  "radioDabNoFavorites": "Noch keine DAB+-Favoriten.",
+  "radioDabAllStations": "Alle DAB+ Sender",
+  "radioDabSortGrouped": "Nach Ensemble gruppiert",
+  "radioDabSortByEnsemble": "Nach Ensemble sortiert",
+  "radioDabSortByName": "Nach Name",
+  "radioDabNoStations": "Noch keine Sender gefunden. Sendersuchlauf starten.",
+  "radioLogoReceiveAllHaveLogo": "Alle Sender haben schon ein Logo.",
+  "radioLogoReceiveProgress": "Sender {index} von {total} - warte auf ein Bild vom Sender…",
+  "@radioLogoReceiveProgress": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "radioLogoReceiveDone": "Fertig: {found} von {total} Sendern haben ein Bild gesendet.",
+  "@radioLogoReceiveDone": {
+    "placeholders": {
+      "found": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "radioLogoReceiveTitle": "Fehlende Logos per Empfang",
+  "radioLogoReceiveStart": "Fehlende Logos per Empfang holen",
+  "radioListen": "Anhören",
+  "radioEditNameLogo": "Bearbeiten (Name, Logo)",
+  "radioRemoveFavorite": "Favorit entfernen",
+  "radioProgramNumberChip": "Nr. {number}",
+  "@radioProgramNumberChip": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "radioAddFavorite": "Favorit hinzufügen",
+  "radioSourceUsbHint": "Quelle: RTL-SDR-Stick per USB - siehe \"Radio-Empfänger\" in den Einstellungen.",
+  "radioSourceNetworkHint": "Quelle: RTL-SDR über Netzwerk - siehe \"Radio-Empfänger\" in den Einstellungen.",
+  "radioScanStart": "Sendersuchlauf starten",
+  "radioDabSingleChannel": "Einzelnen Kanal suchen:",
+  "radioDabSearchChannel": "{channel} suchen",
+  "@radioDabSearchChannel": {
+    "placeholders": {
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "radioPlaybackOfFailed": "Wiedergabe von \"{name}\" fehlgeschlagen.",
+  "@radioPlaybackOfFailed": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "radioDabSearchChannelTitle": "Kanal {channel} suchen",
+  "@radioDabSearchChannelTitle": {
+    "placeholders": {
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "radioDabScanningChannel": "Suche auf {channel} ({freqKhz} kHz), bis zu 15 Sekunden…",
+  "@radioDabScanningChannel": {
+    "placeholders": {
+      "channel": {
+        "type": "String"
+      },
+      "freqKhz": {
+        "type": "int"
+      }
+    }
+  },
+  "radioDabScanProgressOf": "Kanal {index} von {total}: {label}",
+  "@radioDabScanProgressOf": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      },
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "radioDabScanProgress": "Kanal {index}: {label}",
+  "@radioDabScanProgress": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      },
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "radioDabChannelNothingFound": "Auf {channel} wurde kein DAB+-Ensemble empfangen.",
+  "@radioDabChannelNothingFound": {
+    "placeholders": {
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "radioDabScanDone": "Fertig: {ensembles} Ensemble(s) mit {stations} Sender(n) gefunden. Alle gefundenen Sender stehen unter \"Alle DAB+ Sender\".",
+  "@radioDabScanDone": {
+    "placeholders": {
+      "ensembles": {
+        "type": "int"
+      },
+      "stations": {
+        "type": "int"
+      }
+    }
+  },
+  "radioDabNoEnsemblesYet": "Noch keine Ensembles gefunden…",
+  "radioDabEnsembleNameUnknown": "Ensemble-Name unbekannt",
+  "radioDabEnsembleNoServices": "Sender in diesem Ensemble noch nicht erkannt (kurz erneut versuchen).",
+  "radioPlayingShort": "Läuft…",
+  "radioStopPlayback": "Wiedergabe stoppen",
+  "radioFmClearAllTitle": "Alle UKW-Sender löschen?",
+  "radioFmClearAllMessage": "Entfernt alle gespeicherten UKW-Sender aus der Liste. UKW-Favoriten bleiben erhalten.",
+  "radioFmTitle": "UKW-Sender (FM)",
+  "radioFmFindStations": "Sender suchen",
+  "radioFmTuneManually": "Manuell einstellen",
+  "radioFmAllStations": "Alle UKW-Sender",
+  "radioDeleteAll": "Alle löschen",
+  "radioFmNoStations": "Noch keine UKW-Sender. Suchlauf starten oder einen Sender manuell einstellen und speichern.",
+  "radioFmSignal": "Signal {level}",
+  "@radioFmSignal": {
+    "placeholders": {
+      "level": {
+        "type": "String"
+      }
+    }
+  },
+  "radioRemoveStation": "Sender entfernen",
+  "radioFmScanTitle": "UKW-Sendersuchlauf",
+  "radioReceiverFailed": "Empfänger konnte nicht gestartet werden.",
+  "radioSearching": "Suche…",
+  "radioFmScanSurvey": "Schritt 1/2: Band wird vermessen ({frequency})…",
+  "@radioFmScanSurvey": {
+    "placeholders": {
+      "frequency": {
+        "type": "String"
+      }
+    }
+  },
+  "radioFmScanProbe": "Schritt 2/2: Prüfe Sender {index} von {total} ({frequency})…",
+  "@radioFmScanProbe": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      },
+      "frequency": {
+        "type": "String"
+      }
+    }
+  },
+  "radioFmScanDone": "Fertig: {count} Sender gefunden und gespeichert.",
+  "@radioFmScanDone": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "radioFmScanImagesRemoved": "{count} schwache Störfrequenz(en) aussortiert.",
+  "@radioFmScanImagesRemoved": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "radioFmSeekNothingFound": "Kein weiterer Sender gefunden.",
+  "radioFmFrequencyTitle": "Frequenz in MHz",
+  "radioFmFrequencyHint": "z. B. 99,9",
+  "radioSaved": "{name} gespeichert.",
+  "@radioSaved": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "radioFmTuneTitle": "UKW manuell einstellen",
+  "radioFmNoRdsName": "kein RDS-Name",
+  "radioFmSeek": "Suchen",
+  "radioFmStepDown": "−0,05",
+  "radioFmStepUp": "+0,05",
+  "radioFmEnterFrequency": "Frequenz eingeben",
+  "radioFmSaveStation": "Als Sender speichern",
+  "radioFmSaveFavorite": "Als Favorit speichern",
+  "radioNoStationSelected": "Kein Sender ausgewählt",
+  "radioStoppedDisconnected": "Gestoppt - Verbindung getrennt",
+  "radioNowPlaying": "Wiedergabe läuft",
+  "radioPaused": "Pausiert",
+  "radioPlay": "Abspielen",
+  "radioWeatherUnavailable": "Wetter nicht verfügbar - versuche erneut…",
+  "radioWeatherNoData": "Keine Daten",
+  "radioWeatherTemp": "Temp",
+  "radioWeatherWind": "Wind km/h",
+  "radioWeatherRain": "Regen l/m²",
+  "radioWeatherRainAmount": "{amount} l",
+  "@radioWeatherRainAmount": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "radioSunrise": "Sonnenaufgang",
+  "radioSunset": "Sonnenuntergang",
+  "radioDawn": "Morgendämmerung",
+  "radioSolarNoon": "Mittag",
+  "radioDusk": "Abenddämmerung",
+  "radioRadarLoginRejected": "Anmeldung abgelehnt (HTTP {code})",
+  "@radioRadarLoginRejected": {
+    "placeholders": {
+      "code": {
+        "type": "int"
+      }
+    }
+  },
+  "radioRadarIsWebPage": "die Adresse ist eine Webseite, kein Bild - als Art „Webseite“ wählen",
+  "radioRadarNotConfigured": "Kein Wetterradar eingerichtet -\nEinstellungen → Wetterradar → Quelle",
+  "radioRadarWebPageAndroidOnly": "Webseiten als Radarquelle gibt es nur in der Android-Version.",
+  "radioRadarUnreachable": "Radar nicht erreichbar: {error}",
+  "@radioRadarUnreachable": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "radioRadarStale": "Stand {time} · nicht erreichbar",
+  "@radioRadarStale": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "radioLinkSourceLost": "Verbindung zur RTL-SDR-Quelle verloren",
+  "radioLinkDabSignalFound": "DAB-Signal gefunden",
+  "radioLinkEnsembleFound": "Ensemble „{label}“ gefunden",
+  "@radioLinkEnsembleFound": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "radioLinkStationFound": "Sender gefunden - Audio startet…",
+  "radioLinkConnected": "Sender verbunden",
+  "radioLinkConnectingServer": "Verbinde mit dem RTL-Server…",
+  "radioLinkWaitingForStick": "Warte auf den Stick am Server…",
+  "radioLinkOpeningUsbStick": "USB-Stick wird geöffnet…",
+  "radioLinkTuning": "Sender wird eingestellt…",
+  "radioLinkTuningFrequency": "{frequency} wird eingestellt…",
+  "@radioLinkTuningFrequency": {
+    "placeholders": {
+      "frequency": {
+        "type": "String"
+      }
+    }
+  },
+  "radioLinkSearching": "Sender wird gesucht…",
+  "radioLinkSearchingChannel": "Kanal {channel} wird gesucht…",
+  "@radioLinkSearchingChannel": {
+    "placeholders": {
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "radioLinkApp": "App",
+  "radioLinkRtlServer": "RTL-Server",
+  "radioLinkStick": "Stick",
+  "radioLinkUsbStick": "USB-Stick",
+  "radioLinkStation": "Sender",
+  "radioLinkTvChannel": "Sender",
+  "radioDone": "Fertig",
+  "radioEditFavorites": "Favoriten bearbeiten",
+  "radioEditFavoritesHint": "Reihenfolge ändern, umbenennen oder entfernen - mit ✓ fertig.",
+  "radioFavoritesLoadError": "Fehler beim Laden der Favoriten:\n{error}",
+  "@radioFavoritesLoadError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "radioNoFavorites": "Noch keine Favoriten.\nSuche Sender über das Menü.",
+  "radioRemoveFavoriteTitle": "Favorit entfernen?",
+  "radioRemoveFavoriteMessage": "„{name}“ aus den Favoriten entfernen?",
+  "@radioRemoveFavoriteMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "radioRemove": "Entfernen",
+  "radioSidebarNoFmStations": "Noch keine UKW-Sender.\nSuchlauf oder manuelles Einstellen über das UKW-Menü oben.",
+  "radioDabStationsLoadError": "Fehler beim Laden der DAB+ Sender:\n{error}",
+  "@radioDabStationsLoadError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "radioSidebarNoDabStations": "Noch keine DAB+ Sender gefunden.\nSendersuchlauf über das DAB-Menü starten.",
+  "radioMoveUp": "Nach oben",
+  "radioMoveDown": "Nach unten",
+  "radioLinkBuffering": "Stream wird gepuffert…",
+  "radioLinkConnectingStation": "Verbinde mit dem Sender…",
+  "radioPausedOtherApp": "Pausiert - eine andere App spielt Audio ab.",
+  "radioSourceLostReconnecting": "Verbindung zur RTL-SDR-Quelle verloren - versuche erneut zu verbinden…",
+  "radioUsbStickDetached": "USB-Stick getrennt - warte auf Wiederanschluss…",
+  "radioNoReceiverConfigured": "Kein Radio-Empfänger eingerichtet (Einstellungen)",
+  "radioFmReceptionFailedDot": "UKW-Empfang fehlgeschlagen.",
+  "radioFmReceptionFailed": "UKW-Empfang fehlgeschlagen",
+  "radioSourceUnreachableRetrying": "RTL-SDR-Quelle nicht erreichbar - versuche erneut…",
+  "radioSourceUnreachable": "RTL-SDR-Quelle nicht erreichbar.",
+  "radioRtlServerUnreachableRetrying": "RTL-Server nicht erreichbar - versuche erneut…",
+  "radioRtlServerUnreachable": "RTL-Server nicht erreichbar",
+  "radioUsbStickNotFound": "USB-Stick nicht gefunden oder kein Zugriff",
+  "radioNoSignalRetrying": "Kein Signal! - Versuche erneut…",
+  "radioNoSignal": "Kein Signal!",
+  "radioLinkNoSignalRetrying": "Kein Signal - versuche erneut…",
+  "radioMenuListening": "Funk",
+  "radioMenuDabStations": "DAB Sender suchen",
+  "radioMenuAmBands": "LW/MW/KW",
+  "radioMenuSettings": "Radio-Einstellungen",
+  "scannerQuoted": "„{name}“",
+  "@scannerQuoted": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerRtlUnreachable": "rtl_tcp-Server {server} nicht erreichbar ({error})",
+  "@scannerRtlUnreachable": {
+    "placeholders": {
+      "server": {
+        "type": "String"
+      },
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerRtlConnectionLost": "Verbindung zum rtl_tcp-Server unterbrochen ({error})",
+  "@scannerRtlConnectionLost": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerRtlRefused": "rtl_tcp-Server hat die Verbindung abgelehnt (belegt oder kein Stick bereit)",
+  "scannerRtlConnectionClosed": "Verbindung zum rtl_tcp-Server beendet",
+  "scannerRtlNoAnswer": "rtl_tcp-Server antwortet nicht",
+  "scannerRtlNotAServer": "Kein rtl_tcp-Server (unbekannte Begrüßung)",
+  "scannerRtlBadStream": "rtl_tcp-Server: Datenstrom fehlerhaft",
+  "scannerRtlStickAtServer": "USB-Stick am rtl_tcp-Server",
+  "scannerRtlAuthUnsupported": "rtl_tcp-Server verlangt eine Anmeldung, das wird nicht mehr unterstützt. Bitte den rtltcp.server im lokalen Netz verwenden.",
+  "scannerRtlStickReady": "{stick} bereit",
+  "@scannerRtlStickReady": {
+    "placeholders": {
+      "stick": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerRtlStickStarting": "{stick} startet …",
+  "@scannerRtlStickStarting": {
+    "placeholders": {
+      "stick": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerRtlStickNotReady": "{stick} nicht bereit",
+  "@scannerRtlStickNotReady": {
+    "placeholders": {
+      "stick": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerRtlStickLost": "{stick} getrennt – der Server verbindet neu …",
+  "@scannerRtlStickLost": {
+    "placeholders": {
+      "stick": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerRtlServer": "rtl_tcp-Server",
+  "scannerRtlBusy": "{who} wird bereits von einem anderen Gerät verwendet",
+  "@scannerRtlBusy": {
+    "placeholders": {
+      "who": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerRtlBusyBy": "{who} wird bereits von {client} verwendet",
+  "@scannerRtlBusyBy": {
+    "placeholders": {
+      "who": {
+        "type": "String"
+      },
+      "client": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerRtlKicked": "Vom rtl_tcp-Server getrennt",
+  "scannerRtlProtocolError": "rtl_tcp-Server meldet einen Protokollfehler",
+  "scannerRtlServerSays": "rtl_tcp-Server: {message}",
+  "@scannerRtlServerSays": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerRtlStateStarting": "startet",
+  "scannerRtlStateNotReady": "nicht bereit",
+  "scannerRtlStateLost": "getrennt",
+  "scannerRtlStateIdle": "ruht",
+  "scannerRtlSticksOn": "Sticks auf {host}",
+  "@scannerRtlSticksOn": {
+    "placeholders": {
+      "host": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerRtlLocation": "Standort: {location}",
+  "@scannerRtlLocation": {
+    "placeholders": {
+      "location": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerRtlAntenna": "Antenne: {antenna}",
+  "@scannerRtlAntenna": {
+    "placeholders": {
+      "antenna": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerRtlNotSpecified": "nicht angegeben",
+  "scannerRtlVia": "über {instance}",
+  "@scannerRtlVia": {
+    "placeholders": {
+      "instance": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerRtlBusyByShort": "belegt von {client}",
+  "@scannerRtlBusyByShort": {
+    "placeholders": {
+      "client": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerRtlReceiverTitle": "Radio-Empfänger (DAB+ & UKW)",
+  "scannerRtlReceiverLabel": "Empfänger:",
+  "scannerRtlModeNone": "Kein Empfänger (nur Internetradio)",
+  "scannerRtlModeUsb": "RTL-SDR-Stick per USB",
+  "scannerRtlModeTcp": "RTL-SDR über Netzwerk (rtl_tcp)",
+  "scannerRtlNoneHint": "DAB+- und UKW-Suche sowie die Reiter „DAB+“ und „FM“ sind ausgeblendet. Vorhandene Favoriten bleiben erhalten und spielen wieder, sobald ein Empfänger eingerichtet ist.",
+  "scannerRtlUsbHint": "Der Empfänger öffnet den Stick direkt über USB, sobald ein Sender startet.",
+  "scannerRtlUsbWindows": "Windows: einmalig den WinUSB-Treiber mit Zadig (zadig.akeo.ie) für „Bulk-In, Interface (Interface 0)“ installieren.",
+  "scannerRtlUsbLinux": "Linux: braucht eine udev-Regel für den Stick (z. B. aus dem Paket rtl-sdr); der DVB-T-Treiber des Kernels wird automatisch abgekoppelt.",
+  "scannerRtlNoStick": "Kein RTL-SDR-Stick erkannt.",
+  "scannerRtlAllowAccess": "Zugriff erlauben",
+  "scannerRtlAccessGranted": "Zugriff erteilt",
+  "scannerRtlRescan": "Neu suchen",
+  "scannerRtlTcpHint": "rtl_tcp-Server im lokalen Netz: Treiber-App auf diesem Gerät (127.0.0.1), Raspberry Pi oder rtltcp.server. Der markierte Server ist der Standard für DAB+ und UKW. Sticks an anderen Standorten stellt der rtltcp.server über rtl.over.internet lokal bereit.",
+  "scannerRtlAddServer": "Server hinzufügen",
+  "scannerRtlTestHint": "„Testen“ unterbricht DAB+ oder UKW, wenn es über diesen Server läuft; der Sender spielt beim Zurückkehren weiter.",
+  "scannerRtlDefault": "Standard",
+  "scannerRtlTest": "Testen",
+  "scannerRtlChooseStick": "Stick wählen ({count})",
+  "@scannerRtlChooseStick": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "scannerRtlRemove": "Entfernen",
+  "scannerRtlNoConnection": "Keine Verbindung",
+  "scannerRtlClassicServer": "rtl_tcp – Server unterstützt Standort und Antenne nicht",
+  "scannerRtlProtocol": "Protokoll: {name}",
+  "@scannerRtlProtocol": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerRtlTunerInfo": "Tuner-Typ: {type}, {gains} Gain-Stufen",
+  "@scannerRtlTunerInfo": {
+    "placeholders": {
+      "type": {
+        "type": "String"
+      },
+      "gains": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerAprsCompass": "N NO O SO S SW W NW",
+  "scannerAprsKindPosition": "Position",
+  "scannerAprsKindWeather": "Wetter",
+  "scannerAprsKindObject": "Objekt",
+  "scannerAprsKindObjectDeleted": "Objekt (gelöscht)",
+  "scannerAprsKindMessage": "Nachricht",
+  "scannerAprsKindAck": "Bestätigung",
+  "scannerAprsKindTelemetry": "Telemetrie",
+  "scannerAprsKindCapabilities": "Fähigkeiten",
+  "scannerAprsKindThirdParty": "Weitergeleitet",
+  "scannerAprsKindData": "Daten",
+  "scannerAprsKindEmpty": "Leer",
+  "scannerWind": "Wind {speed} km/h",
+  "@scannerWind": {
+    "placeholders": {
+      "speed": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerWindFrom": "aus {degrees}°",
+  "@scannerWindFrom": {
+    "placeholders": {
+      "degrees": {
+        "type": "int"
+      }
+    }
+  },
+  "scannerGusts": "Böen {speed}",
+  "@scannerGusts": {
+    "placeholders": {
+      "speed": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerAprsRain": "Regen {rate} mm/h",
+  "@scannerAprsRain": {
+    "placeholders": {
+      "rate": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerAprsSymbolWeatherStation": "Wetterstation",
+  "scannerAprsSymbolHouse": "Haus",
+  "scannerAprsSymbolCar": "Auto",
+  "scannerAprsSymbolAmbulance": "Rettung",
+  "scannerAprsSymbolNode": "Knoten",
+  "scannerAprsSymbolTruck": "LKW",
+  "scannerAprsSymbolAircraft": "Flugzeug",
+  "scannerAprsSymbolBalloon": "Ballon",
+  "scannerAprsSymbolRepeater": "Relais",
+  "scannerAprsSymbolRv": "Wohnmobil",
+  "scannerAprsSymbolMotorcycle": "Motorrad",
+  "scannerAprsSymbolBicycle": "Fahrrad",
+  "scannerAprsSymbolPedestrian": "Fußgänger",
+  "scannerAprsSymbolAntennaStation": "Station mit Antenne",
+  "scannerAprsSymbolShip": "Schiff",
+  "scannerAprsSymbolSmallAircraft": "Kleinflugzeug",
+  "scannerAprsSymbolHelicopter": "Hubschrauber",
+  "scannerAprsSymbolFireTruck": "Feuerwehr",
+  "scannerAprsSymbolPolice": "Polizei",
+  "scannerAprsSymbolSatellite": "Satellit",
+  "scannerAprsSymbolTrain": "Zug",
+  "scannerChannel": "Kanal {channel}",
+  "@scannerChannel": {
+    "placeholders": {
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerBandCb": "CB-Funk",
+  "scannerMarkEmergency": "Notruf",
+  "scannerCbTruckers": "Fernfahrer",
+  "scannerSegCbFm": "Sprechfunk FM (Kanal 9 Notruf, 19 Fernfahrer)",
+  "scannerSegCbSsb": "SSB-Bereich (Kanal 36–40)",
+  "scannerBandAir": "Flugfunk",
+  "scannerBandMil": "Militärfunk",
+  "scannerSegMilAir": "Militärischer Flugfunk",
+  "scannerBandHam": "Amateurfunk {band}",
+  "@scannerBandHam": {
+    "placeholders": {
+      "band": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerSegCw": "Telegrafie",
+  "scannerSegDigital": "Digitale Betriebsarten",
+  "scannerSegVoiceLsb": "Sprechfunk (LSB)",
+  "scannerSegVoiceUsb": "Sprechfunk (USB)",
+  "scannerSegVoiceSsb": "Sprechfunk (SSB)",
+  "scannerSegDigitalVoiceUsb": "Digital & Sprechfunk (USB)",
+  "scannerSegBeacons": "Baken",
+  "scannerSegDigitalAllModes": "Digital & alle Betriebsarten",
+  "scannerSegBeaconsAllModes": "Baken & alle Betriebsarten",
+  "scannerSegAmVoice": "AM-Sprechfunk",
+  "scannerSegFmSimplex": "FM-Direkt",
+  "scannerSegPacket": "Digital (Packet)",
+  "scannerSegSatellites": "Satelliten",
+  "scannerSegRepeaterInputs": "FM-Relais-Eingaben",
+  "scannerSegRepeaterOutputs": "FM-Relais-Ausgaben",
+  "scannerSegFmSimplexCall": "FM-Direkt ({frequency} Anruf)",
+  "@scannerSegFmSimplexCall": {
+    "placeholders": {
+      "frequency": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerMarkCall": "Anruf",
+  "scannerSegCwBeacons": "Telegrafie & Baken",
+  "scannerSegSsbVoiceCall": "Sprechfunk (SSB, {frequency} Anruf)",
+  "@scannerSegSsbVoiceCall": {
+    "placeholders": {
+      "frequency": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerSegAllModes": "Alle Betriebsarten",
+  "scannerSegCwEme": "Telegrafie (EME)",
+  "scannerSegAllModesSstv": "Alle Betriebsarten (SSTV, Digital)",
+  "scannerSegDigitalAprs": "Digital ({frequency} APRS)",
+  "@scannerSegDigitalAprs": {
+    "placeholders": {
+      "frequency": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerSegSatellitesIss": "Satelliten ({frequency} ISS)",
+  "@scannerSegSatellitesIss": {
+    "placeholders": {
+      "frequency": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerSegDigitalRepeaterInputs": "Digital & Relais-Eingaben",
+  "scannerSegRepeaterInputsLpd": "FM-Relais-Eingaben, LPD-Funkgeräte",
+  "scannerSegFmSimplexCallLpd": "FM-Direkt ({frequency} Anruf), LPD",
+  "@scannerSegFmSimplexCallLpd": {
+    "placeholders": {
+      "frequency": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerSegLpdIsm": "LPD-Funkgeräte & ISM ({frequency} Sensoren)",
+  "@scannerSegLpdIsm": {
+    "placeholders": {
+      "frequency": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerMarkSensors": "Sensoren",
+  "scannerSegRepeaterOutputsDigital": "Relais-Ausgaben (auch DMR/C4FM)",
+  "scannerSegAtv": "Amateurfernsehen (ATV)",
+  "scannerSegSatellitesUplink": "Satelliten (Uplink)",
+  "scannerSegAtvDigital": "ATV & Digital",
+  "scannerBandLongWave": "Langwelle",
+  "scannerBandMediumWave": "Mittelwelle",
+  "scannerBandShortwave": "KW-Rundfunk {band}",
+  "@scannerBandShortwave": {
+    "placeholders": {
+      "band": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerUtilTimeSignal": "Zeitzeichen {station}",
+  "@scannerUtilTimeSignal": {
+    "placeholders": {
+      "station": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerUtilWeatherFax": "Wetterfax {station}",
+  "@scannerUtilWeatherFax": {
+    "placeholders": {
+      "station": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerUtilWeatherRtty": "Wetter-RTTY {station}",
+  "@scannerUtilWeatherRtty": {
+    "placeholders": {
+      "station": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerBandHfUtility": "KW-Funkdienste",
+  "scannerSegFmBroadcast": "UKW-Rundfunk",
+  "scannerSegAirNavVorIls": "Flugnavigation (VOR/ILS)",
+  "scannerSegWeatherSatellites": "Wettersatelliten",
+  "scannerSegLandMobile": "Betriebsfunk",
+  "scannerSegLandMobileBos": "Betriebsfunk / BOS",
+  "scannerSegMarine": "Seefunk (Kanal 16 = {frequency})",
+  "@scannerSegMarine": {
+    "placeholders": {
+      "frequency": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerSegLandMobileRail": "Betriebsfunk / Bahnfunk",
+  "scannerSegDab": "DAB+ Band III (digital, nicht hörbar)",
+  "scannerSegRadiosondes": "Wettersonden",
+  "scannerSegDistressBeacons": "Notfunkbaken (digital)",
+  "scannerSegDvbt": "Fernsehen DVB-T2 (digital)",
+  "scannerSegLte": "Mobilfunk LTE (digital)",
+  "scannerSegSensorsLora": "Funksensoren / LoRa 868",
+  "scannerSegGsm": "Mobilfunk / GSM-R (digital)",
+  "scannerSegAirNavDme": "Flugnavigation (DME)",
+  "scannerSegAdsb": "ADS-B 1090 (→ Flugzeuge)",
+  "scannerSegGnss": "Satellitennavigation (GNSS)",
+  "scannerSegSatPhone": "Satelliten-Telefonie (Inmarsat)",
+  "scannerBandWorld": "Freier Band-Scan",
+  "scannerJumpMarine": "Seefunk Kanal 16",
+  "scannerJumpMilAir": "Militärflugfunk",
+  "scannerSensors": "Funksensoren",
+  "scannerJumpRepeaters70": "Relais 70 cm ({frequency})",
+  "@scannerJumpRepeaters70": {
+    "placeholders": {
+      "frequency": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerHubTitle": "Funk",
+  "scannerHubCbSubtitle": "26,965–27,405 MHz · Kanal 1–40 (80)",
+  "scannerHubPmrSubtitle": "446,00625–446,19375 MHz · Kanal 1–16",
+  "scannerHubHam": "Amateurfunk",
+  "scannerHubHamSubtitle": "160 m bis 23 cm mit Bandplan",
+  "scannerHubShortwave": "Kurzwelle",
+  "scannerHubShortwaveSubtitle": "KW-Rundfunk · Amateurfunk KW · Zeitzeichen & Flugwetter",
+  "scannerHubAircraft": "Flugzeuge",
+  "scannerHubAircraftSubtitle": "Flugfunk · ACARS · Radar (ADS-B)",
+  "scannerHubSensorsSubtitle": "433/868 MHz · Thermometer, Wetterstationen, Schalter",
+  "scannerHubWorldSubtitle": "0,5–1766 MHz frei abstimmen, Bänder eingezeichnet",
+  "scannerHubAirSubtitle": "118–137 MHz · Sprechfunk (AM)",
+  "scannerHubAcarsSubtitle": "131,5–131,9 MHz · Textmeldungen von Flugzeugen",
+  "scannerHubAdsbSubtitle": "1090 MHz · Flugnummer, Höhe, Position auf der Karte",
+  "scannerUpconverterNone": "Keiner – Direct Sampling oder RTL-SDR Blog V4",
+  "scannerUpconverterDialogTitle": "Aufwärtsmischer vor dem Stick",
+  "scannerUpconverter": "Aufwärtsmischer",
+  "scannerHubHfHam": "Amateurfunk KW",
+  "scannerHubHfHamSubtitle": "160 m bis 10 m · SSB, CW, FT8",
+  "scannerHubHfUtilitySubtitle": "Zeitzeichen · VOLMET · Shanwick · Wetterfax",
+  "scannerHubShortwaveFooter": "Kurzwelle braucht einen Stick mit Kurzwelleneingang: RTL-SDR Blog V3 (Direct Sampling, schaltet unter 24 MHz automatisch um), RTL-SDR Blog V4 (eingebauter Aufwärtsmischer; über rtl_tcp nur, wenn der Server ihn unterstützt) – oder einen beliebigen Stick mit einem Aufwärtsmischer wie dem Ham It Up. Gewöhnliche Sticks (z. B. NooElec NESDR) haben keinen. Dazu eine Antenne für Kurzwelle – eine Langdraht- oder Aktivantenne. Rundfunk auf Lang-, Mittel- und Kurzwelle: eigener Punkt „LW/MW/KW“ oben.",
+  "scannerRxWaiting": "Warte auf Daten vom Stick…",
+  "scannerRxNoData": "Keine Daten vom Stick",
+  "scannerRxSlow": "Daten kommen zu langsam",
+  "scannerRxRunning": "Empfang läuft",
+  "scannerRxLevel": "Pegel",
+  "scannerRxClipping": "übersteuert – Verstärkung senken",
+  "scannerMapAttribution": "© OpenStreetMap-Mitwirkende",
+  "scannerReceiverStartFailed": "Empfänger konnte nicht gestartet werden.",
+  "scannerReceiverStarting": "Starte Empfänger…",
+  "scannerGain": "Verstärkung",
+  "scannerAcarsTitle": "ACARS (Textmeldungen von Flugzeugen)",
+  "scannerAcarsVdl2Chip": "VDL2 · 136,9 MHz",
+  "scannerAcarsClassicChip": "ACARS klassisch · 131 MHz",
+  "scannerAcarsMessageCount": "{count, plural, =1{1 Meldung} other{{count} Meldungen}}",
+  "@scannerAcarsMessageCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "scannerAcarsHint": "Alle {count} Kanäle werden gleichzeitig dekodiert. Punkt grün = Meldung in den letzten 10 s, Balken grün = auf dem Kanal wird gerade gesendet.",
+  "@scannerAcarsHint": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "scannerAcarsVdl2Hint": "VDL2 ist digital: Bodenstationen und Flugzeuge senden kurze Datenpakete, Textmeldungen (ACARS) sind ein Teil davon.",
+  "scannerAcarsWaiting": "Warte auf Meldungen… Bei Flugverkehr in der Nähe kommen meist mehrere pro Minute.\nAntenne für {antenna} (Viertelwelle) - möglichst frei, am Fenster.",
+  "@scannerAcarsWaiting": {
+    "placeholders": {
+      "antenna": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerAcarsAntenna": "{frequency} MHz: senkrecht, ~{length} cm",
+  "@scannerAcarsAntenna": {
+    "placeholders": {
+      "frequency": {
+        "type": "String"
+      },
+      "length": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerAcarsTryVdl2": "In Europa senden die meisten Flugzeuge inzwischen über VDL2 - kommt hier nichts, oben auf VDL2 umschalten.",
+  "scannerColTime": "Zeit",
+  "scannerColFlight": "Flug",
+  "scannerColRegistration": "Kennzeichen",
+  "scannerColType": "Art",
+  "scannerAcarsReceived": "Empfangen {time} auf {frequency} MHz",
+  "@scannerAcarsReceived": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      },
+      "frequency": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerAcarsDirection": "Richtung: {direction}",
+  "@scannerAcarsDirection": {
+    "placeholders": {
+      "direction": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerAcarsFromAircraft": "vom Flugzeug",
+  "scannerAcarsToAircraft": "zum Flugzeug",
+  "scannerAcarsRegistration": "Kennzeichen: {registration}",
+  "@scannerAcarsRegistration": {
+    "placeholders": {
+      "registration": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerAcarsFlight": "Flug {flight}",
+  "@scannerAcarsFlight": {
+    "placeholders": {
+      "flight": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerAcarsMessageNo": "Nr. {number}",
+  "@scannerAcarsMessageNo": {
+    "placeholders": {
+      "number": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerAcarsContinued": "Fortsetzung folgt",
+  "scannerAcarsNoText": "(kein Text)",
+  "scannerAdsbTitle": "Flugzeuge (ADS-B 1090 MHz)",
+  "scannerAdsbCount": "{count, plural, =1{1 Flugzeug} other{{count} Flugzeuge}} · {withPosition} mit Position",
+  "@scannerAdsbCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "withPosition": {
+        "type": "int"
+      }
+    }
+  },
+  "scannerAdsbRate": "{rate} Meldungen/s",
+  "@scannerAdsbRate": {
+    "placeholders": {
+      "rate": {
+        "type": "int"
+      }
+    }
+  },
+  "scannerAdsbMap": "Karte",
+  "scannerAdsbNoAircraft": "Noch kein Flugzeug empfangen.\nAntenne: senkrecht, ~6,9 cm (Viertelwelle 1090 MHz), möglichst am Fenster.",
+  "scannerAdsbOnGround": "am Boden",
+  "scannerAdsbColFlight": "Flug / ICAO",
+  "scannerAdsbColAltitude": "Höhe",
+  "scannerAdsbColSpeed": "Tempo",
+  "scannerAdsbColClimb": "Steig/Sink",
+  "scannerAdsbColDistance": "Entfernung",
+  "scannerAdsbColCountry": "Zulassung",
+  "scannerAdsbColLastSeen": "Zuletzt",
+  "scannerAdsbRouteLoading": "Route wird geladen…",
+  "scannerAdsbRouteStale": "Passt nicht zur Flugrichtung – die Fluglinie vergibt dieses Rufzeichen offenbar für eine andere Strecke; die Routendaten sind veraltet.",
+  "scannerAdsbFrom": "Von",
+  "scannerAdsbTo": "Nach",
+  "scannerAdsbHideRoute": "Flugroute ausblenden (Zurück)",
+  "scannerAdsbShowRoute": "Flugroute zeigen (OK)",
+  "scannerAdsbNoRoute": "Keine Routendaten bekannt",
+  "scannerAdsbAirline": "Fluglinie",
+  "scannerAdsbAircraft": "Flugzeug",
+  "scannerAdsbOwner": "Halter",
+  "scannerAdsbIcaoAddress": "ICAO-Adresse",
+  "scannerAdsbTrack": "Kurs",
+  "scannerAdsbClimbRate": "Steigen/Sinken",
+  "scannerAdsbGroundSpeed": "Geschwindigkeit",
+  "scannerAdsbPosition": "{lat}° N, {lon}° O",
+  "@scannerAdsbPosition": {
+    "placeholders": {
+      "lat": {
+        "type": "String"
+      },
+      "lon": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerAdsbBearing": "Richtung",
+  "scannerAdsbBearingValue": "{degrees}° in {distance} km",
+  "@scannerAdsbBearingValue": {
+    "placeholders": {
+      "degrees": {
+        "type": "int"
+      },
+      "distance": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerAdsbReception": "Empfang",
+  "scannerAdsbReceptionValue": "{count, plural, =1{1 Meldung} other{{count} Meldungen}} · Signal {signal} dB",
+  "@scannerAdsbReceptionValue": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "signal": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerAdsbDataSource": "Route und Flugzeugdaten: adsbdb.com",
+  "scannerAdsbClimbing": "↗ steigt",
+  "scannerAdsbDescending": "↘ sinkt",
+  "scannerAgoSeconds": "vor {seconds} s",
+  "@scannerAgoSeconds": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "scannerAgoMinutes": "vor {minutes} min",
+  "@scannerAgoMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "scannerAgoHours": "vor {hours} h",
+  "@scannerAgoHours": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "scannerIsmNameFor": "Name für {model}",
+  "@scannerIsmNameFor": {
+    "placeholders": {
+      "model": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerIsmNameHint": "z. B. Balkon, Keller, Nachbar Garten",
+  "scannerIsmDevices": "{count, plural, =1{1 Gerät} other{{count} Geräte}}",
+  "@scannerIsmDevices": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "scannerIsmSignals": "{count, plural, =1{1 Signal} other{{count} Signale}}",
+  "@scannerIsmSignals": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "scannerIsmShowHidden": "Ausgeblendete zeigen ({count})",
+  "@scannerIsmShowHidden": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "scannerIsmWaiting": "Warte auf Funksensoren… Die meisten senden alle 30–60 Sekunden.\nAntenne für 433 MHz: senkrecht, ~17 cm (868 MHz: ~8,6 cm).",
+  "scannerIsmSectionWeather": "Thermometer & Wetter",
+  "scannerIsmSectionSwitches": "Schalter, Klingeln, Fernbedienungen",
+  "scannerIsmSectionKeys": "Funkschlüssel (anonym)",
+  "scannerIsmSectionUnknown": "Unbekannt",
+  "scannerIsmKeyPresses": "{count, plural, =1{1 Tastendruck} other{{count} Tastendrücke}} in der Umgebung, seit diese Seite offen ist · zuletzt {age}",
+  "@scannerIsmKeyPresses": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "age": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerIsmTransmitters": "{count, plural, =1{1 Sender} other{{count} Sender}}",
+  "@scannerIsmTransmitters": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "scannerIsmHideRaw": "Rohdaten ausblenden",
+  "scannerIsmShowRaw": "Rohdaten ansehen",
+  "scannerIsmRain": "Regen {amount} mm",
+  "@scannerIsmRain": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerIsmBatteryOk": "ok",
+  "scannerIsmBatteryLow": "schwach",
+  "scannerIsmContinuous": "Dauersender (FSK, ~{bitTime} µs/Bit)",
+  "@scannerIsmContinuous": {
+    "placeholders": {
+      "bitTime": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerIsmNotDecodable": "fortlaufendes Muster, nicht dekodierbar",
+  "scannerIsmBitTime": "~{bitTime} µs/Bit",
+  "@scannerIsmBitTime": {
+    "placeholders": {
+      "bitTime": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerIsmPulses": "{count} Pulse ({pulses}, Pausen {gaps})",
+  "@scannerIsmPulses": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "pulses": {
+        "type": "String"
+      },
+      "gaps": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerIsmAfterSync": "Nach Sync 2DD4: {data}",
+  "@scannerIsmAfterSync": {
+    "placeholders": {
+      "data": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerIsmDevice": "Gerät: {model} · ID {id}",
+  "@scannerIsmDevice": {
+    "placeholders": {
+      "model": {
+        "type": "String"
+      },
+      "id": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerIsmTemperature": "Temperatur: {value} °C",
+  "@scannerIsmTemperature": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerIsmTempRange": "24 h: {min} bis {max} °C",
+  "@scannerIsmTempRange": {
+    "placeholders": {
+      "min": {
+        "type": "String"
+      },
+      "max": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerIsmHumidity": "Luftfeuchte: {value} %",
+  "@scannerIsmHumidity": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerIsmBattery": "Batterie: {state}",
+  "@scannerIsmBattery": {
+    "placeholders": {
+      "state": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerIsmReceived": "Empfangen: {count}× · zuletzt {age} · Pegel {level} dB",
+  "@scannerIsmReceived": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "age": {
+        "type": "String"
+      },
+      "level": {
+        "type": "int"
+      }
+    }
+  },
+  "scannerIsmSetName": "Name vergeben",
+  "scannerIsmRename": "Umbenennen",
+  "scannerIsmShowAgain": "Wieder anzeigen",
+  "scannerIsmHide": "Ausblenden",
+  "scannerJumpTo": "Springen zu…",
+  "scannerFrequencyTitle": "Frequenz (MHz)",
+  "scannerFrequencyHint": "z. B. 145,500",
+  "scannerOutOfRange": "Der Stick empfängt {low}–{high} MHz.",
+  "@scannerOutOfRange": {
+    "placeholders": {
+      "low": {
+        "type": "String"
+      },
+      "high": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerHfHint": "Nichts zu hören? Kurzwelle braucht einen Stick mit Direct Sampling (RTL-SDR Blog V3, NESDR SMArt v5), einen RTL-SDR Blog V4 (über rtl_tcp nur mit dem Blog-V4-Treiber am Server) oder einen Aufwärtsmischer (Funk → Kurzwelle) - und eine Antenne für Kurzwelle.",
+  "scannerSignalAboveNoise": "Signal {snr} dB über Rauschen",
+  "@scannerSignalAboveNoise": {
+    "placeholders": {
+      "snr": {
+        "type": "int"
+      }
+    }
+  },
+  "scannerChannelButton": "Kanal",
+  "scannerFrequencyButton": "Frequenz…",
+  "scannerFine": "Fein",
+  "scannerCbChannels": "{count} Kanäle",
+  "@scannerCbChannels": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "scannerScan": "Suchlauf",
+  "scannerAprsTooltip": "APRS-Pakete (1200 Baud) dekodieren - auf 144,800 und 145,825 automatisch",
+  "scannerBandPlanTooltip": "Modulation und Filter passend zum Bereich des Bandplans",
+  "scannerBandPlan": "Bandplan",
+  "scannerSquelch": "Rauschsperre",
+  "scannerSampleRate": "Bandbreite {rate} MHz (~{mbit} Mbit/s)",
+  "@scannerSampleRate": {
+    "placeholders": {
+      "rate": {
+        "type": "String"
+      },
+      "mbit": {
+        "type": "int"
+      }
+    }
+  },
+  "scannerSignalFilters": "Signalfilter",
+  "scannerRange": "Bereich",
+  "scannerShowing": "Zeigt {low}–{high} MHz",
+  "@scannerShowing": {
+    "placeholders": {
+      "low": {
+        "type": "String"
+      },
+      "high": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerFilterWidth": "Filterbreite",
+  "scannerFilterWidthHelp": "Schmaler: weniger Rauschen und Nachbarkanäle. Breiter: verständlicher, wenn ein Sender etwas daneben liegt. Auto passt zur Modulation.",
+  "scannerNoiseBlanker": "Störaustaster",
+  "scannerNoiseBlankerHelp": "Entfernt kurze Knackser von Zündfunken, Weidezäunen und Netzteilen.",
+  "scannerVoiceFilter": "Sprachfilter",
+  "scannerVoiceFilterHelp": "Nur der Sprachbereich 300–3000 Hz: weniger Brummen, Rauschen und Pilottöne.",
+  "scannerAgc": "Lautstärkeregelung",
+  "scannerAgcHelp": "Schnell für AM/FM, langsam für SSB - verhindert Pumpen zwischen den Silben. Auto wählt passend zur Modulation.",
+  "scannerAgcFast": "Schnell",
+  "scannerAgcSlow": "Langsam",
+  "scannerDmrCallPending": "Gespräch (Kennung folgt…)",
+  "scannerDmrLast": "zuletzt {call} {ago}",
+  "@scannerDmrLast": {
+    "placeholders": {
+      "call": {
+        "type": "String"
+      },
+      "ago": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerDmrIdle": "frei",
+  "scannerDmrReceptionGood": "Empfang gut",
+  "scannerDmrReceptionFair": "Empfang mäßig",
+  "scannerDmrReceptionPoor": "Empfang schlecht",
+  "scannerDmrSlot": "Zeitschlitz {slot}",
+  "@scannerDmrSlot": {
+    "placeholders": {
+      "slot": {
+        "type": "int"
+      }
+    }
+  },
+  "scannerDmrEmergency": "NOTRUF",
+  "scannerDmrEncryptedNoAudio": "verschlüsselt – kein Ton",
+  "scannerDmrNoSignal": "kein DMR-Signal",
+  "scannerDmrColorCode": "Farbcode {code}",
+  "@scannerDmrColorCode": {
+    "placeholders": {
+      "code": {
+        "type": "int"
+      }
+    }
+  },
+  "scannerDmrNoVoiceDecoder": "ohne Sprachdecoder gebaut – nur Anzeige",
+  "scannerDmrRecentlyHeard": "Zuletzt gehört",
+  "scannerDmrEncrypted": "verschlüsselt",
+  "scannerAprsPackets": "{count, plural, =1{1 Paket} other{{count} Pakete}}",
+  "@scannerAprsPackets": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "scannerAprsDecoderWaiting": "Dekoder läuft - warte auf Pakete…",
+  "scannerAprsDecoderRunning": "Dekoder läuft",
+  "scannerAprsDecoderOff": "Dekoder aus",
+  "scannerAprsClear": "Leeren",
+  "scannerAprsTo": "an {name}",
+  "@scannerAprsTo": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerAprsReceived": "Empfangen {time}",
+  "@scannerAprsReceived": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerEastShort": "O",
+  "scannerAprsDistance": "Entfernung: {distance}",
+  "@scannerAprsDistance": {
+    "placeholders": {
+      "distance": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerAprsPath": "Weg: {path}",
+  "@scannerAprsPath": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "scannerAprsDirect": "direkt",
+  "scannerRawData": "Rohdaten",
+  "settingsOr": "oder",
+  "@settingsOr": {
+    "description": "Between two addresses of the admin page: 'http://… oder http://…'."
+  },
+  "settingsNotSetUp": "nicht eingerichtet",
+  "settingsPercent": "{value} %",
+  "@settingsPercent": {
+    "placeholders": {
+      "value": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsMinutesShort": "{minutes} Min.",
+  "@settingsMinutesShort": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsSecondsShort": "{seconds} Sek.",
+  "@settingsSecondsShort": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsDeviceNameHelp": "Eindeutig im Heimnetz - erscheint auf der Verwaltungsseite und im Namen der Backups.",
+  "settingsDeviceNameOwn": "Eigener Name",
+  "settingsDeviceNameNotSet": "nicht vergeben",
+  "settingsDeviceNameSuggestionTerrace": "Terrassen-Media",
+  "settingsDeviceNameSuggestionLivingRoom": "Wohnzimmer-TV",
+  "settingsDeviceNameSuggestionBedroom": "Schlafzimmer-TV",
+  "settingsDeviceNameSuggestionKitchen": "Küchen-Tablet",
+  "settingsReception": "Empfang",
+  "settingsReceiverNone": "Kein Empfänger",
+  "settingsReceiverUsb": "RTL-SDR per USB",
+  "settingsReceiverTcp": "RTL-SDR über Netzwerk",
+  "settingsShowDab": "DAB anzeigen",
+  "settingsShowFm": "FM anzeigen",
+  "settingsShowAm": "LW/MW/KW anzeigen",
+  "settingsShowFunk": "Funk anzeigen",
+  "settingsPartsHeading": "Teile von Home System",
+  "settingsPartsHelp": "Ausgeschaltete Teile haben keine Kachel unter Home, und ihre Einstellungen sind ausgegraut.",
+  "settingsDeviceHeading": "Gerät",
+  "settingsAdminPageOffline": "Verwaltungsseite (Backups): ohne Netzwerkverbindung nicht erreichbar",
+  "settingsAdminPageAt": "Verwaltungsseite (Backups) im Browser: {url}",
+  "@settingsAdminPageAt": {
+    "placeholders": {
+      "url": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsNas": "NAS-Server",
+  "settingsStartShowHome": "Home anzeigen",
+  "settingsStartRadio": "Radio mit Sender starten (Radio → Autostart)",
+  "settingsStartTv": "TV mit Sender starten (TV → Sender beim Start)",
+  "settingsBackground": "Hintergrund",
+  "settingsBackgroundGradients": "Farbverläufe",
+  "settingsBackgroundPhotos": "Landschaftsfotos",
+  "settingsBackgroundServer": "Eigener Server",
+  "settingsIconPack": "Icon-Paket",
+  "settingsIconPackNone": "Original-Logos",
+  "settingsHomeKey": "Home-Taste",
+  "settingsReceiverHeading": "Receiver",
+  "settingsSatReceiver": "Sat-Receiver (Enigma2)",
+  "settingsTvKeysValue": "Senderliste, Programmführer, Optionen, Tonspur",
+  "settingsTvZapEncrypted": "Receiver bei Bedarf umschalten",
+  "settingsTvZapEncryptedHelp": "Nur wenn der Receiver eingeschaltet ist: Karte bzw. CI-Modul entschlüsseln dann nur den Sender, den er selbst zeigt, und an einem Sat-Kabel empfangen alle Tuner nur dessen Band. Für einen verschlüsselten Sender oder einen auf einem anderen Band schaltet die App den Receiver dann um (sein Bild wechselt mit).\nIm Standby schaltet die App nie um - der Receiver entschlüsselt dort selbst und bleibt frei. Hält er noch einen Sender fest, gibt die App ihn frei.",
+  "settingsTvStartHeading": "Sender beim Start",
+  "settingsTvStartLast": "Zuletzt gesehenen Sender",
+  "settingsTvStartFixed": "Festen Sender",
+  "settingsTvChannelsError": "Senderliste nicht erreichbar: {error}",
+  "@settingsTvChannelsError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsTvSetUpReceiverFirst": "Erst den Receiver einrichten.",
+  "settingsTvNextUpHeading": "Als Nächstes",
+  "settingsTvNextUpHelp": "Kurz bevor auf dem laufenden Sender die nächste Sendung beginnt, erscheint ein Hinweis, was als Nächstes kommt.",
+  "settingsTvNextUpToggle": "Hinweis auf die nächste Sendung",
+  "settingsTvNextUpLead": "Wie lange vorher",
+  "settingsTvNextUpShow": "Wie lange anzeigen",
+  "settingsAutostartHeading": "Autostart",
+  "settingsAutostartLast": "Zuletzt gehörten Sender starten",
+  "settingsAutostartFixed": "Festen Sender starten",
+  "settingsDisplayHeading": "Anzeige",
+  "settingsShowClockDate": "Datum neben der Uhrzeit anzeigen",
+  "settingsFullscreen": "Vollbild",
+  "settingsFullscreenMonitor": "Monitor für Vollbild",
+  "settingsMonitorOf": "{monitor} von {count}",
+  "@settingsMonitorOf": {
+    "placeholders": {
+      "monitor": {
+        "type": "int"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsUiScale": "Größe der Oberfläche",
+  "settingsTilesHeading": "Kacheln",
+  "settingsLocation": "Standort",
+  "settingsWeatherForecast": "Wetterprognose",
+  "settingsWeatherSpanTwoTiles": "Über 2 Kacheln (volle Höhe)",
+  "settingsTileSize": "Größe der Kachel",
+  "settingsContentSize": "Größe des Inhalts",
+  "settingsWeatherRadar": "Wetterradar",
+  "settingsRadarSource": "Quelle",
+  "settingsRadarRadius": "Umkreis um den Standort ({token} in der Adresse)",
+  "@settingsRadarRadius": {
+    "description": "token is the literal URL placeholder {r}.",
+    "placeholders": {
+      "token": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsRadarDimming": "Abdunkeln (für abends)",
+  "settingsSunMoon": "Sonne & Mond",
+  "settingsMoreSettings": "Weitere Einstellungen (System, TV)",
+  "settingsMoreHeading": "Weiteres",
+  "settingsBackupCreate": "Backup erstellen",
+  "settingsBackupRestore": "Backup wiederherstellen",
+  "settingsBackupRestoreHint": "auch über die Verwaltungsseite",
+  "settingsAboutHeading": "Über",
+  "settingsQuit": "Programm beenden",
+  "settingsQuitConfirm": "Programm beenden?",
+  "settingsQuitButton": "Beenden",
+  "settingsPartOff": "{part} ist ausgeschaltet - unter System → Teile von Home System einschalten.",
+  "@settingsPartOff": {
+    "placeholders": {
+      "part": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsAreaSystemSubtitle": "Radio & TV ein/aus, Gerätename, NAS, Start, Home, Home-Taste, Anzeige, Backup, Updates",
+  "settingsAreaSystemSubtitleNoHomeKey": "Radio & TV ein/aus, Gerätename, NAS, Start, Home, Anzeige, Backup, Updates",
+  "settingsAreaRadioSubtitle": "Empfänger (DAB+, UKW, Funk), Autostart-Sender, Wetter, Radar, Sonne & Mond",
+  "settingsAreaTvSubtitle": "Sat-Receiver (Enigma2, z. B. GigaBlue)",
+  "settingsAreaOff": "Ausgeschaltet - unter System einschalten",
+  "settingsAboutLicense": "PolyForm Noncommercial 1.0.0 - frei für private und nicht-kommerzielle Nutzung. © 2026 Jürgen Laschak, github.com/JayLo1401/home.system",
+  "settingsAboutWeatherData": "Daten: © GeoSphere Austria, lizenziert unter CC BY 4.0 (data.hub.geosphere.at)",
+  "settingsAboutUvIndex": "UV-Index",
+  "settingsAboutUvData": "Weather data by Open-Meteo.com, lizenziert unter CC BY 4.0",
+  "settingsAboutInternetRadio": "Internetradio",
+  "settingsAboutInternetRadioData": "Sendersuche und Logos über das Community-Verzeichnis Radio Browser (radio-browser.info)",
+  "settingsAboutPlaceSearch": "Ortssuche",
+  "settingsAboutPlaceSearchData": "© OpenStreetMap-Mitwirkende, Daten unter der Open Database License (ODbL), über Nominatim.",
+  "settingsAboutBackgroundPhotos": "Hintergrundfotos von Home",
+  "settingsAboutBackgroundPhotosData": "Bing-Bilder des Tages, © bei den jeweiligen Fotografen (nur wenn „Landschaftsfotos aus dem Internet“ gewählt ist).",
+  "settingsAboutRadarData": "Das Radarbild kommt von der selbst eingetragenen Quelle; Rechte und Quellenangaben liegen beim jeweiligen Anbieter.",
+  "settingsAudioChannelName": "Radio-Wiedergabe",
+  "@settingsAudioChannelName": {
+    "description": "Android notification channel of the radio playback."
+  },
+  "settingsBackupNotHomeSystem": "Die Datei ist kein Home-System-Backup.",
+  "settingsBackupNewerVersion": "Das Backup stammt von einer neueren App-Version.",
+  "settingsBackupCorrupt": "Das Backup ist beschädigt oder unvollständig.",
+  "settingsLauncherMenuApp": "Home System (App-Einstellungen)",
+  "settingsLauncherMenuAndroid": "Android-Einstellungen",
+  "settingsLauncherNotInstalled": "„{app}“ ist nicht (mehr) installiert.",
+  "@settingsLauncherNotInstalled": {
+    "placeholders": {
+      "app": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsLauncherMoveLeft": "Nach links verschieben",
+  "settingsLauncherMoveRight": "Nach rechts verschieben",
+  "settingsLauncherChangeImage": "Bild ändern",
+  "settingsLauncherRemove": "Aus der Startleiste entfernen",
+  "settingsLauncherOptionsHint": "{key}  Optionen der Kachel",
+  "@settingsLauncherOptionsHint": {
+    "placeholders": {
+      "key": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsLauncherOptionsHintMouse": "{key} oder Rechtsklick  Optionen der Kachel",
+  "@settingsLauncherOptionsHintMouse": {
+    "placeholders": {
+      "key": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsLauncherAppInfoFailed": "Die App-Info von „{app}“ lässt sich nicht öffnen.",
+  "@settingsLauncherAppInfoFailed": {
+    "placeholders": {
+      "app": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsLauncherImageTitle": "Bild für „{tile}“",
+  "@settingsLauncherImageTitle": {
+    "placeholders": {
+      "tile": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsLauncherImageAuto": "Automatisch (Icon-Paket, sonst Original)",
+  "settingsLauncherImageDefault": "Standard",
+  "settingsLauncherImageOriginal": "Original der App",
+  "settingsLauncherImageFromUrl": "Bild von einer Adresse (URL) …",
+  "settingsLauncherImageUrlTitle": "Bild-Adresse (PNG/JPG, am besten 16:9)",
+  "settingsLauncherFindApps": "Apps suchen & hinzufügen",
+  "settingsWizardTitle": "Home System einrichten",
+  "settingsWizardStep": "Schritt {step} von {count}",
+  "@settingsWizardStep": {
+    "placeholders": {
+      "step": {
+        "type": "int"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsWizardWelcome": "Willkommen! Gibt es schon ein Backup von Home System?",
+  "settingsWizardRestoreHint": "Von diesem Gerät, vom USB-Stick oder über die Verwaltungsseite",
+  "settingsWizardRestoreHintUrl": "Von diesem Gerät, vom USB-Stick oder über die Verwaltungsseite ({url})",
+  "@settingsWizardRestoreHintUrl": {
+    "placeholders": {
+      "url": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsWizardNew": "Neu einrichten",
+  "settingsWizardLanguage": "Sprache: {language}",
+  "@settingsWizardLanguage": {
+    "placeholders": {
+      "language": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsWizardNameQuestion": "Wie soll dieses Gerät heißen?",
+  "settingsWizardNameHint": "Ein eindeutiger Name, damit man die Geräte unterscheiden kann - auf der Verwaltungsseite und bei Backups.",
+  "settingsWizardNameOwn": "Oder eigener Name",
+  "settingsWizardNext": "Weiter",
+  "settingsWizardHomeKeyTitle": "Home-Taste der Fernbedienung (freiwillig)",
+  "settingsWizardHomeKeyHint": "Wer möchte, dass die Home-Taste der Fernbedienung Home System öffnet, richtet das hier ein - Home System wird dafür Standard-Launcher, oder eine Bedienungshilfe wird eingeschaltet. Wer das nicht will, geht einfach weiter; es lässt sich jederzeit unter Einstellungen → System → Home-Taste nachholen.",
+  "settingsWizardHomeKeySetUp": "Home-Taste einrichten",
+  "settingsWizardHomeKeySkip": "Weiter (ohne bzw. nach dem Einrichten)",
+  "settingsWizardDone": "Fertig - „{name}“ ist eingerichtet.",
+  "@settingsWizardDone": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsWizardDoneHint": "Home System startet mit Home: Radio, TV und die Apps als Kacheln. Weiteres (Radio-Empfänger, Sat-Receiver, Hintergrund …) unter Einstellungen.",
+  "settingsWizardDoneBackups": "Backups gibt es jederzeit auf der Verwaltungsseite: {url}",
+  "@settingsWizardDoneBackups": {
+    "placeholders": {
+      "url": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsWizardStart": "Los geht's",
+  "systemStartDashboard": "Haussteuerung anzeigen (Wandtablet)",
+  "systemStartAppNone": "Andere App starten …",
+  "systemStartApp": "App starten: {app}",
+  "@systemStartApp": {
+    "placeholders": {
+      "app": {
+        "type": "String"
+      }
+    }
+  },
+  "systemStartAppPick": "Welche App beim Start?",
+  "systemStartAppMissing": "Die Start-App „{app}“ ist nicht installiert.",
+  "@systemStartAppMissing": {
+    "placeholders": {
+      "app": {
+        "type": "String"
+      }
+    }
+  },
+  "systemSettingsAll": "Alle Einstellungen",
+  "systemTileSettings": "Einstellungen (TV)",
+  "systemTileSettingsShort": "Einstellungen",
+  "systemSettingsTitleSystem": "System-Einstellungen",
+  "systemSettingsTitleRadio": "Radio-Einstellungen",
+  "systemSettingsTitleTv": "TV-Einstellungen",
+  "tvLinkConnecting": "Verbinde mit dem Receiver…",
+  "tvLinkZapping": "{reason} - Receiver schaltet um…",
+  "@tvLinkZapping": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "tvReasonEncrypted": "Verschlüsselt",
+  "tvReasonNoFreeTuner": "Kein freier Tuner",
+  "tvLinkLoadingPicture": "Bild wird geladen…",
+  "tvLinkDescrambling": "Verschlüsselt - Receiver entschlüsselt…",
+  "tvLinkPlaying": "Sender läuft",
+  "tvErrorEncryptedReceiverBusy": "„{channel}“ ist verschlüsselt und der Receiver zeigt selbst einen anderen Sender - Einstellungen → TV → „Receiver bei Bedarf umschalten“.",
+  "@tvErrorEncryptedReceiverBusy": {
+    "placeholders": {
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "tvErrorStillEncrypted": "„{channel}“ bleibt verschlüsselt - Karte bzw. CI-Modul für diesen Sender freigeschaltet?",
+  "@tvErrorStillEncrypted": {
+    "placeholders": {
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "tvErrorNoTunerCableBusy": "Kein freier Tuner für „{channel}“ - das Sat-Kabel ist gerade auf einem anderen Band belegt (Aufnahme oder ein anderes Gerät).",
+  "@tvErrorNoTunerCableBusy": {
+    "placeholders": {
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "tvErrorNoTunerReceiverBusy": "Kein freier Tuner für „{channel}“ - der Receiver zeigt selbst einen Sender auf einem anderen Band (Einstellungen → TV → „Receiver bei Bedarf umschalten“).",
+  "@tvErrorNoTunerReceiverBusy": {
+    "placeholders": {
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "tvErrorNoPicture": "Kein Bild von „{channel}“ - ist der Receiver an und ein Tuner frei?",
+  "@tvErrorNoPicture": {
+    "placeholders": {
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "tvPaused": "Angehalten - ⏯ spielt weiter",
+  "tvAudioTrack": "Tonspur",
+  "tvAudioTrackNumber": "Tonspur {number}",
+  "@tvAudioTrackNumber": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "tvAudioTrackCount": "{count} Tonspuren",
+  "@tvAudioTrackCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "tvAudioChannels": "{count} Kanäle",
+  "@tvAudioChannels": {
+    "description": "Number of sound channels of an audio track (not 1, 2, 6 or 8).",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "tvAudioLanguageGerman": "Deutsch",
+  "tvAudioLanguageEnglish": "Englisch",
+  "tvAudioLanguageFrench": "Französisch",
+  "tvAudioLanguageItalian": "Italienisch",
+  "tvAudioLanguageSpanish": "Spanisch",
+  "tvAudioLanguageTurkish": "Türkisch",
+  "tvAudioLanguagePolish": "Polnisch",
+  "tvAudioLanguageCroatianSerbian": "Kroatisch/Serbisch",
+  "tvAudioOriginal": "Originalton",
+  "tvAudioDescription": "Audiodeskription",
+  "tvResolutionLines": "{lines} Zeilen",
+  "@tvResolutionLines": {
+    "placeholders": {
+      "lines": {
+        "type": "int"
+      }
+    }
+  },
+  "tvTranscoded": "Transkodiert",
+  "tvOriginalStream": "Original",
+  "tvGuide": "Programmführer",
+  "tvAllProgramsOf": "Alle Sendungen von {channel}",
+  "@tvAllProgramsOf": {
+    "placeholders": {
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "tvAllProgramsOfThisChannel": "Alle Sendungen von diesem Sender",
+  "tvNextUpNow": "Als Nächstes · gleich",
+  "tvNextUpInMinutes": "Als Nächstes · in {minutes} Min.",
+  "@tvNextUpInMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "tvNotSetUpIntro": "Fernsehen vom eigenen Sat-Receiver: Senderlisten, Senderlogos und Programmführer kommen direkt vom Enigma2-Receiver (z. B. GigaBlue, VU+, Dreambox mit OpenWebif) im Heimnetz.",
+  "tvSetUpReceiver": "Receiver einrichten",
+  "tvBannerKeyHint": "{channelListKey} Senderliste  ·  {guideKey} Programm  ·  {optionsKey} Optionen",
+  "@tvBannerKeyHint": {
+    "description": "Key hint in the info banner; the placeholders are the names of the assigned remote keys.",
+    "placeholders": {
+      "channelListKey": {
+        "type": "String"
+      },
+      "guideKey": {
+        "type": "String"
+      },
+      "optionsKey": {
+        "type": "String"
+      }
+    }
+  },
+  "tvNoProgramInfo": "Keine Programminformation",
+  "tvNoProgramInfoSentence": "Keine Programminformation.",
+  "tvThen": "Danach",
+  "@tvThen": {
+    "description": "Before the start time and title of the programme after the current one."
+  },
+  "tvChannelListKeyHint": "OK abspielen (laufender Sender: Info)  ·  → Programm  ·  ← schließen",
+  "tvNoChannelsInList": "Keine Sender in dieser Liste",
+  "tvChannelList": "Senderliste",
+  "tvBouquetFavorites": "Favoriten",
+  "tvBouquetLastScanned": "Zuletzt gescannt",
+  "tvMinutes": "{minutes} Min.",
+  "@tvMinutes": {
+    "description": "Length of a programme.",
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "tvNoDescription": "Keine Beschreibung.",
+  "tvToday": "Heute",
+  "tvTomorrow": "Morgen",
+  "tvDayMonthPattern": "dd.MM.",
+  "@tvDayMonthPattern": {
+    "description": "intl DateFormat pattern for a short date without the year (day and month)."
+  },
+  "tvSchedule": "Programm",
+  "@tvSchedule": {
+    "description": "Heading of one channel's list of programmes (usually a week)."
+  },
+  "tvScheduleNoInfo": "Für diesen Sender hat der Receiver keine Programminformation.",
+  "tvGuideKeyHint": "OK umschalten  ·  {optionsKey} alle Sendungen  ·  ‹‹ ›› ±3 Std.",
+  "@tvGuideKeyHint": {
+    "placeholders": {
+      "optionsKey": {
+        "type": "String"
+      }
+    }
+  },
+  "tvSettingsTitle": "TV: Receiver",
+  "tvSettingsIntro": "Ein Enigma2-Sat-Receiver mit OpenWebif im Heimnetz (z. B. GigaBlue, VU+, Dreambox mit teamBlue, OpenATV oder OpenPLi). Senderlisten, Senderlogos (Picons) und der Programmführer kommen vom Receiver, das Bild über seinen Streaming-Port.",
+  "tvSettingsAddress": "Adresse des Receivers (IP oder Name)",
+  "tvSettingsWebPort": "Web-Port (OpenWebif)",
+  "tvSettingsStreamPort": "Streaming-Port",
+  "tvSettingsPortsHelp": "Üblich: Web 80, Streaming 8001 (8002 = umgewandelt, falls der Receiver das kann).",
+  "tvSettingsHttps": "HTTPS für die Weboberfläche",
+  "tvSettingsUser": "Benutzer (falls Anmeldung aktiv)",
+  "tvSettingsPassword": "Passwort",
+  "tvSettingsTestConnection": "Verbindung testen",
+  "tvSettingsEnterAddress": "Bitte die Adresse des Receivers eintragen.",
+  "tvSettingsConnected": "Verbunden: {receiver} · {count} Senderlisten",
+  "@tvSettingsConnected": {
+    "placeholders": {
+      "receiver": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "tvSettingsChannelList": "Senderliste für TV",
+  "tvSettingsChannelListHelp": "Im TV wechseln ← / → in der Senderliste zwischen den Listen.",
+  "tvEnigma2Receiver": "Enigma2-Receiver",
+  "tvReceiverNeedsLogin": "Enigma2-Receiver (Anmeldung nötig)",
+  "tvSearchReceiver": "Receiver suchen",
+  "tvSearchScanning": "Durchsuche das Heimnetz …",
+  "tvSearchScanningNetworks": "Durchsuche das Heimnetz ({networks}) …",
+  "@tvSearchScanningNetworks": {
+    "placeholders": {
+      "networks": {
+        "type": "String"
+      }
+    }
+  },
+  "tvSearchNoneFound": "Kein Receiver gefunden. Ist er eingeschaltet und im selben Netz? Sonst die Adresse bitte von Hand eintragen.",
+  "tvSearchFound": "{count, plural, =1{Ein Receiver gefunden - OK übernimmt ihn.} other{{count} Receiver gefunden - OK übernimmt ihn.}}",
+  "@tvSearchFound": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "tvErrorNoReceiver": "Kein Receiver eingerichtet",
+  "tvErrorUnreachable": "Receiver nicht erreichbar ({host}): {error}",
+  "@tvErrorUnreachable": {
+    "placeholders": {
+      "host": {
+        "type": "String"
+      },
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "tvErrorLoginRejected": "Anmeldung abgelehnt - Benutzer/Passwort prüfen",
+  "tvErrorHttpStatus": "Receiver antwortet mit Fehler {status}",
+  "@tvErrorHttpStatus": {
+    "placeholders": {
+      "status": {
+        "type": "String"
+      }
+    }
+  },
+  "tvErrorUnexpectedResponse": "Unerwartete Antwort vom Receiver",
+  "tvErrorZapFailed": "Receiver schaltet nicht um: {message}",
+  "@tvErrorZapFailed": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "tvSettingsButton": "TV-Einstellungen"
+}

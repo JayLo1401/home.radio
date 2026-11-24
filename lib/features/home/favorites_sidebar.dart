@@ -12,6 +12,7 @@ import '../../data/models/favorite_channel.dart';
 import '../../data/repositories/dab_stations_repository.dart' show DabStationDisplay, dabEnsembleHeading;
 import '../../data/repositories/fm_stations_repository.dart' show FmStationDisplay, sameProgrammeHint;
 import '../../data/repositories/settings_repository.dart' show DabSortMode;
+import '../../l10n/l10n.dart';
 import '../shared/station_edit_dialog.dart';
 
 /// Categorized, scrollable list of stations shown on the right edge of the
@@ -81,7 +82,7 @@ class _FavoritesSidebarState extends ConsumerState<FavoritesSidebar> {
                         Expanded(
                           child: _CategoryTab(
                             icon: Icons.favorite,
-                            label: 'Favoriten',
+                            label: context.l10n.radioFavorites,
                             selected: category == SidebarCategory.favorites,
                             onTap: () => ref.read(sidebarCategoryProvider.notifier).set(SidebarCategory.favorites),
                           ),
@@ -89,7 +90,7 @@ class _FavoritesSidebarState extends ConsumerState<FavoritesSidebar> {
                         if (category == SidebarCategory.favorites)
                           _SmallIconButton(
                             icon: editing ? Icons.check : Icons.edit_outlined,
-                            tooltip: editing ? 'Fertig' : 'Favoriten bearbeiten',
+                            tooltip: editing ? context.l10n.radioDone : context.l10n.radioEditFavorites,
                             highlighted: editing,
                             onTap: () => setState(() => _editing = !_editing),
                           ),
@@ -117,11 +118,11 @@ class _FavoritesSidebarState extends ConsumerState<FavoritesSidebar> {
             ),
           ),
           if (editing)
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 4, 16, 0),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
               child: Text(
-                'Reihenfolge ändern, umbenennen oder entfernen - mit ✓ fertig.',
-                style: TextStyle(color: Colors.white54, fontSize: 12),
+                context.l10n.radioEditFavoritesHint,
+                style: const TextStyle(color: Colors.white54, fontSize: 12),
               ),
             ),
           Expanded(
@@ -235,17 +236,17 @@ class _FavoritesList extends ConsumerWidget {
     return favoritesAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(
-        child: Text('Fehler beim Laden der Favoriten:\n$e', style: const TextStyle(color: Colors.white70)),
+        child: Text(context.l10n.radioFavoritesLoadError('$e'), style: const TextStyle(color: Colors.white70)),
       ),
       data: (favorites) {
         if (favorites.isEmpty) {
-          return const Center(
+          return Center(
             child: Padding(
-              padding: EdgeInsets.all(24),
+              padding: const EdgeInsets.all(24),
               child: Text(
-                'Noch keine Favoriten.\nSuche Sender über das Menü.',
+                context.l10n.radioNoFavorites,
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white70, fontSize: 18),
+                style: const TextStyle(color: Colors.white70, fontSize: 18),
               ),
             ),
           );
@@ -277,15 +278,18 @@ class _FavoritesList extends ConsumerWidget {
                     final confirmed = await showDialog<bool>(
                       context: context,
                       builder: (context) => AlertDialog(
-                        title: const Text('Favorit entfernen?'),
-                        content: Text('„${channel.displayName}“ aus den Favoriten entfernen?'),
+                        title: Text(context.l10n.radioRemoveFavoriteTitle),
+                        content: Text(context.l10n.radioRemoveFavoriteMessage(channel.displayName)),
                         actions: [
                           TextButton(
                             autofocus: true,
                             onPressed: () => Navigator.of(context).pop(false),
-                            child: const Text('Abbrechen'),
+                            child: Text(context.l10n.commonCancel),
                           ),
-                          TextButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Entfernen')),
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(true),
+                            child: Text(context.l10n.radioRemove),
+                          ),
                         ],
                       ),
                     );
@@ -353,13 +357,13 @@ class _FmStationsList extends ConsumerWidget {
     // By frequency; a programme also on another frequency says so.
     final stations = ref.watch(fmStationsStreamProvider).value ?? const <FmStation>[];
     if (stations.isEmpty) {
-      return const Center(
+      return Center(
         child: Padding(
-          padding: EdgeInsets.all(24),
+          padding: const EdgeInsets.all(24),
           child: Text(
-            'Noch keine UKW-Sender.\nSuchlauf oder manuelles Einstellen über das UKW-Menü oben.',
+            context.l10n.radioSidebarNoFmStations,
             textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white70, fontSize: 18),
+            style: const TextStyle(color: Colors.white70, fontSize: 18),
           ),
         ),
       );
@@ -408,17 +412,17 @@ class _DabStationsList extends ConsumerWidget {
     return stationsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(
-        child: Text('Fehler beim Laden der DAB+ Sender:\n$e', style: const TextStyle(color: Colors.white70)),
+        child: Text(context.l10n.radioDabStationsLoadError('$e'), style: const TextStyle(color: Colors.white70)),
       ),
       data: (stations) {
         if (stations.isEmpty) {
-          return const Center(
+          return Center(
             child: Padding(
-              padding: EdgeInsets.all(24),
+              padding: const EdgeInsets.all(24),
               child: Text(
-                'Noch keine DAB+ Sender gefunden.\nSendersuchlauf über das DAB-Menü starten.',
+                context.l10n.radioSidebarNoDabStations,
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white70, fontSize: 18),
+                style: const TextStyle(color: Colors.white70, fontSize: 18),
               ),
             ),
           );
@@ -773,10 +777,10 @@ class _EditableFavoriteRow extends StatelessWidget {
                 style: const TextStyle(color: Colors.white, fontSize: 15),
               ),
             ),
-            _SmallIconButton(icon: Icons.keyboard_arrow_up, tooltip: 'Nach oben', onTap: onMoveUp),
-            _SmallIconButton(icon: Icons.keyboard_arrow_down, tooltip: 'Nach unten', onTap: onMoveDown),
-            _SmallIconButton(icon: Icons.edit_outlined, tooltip: 'Bearbeiten (Name, Logo)', onTap: onRename),
-            _SmallIconButton(icon: Icons.delete_outline, tooltip: 'Entfernen', onTap: onRemove),
+            _SmallIconButton(icon: Icons.keyboard_arrow_up, tooltip: context.l10n.radioMoveUp, onTap: onMoveUp),
+            _SmallIconButton(icon: Icons.keyboard_arrow_down, tooltip: context.l10n.radioMoveDown, onTap: onMoveDown),
+            _SmallIconButton(icon: Icons.edit_outlined, tooltip: context.l10n.radioEditNameLogo, onTap: onRename),
+            _SmallIconButton(icon: Icons.delete_outline, tooltip: context.l10n.radioRemove, onTap: onRemove),
           ],
         ),
       ),

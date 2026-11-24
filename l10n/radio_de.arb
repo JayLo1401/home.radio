@@ -1,0 +1,445 @@
+{
+  "radioErrorConnectionLost": "Verbindung zum Sender verloren - versuche erneut…",
+  "radioErrorStationUnreachable": "Sender nicht erreichbar - versuche erneut…",
+  "radioErrorPlayback": "Wiedergabefehler: {message}",
+  "@radioErrorPlayback": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "radioSourceFm": "UKW",
+  "radioSourceInternet": "Internetradio",
+  "radioMoonNew": "Neumond",
+  "radioMoonWaxingCrescent": "Zunehmende Sichel",
+  "radioMoonFirstQuarter": "Zunehmender Halbmond",
+  "radioMoonWaxingGibbous": "Zunehmender Dreiviertelmond",
+  "radioMoonFull": "Vollmond",
+  "radioMoonWaningGibbous": "Abnehmender Dreiviertelmond",
+  "radioMoonLastQuarter": "Abnehmender Halbmond",
+  "radioMoonWaningCrescent": "Abnehmende Sichel",
+  "radioFmSameProgrammeStronger": "(stärker)",
+  "radioFmSameProgrammeWeaker": "(schwächer)",
+  "radioFmSameProgrammeAlsoOn": "auch auf {frequency}",
+  "@radioFmSameProgrammeAlsoOn": {
+    "placeholders": {
+      "frequency": {
+        "type": "String"
+      }
+    }
+  },
+  "radioDabEnsembleUnknown": "Ensemble unbekannt",
+  "radioPlaceSearchFailed": "Ortssuche: HTTP {code}",
+  "@radioPlaceSearchFailed": {
+    "placeholders": {
+      "code": {
+        "type": "int"
+      }
+    }
+  },
+  "radioProgramNumberTitle": "Programmnummer vergeben",
+  "radioEditStationTitle": "Sender bearbeiten",
+  "radioEditStationName": "Name",
+  "radioEditStationSearchLogo": "Logo suchen",
+  "radioEditStationUseLiveImage": "Aktuelles Senderbild übernehmen",
+  "radioEditStationNewLogoHint": "Neues Logo - wird mit „Speichern“ übernommen.",
+  "radioLogoDabIdle": "Holt das Bild, das der Sender selbst ausstrahlt.",
+  "radioLogoDabWaiting": "Warte auf ein Bild vom Sender (bis etwa 30 s)…",
+  "radioLogoDabUseImage": "Dieses Bild übernehmen",
+  "radioLogoDabNone": "Der Sender hat in der Zeit kein Bild gesendet.",
+  "radioDabDecoderFailed": "DAB+-Decoder konnte nicht gestartet werden.",
+  "radioLogoDabFetch": "DAB-Logo holen",
+  "radioLogoTitle": "Logo wählen",
+  "radioLogoSearchInternet": "Im Internet suchen (Sendername)",
+  "radioLogoNoResults": "Keine Treffer mit Logo.",
+  "radioLogoOwnUrl": "oder eigene Bild-Adresse (URL)",
+  "radioRegionEurope": "Europa",
+  "radioRegionNorthAmerica": "Nord- & Mittelamerika",
+  "radioRegionSouthAmerica": "Südamerika",
+  "radioRegionAsia": "Asien & Nahost",
+  "radioRegionAfrica": "Afrika",
+  "radioRegionOceania": "Ozeanien",
+  "radioRegionOther": "Andere",
+  "radioSavedAsNumber": "\"{name}\" als Nr. {number} gespeichert.",
+  "@radioSavedAsNumber": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "radioSearchInternetTitle": "Internetradio suchen",
+  "radioSearchStationName": "Sendername",
+  "radioSearchGenre": "Genre",
+  "radioSearchAllGenres": "Alle Genres",
+  "radioSearchRegion": "Region",
+  "radioSearchAllRegions": "Alle Regionen",
+  "radioSearchCountry": "Land",
+  "radioSearchAllCountries": "Alle Länder",
+  "radioSearchButton": "Suchen",
+  "radioSearchNoResults": "Keine Ergebnisse.",
+  "radioStop": "Stopp",
+  "radioSearchPreview": "Probehören",
+  "radioSearchAddFavorite": "Favorit",
+  "radioDabClearAllTitle": "Alle DAB-Sender löschen?",
+  "radioDabClearAllMessage": "Entfernt alle bisher gefundenen DAB+-Sender aus der Liste \"Alle DAB+ Sender\" und alle DAB+-Favoriten. Kann nicht rückgängig gemacht werden.",
+  "radioDabTitle": "DAB+ Sender",
+  "radioScanTitle": "Sendersuchlauf",
+  "radioDabClearAll": "Alle DAB-Sender löschen",
+  "radioFavorites": "Favoriten",
+  "radioDabNoFavorites": "Noch keine DAB+-Favoriten.",
+  "radioDabAllStations": "Alle DAB+ Sender",
+  "radioDabSortGrouped": "Nach Ensemble gruppiert",
+  "radioDabSortByEnsemble": "Nach Ensemble sortiert",
+  "radioDabSortByName": "Nach Name",
+  "radioDabNoStations": "Noch keine Sender gefunden. Sendersuchlauf starten.",
+  "radioLogoReceiveAllHaveLogo": "Alle Sender haben schon ein Logo.",
+  "radioLogoReceiveProgress": "Sender {index} von {total} - warte auf ein Bild vom Sender…",
+  "@radioLogoReceiveProgress": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "radioLogoReceiveDone": "Fertig: {found} von {total} Sendern haben ein Bild gesendet.",
+  "@radioLogoReceiveDone": {
+    "placeholders": {
+      "found": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "radioLogoReceiveTitle": "Fehlende Logos per Empfang",
+  "radioLogoReceiveStart": "Fehlende Logos per Empfang holen",
+  "radioListen": "Anhören",
+  "radioEditNameLogo": "Bearbeiten (Name, Logo)",
+  "radioRemoveFavorite": "Favorit entfernen",
+  "radioProgramNumberChip": "Nr. {number}",
+  "@radioProgramNumberChip": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "radioAddFavorite": "Favorit hinzufügen",
+  "radioSourceUsbHint": "Quelle: RTL-SDR-Stick per USB - siehe \"Radio-Empfänger\" in den Einstellungen.",
+  "radioSourceNetworkHint": "Quelle: RTL-SDR über Netzwerk - siehe \"Radio-Empfänger\" in den Einstellungen.",
+  "radioScanStart": "Sendersuchlauf starten",
+  "radioDabSingleChannel": "Einzelnen Kanal suchen:",
+  "radioDabSearchChannel": "{channel} suchen",
+  "@radioDabSearchChannel": {
+    "placeholders": {
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "radioPlaybackOfFailed": "Wiedergabe von \"{name}\" fehlgeschlagen.",
+  "@radioPlaybackOfFailed": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "radioDabSearchChannelTitle": "Kanal {channel} suchen",
+  "@radioDabSearchChannelTitle": {
+    "placeholders": {
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "radioDabScanningChannel": "Suche auf {channel} ({freqKhz} kHz), bis zu 15 Sekunden…",
+  "@radioDabScanningChannel": {
+    "placeholders": {
+      "channel": {
+        "type": "String"
+      },
+      "freqKhz": {
+        "type": "int"
+      }
+    }
+  },
+  "radioDabScanProgressOf": "Kanal {index} von {total}: {label}",
+  "@radioDabScanProgressOf": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      },
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "radioDabScanProgress": "Kanal {index}: {label}",
+  "@radioDabScanProgress": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      },
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "radioDabChannelNothingFound": "Auf {channel} wurde kein DAB+-Ensemble empfangen.",
+  "@radioDabChannelNothingFound": {
+    "placeholders": {
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "radioDabScanDone": "Fertig: {ensembles} Ensemble(s) mit {stations} Sender(n) gefunden. Alle gefundenen Sender stehen unter \"Alle DAB+ Sender\".",
+  "@radioDabScanDone": {
+    "placeholders": {
+      "ensembles": {
+        "type": "int"
+      },
+      "stations": {
+        "type": "int"
+      }
+    }
+  },
+  "radioDabNoEnsemblesYet": "Noch keine Ensembles gefunden…",
+  "radioDabEnsembleNameUnknown": "Ensemble-Name unbekannt",
+  "radioDabEnsembleNoServices": "Sender in diesem Ensemble noch nicht erkannt (kurz erneut versuchen).",
+  "radioPlayingShort": "Läuft…",
+  "radioStopPlayback": "Wiedergabe stoppen",
+  "radioFmClearAllTitle": "Alle UKW-Sender löschen?",
+  "radioFmClearAllMessage": "Entfernt alle gespeicherten UKW-Sender aus der Liste. UKW-Favoriten bleiben erhalten.",
+  "radioFmTitle": "UKW-Sender (FM)",
+  "radioFmFindStations": "Sender suchen",
+  "radioFmTuneManually": "Manuell einstellen",
+  "radioFmAllStations": "Alle UKW-Sender",
+  "radioDeleteAll": "Alle löschen",
+  "radioFmNoStations": "Noch keine UKW-Sender. Suchlauf starten oder einen Sender manuell einstellen und speichern.",
+  "radioFmSignal": "Signal {level}",
+  "@radioFmSignal": {
+    "placeholders": {
+      "level": {
+        "type": "String"
+      }
+    }
+  },
+  "radioRemoveStation": "Sender entfernen",
+  "radioFmScanTitle": "UKW-Sendersuchlauf",
+  "radioReceiverFailed": "Empfänger konnte nicht gestartet werden.",
+  "radioSearching": "Suche…",
+  "radioFmScanSurvey": "Schritt 1/2: Band wird vermessen ({frequency})…",
+  "@radioFmScanSurvey": {
+    "placeholders": {
+      "frequency": {
+        "type": "String"
+      }
+    }
+  },
+  "radioFmScanProbe": "Schritt 2/2: Prüfe Sender {index} von {total} ({frequency})…",
+  "@radioFmScanProbe": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      },
+      "frequency": {
+        "type": "String"
+      }
+    }
+  },
+  "radioFmScanDone": "Fertig: {count} Sender gefunden und gespeichert.",
+  "@radioFmScanDone": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "radioFmScanImagesRemoved": "{count} schwache Störfrequenz(en) aussortiert.",
+  "@radioFmScanImagesRemoved": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "radioFmSeekNothingFound": "Kein weiterer Sender gefunden.",
+  "radioFmFrequencyTitle": "Frequenz in MHz",
+  "radioFmFrequencyHint": "z. B. 99,9",
+  "radioSaved": "{name} gespeichert.",
+  "@radioSaved": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "radioFmTuneTitle": "UKW manuell einstellen",
+  "radioFmNoRdsName": "kein RDS-Name",
+  "radioFmSeek": "Suchen",
+  "radioFmStepDown": "−0,05",
+  "radioFmStepUp": "+0,05",
+  "radioFmEnterFrequency": "Frequenz eingeben",
+  "radioFmSaveStation": "Als Sender speichern",
+  "radioFmSaveFavorite": "Als Favorit speichern",
+  "radioNoStationSelected": "Kein Sender ausgewählt",
+  "radioStoppedDisconnected": "Gestoppt - Verbindung getrennt",
+  "radioNowPlaying": "Wiedergabe läuft",
+  "radioPaused": "Pausiert",
+  "radioPlay": "Abspielen",
+  "radioWeatherUnavailable": "Wetter nicht verfügbar - versuche erneut…",
+  "radioWeatherNoData": "Keine Daten",
+  "radioWeatherTemp": "Temp",
+  "radioWeatherWind": "Wind km/h",
+  "radioWeatherRain": "Regen l/m²",
+  "radioWeatherRainAmount": "{amount} l",
+  "@radioWeatherRainAmount": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "radioSunrise": "Sonnenaufgang",
+  "radioSunset": "Sonnenuntergang",
+  "radioDawn": "Morgendämmerung",
+  "radioSolarNoon": "Mittag",
+  "radioDusk": "Abenddämmerung",
+  "radioRadarLoginRejected": "Anmeldung abgelehnt (HTTP {code})",
+  "@radioRadarLoginRejected": {
+    "placeholders": {
+      "code": {
+        "type": "int"
+      }
+    }
+  },
+  "radioRadarIsWebPage": "die Adresse ist eine Webseite, kein Bild - als Art „Webseite“ wählen",
+  "radioRadarNotConfigured": "Kein Wetterradar eingerichtet -\nEinstellungen → Wetterradar → Quelle",
+  "radioRadarWebPageAndroidOnly": "Webseiten als Radarquelle gibt es nur in der Android-Version.",
+  "radioRadarUnreachable": "Radar nicht erreichbar: {error}",
+  "@radioRadarUnreachable": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "radioRadarStale": "Stand {time} · nicht erreichbar",
+  "@radioRadarStale": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "radioLinkSourceLost": "Verbindung zur RTL-SDR-Quelle verloren",
+  "radioLinkDabSignalFound": "DAB-Signal gefunden",
+  "radioLinkEnsembleFound": "Ensemble „{label}“ gefunden",
+  "@radioLinkEnsembleFound": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "radioLinkStationFound": "Sender gefunden - Audio startet…",
+  "radioLinkConnected": "Sender verbunden",
+  "radioLinkConnectingServer": "Verbinde mit dem RTL-Server…",
+  "radioLinkWaitingForStick": "Warte auf den Stick am Server…",
+  "radioLinkOpeningUsbStick": "USB-Stick wird geöffnet…",
+  "radioLinkTuning": "Sender wird eingestellt…",
+  "radioLinkTuningFrequency": "{frequency} wird eingestellt…",
+  "@radioLinkTuningFrequency": {
+    "placeholders": {
+      "frequency": {
+        "type": "String"
+      }
+    }
+  },
+  "radioLinkSearching": "Sender wird gesucht…",
+  "radioLinkSearchingChannel": "Kanal {channel} wird gesucht…",
+  "@radioLinkSearchingChannel": {
+    "placeholders": {
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "radioLinkApp": "App",
+  "radioLinkRtlServer": "RTL-Server",
+  "radioLinkStick": "Stick",
+  "radioLinkUsbStick": "USB-Stick",
+  "radioLinkStation": "Sender",
+  "radioLinkTvChannel": "Sender",
+  "radioDone": "Fertig",
+  "radioEditFavorites": "Favoriten bearbeiten",
+  "radioEditFavoritesHint": "Reihenfolge ändern, umbenennen oder entfernen - mit ✓ fertig.",
+  "radioFavoritesLoadError": "Fehler beim Laden der Favoriten:\n{error}",
+  "@radioFavoritesLoadError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "radioNoFavorites": "Noch keine Favoriten.\nSuche Sender über das Menü.",
+  "radioRemoveFavoriteTitle": "Favorit entfernen?",
+  "radioRemoveFavoriteMessage": "„{name}“ aus den Favoriten entfernen?",
+  "@radioRemoveFavoriteMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "radioRemove": "Entfernen",
+  "radioSidebarNoFmStations": "Noch keine UKW-Sender.\nSuchlauf oder manuelles Einstellen über das UKW-Menü oben.",
+  "radioDabStationsLoadError": "Fehler beim Laden der DAB+ Sender:\n{error}",
+  "@radioDabStationsLoadError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "radioSidebarNoDabStations": "Noch keine DAB+ Sender gefunden.\nSendersuchlauf über das DAB-Menü starten.",
+  "radioMoveUp": "Nach oben",
+  "radioMoveDown": "Nach unten",
+  "radioLinkBuffering": "Stream wird gepuffert…",
+  "radioLinkConnectingStation": "Verbinde mit dem Sender…",
+  "radioPausedOtherApp": "Pausiert - eine andere App spielt Audio ab.",
+  "radioSourceLostReconnecting": "Verbindung zur RTL-SDR-Quelle verloren - versuche erneut zu verbinden…",
+  "radioUsbStickDetached": "USB-Stick getrennt - warte auf Wiederanschluss…",
+  "radioNoReceiverConfigured": "Kein Radio-Empfänger eingerichtet (Einstellungen)",
+  "radioFmReceptionFailedDot": "UKW-Empfang fehlgeschlagen.",
+  "radioFmReceptionFailed": "UKW-Empfang fehlgeschlagen",
+  "radioSourceUnreachableRetrying": "RTL-SDR-Quelle nicht erreichbar - versuche erneut…",
+  "radioSourceUnreachable": "RTL-SDR-Quelle nicht erreichbar.",
+  "radioRtlServerUnreachableRetrying": "RTL-Server nicht erreichbar - versuche erneut…",
+  "radioRtlServerUnreachable": "RTL-Server nicht erreichbar",
+  "radioUsbStickNotFound": "USB-Stick nicht gefunden oder kein Zugriff",
+  "radioNoSignalRetrying": "Kein Signal! - Versuche erneut…",
+  "radioNoSignal": "Kein Signal!",
+  "radioLinkNoSignalRetrying": "Kein Signal - versuche erneut…",
+  "radioMenuListening": "Funk",
+  "radioMenuDabStations": "DAB Sender suchen",
+  "radioMenuAmBands": "LW/MW/KW",
+  "radioMenuSettings": "Radio-Einstellungen"
+}

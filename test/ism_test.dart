@@ -1,5 +1,7 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:home_system/data/models/ism.dart';
+import 'package:home_system/l10n/l10n.dart';
 
 List<int> bitsOf(int value, int width) => [for (var i = width - 1; i >= 0; i--) (value >> i) & 1];
 
@@ -32,6 +34,9 @@ List<int> pwm(List<int> bits, {required int short, required int long, required i
 }
 
 void main() {
+  // The expected texts are the German ones.
+  setUpAll(() => applyAppLocale(const Locale('de')));
+
   test('Nexus-TH: 21.6 °C, 48 %, channel 2', () {
     final bits = [
       ...bitsOf(0x5A, 8), 1, 0, ...bitsOf(1, 2), // id, battery, ?, channel-1

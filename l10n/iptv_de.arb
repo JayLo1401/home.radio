@@ -1,0 +1,162 @@
+{
+  "iptvListName": "Internet-TV",
+  "iptvBrowse": "Sender suchen",
+  "iptvBrowseTitle": "Internet-TV – Sender suchen",
+  "iptvSearchName": "Sendername",
+  "iptvCountry": "Land",
+  "iptvMyCountries": "Meine Länder ({countries})",
+  "@iptvMyCountries": {
+    "placeholders": {
+      "countries": {
+        "type": "String"
+      }
+    }
+  },
+  "iptvAllCountries": "Alle Länder",
+  "iptvCategory": "Kategorie",
+  "iptvAllCategories": "Alle Kategorien",
+  "iptvLanguage": "Sprache",
+  "iptvMyLanguages": "Meine Sprachen ({languages})",
+  "@iptvMyLanguages": {
+    "placeholders": {
+      "languages": {
+        "type": "String"
+      }
+    }
+  },
+  "iptvAllLanguages": "Alle Sprachen",
+  "iptvBrowseKeyHint": "OK spielt den Sender  ·  ★ (→) oder Optionen-Taste: in die Internet-TV-Liste aufnehmen bzw. entfernen",
+  "iptvResultCount": "{count, plural, =1{1 Sender} other{{count} Sender}}",
+  "@iptvResultCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "iptvCatalogueDate": "Katalog vom {date}",
+  "@iptvCatalogueDate": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "iptvLoadingCatalogue": "Senderkatalog wird geladen… (beim ersten Mal kann das eine Minute dauern)",
+  "iptvUpdatingCatalogue": "wird aktualisiert…",
+  "iptvUpdateFailed": "Aktualisieren fehlgeschlagen",
+  "iptvCatalogueError": "Senderkatalog nicht ladbar: {error}",
+  "@iptvCatalogueError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "iptvTryAgain": "Nochmal versuchen",
+  "iptvNoResults": "Keine Sender gefunden",
+  "iptvAddFavorite": "In die Internet-TV-Liste",
+  "iptvRemoveFavorite": "Aus der Internet-TV-Liste entfernen",
+  "iptvAddedAsNumber": "„{name}“ ist jetzt Internet-TV Nr. {number}",
+  "@iptvAddedAsNumber": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "iptvRemoved": "„{name}“ aus der Internet-TV-Liste entfernt",
+  "@iptvRemoved": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "iptvFavoriteNumber": "Nr. {number}",
+  "@iptvFavoriteNumber": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "iptvEmptyList": "Noch keine Internet-TV-Sender. Oben „Sender suchen“: dort spielt OK einen Sender, ★ nimmt ihn in diese Liste auf.",
+  "iptvChannelListKeyHint": "OK abspielen (laufender Sender: Info)  ·  → Optionen (verschieben, entfernen)  ·  ← schließen",
+  "iptvMove": "Verschieben",
+  "iptvMoveHint": "↑/↓ verschieben  ·  OK fertig",
+  "iptvChangeNumber": "Nummer ändern…",
+  "iptvPlay": "Abspielen",
+  "iptvLinkConnecting": "Verbinde mit dem Sender…",
+  "iptvLinkTryingOther": "Anderer Stream wird versucht ({attempt} von {count})…",
+  "@iptvLinkTryingOther": {
+    "placeholders": {
+      "attempt": {
+        "type": "int"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "iptvErrorNoPicture": "„{channel}“ sendet gerade nicht oder ist hier gesperrt (Geo-Sperre).",
+  "@iptvErrorNoPicture": {
+    "placeholders": {
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "iptvNoGuide": "Kein Programmführer für Internet-TV",
+  "iptvNoGuideSentence": "Für Internet-TV-Sender gibt es keinen Programmführer.",
+  "iptvBannerKeyHint": "{channelListKey} Senderliste  ·  {optionsKey} Optionen",
+  "@iptvBannerKeyHint": {
+    "placeholders": {
+      "channelListKey": {
+        "type": "String"
+      },
+      "optionsKey": {
+        "type": "String"
+      }
+    }
+  },
+  "iptvGeoBlocked": "Evtl. nur im eigenen Land empfangbar (Geo-Sperre)",
+  "iptvNotAlways": "Sendet nicht rund um die Uhr",
+  "iptvSource": "Quelle: offener Senderkatalog iptv-org (github.com/iptv-org/iptv)",
+  "iptvNotSetUpIntro": "Oder ganz ohne Receiver: frei empfangbare Sender aus dem Internet (Internet-TV).",
+  "iptvSetUp": "Internet-TV-Sender suchen",
+  "iptvSettingsTitle": "Internet-TV",
+  "iptvSettingsIntro": "Frei und legal empfangbare Fernsehsender aus dem Internet – aus dem offenen Senderkatalog iptv-org (github.com/iptv-org/iptv). Internet-TV hat eine eigene Senderliste mit eigenen Nummern; die Liste des Receivers bleibt, wie sie ist. Manche Sender gehen nur in ihrem Land (Geo-Sperre) oder nicht rund um die Uhr.",
+  "iptvSettingsEnabled": "Internet-TV im TV anzeigen",
+  "iptvSettingsCountries": "Meine Länder",
+  "iptvSettingsCountriesHelp": "Mit diesen Ländern beginnt die Sendersuche.",
+  "iptvSettingsLanguages": "Meine Sprachen",
+  "iptvSettingsLanguagesHelp": "Mit diesen Sprachen beginnt die Sendersuche – keine: alle Sprachen.",
+  "iptvSettingsAddCountry": "Land hinzufügen",
+  "iptvSettingsAddLanguage": "Sprache hinzufügen",
+  "iptvSettingsChipHelp": "OK auf ein Land bzw. eine Sprache nimmt es wieder heraus.",
+  "iptvSettingsCatalogue": "Senderkatalog",
+  "iptvSettingsCatalogueHelp": "Wird beim ersten Suchen geladen und danach höchstens einmal am Tag aktualisiert.",
+  "iptvSettingsRefresh": "Jetzt aktualisieren",
+  "iptvSettingsFavorites": "{count, plural, =0{Noch keine Sender in der Internet-TV-Liste} =1{1 Sender in der Internet-TV-Liste} other{{count} Sender in der Internet-TV-Liste}}",
+  "@iptvSettingsFavorites": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "iptvSettingsFavoritesHelp": "Sortieren und entfernen in der Senderliste des TV: dort → auf einem Sender.",
+  "iptvSettingsClearFavorites": "Alle entfernen",
+  "iptvSettingsClearConfirm": "Alle {count} Sender aus der Internet-TV-Liste entfernen?",
+  "@iptvSettingsClearConfirm": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
+}

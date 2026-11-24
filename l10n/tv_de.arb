@@ -1,0 +1,255 @@
+{
+  "tvLinkConnecting": "Verbinde mit dem Receiver…",
+  "tvLinkZapping": "{reason} - Receiver schaltet um…",
+  "@tvLinkZapping": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "tvReasonEncrypted": "Verschlüsselt",
+  "tvReasonNoFreeTuner": "Kein freier Tuner",
+  "tvLinkLoadingPicture": "Bild wird geladen…",
+  "tvLinkDescrambling": "Verschlüsselt - Receiver entschlüsselt…",
+  "tvLinkPlaying": "Sender läuft",
+  "tvErrorEncryptedReceiverBusy": "„{channel}“ ist verschlüsselt und der Receiver zeigt selbst einen anderen Sender - Einstellungen → TV → „Receiver bei Bedarf umschalten“.",
+  "@tvErrorEncryptedReceiverBusy": {
+    "placeholders": {
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "tvErrorStillEncrypted": "„{channel}“ bleibt verschlüsselt - Karte bzw. CI-Modul für diesen Sender freigeschaltet?",
+  "@tvErrorStillEncrypted": {
+    "placeholders": {
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "tvErrorNoTunerCableBusy": "Kein freier Tuner für „{channel}“ - das Sat-Kabel ist gerade auf einem anderen Band belegt (Aufnahme oder ein anderes Gerät).",
+  "@tvErrorNoTunerCableBusy": {
+    "placeholders": {
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "tvErrorNoTunerReceiverBusy": "Kein freier Tuner für „{channel}“ - der Receiver zeigt selbst einen Sender auf einem anderen Band (Einstellungen → TV → „Receiver bei Bedarf umschalten“).",
+  "@tvErrorNoTunerReceiverBusy": {
+    "placeholders": {
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "tvErrorNoPicture": "Kein Bild von „{channel}“ - ist der Receiver an und ein Tuner frei?",
+  "@tvErrorNoPicture": {
+    "placeholders": {
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "tvPaused": "Angehalten - ⏯ spielt weiter",
+  "tvAudioTrack": "Tonspur",
+  "tvAudioTrackNumber": "Tonspur {number}",
+  "@tvAudioTrackNumber": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "tvAudioTrackCount": "{count} Tonspuren",
+  "@tvAudioTrackCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "tvAudioChannels": "{count} Kanäle",
+  "@tvAudioChannels": {
+    "description": "Number of sound channels of an audio track (not 1, 2, 6 or 8).",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "tvAudioLanguageGerman": "Deutsch",
+  "tvAudioLanguageEnglish": "Englisch",
+  "tvAudioLanguageFrench": "Französisch",
+  "tvAudioLanguageItalian": "Italienisch",
+  "tvAudioLanguageSpanish": "Spanisch",
+  "tvAudioLanguageTurkish": "Türkisch",
+  "tvAudioLanguagePolish": "Polnisch",
+  "tvAudioLanguageCroatianSerbian": "Kroatisch/Serbisch",
+  "tvAudioOriginal": "Originalton",
+  "tvAudioDescription": "Audiodeskription",
+  "tvResolutionLines": "{lines} Zeilen",
+  "@tvResolutionLines": {
+    "placeholders": {
+      "lines": {
+        "type": "int"
+      }
+    }
+  },
+  "tvTranscoded": "Transkodiert",
+  "tvOriginalStream": "Original",
+  "tvGuide": "Programmführer",
+  "tvAllProgramsOf": "Alle Sendungen von {channel}",
+  "@tvAllProgramsOf": {
+    "placeholders": {
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "tvAllProgramsOfThisChannel": "Alle Sendungen von diesem Sender",
+  "tvNextUpNow": "Als Nächstes · gleich",
+  "tvNextUpInMinutes": "Als Nächstes · in {minutes} Min.",
+  "@tvNextUpInMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "tvNotSetUpIntro": "Fernsehen vom eigenen Sat-Receiver: Senderlisten, Senderlogos und Programmführer kommen direkt vom Enigma2-Receiver (z. B. GigaBlue, VU+, Dreambox mit OpenWebif) im Heimnetz.",
+  "tvSetUpReceiver": "Receiver einrichten",
+  "tvBannerKeyHint": "{channelListKey} Senderliste  ·  {guideKey} Programm  ·  {optionsKey} Optionen",
+  "@tvBannerKeyHint": {
+    "description": "Key hint in the info banner; the placeholders are the names of the assigned remote keys.",
+    "placeholders": {
+      "channelListKey": {
+        "type": "String"
+      },
+      "guideKey": {
+        "type": "String"
+      },
+      "optionsKey": {
+        "type": "String"
+      }
+    }
+  },
+  "tvNoProgramInfo": "Keine Programminformation",
+  "tvNoProgramInfoSentence": "Keine Programminformation.",
+  "tvThen": "Danach",
+  "@tvThen": {
+    "description": "Before the start time and title of the programme after the current one."
+  },
+  "tvChannelListKeyHint": "OK abspielen (laufender Sender: Info)  ·  → Programm  ·  ← schließen",
+  "tvNoChannelsInList": "Keine Sender in dieser Liste",
+  "tvChannelList": "Senderliste",
+  "tvBouquetFavorites": "Favoriten",
+  "tvBouquetLastScanned": "Zuletzt gescannt",
+  "tvMinutes": "{minutes} Min.",
+  "@tvMinutes": {
+    "description": "Length of a programme.",
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "tvNoDescription": "Keine Beschreibung.",
+  "tvToday": "Heute",
+  "tvTomorrow": "Morgen",
+  "tvDayMonthPattern": "dd.MM.",
+  "@tvDayMonthPattern": {
+    "description": "intl DateFormat pattern for a short date without the year (day and month)."
+  },
+  "tvSchedule": "Programm",
+  "@tvSchedule": {
+    "description": "Heading of one channel's list of programmes (usually a week)."
+  },
+  "tvScheduleNoInfo": "Für diesen Sender hat der Receiver keine Programminformation.",
+  "tvGuideKeyHint": "OK umschalten  ·  {optionsKey} alle Sendungen  ·  ‹‹ ›› ±3 Std.",
+  "@tvGuideKeyHint": {
+    "placeholders": {
+      "optionsKey": {
+        "type": "String"
+      }
+    }
+  },
+  "tvSettingsTitle": "TV: Receiver",
+  "tvSettingsIntro": "Ein Enigma2-Sat-Receiver mit OpenWebif im Heimnetz (z. B. GigaBlue, VU+, Dreambox mit teamBlue, OpenATV oder OpenPLi). Senderlisten, Senderlogos (Picons) und der Programmführer kommen vom Receiver, das Bild über seinen Streaming-Port.",
+  "tvSettingsAddress": "Adresse des Receivers (IP oder Name)",
+  "tvSettingsWebPort": "Web-Port (OpenWebif)",
+  "tvSettingsStreamPort": "Streaming-Port",
+  "tvSettingsPortsHelp": "Üblich: Web 80, Streaming 8001 (8002 = umgewandelt, falls der Receiver das kann).",
+  "tvSettingsHttps": "HTTPS für die Weboberfläche",
+  "tvSettingsUser": "Benutzer (falls Anmeldung aktiv)",
+  "tvSettingsPassword": "Passwort",
+  "tvSettingsTestConnection": "Verbindung testen",
+  "tvSettingsEnterAddress": "Bitte die Adresse des Receivers eintragen.",
+  "tvSettingsConnected": "Verbunden: {receiver} · {count} Senderlisten",
+  "@tvSettingsConnected": {
+    "placeholders": {
+      "receiver": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "tvSettingsChannelList": "Senderliste für TV",
+  "tvSettingsChannelListHelp": "Im TV wechseln ← / → in der Senderliste zwischen den Listen.",
+  "tvEnigma2Receiver": "Enigma2-Receiver",
+  "tvReceiverNeedsLogin": "Enigma2-Receiver (Anmeldung nötig)",
+  "tvSearchReceiver": "Receiver suchen",
+  "tvSearchScanning": "Durchsuche das Heimnetz …",
+  "tvSearchScanningNetworks": "Durchsuche das Heimnetz ({networks}) …",
+  "@tvSearchScanningNetworks": {
+    "placeholders": {
+      "networks": {
+        "type": "String"
+      }
+    }
+  },
+  "tvSearchNoneFound": "Kein Receiver gefunden. Ist er eingeschaltet und im selben Netz? Sonst die Adresse bitte von Hand eintragen.",
+  "tvSearchFound": "{count, plural, =1{Ein Receiver gefunden - OK übernimmt ihn.} other{{count} Receiver gefunden - OK übernimmt ihn.}}",
+  "@tvSearchFound": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "tvErrorNoReceiver": "Kein Receiver eingerichtet",
+  "tvErrorUnreachable": "Receiver nicht erreichbar ({host}): {error}",
+  "@tvErrorUnreachable": {
+    "placeholders": {
+      "host": {
+        "type": "String"
+      },
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "tvErrorLoginRejected": "Anmeldung abgelehnt - Benutzer/Passwort prüfen",
+  "tvErrorHttpStatus": "Receiver antwortet mit Fehler {status}",
+  "@tvErrorHttpStatus": {
+    "placeholders": {
+      "status": {
+        "type": "String"
+      }
+    }
+  },
+  "tvErrorUnexpectedResponse": "Unerwartete Antwort vom Receiver",
+  "tvErrorZapFailed": "Receiver schaltet nicht um: {message}",
+  "@tvErrorZapFailed": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "tvSettingsButton": "TV-Einstellungen"
+}

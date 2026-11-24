@@ -1,42 +1,93 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/nas_providers.dart';
 import '../../core/providers.dart';
+import '../../data/services/nas_service.dart';
 import '../../data/services/update_service.dart';
+import '../../l10n/l10n.dart';
 
 /// Downloads and installs [update] behind a progress dialog. On Windows/
 /// Linux the app quits when the installer takes over; on Android the
 /// system's "Update?" confirmation follows. Errors end up in a SnackBar.
+///
+/// Right before installing, a backup goes to the NAS backup folder if one
+/// is set (Settings → NAS) - at most [_nasBackupTimeout]; if that fails, a
+/// short message and the update goes on.
 Future<void> installUpdate(BuildContext context, WidgetRef ref, AvailableUpdate update) async {
   final progress = ValueNotifier<double?>(null);
+  final backingUp = ValueNotifier(false);
   final messenger = ScaffoldMessenger.of(context);
   final navigator = Navigator.of(context, rootNavigator: true);
+  final l = context.l10n;
   showDialog<void>(
     context: context,
     barrierDismissible: false,
     builder: (_) => AlertDialog(
-      title: Text('Update auf ${update.version}'),
-      content: ValueListenableBuilder<double?>(
-        valueListenable: progress,
-        builder: (_, value, _) => Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(value == null ? 'Wird geladen…' : 'Wird geladen… ${(value * 100).round()} %'),
-            const SizedBox(height: 12),
-            LinearProgressIndicator(value: value),
-          ],
-        ),
+      title: Text(l.miscUpdateDialogTitle(update.version)),
+      content: ListenableBuilder(
+        listenable: Listenable.merge([progress, backingUp]),
+        builder: (_, _) {
+          final value = backingUp.value ? null : progress.value;
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                backingUp.value
+                    ? l.nasBackupRunning
+                    : value == null
+                        ? l.miscUpdateDownloading
+                        : l.miscUpdateDownloadingPercent((value * 100).round()),
+              ),
+              const SizedBox(height: 12),
+              LinearProgressIndicator(value: value),
+            ],
+          );
+        },
       ),
     ),
   );
   try {
-    await ref.read(updateServiceProvider).install(update, onProgress: (v) => progress.value = v);
+    await ref.read(updateServiceProvider).install(
+      update,
+      onProgress: (v) => progress.value = v,
+      beforeInstall: () async {
+        backingUp.value = true;
+        final error = await backupToNasBeforeUpdate(ref);
+        backingUp.value = false;
+        if (error != null) messenger.showSnackBar(SnackBar(content: Text(l.nasBackupFailed(error))));
+      },
+    );
   } catch (e) {
-    messenger.showSnackBar(SnackBar(content: Text('Update fehlgeschlagen: $e')));
+    messenger.showSnackBar(SnackBar(content: Text(l.miscUpdateFailed('$e'))));
   } finally {
     navigator.pop();
     progress.dispose();
+    backingUp.dispose();
+  }
+}
+
+const _nasBackupTimeout = Duration(seconds: 30);
+
+/// Puts a backup into the NAS backup folder (if one is set) and prunes this
+/// device's old ones - for the update path. Never throws and gives up after
+/// [_nasBackupTimeout], so a dead NAS can't block an update. Returns a short
+/// error message, or null (done, or no backup folder).
+Future<String?> backupToNasBeforeUpdate(WidgetRef ref) async {
+  try {
+    final name = await ref.read(nasBackupServiceProvider).backupNow().timeout(_nasBackupTimeout);
+    if (name != null) debugPrint('NAS backup before update: $name');
+    return null;
+  } on TimeoutException {
+    return l10n.nasErrorTimeout;
+  } on NasException catch (e) {
+    return e.message;
+  } catch (e) {
+    debugPrint('NAS backup before update: $e');
+    return '$e';
   }
 }
 
@@ -88,20 +139,21 @@ class _UpdateSettingsScreenState extends ConsumerState<UpdateSettingsScreen> {
   Widget build(BuildContext context) {
     const hint = TextStyle(color: Colors.white54);
     final update = _update;
+    final l = context.l10n;
     return Scaffold(
-      appBar: AppBar(title: const Text('Updates')),
+      appBar: AppBar(title: Text(l.miscUpdatesTitle)),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Text('Installierte Version: ${_version ?? '…'}', style: Theme.of(context).textTheme.titleMedium),
+          Text(l.miscUpdateInstalledVersion(_version ?? '…'), style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 16),
           if (!UpdateService.supported)
-            const Text('Diese Version wurde lokal gebaut und aktualisiert sich nicht selbst.', style: hint)
+            Text(l.miscUpdateLocalBuild, style: hint)
           else ...[
             SwitchListTile(
               autofocus: true,
-              title: const Text('Beim Start automatisch aktualisieren'),
-              subtitle: const Text('Neue Versionen werden beim Start geladen und installiert.', style: hint),
+              title: Text(l.miscUpdateAuto),
+              subtitle: Text(l.miscUpdateAutoHint, style: hint),
               value: _auto,
               onChanged: (v) {
                 setState(() => _auto = v);
@@ -110,34 +162,32 @@ class _UpdateSettingsScreenState extends ConsumerState<UpdateSettingsScreen> {
             ),
             const SizedBox(height: 16),
             if (_checking)
-              const Row(
+              Row(
                 children: [
-                  SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
-                  SizedBox(width: 12),
-                  Text('Suche nach Updates…'),
+                  const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+                  const SizedBox(width: 12),
+                  Text(l.miscUpdateChecking),
                 ],
               )
             else if (update != null)
               Row(
                 children: [
-                  Expanded(child: Text('Neue Version ${update.version} verfügbar.')),
+                  Expanded(child: Text(l.miscUpdateAvailable(update.version))),
                   FilledButton.icon(
                     onPressed: () => installUpdate(context, ref, update),
                     icon: const Icon(Icons.system_update),
-                    label: const Text('Jetzt aktualisieren'),
+                    label: Text(l.miscUpdateNow),
                   ),
                 ],
               )
             else
               Row(
                 children: [
-                  Expanded(
-                    child: Text(_checked ? 'Die App ist aktuell (oder der Update-Server ist nicht erreichbar).' : ''),
-                  ),
+                  Expanded(child: Text(_checked ? l.miscUpdateUpToDate : '')),
                   OutlinedButton.icon(
                     onPressed: _check,
                     icon: const Icon(Icons.refresh),
-                    label: const Text('Erneut suchen'),
+                    label: Text(l.miscUpdateCheckAgain),
                   ),
                 ],
               ),

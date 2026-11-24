@@ -1,5 +1,7 @@
 import 'dart:math' as math;
 
+import '../../l10n/l10n.dart';
+
 /// One burst from the receiver's ISM detector (`ismBurst` event):
 /// alternating high/low durations in microseconds, starting with high.
 /// For OOK high = carrier on; for FSK high = the upper frequency.
@@ -81,9 +83,17 @@ class IsmReading {
     this.event,
   });
 
-  /// Identifies the device: model, id and channel.
+  /// Identifies the device: model, id and channel. Part of the saved device
+  /// names' keys, so [model] stays the same in every language.
   String get key => '$model|$id|${channel ?? ''}';
+
+  /// [model] for display, in the app's language.
+  String get modelName => model == ev1527Model ? l10n.modelsIsmRemoteSwitch : model;
 }
+
+/// [IsmReading.model] of EV1527 remotes - German, as in the names saved
+/// before the app had English ([IsmReading.modelName] shows it translated).
+const ev1527Model = 'Funkschalter (EV1527)';
 
 // --- bit helpers ---
 
@@ -405,10 +415,10 @@ List<IsmReading> decodeEv1527(IsmBurst b) {
   final data = bitsAt(r, 20, 4);
   return [
     IsmReading(
-      model: 'Funkschalter (EV1527)',
+      model: ev1527Model,
       id: id.toRadixString(16).toUpperCase().padLeft(5, '0'),
       category: IsmCategory.switches,
-      event: 'Taste ${data.toRadixString(2).padLeft(4, '0')}',
+      event: l10n.modelsIsmButton(data.toRadixString(2).padLeft(4, '0')),
     ),
   ];
 }

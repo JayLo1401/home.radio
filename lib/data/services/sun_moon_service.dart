@@ -3,6 +3,8 @@ import 'dart:math' as math;
 
 import 'package:http/http.dart' as http;
 
+import '../../l10n/l10n.dart';
+
 /// Sunrise/sunset, civil-twilight (dawn/dusk) and solar-noon for one local
 /// day, plus the current moon phase.
 class SunTimes {
@@ -70,14 +72,14 @@ class SunMoonService {
   }
 
   String _phaseName(double f) {
-    if (f < 0.02 || f > 0.98) return 'Neumond';
-    if (f < 0.23) return 'Zunehmende Sichel';
-    if (f < 0.27) return 'Zunehmender Halbmond';
-    if (f < 0.48) return 'Zunehmender Dreiviertelmond';
-    if (f < 0.52) return 'Vollmond';
-    if (f < 0.73) return 'Abnehmender Dreiviertelmond';
-    if (f < 0.77) return 'Abnehmender Halbmond';
-    return 'Abnehmende Sichel';
+    if (f < 0.02 || f > 0.98) return l10n.radioMoonNew;
+    if (f < 0.23) return l10n.radioMoonWaxingCrescent;
+    if (f < 0.27) return l10n.radioMoonFirstQuarter;
+    if (f < 0.48) return l10n.radioMoonWaxingGibbous;
+    if (f < 0.52) return l10n.radioMoonFull;
+    if (f < 0.73) return l10n.radioMoonWaningGibbous;
+    if (f < 0.77) return l10n.radioMoonLastQuarter;
+    return l10n.radioMoonWaningCrescent;
   }
 
   // --- NOAA Solar Calculator equations (public domain) ---

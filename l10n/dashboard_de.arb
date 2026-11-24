@@ -1,0 +1,67 @@
+{
+  "dashboardTitle": "Haussteuerung",
+  "dashboardAndroidOnly": "Die Haussteuerung gibt es nur unter Android (Tablet, TV-Box).",
+  "dashboardNoAddress": "Noch keine Adresse für das Home-Assistant-Dashboard eingetragen.",
+  "dashboardOpenSettings": "Einstellungen öffnen",
+  "dashboardUnreachable": "{url} ist nicht erreichbar - neuer Versuch in 15 Sekunden.",
+  "@dashboardUnreachable": {
+    "placeholders": {
+      "url": {
+        "type": "String"
+      }
+    }
+  },
+  "dashboardSettingsTitle": "Haussteuerungs-Einstellungen",
+  "dashboardAreaSubtitle": "Home-Assistant-Dashboard, Display per Bewegung",
+  "dashboardAddress": "Dashboard-Adresse",
+  "dashboardAddressHint": "http://homeassistant.local:8123/lovelace/0",
+  "dashboardAddressHelp": "Die Seite des Dashboards in Home Assistant. Die Anmeldung bleibt gespeichert. Mit „?kiosk“ am Ende (Integration „kiosk-mode“) ohne Kopf- und Seitenleiste.",
+  "dashboardNotSet": "nicht eingetragen",
+  "dashboardDisplayHeading": "Display per Bewegung",
+  "dashboardMotion": "Display per Kamera ein- und ausschalten",
+  "dashboardMotionHelp": "Die Kamera erkennt Bewegung vor dem Gerät: Das Display geht an und zeigt die Haussteuerung. Ist eine Weile niemand da, geht es aus. Es werden keine Bilder gespeichert oder verschickt.",
+  "dashboardNoCamera": "Dieses Gerät hat keine Kamera.",
+  "dashboardCameraDenied": "Ohne Zugriff auf die Kamera geht das nicht.",
+  "dashboardNoAccessibility": "Zum Ausschalten des Displays braucht Home System die Bedienungshilfe „Home System: Home-Taste“ (Android 9 oder neuer).",
+  "dashboardSensitivity": "Empfindlichkeit",
+  "dashboardSensitivityValue": "{value} von 10",
+  "@dashboardSensitivityValue": {
+    "placeholders": {
+      "value": {
+        "type": "int"
+      }
+    }
+  },
+  "dashboardTimeout": "Display aus nach",
+  "dashboardTimeoutMinutes": "{minutes, plural, =1{1 Minute} other{{minutes} Minuten}}",
+  "@dashboardTimeoutMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "dashboardTimeoutNever": "nie",
+  "dashboardLevel": "Bewegung jetzt: {percent} %",
+  "@dashboardLevel": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "dashboardLevelMotion": "Bewegung erkannt",
+  "dashboardHaHeading": "Home Assistant",
+  "dashboardWebhook": "Webhook für Bewegung",
+  "dashboardWebhookHint": "http://homeassistant.local:8123/api/webhook/flur-tablet",
+  "dashboardWebhookHelp": "Bei Bewegung schickt Home System \"motion\": true, nach einer Minute Ruhe \"motion\": false - als Auslöser für Automationen (Auslöser „Webhook“).",
+  "dashboardRemoteHelp": "Home Assistant kann das Display schalten und das Dashboard neu laden: {url}/api/display/on, …/off, …/api/dashboard/reload (POST, z. B. mit rest_command).",
+  "@dashboardRemoteHelp": {
+    "placeholders": {
+      "url": {
+        "type": "String"
+      }
+    }
+  },
+  "dashboardTestOff": "Display jetzt ausschalten (Test)"
+}

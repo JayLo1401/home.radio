@@ -82,6 +82,7 @@ class LauncherPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                 result.success(start(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", pkg, null))))
             }
             "isFireTv" -> result.success(isFireTv(appContext))
+            "sdkInt" -> result.success(android.os.Build.VERSION.SDK_INT)
             // The device's own name from its settings ("Jürgens FireTVStick") -
             // the admin page's host name when the network has none.
             "deviceName" -> result.success(

@@ -11,6 +11,7 @@ import '../../data/db/database.dart' show FmStation;
 import '../../data/models/favorite_channel.dart';
 import '../../data/repositories/fm_stations_repository.dart';
 import '../../data/services/dab_rtlsdr_service.dart' show DabRtlSdrService;
+import '../../l10n/l10n.dart';
 import '../shared/logo_picker_dialog.dart';
 import '../shared/program_number_dialog.dart';
 import '../shared/station_edit_dialog.dart';
@@ -26,13 +27,15 @@ class FmStationsScreen extends ConsumerWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Alle UKW-Sender löschen?'),
-        content: const Text(
-          'Entfernt alle gespeicherten UKW-Sender aus der Liste. UKW-Favoriten bleiben erhalten.',
-        ),
+        title: Text(context.l10n.radioFmClearAllTitle),
+        content: Text(context.l10n.radioFmClearAllMessage),
         actions: [
-          TextButton(autofocus: true, onPressed: () => Navigator.of(context).pop(false), child: const Text('Abbrechen')),
-          FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Löschen')),
+          TextButton(
+            autofocus: true,
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(context.l10n.commonCancel),
+          ),
+          FilledButton(onPressed: () => Navigator.of(context).pop(true), child: Text(context.l10n.commonDelete)),
         ],
       ),
     );
@@ -43,12 +46,13 @@ class FmStationsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final stations = ref.watch(fmStationsStreamProvider).value ?? const <FmStation>[];
     final favorites = ref.watch(favoritesStreamProvider).value ?? const <FavoriteChannel>[];
+    final l10n = context.l10n;
     return Scaffold(
-      appBar: AppBar(title: const Text('UKW-Sender (FM)')),
+      appBar: AppBar(title: Text(l10n.radioFmTitle)),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Text('Sender suchen', style: Theme.of(context).textTheme.titleLarge),
+          Text(l10n.radioFmFindStations, style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 8),
           Wrap(
             spacing: 12,
@@ -61,7 +65,7 @@ class FmStationsScreen extends ConsumerWidget {
                   builder: (_) => const _FmScanDialog(),
                 ),
                 icon: const Icon(Icons.radar),
-                label: const Text('Sendersuchlauf starten'),
+                label: Text(l10n.radioScanStart),
               ),
               FilledButton.tonalIcon(
                 onPressed: () => showDialog<void>(
@@ -73,27 +77,27 @@ class FmStationsScreen extends ConsumerWidget {
                   ),
                 ),
                 icon: const Icon(Icons.tune),
-                label: const Text('Manuell einstellen'),
+                label: Text(l10n.radioFmTuneManually),
               ),
             ],
           ),
           const Divider(height: 32),
           Row(
             children: [
-              Expanded(child: Text('Alle UKW-Sender', style: Theme.of(context).textTheme.titleLarge)),
+              Expanded(child: Text(l10n.radioFmAllStations, style: Theme.of(context).textTheme.titleLarge)),
               if (stations.isNotEmpty)
                 TextButton.icon(
                   onPressed: () => _clearAll(context, ref),
                   icon: const Icon(Icons.delete_sweep_outlined),
-                  label: const Text('Alle löschen'),
+                  label: Text(l10n.radioDeleteAll),
                 ),
             ],
           ),
           const SizedBox(height: 8),
           if (stations.isEmpty)
-            const Text(
-              'Noch keine UKW-Sender. Suchlauf starten oder einen Sender manuell einstellen und speichern.',
-              style: TextStyle(color: Colors.white54),
+            Text(
+              l10n.radioFmNoStations,
+              style: const TextStyle(color: Colors.white54),
             )
           else
             // By frequency, like the scan found them; a station also on
@@ -140,7 +144,7 @@ class _FmStationRow extends ConsumerWidget {
     );
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('"${station.displayLabel}" als Nr. $programNumber gespeichert.')),
+        SnackBar(content: Text(context.l10n.radioSavedAsNumber(station.displayLabel, programNumber))),
       );
     }
   }
@@ -164,7 +168,7 @@ class _FmStationRow extends ConsumerWidget {
         ),
         if (station.levelLabel case final level?) ...[
           const TextSpan(text: ' · '),
-          TextSpan(text: 'Signal $level', style: TextStyle(color: fmLevelColor(station.levelDb!))),
+          TextSpan(text: context.l10n.radioFmSignal(level), style: TextStyle(color: fmLevelColor(station.levelDb!))),
         ],
         if (sameProgrammeHint case final hint?) TextSpan(text: ' · $hint'),
       ])),
@@ -173,23 +177,23 @@ class _FmStationRow extends ConsumerWidget {
         children: [
           IconButton(
             icon: const Icon(Icons.play_arrow),
-            tooltip: 'Anhören',
+            tooltip: context.l10n.radioListen,
             onPressed: () => ref.read(playRequestProvider.notifier).fm(station),
           ),
           IconButton(
             icon: const Icon(Icons.edit_outlined),
-            tooltip: 'Bearbeiten (Name, Logo)',
+            tooltip: context.l10n.radioEditNameLogo,
             onPressed: () => editFmStation(context, ref, station),
           ),
           IconButton(
             icon: const Icon(Icons.delete_outline),
-            tooltip: 'Sender entfernen',
+            tooltip: context.l10n.radioRemoveStation,
             onPressed: () => ref.read(fmStationsRepositoryProvider).delete(station.freqKhz),
           ),
           if (favorite != null)
-            Chip(label: Text('Nr. ${favorite!.programNumber}'))
+            Chip(label: Text(context.l10n.radioProgramNumberChip(favorite!.programNumber)))
           else
-            FilledButton.tonal(onPressed: () => _addFavorite(context, ref), child: const Text('Favorit hinzufügen')),
+            FilledButton.tonal(onPressed: () => _addFavorite(context, ref), child: Text(context.l10n.radioAddFavorite)),
         ],
       ),
     );
@@ -312,9 +316,10 @@ class _FmScanDialogState extends ConsumerState<_FmScanDialog> {
   @override
   Widget build(BuildContext context) {
     const hint = TextStyle(color: Colors.white70);
+    final l10n = context.l10n;
     return PopScope(
       child: AlertDialog(
-        title: const Text('UKW-Sendersuchlauf'),
+        title: Text(l10n.radioFmScanTitle),
         content: SizedBox(
           width: 520,
           height: 420,
@@ -322,23 +327,24 @@ class _FmScanDialogState extends ConsumerState<_FmScanDialog> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (_failed)
-                const Text('Empfänger konnte nicht gestartet werden.', style: hint)
+                Text(l10n.radioReceiverFailed, style: hint)
               else if (_scanning) ...[
                 Text(
                   _currentKhz == null
-                      ? 'Suche…'
+                      ? l10n.radioSearching
                       : _surveying
-                          ? 'Schritt 1/2: Band wird vermessen (${formatFmFrequency(_currentKhz!)})…'
-                          : 'Schritt 2/2: Prüfe Sender ${_index + 1} von $_total '
-                              '(${formatFmFrequency(_currentKhz!)})…',
+                          ? l10n.radioFmScanSurvey(formatFmFrequency(_currentKhz!))
+                          : l10n.radioFmScanProbe(_index + 1, _total, formatFmFrequency(_currentKhz!)),
                   style: hint,
                 ),
                 const SizedBox(height: 8),
                 LinearProgressIndicator(value: _total > 0 ? (_index + 1) / _total : null),
               ] else
                 Text(
-                  'Fertig: ${_found.length} Sender gefunden und gespeichert.'
-                  '${_imagesRemoved > 0 ? ' $_imagesRemoved schwache Störfrequenz(en) aussortiert.' : ''}',
+                  [
+                    l10n.radioFmScanDone(_found.length),
+                    if (_imagesRemoved > 0) l10n.radioFmScanImagesRemoved(_imagesRemoved),
+                  ].join(' '),
                   style: hint,
                 ),
               const SizedBox(height: 12),
@@ -355,7 +361,7 @@ class _FmScanDialogState extends ConsumerState<_FmScanDialog> {
                           if (f.levelDb != null) ...[
                             const TextSpan(text: ' · '),
                             TextSpan(
-                              text: 'Signal ${f.levelDb!.round()} dB',
+                              text: l10n.radioFmSignal('${f.levelDb!.round()} dB'),
                               style: TextStyle(color: fmLevelColor(f.levelDb!)),
                             ),
                           ],
@@ -368,7 +374,10 @@ class _FmScanDialogState extends ConsumerState<_FmScanDialog> {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(_scanning ? 'Abbrechen' : 'Schließen')),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(_scanning ? l10n.commonCancel : l10n.commonClose),
+          ),
         ],
       ),
     );
@@ -437,7 +446,7 @@ class _FmTuneDialogState extends ConsumerState<_FmTuneDialog> {
           if (found != null) _setFreq(found);
         });
         if (found == null) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Kein weiterer Sender gefunden.')));
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.l10n.radioFmSeekNothingFound)));
         }
     }
   }
@@ -474,11 +483,13 @@ class _FmTuneDialogState extends ConsumerState<_FmTuneDialog> {
   }
 
   Future<void> _enterFrequency() async {
+    final l10n = context.l10n;
+    final mhzText = (_freqKhz / 1000).toString();
     final text = await showTextInputDialog(
       context,
-      title: 'Frequenz in MHz',
-      initialValue: (_freqKhz / 1000).toString().replaceAll('.', ','),
-      hint: 'z. B. 99,9',
+      title: l10n.radioFmFrequencyTitle,
+      initialValue: l10n.localeName == 'de' ? mhzText.replaceAll('.', ',') : mhzText,
+      hint: l10n.radioFmFrequencyHint,
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
     );
     final mhz = double.tryParse(text?.replaceAll(',', '.') ?? '');
@@ -491,7 +502,7 @@ class _FmTuneDialogState extends ConsumerState<_FmTuneDialog> {
     await ref.read(fmStationsRepositoryProvider).upsert(freqKhz: _freqKhz, pi: _pi, psName: _ps, stereo: _stereo);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${_ps ?? formatFmFrequency(_freqKhz)} gespeichert.')),
+        SnackBar(content: Text(context.l10n.radioSaved(_ps ?? formatFmFrequency(_freqKhz)))),
       );
     }
   }
@@ -509,7 +520,8 @@ class _FmTuneDialogState extends ConsumerState<_FmTuneDialog> {
     final name = _ps?.isNotEmpty == true ? _ps! : formatFmFrequency(_freqKhz);
     await repo.addFmStation(programNumber: programNumber, displayName: name, freqKhz: _freqKhz, pi: _pi);
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('"$name" als Nr. $programNumber gespeichert.')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(context.l10n.radioSavedAsNumber(name, programNumber))));
     }
   }
 
@@ -519,9 +531,10 @@ class _FmTuneDialogState extends ConsumerState<_FmTuneDialog> {
     final busy = _seeking || _failed;
     // Rough signal bar: ~30 dB counts as full.
     final signal = ((_snrDb ?? 0) / 30).clamp(0.0, 1.0);
+    final l10n = context.l10n;
     return PopScope(
       child: AlertDialog(
-        title: const Text('UKW manuell einstellen'),
+        title: Text(l10n.radioFmTuneTitle),
         content: SizedBox(
           width: 560,
           child: Column(
@@ -529,11 +542,11 @@ class _FmTuneDialogState extends ConsumerState<_FmTuneDialog> {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               if (_failed)
-                const Text('Empfänger konnte nicht gestartet werden.', style: TextStyle(color: Colors.white70)),
+                Text(l10n.radioReceiverFailed, style: const TextStyle(color: Colors.white70)),
               Text(formatFmFrequency(_freqKhz), style: Theme.of(context).textTheme.displaySmall),
               const SizedBox(height: 4),
               Text(
-                _seeking ? 'Suche…' : (_ps ?? 'kein RDS-Name'),
+                _seeking ? l10n.radioSearching : (_ps ?? l10n.radioFmNoRdsName),
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(color: _ps == null ? Colors.white38 : null),
               ),
               const SizedBox(height: 4),
@@ -572,30 +585,42 @@ class _FmTuneDialogState extends ConsumerState<_FmTuneDialog> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  _TuneButton(icon: Icons.fast_rewind, label: 'Suchen', onPressed: busy ? null : () => _seek(false)),
-                  _TuneButton(icon: Icons.remove, label: '−0,05', onPressed: busy ? null : () => _tune(_freqKhz - step)),
+                  _TuneButton(
+                    icon: Icons.fast_rewind,
+                    label: l10n.radioFmSeek,
+                    onPressed: busy ? null : () => _seek(false),
+                  ),
+                  _TuneButton(
+                    icon: Icons.remove,
+                    label: l10n.radioFmStepDown,
+                    onPressed: busy ? null : () => _tune(_freqKhz - step),
+                  ),
                   _TuneButton(
                     icon: Icons.add,
-                    label: '+0,05',
+                    label: l10n.radioFmStepUp,
                     autofocus: true,
                     onPressed: busy ? null : () => _tune(_freqKhz + step),
                   ),
-                  _TuneButton(icon: Icons.fast_forward, label: 'Suchen', onPressed: busy ? null : () => _seek(true)),
+                  _TuneButton(
+                    icon: Icons.fast_forward,
+                    label: l10n.radioFmSeek,
+                    onPressed: busy ? null : () => _seek(true),
+                  ),
                 ],
               ),
               const SizedBox(height: 8),
               TextButton.icon(
                 onPressed: busy ? null : _enterFrequency,
                 icon: const Icon(Icons.dialpad),
-                label: const Text('Frequenz eingeben'),
+                label: Text(l10n.radioFmEnterFrequency),
               ),
             ],
           ),
         ),
         actions: [
-          TextButton(onPressed: _failed ? null : _saveStation, child: const Text('Als Sender speichern')),
-          TextButton(onPressed: _failed ? null : _saveFavorite, child: const Text('Als Favorit speichern')),
-          FilledButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Schließen')),
+          TextButton(onPressed: _failed ? null : _saveStation, child: Text(l10n.radioFmSaveStation)),
+          TextButton(onPressed: _failed ? null : _saveFavorite, child: Text(l10n.radioFmSaveFavorite)),
+          FilledButton(onPressed: () => Navigator.of(context).pop(), child: Text(l10n.commonClose)),
         ],
       ),
     );

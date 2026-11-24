@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- English (default); German in values-de. -->
 <resources>
-    <string name="home_button_service_label">Home System: Home-Taste</string>
-    <string name="home_button_service_description">Öffnet mit der Home-Taste der Fernbedienung Home System statt des Startbildschirms des Geräts. Sieht nur, welche App gerade im Vordergrund ist, und auf Fire TV die Home-Taste - keine Bildschirminhalte, keine anderen Tasten und keine Eingaben.</string>
+    <string name="home_button_service_label">Home System: Home key</string>
+    <string name="home_button_service_description">Makes the remote\'s Home key open Home System instead of the device\'s home screen. Only sees which app is in front and, on Fire TV, the Home key - no screen content, no other keys and no input. For Smart Home it switches the display off when nobody is around.</string>
+    <string name="motion_channel_name">Smart Home: motion</string>
+    <string name="motion_notification_title">Smart Home</string>
+    <string name="motion_notification_text">The camera switches the display on when it sees motion.</string>
 </resources>

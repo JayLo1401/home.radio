@@ -12,8 +12,10 @@ import '../../data/models/dmr.dart';
 import '../../data/repositories/settings_repository.dart';
 import '../../data/services/dab_rtlsdr_service.dart' show DabRtlSdrService;
 import '../../core/popup_text_field.dart' show showTextInputDialog;
+import '../../l10n/l10n.dart';
 import '../shared/logo_picker_dialog.dart' show connectDecoder;
 import 'waterfall_view.dart';
+import '../../core/native_messages.dart';
 
 /// Just listening in on a band (CB radio, airband, amateur radio, a free
 /// range) - full screen and separate from everyday radio: no stations, no
@@ -488,7 +490,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
       case 'connectionMessage':
         final isError = event['isError'] as bool? ?? false;
         final message = (event['message'] as String?)?.trim() ?? '';
-        setState(() => _sourceWarning = isError && message.isNotEmpty ? message : null);
+        setState(() => _sourceWarning = isError && message.isNotEmpty ? nativeMessageText(message) : null);
     }
   }
 
@@ -630,7 +632,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     final hz = await showDialog<int>(
       context: context,
       builder: (context) => SimpleDialog(
-        title: const Text('Springen zu…'),
+        title: Text(context.l10n.scannerJumpTo),
         children: [
           for (final (i, (name, hz)) in _plan.jumpTargets.indexed)
             ListTile(
@@ -649,9 +651,9 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
   Future<void> _enterFrequency() async {
     final text = await showTextInputDialog(
       context,
-      title: 'Frequenz (MHz)',
+      title: context.l10n.scannerFrequencyTitle,
       initialValue: formatMhzAuto(_tunedHz),
-      hint: 'z. B. 145,500',
+      hint: context.l10n.scannerFrequencyHint,
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
     );
     final mhz = double.tryParse(text?.trim().replaceAll(',', '.') ?? '');
@@ -662,8 +664,10 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Der Stick empfängt ${formatMhz(_plan.lowHz, decimals: _plan.lowHz < 1000000 ? 1 : 0)}–'
-              '${formatMhz(_plan.highHz, decimals: 0)} MHz.',
+              context.l10n.scannerOutOfRange(
+                formatMhz(_plan.lowHz, decimals: _plan.lowHz < 1000000 ? 1 : 0),
+                formatMhz(_plan.highHz, decimals: 0),
+              ),
             ),
           ),
         );
@@ -807,13 +811,15 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     // Empty until _start() placed the window.
     final pagesWindow = _window.isNotEmpty && _window.length < _plan.channels.length;
     const muted = TextStyle(color: Colors.white70);
+    final l = context.l10n;
+    String decimal(double v, int d) => l.localeName == 'de' ? v.toStringAsFixed(d).replaceAll('.', ',') : v.toStringAsFixed(d);
     return Focus(
       focusNode: _screenFocus,
       onKeyEvent: _onKey,
       child: Scaffold(
         appBar: AppBar(title: Text(_plan.title)),
         body: _failed
-            ? const Center(child: Text('Empfänger konnte nicht gestartet werden.'))
+            ? Center(child: Text(l.scannerReceiverStartFailed))
             // The controls on top, the waterfall fills the rest of the screen
             // (scrolls only when there's too little room for it).
             : CustomScrollView(
@@ -858,20 +864,14 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
                           ),
                         // Shortwave and nothing comes in: what it takes.
                         if (_hfHint)
-                          const Padding(
-                            padding: EdgeInsets.only(bottom: 12),
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
                             child: Row(
                               children: [
-                                Icon(Icons.info_outline, color: Colors.white54),
-                                SizedBox(width: 8),
+                                const Icon(Icons.info_outline, color: Colors.white54),
+                                const SizedBox(width: 8),
                                 Expanded(
-                                  child: Text(
-                                    'Nichts zu hören? Kurzwelle braucht einen Stick mit Direct Sampling '
-                                    '(RTL-SDR Blog V3, NESDR SMArt v5), einen RTL-SDR Blog V4 (über rtl_tcp nur '
-                                    'mit dem Blog-V4-Treiber am Server) oder einen Aufwärtsmischer '
-                                    '(Funk → Kurzwelle) - und eine Antenne für Kurzwelle.',
-                                    style: TextStyle(color: Colors.white54, fontSize: 15),
-                                  ),
+                                  child: Text(l.scannerHfHint, style: const TextStyle(color: Colors.white54, fontSize: 15)),
                                 ),
                               ],
                             ),
@@ -908,8 +908,8 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
                                   const SizedBox(height: 4),
                                   Text(
                                     _snrDb == null
-                                        ? (_started ? '' : 'Starte Empfänger…')
-                                        : 'Signal ${_snrDb!.round()} dB über Rauschen'
+                                        ? (_started ? '' : l.scannerReceiverStarting)
+                                        : '${l.scannerSignalAboveNoise(_snrDb!.round())}'
                                               '${_levelDb == null ? '' : ' (${_levelDb!.round()} dB)'}',
                                     style: const TextStyle(color: Colors.white54),
                                   ),
@@ -933,28 +933,28 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
                             FilledButton.tonalIcon(
                               onPressed: () => _select(_index - 1),
                               icon: const Icon(Icons.chevron_left),
-                              label: const Text('Kanal'),
+                              label: Text(l.scannerChannelButton),
                             ),
                             FilledButton.tonalIcon(
                               autofocus: true,
                               onPressed: () => _select(_index + 1),
                               icon: const Icon(Icons.chevron_right),
-                              label: const Text('Kanal'),
+                              label: Text(l.scannerChannelButton),
                             ),
                             if (_plan.isFree) ...[
                               OutlinedButton.icon(
                                 onPressed: _pickJump,
                                 icon: const Icon(Icons.bookmarks_outlined),
-                                label: const Text('Springen zu…'),
+                                label: Text(l.scannerJumpTo),
                               ),
                               OutlinedButton.icon(
                                 onPressed: _enterFrequency,
                                 icon: const Icon(Icons.dialpad),
-                                label: const Text('Frequenz…'),
+                                label: Text(l.scannerFrequencyButton),
                               ),
                             ],
                             if (_fineTunable) ...[
-                              const Text('Fein', style: muted),
+                              Text(l.scannerFine, style: muted),
                               IconButton(
                                 tooltip: '−100 Hz',
                                 onPressed: () => _fineTune(-100),
@@ -970,12 +970,12 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
                             if (widget.plan.id == 'cb')
                               for (final all80 in const [false, true])
                                 ChoiceChip(
-                                  label: Text(all80 ? '80 Kanäle' : '40 Kanäle'),
+                                  label: Text(l.scannerCbChannels(all80 ? 80 : 40)),
                                   selected: _cbAll80 == all80,
                                   onSelected: (_) => _setCbAll80(all80),
                                 ),
                             FilterChip(
-                              label: const Text('Suchlauf'),
+                              label: Text(l.scannerScan),
                               selected: _scanning,
                               onSelected: (v) => setState(() {
                                 _scanning = v;
@@ -984,7 +984,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
                             ),
                             if (_fmLike)
                               Tooltip(
-                                message: 'APRS-Pakete (1200 Baud) dekodieren - auf 144,800 und 145,825 automatisch',
+                                message: l.scannerAprsTooltip,
                                 child: FilterChip(
                                   label: const Text('APRS'),
                                   selected: _decoderOn,
@@ -996,25 +996,25 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
                               ),
                             if (_plan.segments.length > 1)
                               Tooltip(
-                                message: 'Modulation und Filter passend zum Bereich des Bandplans',
+                                message: l.scannerBandPlanTooltip,
                                 child: FilterChip(
-                                  label: const Text('Bandplan'),
+                                  label: Text(l.scannerBandPlan),
                                   selected: _bandPlanAuto,
                                   onSelected: _setBandPlanAuto,
                                 ),
                               ),
                             const SizedBox(width: 8),
-                            const Text('Rauschsperre', style: muted),
+                            Text(l.scannerSquelch, style: muted),
                             IconButton(onPressed: () => _setSquelch(_squelchDb - 2), icon: const Icon(Icons.remove)),
                             Text('${_squelchDb.round()} dB'),
                             IconButton(onPressed: () => _setSquelch(_squelchDb + 2), icon: const Icon(Icons.add)),
                             const SizedBox(width: 8),
-                            const Text('Verstärkung', style: muted),
+                            Text(l.scannerGain, style: muted),
                             IconButton(onPressed: () => _stepGain(-1), icon: const Icon(Icons.remove)),
                             Text(
                               _gainIndex < 0
-                                  ? 'Auto${_gainDb == null ? '' : ' (${_gainDb!.toStringAsFixed(1).replaceAll('.', ',')} dB)'}'
-                                  : '${(_gainDb ?? 0).toStringAsFixed(1).replaceAll('.', ',')} dB',
+                                  ? 'Auto${_gainDb == null ? '' : ' (${decimal(_gainDb!, 1)} dB)'}'
+                                  : '${decimal(_gainDb ?? 0, 1)} dB',
                             ),
                             IconButton(onPressed: () => _stepGain(1), icon: const Icon(Icons.add)),
                             if (_plan.modes.length > 1)
@@ -1031,9 +1031,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
                                   DropdownMenuItem(
                                     value: r,
                                     // 2 bytes per sample over rtl_tcp.
-                                    child: Text(
-                                      'Bandbreite ${formatMhz(r, decimals: 2)} MHz (~${(r * 16 / 1e6).round()} Mbit/s)',
-                                    ),
+                                    child: Text(l.scannerSampleRate(formatMhz(r, decimals: 2), (r * 16 / 1e6).round())),
                                   ),
                               ],
                               onChanged: (r) => r == null || r == _sampleRate ? null : _setSampleRate(r),
@@ -1051,7 +1049,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
                                 ),
                               ),
                               icon: const Icon(Icons.tune),
-                              label: const Text('Signalfilter'),
+                              label: Text(l.scannerSignalFilters),
                             ),
                           ],
                         ),
@@ -1068,11 +1066,11 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
                                       )
                                     : null,
                                 icon: const Icon(Icons.keyboard_double_arrow_left),
-                                label: const Text('Bereich'),
+                                label: Text(l.scannerRange),
                               ),
                               Expanded(
                                 child: Text(
-                                  'Zeigt ${formatMhz(_window.first.freqHz)}–${formatMhz(_window.last.freqHz)} MHz',
+                                  l.scannerShowing(formatMhz(_window.first.freqHz), formatMhz(_window.last.freqHz)),
                                   textAlign: TextAlign.center,
                                   style: const TextStyle(color: Colors.white54),
                                 ),
@@ -1084,7 +1082,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
                                       )
                                     : null,
                                 icon: const Icon(Icons.keyboard_double_arrow_right),
-                                label: const Text('Bereich'),
+                                label: Text(l.scannerRange),
                               ),
                             ],
                           ),
@@ -1293,6 +1291,7 @@ class _FilterDialogState extends State<_FilterDialog> {
   @override
   Widget build(BuildContext context) {
     const hint = TextStyle(color: Colors.white54, fontSize: 12);
+    final l = context.l10n;
     Widget row(String title, String help, List<Widget> controls) => Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Row(
@@ -1312,10 +1311,14 @@ class _FilterDialogState extends State<_FilterDialog> {
         ],
       ),
     );
-    String khz(int hz) =>
-        hz == 0 ? 'Auto' : '${(hz / 1000).toStringAsFixed(hz % 1000 == 0 ? 0 : 2).replaceAll('.', ',')} kHz';
+    String khz(int hz) {
+      if (hz == 0) return 'Auto';
+      final text = (hz / 1000).toStringAsFixed(hz % 1000 == 0 ? 0 : 2);
+      return '${l.localeName == 'de' ? text.replaceAll('.', ',') : text} kHz';
+    }
+
     return AlertDialog(
-      title: const Text('Signalfilter'),
+      title: Text(l.scannerSignalFilters),
       content: SizedBox(
         width: 720,
         child: SingleChildScrollView(
@@ -1323,9 +1326,8 @@ class _FilterDialogState extends State<_FilterDialog> {
             mainAxisSize: MainAxisSize.min,
             children: [
               row(
-                'Filterbreite',
-                'Schmaler: weniger Rauschen und Nachbarkanäle. Breiter: verständlicher, wenn ein Sender '
-                    'etwas daneben liegt. Auto passt zur Modulation.',
+                l.scannerFilterWidth,
+                l.scannerFilterWidthHelp,
                 [
                   for (final bw in widget.bandwidthChoices)
                     ChoiceChip(
@@ -1335,24 +1337,23 @@ class _FilterDialogState extends State<_FilterDialog> {
                     ),
                 ],
               ),
-              row('Störaustaster', 'Entfernt kurze Knackser von Zündfunken, Weidezäunen und Netzteilen.', [
+              row(l.scannerNoiseBlanker, l.scannerNoiseBlankerHelp, [
                 Switch(
                   value: noiseBlanker,
                   onChanged: (v) => onChanged(noiseBlanker: v),
                 ),
               ]),
-              row('Sprachfilter', 'Nur der Sprachbereich 300–3000 Hz: weniger Brummen, Rauschen und Pilottöne.', [
+              row(l.scannerVoiceFilter, l.scannerVoiceFilterHelp, [
                 Switch(
                   value: voiceFilter,
                   onChanged: (v) => onChanged(voiceFilter: v),
                 ),
               ]),
               row(
-                'Lautstärkeregelung',
-                'Schnell für AM/FM, langsam für SSB - verhindert Pumpen zwischen den Silben. '
-                    'Auto wählt passend zur Modulation.',
+                l.scannerAgc,
+                l.scannerAgcHelp,
                 [
-                  for (final (value, label) in const [('auto', 'Auto'), ('fast', 'Schnell'), ('slow', 'Langsam')])
+                  for (final (value, label) in [('auto', 'Auto'), ('fast', l.scannerAgcFast), ('slow', l.scannerAgcSlow)])
                     ChoiceChip(
                       label: Text(label),
                       selected: agc == value,
@@ -1365,7 +1366,7 @@ class _FilterDialogState extends State<_FilterDialog> {
         ),
       ),
       actions: [
-        TextButton(autofocus: true, onPressed: () => Navigator.of(context).pop(), child: const Text('Schließen')),
+        TextButton(autofocus: true, onPressed: () => Navigator.of(context).pop(), child: Text(l.commonClose)),
       ],
     );
   }
@@ -1391,40 +1392,43 @@ class _DmrPanel extends StatelessWidget {
   static String _time(DateTime t) =>
       '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}:${t.second.toString().padLeft(2, '0')}';
 
-  static String _ago(double s) => s < 60 ? 'vor ${s.round()} s' : 'vor ${(s / 60).round()} min';
+  static String _ago(AppLocalizations l, double s) =>
+      s < 60 ? l.scannerAgoSeconds(s.round()) : l.scannerAgoMinutes((s / 60).round());
 
   static String _call(DmrSlot s) => [if (s.target.isNotEmpty) s.target, if (s.speaker.isNotEmpty) s.speaker].join(' · ');
 
-  Widget _slotLine(DmrSlot s, bool playing) {
+  Widget _slotLine(AppLocalizations l, DmrSlot s, bool playing) {
     const muted = TextStyle(color: Colors.white54);
     final String text;
     final Color colour;
     final IconData icon;
     if (s.talking) {
       final call = _call(s);
-      text = call.isEmpty ? 'Gespräch (Kennung folgt…)' : call;
+      text = call.isEmpty ? l.scannerDmrCallPending : call;
       colour = s.emergency ? Colors.redAccent : Colors.greenAccent;
       icon = s.encrypted ? Icons.lock : (playing ? Icons.volume_up : Icons.record_voice_over);
     } else {
-      final last = s.heard && s.secondsAgo < 600 && _call(s).isNotEmpty ? ' – zuletzt ${_call(s)} ${_ago(s.secondsAgo)}' : '';
-      text = 'frei$last';
+      final last = s.heard && s.secondsAgo < 600 && _call(s).isNotEmpty
+          ? ' – ${l.scannerDmrLast(_call(s), _ago(l, s.secondsAgo))}'
+          : '';
+      text = '${l.scannerDmrIdle}$last';
       colour = Colors.white38;
       icon = Icons.radio_button_unchecked;
     }
     final quality = !s.talking || s.encrypted
         ? ''
         : s.errorRate < 0.5
-        ? 'Empfang gut'
+        ? l.scannerDmrReceptionGood
         : s.errorRate < 2
-        ? 'Empfang mäßig'
-        : 'Empfang schlecht';
+        ? l.scannerDmrReceptionFair
+        : l.scannerDmrReceptionPoor;
     return Padding(
       padding: const EdgeInsets.only(top: 6),
       child: Row(
         children: [
           Icon(icon, color: colour, size: 22),
           const SizedBox(width: 8),
-          Text('Zeitschlitz ${s.slot}: ', style: muted),
+          Text('${l.scannerDmrSlot(s.slot)}: ', style: muted),
           Expanded(
             child: Text(
               text,
@@ -1432,8 +1436,8 @@ class _DmrPanel extends StatelessWidget {
               style: TextStyle(fontSize: 18, color: s.talking ? Colors.white : Colors.white54),
             ),
           ),
-          if (s.talking && s.emergency) const Text('NOTRUF  ', style: TextStyle(color: Colors.redAccent)),
-          if (s.talking && s.encrypted) const Text('verschlüsselt – kein Ton', style: muted),
+          if (s.talking && s.emergency) Text('${l.scannerDmrEmergency}  ', style: const TextStyle(color: Colors.redAccent)),
+          if (s.talking && s.encrypted) Text(l.scannerDmrEncryptedNoAudio, style: muted),
           if (quality.isNotEmpty) Text(quality, style: muted),
         ],
       ),
@@ -1443,13 +1447,14 @@ class _DmrPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const muted = TextStyle(color: Colors.white54);
+    final l = context.l10n;
     final st = status;
     final head = st == null || !st.sync
-        ? 'DMR · kein DMR-Signal'
+        ? 'DMR · ${l.scannerDmrNoSignal}'
         : [
             'DMR',
             if (st.sourceLabel.isNotEmpty) st.sourceLabel,
-            if (st.colorCode >= 0) 'Farbcode ${st.colorCode}',
+            if (st.colorCode >= 0) l.scannerDmrColorCode(st.colorCode),
           ].join(' · ');
     // A single radio uses one slot: the other is only shown once heard.
     final slots = st == null
@@ -1471,19 +1476,20 @@ class _DmrPanel extends StatelessWidget {
               Text(head, style: Theme.of(context).textTheme.titleMedium),
               if (st != null && !st.voiceDecoder) ...[
                 const SizedBox(width: 12),
-                const Expanded(
-                  child: Text('ohne Sprachdecoder gebaut – nur Anzeige', style: muted, overflow: TextOverflow.ellipsis),
+                Expanded(
+                  child: Text(l.scannerDmrNoVoiceDecoder, style: muted, overflow: TextOverflow.ellipsis),
                 ),
               ],
             ],
           ),
-          for (final s in slots) _slotLine(s, st!.audioSlot == s.slot),
+          for (final s in slots) _slotLine(l, s, st!.audioSlot == s.slot),
           if (calls.isNotEmpty) ...[
             const SizedBox(height: 8),
-            const Text('Zuletzt gehört', style: muted),
+            Text(l.scannerDmrRecentlyHeard, style: muted),
             for (final c in calls.take(5))
               Text(
-                '${_time(c.at)} · Zeitschlitz ${c.slot.slot} · ${_call(c.slot)}${c.slot.encrypted ? ' · verschlüsselt' : ''}',
+                '${_time(c.at)} · ${l.scannerDmrSlot(c.slot.slot)} · ${_call(c.slot)}'
+                '${c.slot.encrypted ? ' · ${l.scannerDmrEncrypted}' : ''}',
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(color: Colors.white70),
               ),
@@ -1504,22 +1510,23 @@ class _AprsHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = context.l10n;
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Row(
         children: [
           Icon(Icons.location_on, color: decoding ? Colors.greenAccent : Colors.white38),
           const SizedBox(width: 8),
-          Text('APRS · $count ${count == 1 ? 'Paket' : 'Pakete'}', style: Theme.of(context).textTheme.titleMedium),
+          Text('APRS · ${l.scannerAprsPackets(count)}', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              decoding ? (count == 0 ? 'Dekoder läuft - warte auf Pakete…' : 'Dekoder läuft') : 'Dekoder aus',
+              decoding ? (count == 0 ? l.scannerAprsDecoderWaiting : l.scannerAprsDecoderRunning) : l.scannerAprsDecoderOff,
               style: const TextStyle(color: Colors.white54),
             ),
           ),
           if (onClear != null)
-            TextButton.icon(onPressed: onClear, icon: const Icon(Icons.delete_outline), label: const Text('Leeren')),
+            TextButton.icon(onPressed: onClear, icon: const Icon(Icons.delete_outline), label: Text(l.scannerAprsClear)),
         ],
       ),
     );
@@ -1541,17 +1548,19 @@ class _AprsTile extends StatelessWidget {
     return '${two(t.hour)}:${two(t.minute)}:${two(t.second)}';
   }
 
-  String? get _where {
+  String? _where(AppLocalizations l) {
     final km = packet.distanceKm(homeLat, homeLon);
     if (km == null) return null;
-    final d = km < 10 ? km.toStringAsFixed(1).replaceAll('.', ',') : km.round().toString();
+    final d = km >= 10
+        ? km.round().toString()
+        : (l.localeName == 'de' ? km.toStringAsFixed(1).replaceAll('.', ',') : km.toStringAsFixed(1));
     return '$d km ${packet.bearingFrom(homeLat, homeLon)}';
   }
 
-  String get _text {
+  String _text(AppLocalizations l) {
     final p = packet;
     return [
-      if (p.name != null) p.kind == 'Nachricht' ? 'an ${p.name}' : p.name!,
+      if (p.name != null) p.type == AprsKind.message ? l.scannerAprsTo(p.name!) : p.name!,
       if (p.weather != null) p.weather!.describe(),
       if (p.speedKmh != null) '${p.speedKmh!.round()} km/h${p.course != null ? ' · ${p.course}°' : ''}',
       if (p.comment != null) p.comment!,
@@ -1560,8 +1569,13 @@ class _AprsTile extends StatelessWidget {
 
   void _details(BuildContext context) {
     final p = packet;
-    String coord(double v, String pos, String neg) =>
-        '${v.abs().toStringAsFixed(5).replaceAll('.', ',')}° ${v >= 0 ? pos : neg}';
+    final l = context.l10n;
+    final where = _where(l), text = _text(l);
+    String coord(double v, String pos, String neg) {
+      final n = v.abs().toStringAsFixed(5);
+      return '${l.localeName == 'de' ? n.replaceAll('.', ',') : n}° ${v >= 0 ? pos : neg}';
+    }
+
     showDialog<void>(
       context: context,
       builder: (_) => AlertDialog(
@@ -1572,20 +1586,20 @@ class _AprsTile extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Empfangen $_time'),
+              Text(l.scannerAprsReceived(_time)),
               if (p.symbolName != null) Text('Symbol: ${p.symbolName}'),
-              if (p.hasPosition) Text('Position: ${coord(p.lat!, 'N', 'S')}, ${coord(p.lon!, 'O', 'W')}'),
-              if (_where != null) Text('Entfernung: $_where'),
-              if (_text.isNotEmpty) Text(_text),
-              Text('Weg: ${p.path.isEmpty ? 'direkt' : p.path.join(', ')}'),
+              if (p.hasPosition) Text('Position: ${coord(p.lat!, 'N', 'S')}, ${coord(p.lon!, l.scannerEastShort, 'W')}'),
+              if (where != null) Text(l.scannerAprsDistance(where)),
+              if (text.isNotEmpty) Text(text),
+              Text(l.scannerAprsPath(p.path.isEmpty ? l.scannerAprsDirect : p.path.join(', '))),
               const SizedBox(height: 12),
-              const Text('Rohdaten', style: TextStyle(color: Colors.white54)),
+              Text(l.scannerRawData, style: const TextStyle(color: Colors.white54)),
               SelectableText(p.tnc2, style: const TextStyle(fontFamily: 'monospace', fontSize: 13)),
             ],
           ),
         ),
         actions: [
-          TextButton(autofocus: true, onPressed: () => Navigator.of(context).pop(), child: const Text('Schließen')),
+          TextButton(autofocus: true, onPressed: () => Navigator.of(context).pop(), child: Text(l.commonClose)),
         ],
       ),
     );
@@ -1593,8 +1607,9 @@ class _AprsTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final where = _where;
-    final text = _text;
+    final l = context.l10n;
+    final where = _where(l);
+    final text = _text(l);
     return Card(
       margin: const EdgeInsets.only(bottom: 4),
       child: InkWell(

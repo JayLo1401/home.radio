@@ -1,0 +1,20 @@
+{
+  "commonOk": "OK",
+  "commonCancel": "Cancel",
+  "commonSave": "Save",
+  "commonDelete": "Delete",
+  "commonClose": "Close",
+  "commonBack": "Back",
+  "commonYes": "Yes",
+  "commonNo": "No",
+  "commonOn": "On",
+  "commonOff": "Off",
+  "commonEdit": "Edit",
+  "commonRetry": "Try again",
+  "commonLoading": "Loading …",
+  "commonError": "Error: {message}",
+  "commonLanguage": "Language",
+  "commonLanguageSystem": "Same as the device",
+  "commonLanguageGerman": "Deutsch",
+  "commonLanguageEnglish": "English"
+}

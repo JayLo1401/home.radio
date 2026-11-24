@@ -8,6 +8,7 @@ import '../../core/providers.dart';
 import '../../data/repositories/settings_repository.dart' show ReceiverMode, RtlTcpServer, RtlTcpServers;
 import '../../data/services/rtl_sdr_service.dart';
 import '../../data/services/rtl_sdr_usb_service.dart';
+import '../../l10n/l10n.dart';
 
 /// "Radio-Empfänger": whether and how DAB+ and FM reach the RTL-SDR receiver
 /// (see [ReceiverMode]) - "Kein Empfänger" for internet radio only.
@@ -189,7 +190,7 @@ class _RtlSdrTestScreenState extends ConsumerState<RtlSdrTestScreen> {
     final port = await showDialog<int>(
       context: context,
       builder: (context) => SimpleDialog(
-        title: Text('Sticks auf ${row.server.host}'),
+        title: Text(context.l10n.scannerRtlSticksOn(row.server.host)),
         children: [
           for (final s in sticks)
             if (s.port != null)
@@ -199,7 +200,7 @@ class _RtlSdrTestScreenState extends ConsumerState<RtlSdrTestScreen> {
                   contentPadding: EdgeInsets.zero,
                   leading: Icon(s.port == current ? Icons.radio_button_checked : Icons.radio_button_unchecked),
                   title: Text('${s.name ?? 'Stick'} · Port ${s.port}'),
-                  subtitle: Text(_stickDetails(s)),
+                  subtitle: Text(_stickDetails(context.l10n, s)),
                 ),
               ),
         ],
@@ -211,18 +212,19 @@ class _RtlSdrTestScreenState extends ConsumerState<RtlSdrTestScreen> {
   }
 
   /// "Standort: … · Antenne: … · über … · belegt von …" for one stick.
-  static String _stickDetails(RtlStick s, {bool withName = false}) => [
-        if (withName && s.name != null) '„${s.name}“',
-        'Standort: ${s.location ?? 'nicht angegeben'}',
-        'Antenne: ${s.antenna ?? 'nicht angegeben'}',
-        if (s.isRemote && s.remoteInstance != null) 'über ${s.remoteInstance}',
-        if (s.busyBy != null) 'belegt von ${s.busyBy}' else if (s.stateText != null) s.stateText!,
+  static String _stickDetails(AppLocalizations t, RtlStick s, {bool withName = false}) => [
+        if (withName && s.name != null) t.scannerQuoted(s.name!),
+        t.scannerRtlLocation(s.location ?? t.scannerRtlNotSpecified),
+        t.scannerRtlAntenna(s.antenna ?? t.scannerRtlNotSpecified),
+        if (s.isRemote && s.remoteInstance != null) t.scannerRtlVia(s.remoteInstance!),
+        if (s.busyBy != null) t.scannerRtlBusyByShort(s.busyBy!) else if (s.stateText != null) s.stateText!,
       ].join(' · ');
 
   @override
   Widget build(BuildContext context) {
+    final t = context.l10n;
     return Scaffold(
-      appBar: AppBar(title: const Text('Radio-Empfänger (DAB+ & UKW)')),
+      appBar: AppBar(title: Text(t.scannerRtlReceiverTitle)),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -230,14 +232,14 @@ class _RtlSdrTestScreenState extends ConsumerState<RtlSdrTestScreen> {
           children: [
             Row(
               children: [
-                const Text('Empfänger:'),
+                Text(t.scannerRtlReceiverLabel),
                 const SizedBox(width: 12),
                 DropdownButton<ReceiverMode>(
                   value: _mode,
-                  items: const [
-                    DropdownMenuItem(value: ReceiverMode.none, child: Text('Kein Empfänger (nur Internetradio)')),
-                    DropdownMenuItem(value: ReceiverMode.usb, child: Text('RTL-SDR-Stick per USB')),
-                    DropdownMenuItem(value: ReceiverMode.tcp, child: Text('RTL-SDR über Netzwerk (rtl_tcp)')),
+                  items: [
+                    DropdownMenuItem(value: ReceiverMode.none, child: Text(t.scannerRtlModeNone)),
+                    DropdownMenuItem(value: ReceiverMode.usb, child: Text(t.scannerRtlModeUsb)),
+                    DropdownMenuItem(value: ReceiverMode.tcp, child: Text(t.scannerRtlModeTcp)),
                   ],
                   onChanged: _testing != null ? null : (m) => m == null ? null : _selectMode(m),
                 ),
@@ -246,11 +248,7 @@ class _RtlSdrTestScreenState extends ConsumerState<RtlSdrTestScreen> {
             const SizedBox(height: 8),
             ...switch (_mode) {
               ReceiverMode.none => [
-                  const Text(
-                    'DAB+- und UKW-Suche sowie die Reiter „DAB+“ und „FM“ sind ausgeblendet. '
-                    'Vorhandene Favoriten bleiben erhalten und spielen wieder, sobald ein Empfänger eingerichtet ist.',
-                    style: _hint,
-                  ),
+                  Text(t.scannerRtlNoneHint, style: _hint),
                 ],
               ReceiverMode.usb => _usbSection(),
               ReceiverMode.tcp => _tcpSection(),
@@ -264,19 +262,15 @@ class _RtlSdrTestScreenState extends ConsumerState<RtlSdrTestScreen> {
   List<Widget> _usbSection() => [
         Text(
           [
-            'Der Empfänger öffnet den Stick direkt über USB, sobald ein Sender startet.',
-            if (Platform.isWindows)
-              'Windows: einmalig den WinUSB-Treiber mit Zadig (zadig.akeo.ie) für '
-                  '„Bulk-In, Interface (Interface 0)“ installieren.',
-            if (Platform.isLinux)
-              'Linux: braucht eine udev-Regel für den Stick (z. B. aus dem Paket rtl-sdr); '
-                  'der DVB-T-Treiber des Kernels wird automatisch abgekoppelt.',
+            context.l10n.scannerRtlUsbHint,
+            if (Platform.isWindows) context.l10n.scannerRtlUsbWindows,
+            if (Platform.isLinux) context.l10n.scannerRtlUsbLinux,
           ].join(' '),
           style: _hint,
         ),
         const SizedBox(height: 8),
         if (_usbDevices.isEmpty)
-          const Text('Kein RTL-SDR-Stick erkannt.', style: TextStyle(color: Colors.orangeAccent)),
+          Text(context.l10n.scannerRtlNoStick, style: const TextStyle(color: Colors.orangeAccent)),
         for (final device in _usbDevices)
           Row(
             children: [
@@ -284,10 +278,10 @@ class _RtlSdrTestScreenState extends ConsumerState<RtlSdrTestScreen> {
               if (!device.hasPermission)
                 ElevatedButton(
                   onPressed: _usbBusy ? null : () => _requestUsbPermission(device),
-                  child: const Text('Zugriff erlauben'),
+                  child: Text(context.l10n.scannerRtlAllowAccess),
                 )
               else
-                const Text('Zugriff erteilt', style: TextStyle(color: Colors.greenAccent)),
+                Text(context.l10n.scannerRtlAccessGranted, style: const TextStyle(color: Colors.greenAccent)),
             ],
           ),
         Align(
@@ -295,18 +289,13 @@ class _RtlSdrTestScreenState extends ConsumerState<RtlSdrTestScreen> {
           child: TextButton.icon(
             onPressed: _refreshUsbDevices,
             icon: const Icon(Icons.refresh),
-            label: const Text('Neu suchen'),
+            label: Text(context.l10n.scannerRtlRescan),
           ),
         ),
       ];
 
   List<Widget> _tcpSection() => [
-        const Text(
-          'rtl_tcp-Server im lokalen Netz: Treiber-App auf diesem Gerät (127.0.0.1), Raspberry Pi oder '
-          'rtltcp.server. Der markierte Server ist der Standard für DAB+ und UKW. Sticks an anderen '
-          'Standorten stellt der rtltcp.server über rtl.over.internet lokal bereit.',
-          style: _hint,
-        ),
+        Text(context.l10n.scannerRtlTcpHint, style: _hint),
         const SizedBox(height: 8),
         RadioGroup<int>(
           groupValue: _defaultIndex,
@@ -322,14 +311,10 @@ class _RtlSdrTestScreenState extends ConsumerState<RtlSdrTestScreen> {
           child: TextButton.icon(
             onPressed: _testing != null ? null : _add,
             icon: const Icon(Icons.add),
-            label: const Text('Server hinzufügen'),
+            label: Text(context.l10n.scannerRtlAddServer),
           ),
         ),
-        const Text(
-          '„Testen“ unterbricht DAB+ oder UKW, wenn es über diesen Server läuft; der Sender spielt beim '
-          'Zurückkehren weiter.',
-          style: TextStyle(color: Colors.white54, fontSize: 12),
-        ),
+        Text(context.l10n.scannerRtlTestHint, style: const TextStyle(color: Colors.white54, fontSize: 12)),
       ];
 
   Widget _serverRow(int index, _ServerRow row) {
@@ -339,7 +324,7 @@ class _RtlSdrTestScreenState extends ConsumerState<RtlSdrTestScreen> {
       child: Row(
         children: [
           Tooltip(
-            message: 'Standard',
+            message: context.l10n.scannerRtlDefault,
             child: Radio<int>(value: index),
           ),
           SizedBox(
@@ -367,17 +352,17 @@ class _RtlSdrTestScreenState extends ConsumerState<RtlSdrTestScreen> {
             onPressed: _testing != null ? null : () => _test(row),
             child: testing
                 ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                : const Text('Testen'),
+                : Text(context.l10n.scannerRtlTest),
           ),
           const SizedBox(width: 12),
           Expanded(child: _resultText(row.result)),
           if ((row.result?.devices?.length ?? 0) > 1)
             TextButton(
               onPressed: _testing != null ? null : () => _chooseStick(row),
-              child: Text('Stick wählen (${row.result!.devices!.length})'),
+              child: Text(context.l10n.scannerRtlChooseStick(row.result!.devices!.length)),
             ),
           IconButton(
-            tooltip: 'Entfernen',
+            tooltip: context.l10n.scannerRtlRemove,
             onPressed: _rows.length > 1 && _testing == null ? () => _remove(index) : null,
             icon: const Icon(Icons.delete_outline),
           ),
@@ -390,13 +375,14 @@ class _RtlSdrTestScreenState extends ConsumerState<RtlSdrTestScreen> {
   /// classic server, or the error. Details in the tooltip.
   Widget _resultText(RtlConnectResult? r) {
     if (r == null) return const SizedBox.shrink();
+    final t = context.l10n;
     final String text;
     final Color color;
     if (!r.connected) {
-      text = r.error ?? 'Keine Verbindung';
+      text = r.error ?? t.scannerRtlNoConnection;
       color = Colors.redAccent;
     } else if (r.protocol != RtlTcpProtocol.jayExtended) {
-      text = 'rtl_tcp – Server unterstützt Standort und Antenne nicht';
+      text = t.scannerRtlClassicServer;
       color = Colors.white70;
     } else {
       // The `devices` entry of this port carries state and busy_by too.
@@ -404,14 +390,14 @@ class _RtlSdrTestScreenState extends ConsumerState<RtlSdrTestScreen> {
       final stick = r.devices?.where((s) => port != null && s.port == port).firstOrNull ??
           r.device ??
           const RtlStick();
-      text = _stickDetails(stick, withName: true);
+      text = _stickDetails(t, stick, withName: true);
       final trouble = stick.busyBy != null || (stick.stateText != null && stick.state != 'idle');
       color = trouble ? Colors.orangeAccent : Colors.greenAccent;
     }
     final details = [
-      if (r.protocol != null) 'Protokoll: ${r.protocol!.label}',
+      if (r.protocol != null) t.scannerRtlProtocol(r.protocol!.label),
       if (r.server?.isNotEmpty ?? false) 'Server: ${r.server}',
-      if (r.tunerType != null) 'Tuner-Typ: ${r.tunerType}, ${r.tunerGainCount ?? '?'} Gain-Stufen',
+      if (r.tunerType != null) t.scannerRtlTunerInfo('${r.tunerType}', '${r.tunerGainCount ?? '?'}'),
     ];
     final label = Text(text, style: TextStyle(color: color), maxLines: 2, overflow: TextOverflow.ellipsis);
     return details.isEmpty ? label : Tooltip(message: details.join('\n'), child: label);
