@@ -176,8 +176,6 @@
       }
     }
   },
-  "settingsLauncherMoveLeft": "Nach links verschieben",
-  "settingsLauncherMoveRight": "Nach rechts verschieben",
   "settingsLauncherChangeImage": "Bild ändern",
   "settingsLauncherRemove": "Aus der Startleiste entfernen",
   "settingsLauncherOptionsHint": "{key}  Optionen der Kachel",
@@ -394,5 +392,17 @@
   "settingsRestoreAllowAllFiles": "Zugriff auf alle Dateien erlauben",
   "settingsRestorePickFile": "Backup-Datei auswählen … (z. B. vom USB-Stick)",
   "settingsAboutAdblock": "Werbefilter (Browser)",
-  "settingsAboutAdblockData": "Filterlisten, zur Laufzeit geladen: uBlock Origin uAssets (GPLv3, github.com/uBlockOrigin/uAssets), EasyList, EasyPrivacy, EasyList Germany (GPLv3 oder CC BY-SA 3.0, easylist.to), Peter Lowe’s Ad and tracking server list (pgl.yoyo.org/adservers). Die Scriptlets sind eigene Umsetzungen nach den Namen und Argumenten von uBlock Origin."
+  "settingsAboutAdblockData": "Filterlisten, zur Laufzeit geladen: uBlock Origin uAssets (GPLv3, github.com/uBlockOrigin/uAssets), EasyList, EasyPrivacy, EasyList Germany (GPLv3 oder CC BY-SA 3.0, easylist.to), Peter Lowe’s Ad and tracking server list (pgl.yoyo.org/adservers). Die Scriptlets sind eigene Umsetzungen nach den Namen und Argumenten von uBlock Origin.",
+  "settingsHomeKeyWorking": "funktioniert",
+  "settingsHomeKeyBroken": "funktioniert nicht - bitte öffnen",
+  "settingsHomeKeyNotRunning": "Dienst „Home System: Home-Taste“ ist eingeschaltet, läuft aber nicht (die App wurde beendet). Die App startet ihn selbst neu, wenn sie darf - sonst hier neu starten.",
+  "settingsHomeKeyRestart": "Dienst neu starten",
+  "errorCaught": "Fehler abgefangen: {message}",
+  "@errorCaught": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  }
 }

@@ -1,4 +1,7 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:home_system/core/ok_long_press.dart';
 import 'package:home_system/data/models/launcher_tile.dart';
 import 'package:home_system/data/services/launcher_background_service.dart';
 
@@ -45,5 +48,46 @@ void main() {
       expect(tile.imageUrl, isNull);
       expect(tile.withImage(null).image, isNull);
     });
+  });
+  // The launcher's wiring in move mode: the tile's own OkLongPress gets no
+  // onLongPress, so OK (short and held) goes through to the rows' one.
+  testWidgets('move mode: OK goes past the tile to the rows', (tester) async {
+    var moving = false;
+    var opened = 0, options = 0, picked = 0, finished = 0;
+    late StateSetter update;
+    await tester.pumpWidget(MaterialApp(
+      home: Material(child: StatefulBuilder(builder: (context, setState) {
+        update = setState;
+        return OkLongPress(
+          onTap: moving ? () => picked++ : null,
+          onLongPress: moving ? () => finished++ : null,
+          child: OkLongPress(
+            onTap: () => opened++,
+            onLongPress: moving ? null : () => options++,
+            child: InkWell(autofocus: true, onTap: () => opened++, child: const SizedBox(width: 50, height: 50)),
+          ),
+        );
+      })),
+    ));
+    await tester.pump();
+
+    Future<void> press({bool hold = false}) async {
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.select);
+      if (hold) await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 700)));
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.select);
+      await tester.pump();
+    }
+
+    await press();
+    expect((opened, options, picked, finished), (1, 0, 0, 0));
+    await press(hold: true);
+    expect((opened, options, picked, finished), (1, 1, 0, 0));
+
+    update(() => moving = true);
+    await tester.pump();
+    await press();
+    expect((opened, options, picked, finished), (1, 1, 1, 0), reason: 'OK picks up / drops, opens nothing');
+    await press(hold: true);
+    expect((opened, options, picked, finished), (1, 1, 1, 1), reason: 'held OK ends move mode');
   });
 }

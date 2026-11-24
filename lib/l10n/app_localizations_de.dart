@@ -920,6 +920,20 @@ class AppLocalizationsDe extends AppLocalizations {
       'OK: App öffnen  ·  ☰ oder OK lange drücken: Favorit, Gruppe, App-Info (beenden, deinstallieren)';
 
   @override
+  String get launcherMoveTile => 'Verschieben';
+
+  @override
+  String get launcherMoveTiles => 'Kacheln verschieben';
+
+  @override
+  String get launcherMoveModeHint =>
+      'Verschiebemodus: OK nehmen/ablegen · ◀ ▶ verschieben · OK lang: fertig';
+
+  @override
+  String get launcherMoveModeLiftedHint =>
+      '◀ ▶ verschieben · OK: hier ablegen · Zurück: abbrechen · OK lang: fertig';
+
+  @override
   String get miscApply => 'Übernehmen';
 
   @override
@@ -4629,12 +4643,6 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get settingsLauncherMoveLeft => 'Nach links verschieben';
-
-  @override
-  String get settingsLauncherMoveRight => 'Nach rechts verschieben';
-
-  @override
   String get settingsLauncherChangeImage => 'Bild ändern';
 
   @override
@@ -4983,6 +4991,24 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get settingsAboutAdblockData =>
       'Filterlisten, zur Laufzeit geladen: uBlock Origin uAssets (GPLv3, github.com/uBlockOrigin/uAssets), EasyList, EasyPrivacy, EasyList Germany (GPLv3 oder CC BY-SA 3.0, easylist.to), Peter Lowe’s Ad and tracking server list (pgl.yoyo.org/adservers). Die Scriptlets sind eigene Umsetzungen nach den Namen und Argumenten von uBlock Origin.';
+
+  @override
+  String get settingsHomeKeyWorking => 'funktioniert';
+
+  @override
+  String get settingsHomeKeyBroken => 'funktioniert nicht - bitte öffnen';
+
+  @override
+  String get settingsHomeKeyNotRunning =>
+      'Dienst „Home System: Home-Taste“ ist eingeschaltet, läuft aber nicht (die App wurde beendet). Die App startet ihn selbst neu, wenn sie darf - sonst hier neu starten.';
+
+  @override
+  String get settingsHomeKeyRestart => 'Dienst neu starten';
+
+  @override
+  String errorCaught(String message) {
+    return 'Fehler abgefangen: $message';
+  }
 
   @override
   String get systemStartDashboard => 'Haussteuerung anzeigen (Wandtablet)';

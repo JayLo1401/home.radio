@@ -118,7 +118,7 @@ class UpdateInstallReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == Intent.ACTION_MY_PACKAGE_REPLACED) {
             // The update switched the Home key service off.
-            HomeButtonService.restoreAfterUpdate(context)
+            HomeButtonService.ensureRunning(context)
             context.packageManager.getLaunchIntentForPackage(context.packageName)
                 ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 ?.let { runCatching { context.startActivity(it) } }

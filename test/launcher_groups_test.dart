@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:home_system/data/models/launcher_group.dart';
 import 'package:home_system/data/models/launcher_tile.dart';
+import 'package:home_system/features/launcher/launcher_move_mode.dart';
 
 void main() {
   const netflix = LauncherTile.app(package: 'com.netflix.ninja', label: 'Netflix');
@@ -200,5 +201,124 @@ void main() {
     final row = [const LauncherTile.radio(), const LauncherTile.tv(), const LauncherTile.browser(), app];
     expect(insertLauncherTile(row, const LauncherTile.music()).map((t) => t.id), ['radio', 'music', 'tv', 'browser', 'app:x']);
     expect(insertLauncherTile(row, const LauncherTile.pictures()).map((t) => t.id), ['radio', 'tv', 'pictures', 'browser', 'app:x']);
+  });
+  group('move mode: placing a dropped tile', () {
+    List<String> ids(List<LauncherTile> tiles) => [for (final t in tiles) t.id];
+    final row = [const LauncherTile.radio(), const LauncherTile.tv(), netflix, disney, files];
+
+    test('anywhere in the row - also an app before the own tiles', () {
+      expect(ids(placeLauncherTile(row, files.id, 0)), [files.id, 'radio', 'tv', netflix.id, disney.id]);
+      expect(ids(placeLauncherTile(row, 'radio', 4)), ['tv', netflix.id, disney.id, files.id, 'radio']);
+      expect(ids(placeLauncherTile(row, netflix.id, 1)), ['radio', netflix.id, 'tv', disney.id, files.id]);
+      // Out of range: clamped to the ends.
+      expect(ids(placeLauncherTile(row, 'tv', 99)), ['radio', netflix.id, disney.id, files.id, 'tv']);
+      expect(ids(placeLauncherTile(row, disney.id, -3)), [disney.id, 'radio', 'tv', netflix.id, files.id]);
+    });
+
+    test('unchanged: same place, or no such tile', () {
+      expect(placeLauncherTile(row, netflix.id, 2), same(row));
+      expect(placeLauncherTile(row, adb.id, 0), same(row));
+    });
+
+    test('places count the shown tiles - hidden parts keep their place', () {
+      // TV switched off: shown are Radio, Netflix, Disney+, Dateien.
+      bool shown(LauncherTile t) => !t.isTv;
+      // Dateien to the 2nd place shown: right before Netflix, behind the hidden TV.
+      expect(ids(placeLauncherTile(row, files.id, 1, shown: shown)), ['radio', 'tv', files.id, netflix.id, disney.id]);
+      // Netflix to the front: before Radio.
+      expect(ids(placeLauncherTile(row, netflix.id, 0, shown: shown)), [netflix.id, 'radio', 'tv', disney.id, files.id]);
+      // Radio to the end: behind the last shown tile.
+      expect(ids(placeLauncherTile(row, 'radio', 3, shown: shown)), ['tv', netflix.id, disney.id, files.id, 'radio']);
+      // Netflix stays the 2nd shown: nothing changes (TV stays before it).
+      expect(placeLauncherTile(row, netflix.id, 1, shown: shown), same(row));
+    });
+
+    test('in a group', () {
+      final groups = [
+        LauncherGroup(id: 'g1', name: 'A', tiles: [netflix, disney, files]),
+        const LauncherGroup(id: 'g2', name: 'B', tiles: [adb]),
+      ];
+      final moved = groups.placeTile('g1', files.id, 0);
+      expect(ids(moved.byId('g1')!.tiles), [files.id, netflix.id, disney.id]);
+      expect(moved.byId('g2'), same(groups.byId('g2')));
+      expect(groups.placeTile('g1', disney.id, 1).byId('g1'), same(groups.byId('g1')));
+    });
+  });
+
+  group('move mode keys', () {
+    const tiles = ['radio', 'tv', 'netflix', 'disney'];
+    List<String> shown(LauncherMoveMode m, [String row = '']) => m.arrange(row, tiles, (t) => t);
+
+    test('off: OK, arrows and Back are not its business', () {
+      final m = LauncherMoveMode();
+      expect(m.active, isFalse);
+      expect(m.ok('', 'tv', 1), isNull);
+      expect(m.lifted, isNull);
+      expect(m.step(1, 4), isNull);
+      expect(m.back(), LauncherMoveBack.ignored);
+      expect(shown(m), tiles);
+    });
+
+    test('OK lifts, ◀ ▶ move (stopping at the ends), OK drops', () {
+      final m = LauncherMoveMode()..start();
+      expect(m.step(-1, 4), isNull, reason: 'nothing lifted: the arrows move the focus');
+      expect(m.ok('', 'disney', 3), isNull);
+      expect(m.isLifted('', 'disney'), isTrue);
+      expect(m.step(-1, 4), 2);
+      expect(m.step(-1, 4), 1);
+      expect(m.step(-1, 4), 0);
+      expect(m.step(-1, 4), 0, reason: 'already first');
+      expect(shown(m), ['disney', 'radio', 'tv', 'netflix']);
+      expect(shown(m, 'g1'), tiles, reason: 'other rows stay as they are');
+      final drop = m.ok('', 'disney', 0);
+      expect(drop, (row: '', tileId: 'disney', from: 3, index: 0));
+      expect(m.lifted, isNull);
+      expect(m.active, isTrue, reason: 'on to the next tile');
+      // The next one: lifted and put down where it was - nothing to save.
+      m.ok('', 'tv', 1);
+      expect(m.step(1, 4), 2);
+      expect(m.step(1, 4), 3);
+      expect(m.step(1, 4), 3, reason: 'already last');
+      expect(m.step(-1, 4), 2);
+      expect(m.step(-1, 4), 1);
+      expect(m.ok('', 'tv', 1), isNull);
+    });
+
+    test('OK on something that is no tile lifts nothing', () {
+      final m = LauncherMoveMode()..start();
+      expect(m.ok('', null, 4), isNull);
+      expect(m.lifted, isNull);
+    });
+
+    test('Back puts the lifted tile back, then ends move mode', () {
+      final m = LauncherMoveMode()..start(row: 'g1', tileId: 'netflix', index: 2);
+      expect(m.isLifted('g1', 'netflix'), isTrue);
+      m.step(-1, 4);
+      expect(shown(m, 'g1'), ['radio', 'netflix', 'tv', 'disney']);
+      expect(m.back(), LauncherMoveBack.putBack);
+      expect(shown(m, 'g1'), tiles);
+      expect(m.active, isTrue);
+      expect(m.back(), LauncherMoveBack.ended);
+      expect(m.active, isFalse);
+      expect(m.back(), LauncherMoveBack.ignored);
+    });
+
+    test('holding OK ends move mode - a lifted tile stays where it is', () {
+      final m = LauncherMoveMode()..start(row: '', tileId: 'radio', index: 0);
+      m.step(1, 4);
+      expect(m.finish(), (row: '', tileId: 'radio', from: 0, index: 1));
+      expect(m.active, isFalse);
+      expect(m.lifted, isNull);
+      expect((LauncherMoveMode()..start()).finish(), isNull);
+    });
+
+    test('a lifted tile that left its row is shown and kept as it is', () {
+      final m = LauncherMoveMode()..start(row: '', tileId: 'gone', index: 1);
+      m.step(1, 4);
+      expect(shown(m), tiles);
+      m.cancelLift();
+      expect(m.lifted, isNull);
+      expect(m.active, isTrue);
+    });
   });
 }

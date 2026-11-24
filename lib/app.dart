@@ -8,6 +8,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/dashboard_providers.dart';
+import 'core/native_errors.dart';
 import 'core/providers.dart';
 import 'core/system_providers.dart';
 import 'data/services/display_service.dart';
@@ -49,6 +50,7 @@ class HomeSystemApp extends ConsumerWidget {
     return MaterialApp(
       title: 'Home System',
       navigatorKey: appNavigatorKey,
+      scaffoldMessengerKey: appMessengerKey,
       debugShowCheckedModeBanner: false,
       theme: buildTvTheme(),
       locale: language.locale,

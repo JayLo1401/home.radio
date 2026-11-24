@@ -97,6 +97,7 @@ class LauncherPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
             "homeButtonStatus" -> result.success(
                 mapOf(
                     "serviceEnabled" to HomeButtonService.isEnabled(appContext),
+                    "serviceRunning" to HomeButtonService.isRunning(),
                     "canEnable" to canWriteSecureSettings(),
                     "redirect" to HomeButtonService.redirectEnabled(appContext),
                 ),
@@ -293,7 +294,13 @@ class LauncherPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
      * WRITE_SECURE_SETTINGS was granted over adb
      * (`pm grant at.jaycloud.home.system android.permission.WRITE_SECURE_SETTINGS`).
      */
-    private fun enableHomeButtonService(): Boolean = HomeButtonService.enable(appContext)
+    /** Switched on but not running (the app's process died): restarted; else switched on. */
+    private fun enableHomeButtonService(): Boolean =
+        if (HomeButtonService.isEnabled(appContext) && !HomeButtonService.isRunning()) {
+            HomeButtonService.restart(appContext)
+        } else {
+            HomeButtonService.enable(appContext)
+        }
 
     companion object {
         const val TAG = "LauncherPlugin"

@@ -111,6 +111,13 @@ extension LauncherGroupEdits on List<LauncherGroup> {
     return g.copyWith(tiles: tiles);
   });
 
+  /// Move mode's drop in a group: the tile at place [index] (see
+  /// [placeLauncherTile]).
+  List<LauncherGroup> placeTile(String groupId, String tileId, int index) => _replace(groupId, (g) {
+    final tiles = placeLauncherTile(g.tiles, tileId, index);
+    return identical(tiles, g.tiles) ? g : g.copyWith(tiles: tiles);
+  });
+
   /// Takes a tile out of group [fromId] and appends it to [toId] (if it's
   /// already there, it's just taken out of [fromId]).
   List<LauncherGroup> moveTileTo(String fromId, String toId, LauncherTile tile) {
@@ -153,6 +160,34 @@ List<LauncherTile> insertLauncherTile(List<LauncherTile> tiles, LauncherTile til
   if (before >= 0) return [...tiles]..insert(before, tile);
   final last = tiles.lastIndexWhere((t) => t.isBuiltIn);
   return [...tiles]..insert(last + 1, tile);
+}
+
+/// Move mode's drop: [tiles] with tile [id] at place [index] of the row as
+/// it's shown. [shown] tells which tiles are on screen - switched-off parts
+/// keep their place in the saved row but aren't shown, so [index] counts
+/// only the shown ones: the tile goes right before the shown tile now at
+/// [index], or right behind the last shown one. The user's explicit choice,
+/// so any place is fine (no [ownTileRank] rules). [tiles] itself comes back
+/// if the tile isn't there or stays where it was.
+List<LauncherTile> placeLauncherTile(
+  List<LauncherTile> tiles,
+  String id,
+  int index, {
+  bool Function(LauncherTile tile)? shown,
+}) {
+  final isShown = shown ?? (_) => true;
+  final i = tiles.indexWhere((t) => t.id == id);
+  if (i < 0) return tiles;
+  final tile = tiles[i];
+  final rest = [...tiles]..removeAt(i);
+  final visible = [
+    for (var k = 0; k < rest.length; k++)
+      if (isShown(rest[k])) k,
+  ];
+  final to = index.clamp(0, visible.length);
+  if (isShown(tile) && to == tiles.take(i).where(isShown).length) return tiles;
+  final at = to < visible.length ? visible[to] : (visible.isEmpty ? rest.length : visible.last + 1);
+  return rest..insert(at, tile);
 }
 
 /// Home System's own tiles by media type: audio (Radio, Musik), video

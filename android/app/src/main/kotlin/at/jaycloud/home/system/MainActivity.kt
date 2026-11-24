@@ -26,14 +26,17 @@ class MainActivity : AudioServiceActivity() {
         flutterEngine.plugins.add(MusicVisualizerPlugin())
         flutterEngine.plugins.add(PermissionsPlugin())
         flutterEngine.plugins.add(at.jaycloud.home.system.browser.BrowserPlugin())
+        // Uncaught native errors: an error message in the app instead of a crash.
+        flutterEngine.plugins.add(CrashGuard.Plugin())
     }
 
     private var createdAt = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        CrashGuard.install()
         createdAt = SystemClock.elapsedRealtime()
         super.onCreate(savedInstanceState)
-        HomeButtonService.restoreAfterUpdate(this)
+        HomeButtonService.ensureRunning(this)
         // A cold start by the Home key opens the launcher; at boot (also a
         // HOME intent, or HomeButtonService) the app's own start setting
         // decides, as for any other start.
@@ -44,7 +47,7 @@ class MainActivity : AudioServiceActivity() {
 
     override fun onResume() {
         super.onResume()
-        HomeButtonService.restoreAfterUpdate(this)
+        HomeButtonService.ensureRunning(this)
         // Display by motion: shown over the lock screen, and a lock screen
         // without PIN goes away when the display comes back.
         if (MotionService.running != null) {

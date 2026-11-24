@@ -1640,6 +1640,30 @@ abstract class AppLocalizations {
   /// **'OK: App öffnen  ·  ☰ oder OK lange drücken: Favorit, Gruppe, App-Info (beenden, deinstallieren)'**
   String get launcherAllAppsHelp;
 
+  /// No description provided for @launcherMoveTile.
+  ///
+  /// In de, this message translates to:
+  /// **'Verschieben'**
+  String get launcherMoveTile;
+
+  /// No description provided for @launcherMoveTiles.
+  ///
+  /// In de, this message translates to:
+  /// **'Kacheln verschieben'**
+  String get launcherMoveTiles;
+
+  /// No description provided for @launcherMoveModeHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Verschiebemodus: OK nehmen/ablegen · ◀ ▶ verschieben · OK lang: fertig'**
+  String get launcherMoveModeHint;
+
+  /// No description provided for @launcherMoveModeLiftedHint.
+  ///
+  /// In de, this message translates to:
+  /// **'◀ ▶ verschieben · OK: hier ablegen · Zurück: abbrechen · OK lang: fertig'**
+  String get launcherMoveModeLiftedHint;
+
   /// No description provided for @miscApply.
   ///
   /// In de, this message translates to:
@@ -7840,18 +7864,6 @@ abstract class AppLocalizations {
   /// **'„{app}“ ist nicht (mehr) installiert.'**
   String settingsLauncherNotInstalled(String app);
 
-  /// No description provided for @settingsLauncherMoveLeft.
-  ///
-  /// In de, this message translates to:
-  /// **'Nach links verschieben'**
-  String get settingsLauncherMoveLeft;
-
-  /// No description provided for @settingsLauncherMoveRight.
-  ///
-  /// In de, this message translates to:
-  /// **'Nach rechts verschieben'**
-  String get settingsLauncherMoveRight;
-
   /// No description provided for @settingsLauncherChangeImage.
   ///
   /// In de, this message translates to:
@@ -8403,6 +8415,36 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'Filterlisten, zur Laufzeit geladen: uBlock Origin uAssets (GPLv3, github.com/uBlockOrigin/uAssets), EasyList, EasyPrivacy, EasyList Germany (GPLv3 oder CC BY-SA 3.0, easylist.to), Peter Lowe’s Ad and tracking server list (pgl.yoyo.org/adservers). Die Scriptlets sind eigene Umsetzungen nach den Namen und Argumenten von uBlock Origin.'**
   String get settingsAboutAdblockData;
+
+  /// No description provided for @settingsHomeKeyWorking.
+  ///
+  /// In de, this message translates to:
+  /// **'funktioniert'**
+  String get settingsHomeKeyWorking;
+
+  /// No description provided for @settingsHomeKeyBroken.
+  ///
+  /// In de, this message translates to:
+  /// **'funktioniert nicht - bitte öffnen'**
+  String get settingsHomeKeyBroken;
+
+  /// No description provided for @settingsHomeKeyNotRunning.
+  ///
+  /// In de, this message translates to:
+  /// **'Dienst „Home System: Home-Taste“ ist eingeschaltet, läuft aber nicht (die App wurde beendet). Die App startet ihn selbst neu, wenn sie darf - sonst hier neu starten.'**
+  String get settingsHomeKeyNotRunning;
+
+  /// No description provided for @settingsHomeKeyRestart.
+  ///
+  /// In de, this message translates to:
+  /// **'Dienst neu starten'**
+  String get settingsHomeKeyRestart;
+
+  /// No description provided for @errorCaught.
+  ///
+  /// In de, this message translates to:
+  /// **'Fehler abgefangen: {message}'**
+  String errorCaught(String message);
 
   /// No description provided for @systemStartDashboard.
   ///

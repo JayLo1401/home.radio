@@ -920,6 +920,20 @@ class AppLocalizationsEn extends AppLocalizations {
       'OK: open app  ·  ☰ or hold OK: favorite, group, app info (force stop, uninstall)';
 
   @override
+  String get launcherMoveTile => 'Move';
+
+  @override
+  String get launcherMoveTiles => 'Move tiles';
+
+  @override
+  String get launcherMoveModeHint =>
+      'Move mode: OK pick up/drop · ◀ ▶ move · Hold OK: done';
+
+  @override
+  String get launcherMoveModeLiftedHint =>
+      '◀ ▶ move · OK: drop here · Back: cancel · Hold OK: done';
+
+  @override
   String get miscApply => 'Apply';
 
   @override
@@ -4634,12 +4648,6 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get settingsLauncherMoveLeft => 'Move left';
-
-  @override
-  String get settingsLauncherMoveRight => 'Move right';
-
-  @override
   String get settingsLauncherChangeImage => 'Change picture';
 
   @override
@@ -4983,6 +4991,24 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsAboutAdblockData =>
       'Filter lists, downloaded at runtime: uBlock Origin uAssets (GPLv3, github.com/uBlockOrigin/uAssets), EasyList, EasyPrivacy, EasyList Germany (GPLv3 or CC BY-SA 3.0, easylist.to), Peter Lowe’s Ad and tracking server list (pgl.yoyo.org/adservers). The scriptlets are our own implementations following uBlock Origin’s names and arguments.';
+
+  @override
+  String get settingsHomeKeyWorking => 'working';
+
+  @override
+  String get settingsHomeKeyBroken => 'not working - please open';
+
+  @override
+  String get settingsHomeKeyNotRunning =>
+      'Service \"Home System: Home key\" is switched on but not running (the app was ended). The app restarts it by itself where allowed - otherwise restart it here.';
+
+  @override
+  String get settingsHomeKeyRestart => 'Restart service';
+
+  @override
+  String errorCaught(String message) {
+    return 'Error caught: $message';
+  }
 
   @override
   String get systemStartDashboard => 'Show Smart Home (wall tablet)';

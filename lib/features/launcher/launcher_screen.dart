@@ -26,6 +26,7 @@ import '../settings/settings_screen.dart';
 import '../tv/tv_screen.dart';
 import 'all_apps_screen.dart';
 import 'launcher_background.dart';
+import 'launcher_move_mode.dart';
 import 'launcher_navigation.dart';
 import 'launcher_providers.dart';
 
@@ -39,6 +40,12 @@ import 'launcher_providers.dart';
 /// OK opens, ☰ (menu) or holding OK gives the tile's options (move,
 /// picture, groups, app info, remove), ▲ from the favourites reaches the
 /// music bar and the settings. Back does nothing - this is the home screen.
+///
+/// Move mode (the tile's "Verschieben", or "Kacheln verschieben" in the top
+/// bar's menu - see LauncherMoveMode): OK picks a tile up / puts it down,
+/// ◀/▶ move the lifted tile one place (held: on and on), Back puts it back
+/// where it was (or, with none lifted, ends move mode), holding OK ends move
+/// mode (a lifted tile stays where it is).
 class LauncherScreen extends ConsumerStatefulWidget {
   const LauncherScreen({super.key});
 
@@ -115,6 +122,9 @@ class _LauncherScreenState extends ConsumerState<LauncherScreen> {
 
   /// The rows as last built - for ▲/▼ between them.
   var _rows = const <_RowInfo>[];
+
+  /// Move mode ("Verschiebemodus") - see LauncherMoveMode.
+  final _move = LauncherMoveMode();
 
   /// Where the focus is (or was last) in the rows. Plain fields: moving
   /// the focus rebuilds only the two tiles concerned.
@@ -210,6 +220,21 @@ class _LauncherScreenState extends ConsumerState<LauncherScreen> {
     final from = _rows.indexWhere((r) => r.id == _focusRow);
     if (from < 0) return KeyEventResult.ignored;
     final row = _rows[from];
+    if (_move.active) {
+      final lifted = _move.lifted;
+      if (lifted != null) {
+        // A lifted tile: ◀/▶ move it (the focus stays on it), ▲/▼ do
+        // nothing - it stays in its row.
+        if (key == LogicalKeyboardKey.arrowLeft || key == LogicalKeyboardKey.arrowRight) {
+          _stepLifted(lifted, key == LogicalKeyboardKey.arrowLeft ? -1 : 1);
+          return KeyEventResult.handled;
+        }
+        if (key == LogicalKeyboardKey.arrowUp || key == LogicalKeyboardKey.arrowDown) return KeyEventResult.handled;
+      } else if (key == LogicalKeyboardKey.arrowUp && from == 0) {
+        // The focus stays in the rows while moving.
+        return KeyEventResult.handled;
+      }
+    }
     if (key == LogicalKeyboardKey.arrowUp) {
       if (from == 0) {
         (_musicShown ? _musicFocus : _menuFocus).requestFocus();
@@ -225,6 +250,131 @@ class _LauncherScreenState extends ConsumerState<LauncherScreen> {
     if (key == LogicalKeyboardKey.arrowLeft && _focusIndex <= 0) return KeyEventResult.handled;
     if (key == LogicalKeyboardKey.arrowRight && _focusIndex >= row.count - 1) return KeyEventResult.handled;
     return KeyEventResult.ignored;
+  }
+
+  /// Move mode on - with [tile] of [row] already lifted, if given.
+  void _startMove([_RowInfo? row, LauncherTile? tile]) {
+    final index = row == null || tile == null ? -1 : row.tiles.indexWhere((t) => t.id == tile.id);
+    setState(() {
+      index < 0 ? _move.start() : _move.start(row: row!.id, tileId: tile!.id, index: index);
+    });
+    if (index >= 0) {
+      _focusRow = row!.id;
+      _focusIndex = index;
+    }
+    // Back from the menu: the focus to the (lifted) tile.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _move.active) _focusCurrentTile();
+    });
+  }
+
+  /// ◀/▶ with a tile lifted: one place on; the focus stays on the tile and
+  /// the row scrolls along.
+  void _stepLifted(LiftedTile lifted, int direction) {
+    final row = _row(lifted.row);
+    if (row == null) return;
+    final before = lifted.index;
+    final index = _move.step(direction, row.tiles.length);
+    if (index == null || index == before) return;
+    setState(() {});
+    _focusRow = row.id;
+    _focusIndex = index;
+    _scrollToIndex(row, index);
+    // Should the tile have lost the focus all the same: back to it.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final now = _row(row.id);
+      final current = _move.lifted;
+      if (!mounted || now == null || current == null || current.row != row.id) return;
+      final i = current.index;
+      if (i >= now.count || now.keyAt(i) != (row.group == null ? current.tileId : '${row.id}/${current.tileId}')) return;
+      if (!_focusFor(now.keyAt(i)).hasFocus) {
+        _focusRow = row.id;
+        _focusIndex = i;
+        _focusItem(now, i);
+      }
+    });
+  }
+
+  /// OK in move mode on the focused item.
+  void _moveOkFocused() {
+    final row = _row(_focusRow);
+    if (row != null) _moveOkAt(row, _focusIndex);
+  }
+
+  /// OK (or a tap) in move mode on item [index] of [row]: lifts the tile,
+  /// or puts the lifted one down where it is now.
+  void _moveOkAt(_RowInfo row, int index) {
+    final tileId = index >= 0 && index < row.tiles.length ? row.tiles[index].id : null;
+    final drop = _move.ok(row.id, tileId, index);
+    setState(() {});
+    if (drop != null) _saveDrop(drop);
+  }
+
+  /// Holding OK (or ☰) in move mode: move mode ends, a lifted tile stays
+  /// where it is now.
+  void _finishMove() {
+    if (!_move.active) return;
+    final drop = _move.finish();
+    setState(() {});
+    if (drop != null) _saveDrop(drop);
+  }
+
+  /// Back in move mode: a lifted tile goes back to where it was; with none
+  /// lifted, move mode ends.
+  void _moveBack() {
+    final lifted = _move.lifted;
+    final result = _move.back();
+    if (result == LauncherMoveBack.ignored) return;
+    setState(() {});
+    if (result == LauncherMoveBack.putBack && lifted != null) {
+      final row = _row(lifted.row);
+      _focusRow = lifted.row;
+      _focusIndex = lifted.from;
+      if (row != null) _scrollToIndex(row, lifted.from);
+    }
+  }
+
+  /// Saves a drop - with the same notifiers (and so the same storage) as
+  /// every other change of the rows.
+  Future<void> _saveDrop(LauncherMoveDrop drop) async {
+    try {
+      if (drop.row == _favorites) {
+        final parts = ref.read(systemPartsProvider.notifier);
+        await ref.read(launcherTilesProvider.notifier).place(drop.tileId, drop.index, shown: parts.showsTile);
+      } else {
+        await ref.read(launcherGroupsProvider.notifier).placeTile(drop.row, drop.tileId, drop.index);
+      }
+    } catch (e) {
+      debugPrint('Launcher: saving the moved tile failed: $e');
+    }
+  }
+
+  /// Scrolls [row] just enough that its item [index] is fully on screen
+  /// (a lifted tile keeps its focus, so nothing else scrolls the row).
+  void _scrollToIndex(_RowInfo row, int index) {
+    final scroll = _scrolls[row.id];
+    if (scroll == null || !scroll.hasClients) return;
+    final p = scroll.position;
+    final s = row.size;
+    // With a gap's room on either side - the lifted tile is enlarged.
+    final start = _rowLeading + index * s.pitch - s.gap;
+    final end = _rowLeading + index * s.pitch + s.width + s.gap;
+    double? target;
+    if (start < p.pixels) {
+      target = start;
+    } else if (end > p.pixels + p.viewportDimension) {
+      target = end - p.viewportDimension;
+    }
+    if (target == null) return;
+    target = target.clamp(p.minScrollExtent, p.maxScrollExtent);
+    // More than a place behind (a held key outruns the animation): jump, so
+    // the lifted tile never leaves the built part of the row (and with it
+    // the focus).
+    if ((target - p.pixels).abs() > s.pitch) {
+      scroll.jumpTo(target);
+    } else {
+      scroll.animateTo(target, duration: const Duration(milliseconds: 120), curve: Curves.easeOut);
+    }
   }
 
   /// The music bar: ▲ to the top bar, ▼ back to the tiles.
@@ -257,6 +407,7 @@ class _LauncherScreenState extends ConsumerState<LauncherScreen> {
           _option(context, 'app', Icons.tune, l.settingsLauncherMenuApp, autofocus: true),
           _option(context, 'android', Icons.settings_applications_outlined, l.settingsLauncherMenuAndroid),
           _option(context, 'apps', Icons.apps, l.miscAllAppsTitle),
+          _option(context, 'move', Icons.open_with, l.launcherMoveTiles),
         ],
       ),
     );
@@ -268,6 +419,8 @@ class _LauncherScreenState extends ConsumerState<LauncherScreen> {
         await ref.read(launcherServiceProvider).openSystemSettings();
       case 'apps':
         await _openAllApps();
+      case 'move':
+        _startMove();
     }
   }
 
@@ -377,8 +530,7 @@ class _LauncherScreenState extends ConsumerState<LauncherScreen> {
   Future<void> _options(LauncherTile tile, _RowInfo row) async {
     final group = row.group;
     final favorites = ref.read(launcherTilesProvider);
-    final list = group == null ? favorites : (ref.read(launcherGroupsProvider).byId(group.id)?.tiles ?? const []);
-    final index = list.indexWhere((t) => t.id == tile.id);
+    final movable = row.tiles.length > 1 && row.tiles.any((t) => t.id == tile.id);
     final groupable = LauncherService.supported && LauncherGroup.allows(tile);
     final inFavorites = favorites.any((t) => t.id == tile.id);
     final l = context.l10n;
@@ -387,10 +539,9 @@ class _LauncherScreenState extends ConsumerState<LauncherScreen> {
       builder: (context) => SimpleDialog(
         title: Text(tile.displayLabel),
         children: [
-          if (index > 0) _option(context, 'left', Icons.arrow_back, l.settingsLauncherMoveLeft, autofocus: true),
-          if (index >= 0 && index < list.length - 1)
-            _option(context, 'right', Icons.arrow_forward, l.settingsLauncherMoveRight, autofocus: index == 0),
-          _option(context, 'image', Icons.image_outlined, l.settingsLauncherChangeImage, autofocus: list.length <= 1),
+          // Move mode, with this tile already lifted.
+          if (movable) _option(context, 'move', Icons.open_with, l.launcherMoveTile, autofocus: true),
+          _option(context, 'image', Icons.image_outlined, l.settingsLauncherChangeImage, autofocus: !movable),
           if (groupable && group == null) _option(context, 'toGroup', Icons.playlist_add, l.launcherAddToGroup),
           if (group != null) _option(context, 'moveGroup', Icons.drive_file_move_outline, l.launcherMoveToGroup),
           if (group != null && groupable && !inFavorites)
@@ -411,10 +562,8 @@ class _LauncherScreenState extends ConsumerState<LauncherScreen> {
     final position = row.tiles.indexWhere((t) => t.id == tile.id);
     final key = row.keyAt(position < 0 ? 0 : position);
     switch (action) {
-      case 'left' || 'right':
-        final direction = action == 'left' ? -1 : 1;
-        group == null ? await tiles.move(tile.id, direction) : await groups.moveTile(group.id, tile.id, direction);
-        _keepVisible(key);
+      case 'move':
+        _startMove(row, tile);
       case 'image':
         if (mounted) await chooseTileImage(context, ref, tile);
       case 'toGroup':
@@ -541,13 +690,24 @@ class _LauncherScreenState extends ConsumerState<LauncherScreen> {
         if (parts.showsTile(t)) t,
     ];
     final groups = LauncherService.supported ? ref.watch(launcherGroupsProvider) : const <LauncherGroup>[];
+    // In move mode the lifted tile shows where it is now (see LauncherMoveMode).
+    String idOf(LauncherTile t) => t.id;
     _rows = [
-      _RowInfo(id: _favorites, tiles: tiles, appsTile: LauncherService.supported),
-      for (final g in groups) _RowInfo(id: g.id, group: g, tiles: g.tiles),
+      _RowInfo(id: _favorites, tiles: _move.arrange(_favorites, tiles, idOf), appsTile: LauncherService.supported),
+      for (final g in groups) _RowInfo(id: g.id, group: g, tiles: _move.arrange(g.id, g.tiles, idOf)),
     ];
+    // The lifted tile left its row meanwhile: nothing to drop any more.
+    if (_move.lifted case final lifted?) {
+      if (!(_row(lifted.row)?.tiles.any((t) => t.id == lifted.tileId) ?? false)) _move.cancelLift();
+    }
     _musicShown = ref.watch(musicStateProvider.select((s) => s.current != null));
+    final moving = _move.active;
     return PopScope(
       canPop: false,
+      // Back (Esc on the PC) only matters in move mode.
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _moveBack();
+      },
       child: Focus(
         onKeyEvent: _onKey,
         child: Scaffold(
@@ -591,6 +751,7 @@ class _LauncherScreenState extends ConsumerState<LauncherScreen> {
                                 ),
                               ),
                             ),
+                          if (moving) _MoveBanner(lifted: _move.lifted != null),
                           // A band across the whole width, like Radio's
                           // "now playing" banner - top bar and band frame
                           // the picture. With groups it grows upwards and
@@ -598,19 +759,25 @@ class _LauncherScreenState extends ConsumerState<LauncherScreen> {
                           Flexible(
                             child: Container(
                               color: Colors.black.withValues(alpha: ref.watch(launcherSettingsProvider).bandOpacity),
-                              child: Focus(
-                                canRequestFocus: false,
-                                skipTraversal: true,
-                                onKeyEvent: _onRowsKey,
-                                child: SingleChildScrollView(
-                                  controller: _vScroll,
-                                  padding: const EdgeInsets.fromLTRB(32, 16, 32, 8),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      _favoritesRow(_rows.first),
-                                      for (final row in _rows.skip(1)) _groupRow(row),
-                                    ],
+                              // In move mode OK (short / held) is the rows'
+                              // - the tiles let it through.
+                              child: OkLongPress(
+                                onTap: moving ? _moveOkFocused : null,
+                                onLongPress: moving ? _finishMove : null,
+                                child: Focus(
+                                  canRequestFocus: false,
+                                  skipTraversal: true,
+                                  onKeyEvent: _onRowsKey,
+                                  child: SingleChildScrollView(
+                                    controller: _vScroll,
+                                    padding: const EdgeInsets.fromLTRB(32, 16, 32, 8),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        _favoritesRow(_rows.first),
+                                        for (final row in _rows.skip(1)) _groupRow(row),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ),
@@ -665,7 +832,9 @@ class _LauncherScreenState extends ConsumerState<LauncherScreen> {
                   key: const ValueKey(_appsKey),
                   child: _AppsTile(
                     focusNode: _appsFocus,
-                    onOpen: _openAllApps,
+                    onOpen: () {
+                      if (!_move.active) _openAllApps();
+                    },
                     onFocused: () => _onFocused(row.id, i),
                   ),
                 );
@@ -678,8 +847,10 @@ class _LauncherScreenState extends ConsumerState<LauncherScreen> {
                   tile: tile,
                   focusNode: _focusFor(tile.id),
                   autofocus: i == 0,
-                  onOpen: () => _open(tile),
-                  onOptions: () => _options(tile, row),
+                  moving: _move.active,
+                  lifted: _liftedState(row, i),
+                  onOpen: _move.active ? () => _moveOkAt(row, i) : () => _open(tile),
+                  onOptions: _move.active ? _finishMove : () => _options(tile, row),
                   onFocused: () => _onFocused(row.id, i),
                 ),
               );
@@ -736,7 +907,7 @@ class _LauncherScreenState extends ConsumerState<LauncherScreen> {
                   child: _EmptyGroupTile(
                     focusNode: _focusFor(key),
                     hint: context.l10n.launcherGroupEmptyHint(_keyHint(ref, RemoteAction.options)),
-                    onOptions: () => _groupOptions(group),
+                    onOptions: _move.active ? _finishMove : () => _groupOptions(group),
                     onFocused: () => _onFocused(row.id, i),
                   ),
                 );
@@ -749,8 +920,10 @@ class _LauncherScreenState extends ConsumerState<LauncherScreen> {
                   tile: tile,
                   size: size,
                   focusNode: _focusFor(key),
-                  onOpen: () => _open(tile),
-                  onOptions: () => _options(tile, row),
+                  moving: _move.active,
+                  lifted: _liftedState(row, i),
+                  onOpen: _move.active ? () => _moveOkAt(row, i) : () => _open(tile),
+                  onOptions: _move.active ? _finishMove : () => _options(tile, row),
                   onFocused: () => _onFocused(row.id, i),
                 ),
               );
@@ -759,6 +932,14 @@ class _LauncherScreenState extends ConsumerState<LauncherScreen> {
         ),
       ],
     );
+  }
+
+  /// Tile [i] of [row] in move mode: null if it isn't lifted, else which
+  /// ways it can still go.
+  _Lifted? _liftedState(_RowInfo row, int i) {
+    final tile = row.tiles[i];
+    if (!_move.isLifted(row.id, tile.id)) return null;
+    return _Lifted(left: i > 0, right: i < row.tiles.length - 1);
   }
 
   /// Keeps a tile's state (and focus) when the row is reordered.
@@ -1123,8 +1304,15 @@ class _TileView extends ConsumerStatefulWidget {
     this.onFocused,
     this.autofocus = false,
     this.size = _TileSize.favorite,
+    this.moving = false,
+    this.lifted,
   });
 
+  /// Move mode is on: OK (short and held) is the rows' then.
+  final bool moving;
+
+  /// Picked up in move mode (null: not lifted).
+  final _Lifted? lifted;
   final VoidCallback? onFocused;
   final _TileSize size;
   final LauncherTile tile;
@@ -1156,11 +1344,14 @@ class _TileViewState extends ConsumerState<_TileView> {
       onKeyEvent: _onKey,
       child: OkLongPress(
         onTap: widget.onOpen,
-        onLongPress: widget.onOptions,
+        // Null lets OK through to the rows in move mode.
+        onLongPress: widget.moving ? null : widget.onOptions,
         child: _TileFrame(
           focused: _focused,
           label: widget.tile.displayLabel,
           size: widget.size,
+          moving: widget.moving,
+          lifted: widget.lifted,
           child: InkWell(
             focusNode: widget.focusNode,
             autofocus: widget.autofocus,
@@ -1184,31 +1375,55 @@ class _TileViewState extends ConsumerState<_TileView> {
 
 /// Size, scale and frame of a focused/unfocused tile, with its label.
 class _TileFrame extends StatelessWidget {
-  const _TileFrame({required this.focused, required this.label, required this.child, this.size = _TileSize.favorite});
+  const _TileFrame({
+    required this.focused,
+    required this.label,
+    required this.child,
+    this.size = _TileSize.favorite,
+    this.moving = false,
+    this.lifted,
+  });
 
   final bool focused;
   final String label;
   final Widget child;
   final _TileSize size;
 
+  /// Move mode: the focused tile shows that OK picks it up.
+  final bool moving;
+
+  /// Picked up in move mode: raised, larger, green frame, ◀ ▶ arrows.
+  final _Lifted? lifted;
+
   @override
   Widget build(BuildContext context) {
     final small = size.height < _TileSize.favorite.height;
+    final lifted = this.lifted;
+    final picture = ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: SizedBox(width: size.width, height: size.height, child: child),
+    );
     return SizedBox(
       width: size.width,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          AnimatedScale(
-            scale: focused ? 1.08 : 1.0,
+          AnimatedSlide(
+            offset: lifted != null ? const Offset(0, -0.06) : Offset.zero,
             duration: const Duration(milliseconds: 150),
-            child: TvFocusHighlight(
-              focused: focused,
-              borderRadius: BorderRadius.circular(16),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(14),
-                child: SizedBox(width: size.width, height: size.height, child: child),
-              ),
+            child: AnimatedScale(
+              scale: lifted != null ? 1.14 : (focused ? 1.08 : 1.0),
+              duration: const Duration(milliseconds: 150),
+              child: lifted != null
+                  ? _LiftedFrame(lifted: lifted, small: small, child: picture)
+                  : Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        TvFocusHighlight(focused: focused, borderRadius: BorderRadius.circular(16), child: picture),
+                        if (moving && focused)
+                          const Positioned(top: 6, right: 6, child: _RoundIcon(icon: Icons.open_with, size: 20)),
+                      ],
+                    ),
             ),
           ),
           SizedBox(height: small ? 10 : 14),
@@ -1217,12 +1432,121 @@ class _TileFrame extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: focused ? Colors.white : Colors.white70,
+              color: lifted != null ? brandGreen : (focused ? Colors.white : Colors.white70),
               fontSize: size.labelSize,
-              fontWeight: focused ? FontWeight.w600 : FontWeight.normal,
+              fontWeight: focused || lifted != null ? FontWeight.w600 : FontWeight.normal,
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// A lifted tile in move mode: which ways it can still go.
+class _Lifted {
+  const _Lifted({required this.left, required this.right});
+
+  final bool left;
+  final bool right;
+}
+
+/// The lifted tile's look: a thick green frame, a shadow underneath (it
+/// "floats" over the row) and ◀ ▶ on its sides where it can still go.
+class _LiftedFrame extends StatelessWidget {
+  const _LiftedFrame({required this.lifted, required this.small, required this.child});
+
+  final _Lifted lifted;
+  final bool small;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final arrow = small ? 22.0 : 28.0;
+    return Stack(
+      clipBehavior: Clip.none,
+      alignment: Alignment.center,
+      children: [
+        DecoratedBox(
+          position: DecorationPosition.foreground,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: brandGreen, width: 4),
+          ),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                const BoxShadow(color: Colors.black87, blurRadius: 22, offset: Offset(0, 12)),
+                BoxShadow(color: brandGreen.withValues(alpha: 0.6), blurRadius: 16, spreadRadius: 2),
+              ],
+            ),
+            child: child,
+          ),
+        ),
+        if (lifted.left) Positioned(left: 6, child: _RoundIcon(icon: Icons.chevron_left, size: arrow)),
+        if (lifted.right) Positioned(right: 6, child: _RoundIcon(icon: Icons.chevron_right, size: arrow)),
+      ],
+    );
+  }
+}
+
+/// A small white icon on a dark round badge - readable on any picture.
+class _RoundIcon extends StatelessWidget {
+  const _RoundIcon({required this.icon, required this.size});
+
+  final IconData icon;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.75),
+        shape: BoxShape.circle,
+        border: Border.all(color: brandGreen, width: 1.5),
+      ),
+      child: Icon(icon, color: Colors.white, size: size),
+    );
+  }
+}
+
+/// Move mode's hint over the rows: which keys do what.
+class _MoveBanner extends StatelessWidget {
+  const _MoveBanner({required this.lifted});
+
+  final bool lifted;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l10n;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(32, 0, 32, 12),
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.85),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: brandGreen, width: 2),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.open_with, color: brandGreen, size: 22),
+              const SizedBox(width: 10),
+              Flexible(
+                child: Text(
+                  lifted ? l.launcherMoveModeLiftedHint : l.launcherMoveModeHint,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

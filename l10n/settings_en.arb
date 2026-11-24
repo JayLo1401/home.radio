@@ -103,8 +103,6 @@
   "settingsLauncherMenuApp": "Home System (app settings)",
   "settingsLauncherMenuAndroid": "Android settings",
   "settingsLauncherNotInstalled": "\"{app}\" isn't installed (anymore).",
-  "settingsLauncherMoveLeft": "Move left",
-  "settingsLauncherMoveRight": "Move right",
   "settingsLauncherChangeImage": "Change picture",
   "settingsLauncherRemove": "Remove from the start bar",
   "settingsLauncherOptionsHint": "{key}  Tile options",
@@ -196,5 +194,10 @@
   "settingsRestoreAllowAllFiles": "Allow all files access",
   "settingsRestorePickFile": "Choose a backup file … (e.g. from a USB stick)",
   "settingsAboutAdblock": "Ad blocker (browser)",
-  "settingsAboutAdblockData": "Filter lists, downloaded at runtime: uBlock Origin uAssets (GPLv3, github.com/uBlockOrigin/uAssets), EasyList, EasyPrivacy, EasyList Germany (GPLv3 or CC BY-SA 3.0, easylist.to), Peter Lowe’s Ad and tracking server list (pgl.yoyo.org/adservers). The scriptlets are our own implementations following uBlock Origin’s names and arguments."
+  "settingsAboutAdblockData": "Filter lists, downloaded at runtime: uBlock Origin uAssets (GPLv3, github.com/uBlockOrigin/uAssets), EasyList, EasyPrivacy, EasyList Germany (GPLv3 or CC BY-SA 3.0, easylist.to), Peter Lowe’s Ad and tracking server list (pgl.yoyo.org/adservers). The scriptlets are our own implementations following uBlock Origin’s names and arguments.",
+  "settingsHomeKeyWorking": "working",
+  "settingsHomeKeyBroken": "not working - please open",
+  "settingsHomeKeyNotRunning": "Service \"Home System: Home key\" is switched on but not running (the app was ended). The app restarts it by itself where allowed - otherwise restart it here.",
+  "settingsHomeKeyRestart": "Restart service",
+  "errorCaught": "Error caught: {message}"
 }

@@ -27,5 +27,9 @@
   "@launcherAddedToGroup": {"placeholders": {"app": {"type": "String"}, "group": {"type": "String"}}},
   "launcherRemovedFromGroup": "„{app}“ aus „{group}“ entfernt",
   "@launcherRemovedFromGroup": {"placeholders": {"app": {"type": "String"}, "group": {"type": "String"}}},
-  "launcherAllAppsHelp": "OK: App öffnen  ·  ☰ oder OK lange drücken: Favorit, Gruppe, App-Info (beenden, deinstallieren)"
+  "launcherAllAppsHelp": "OK: App öffnen  ·  ☰ oder OK lange drücken: Favorit, Gruppe, App-Info (beenden, deinstallieren)",
+  "launcherMoveTile": "Verschieben",
+  "launcherMoveTiles": "Kacheln verschieben",
+  "launcherMoveModeHint": "Verschiebemodus: OK nehmen/ablegen · ◀ ▶ verschieben · OK lang: fertig",
+  "launcherMoveModeLiftedHint": "◀ ▶ verschieben · OK: hier ablegen · Zurück: abbrechen · OK lang: fertig"
 }

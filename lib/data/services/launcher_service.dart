@@ -25,9 +25,19 @@ class AppImage {
 
 /// State of the Home key redirect (see HomeButtonService.kt).
 class HomeButtonStatus {
-  const HomeButtonStatus({required this.serviceEnabled, required this.canEnable, required this.redirect});
+  const HomeButtonStatus({
+    required this.serviceEnabled,
+    required this.canEnable,
+    required this.redirect,
+    this.serviceRunning = false,
+  });
 
+  /// Switched on in the device's accessibility settings.
   final bool serviceEnabled;
+
+  /// Actually running: Android can leave it switched on but not run it
+  /// (after the app's process died).
+  final bool serviceRunning;
 
   /// WRITE_SECURE_SETTINGS was granted over adb - the app can switch the
   /// service on by itself.
@@ -129,6 +139,7 @@ class LauncherService {
     final m = await _invoke<Map<Object?, Object?>>('homeButtonStatus');
     return HomeButtonStatus(
       serviceEnabled: m?['serviceEnabled'] == true,
+      serviceRunning: m?['serviceRunning'] == true,
       canEnable: m?['canEnable'] == true,
       redirect: m?['redirect'] != false,
     );

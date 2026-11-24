@@ -68,6 +68,8 @@ class HomeButtonService : AccessibilityService() {
     }
 
     override fun onServiceConnected() {
+        // At boot the service can start the app's process before any screen.
+        CrashGuard.install()
         super.onServiceConnected()
         instance = this
         val filter = android.content.IntentFilter(Intent.ACTION_SCREEN_ON)
@@ -81,7 +83,7 @@ class HomeButtonService : AccessibilityService() {
         if (FILTER_HOME_KEY) {
             serviceInfo = serviceInfo.apply { flags = flags or AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS }
         }
-        // Wanted - and as of this version (see restoreAfterUpdate).
+        // Wanted - and as of this version (see ensureRunning).
         prefs(this).edit()
             .putBoolean(KEY_WANTED, true)
             .putLong(KEY_CONFIRMED_VERSION, installTime(this))
@@ -314,23 +316,79 @@ class HomeButtonService : AccessibilityService() {
             }
         }
 
+        /** Connected and working right now (it runs in the app's process). */
+        fun isRunning(): Boolean = instance != null
+
         /**
-         * Android drops an app's accessibility service when the app is
-         * updated. Switched back on when it was on before and only the app's
-         * version changed since - not when the user switched it off.
+         * Switches the service off and on again: Android binds it anew. Needed
+         * when it is still switched on in the settings but Android doesn't
+         * run it - after the app's process died (crash, or killed for
+         * memory) Android counts it as crashed and leaves it be; writing the
+         * same setting again changes nothing.
          */
-        fun restoreAfterUpdate(context: Context) {
+        fun restart(context: Context): Boolean {
+            if (!canWriteSecureSettings(context)) return false
+            return try {
+                val resolver = context.contentResolver
+                val me = ComponentName(context, HomeButtonService::class.java).flattenToString()
+                val current = Settings.Secure.getString(resolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES).orEmpty()
+                val others = current.split(':').filter { it.isNotBlank() && !it.equals(me, ignoreCase = true) }
+                Settings.Secure.putString(resolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, others.joinToString(":"))
+                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                    try {
+                        Settings.Secure.putString(
+                            resolver,
+                            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
+                            (others + me).joinToString(":"),
+                        )
+                        Settings.Secure.putInt(resolver, Settings.Secure.ACCESSIBILITY_ENABLED, 1)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "can't switch the service back on", e)
+                    }
+                }, 700)
+                true
+            } catch (e: Exception) {
+                Log.w(TAG, "can't restart the service", e)
+                false
+            }
+        }
+
+        /** On: switched on and not running - restart. Off: switch on. */
+        private fun bringBack(context: Context): Boolean =
+            if (isEnabled(context)) restart(context) else enable(context)
+
+        private var checksPosted = false
+
+        /**
+         * Keeps the Home key working (each time the app opens or comes back):
+         * - after an update Android drops the service - switched back on when
+         *   it was on before and only the app's version changed since (not
+         *   when the user switched it off);
+         * - after the app's process died Android leaves it switched on but
+         *   doesn't run it - restarted.
+         * A service the user switched off (no longer in the settings) stays off.
+         */
+        fun ensureRunning(context: Context) {
             val app = context.applicationContext
-            if (!needsRestore(app)) return
-            // Android takes the service out a little after the update, not
-            // right away - so it's put back now and a few more times, until
-            // it has connected again for this version.
+            if (checksPosted) return
+            checksPosted = true
             val main = android.os.Handler(android.os.Looper.getMainLooper())
-            for (delay in longArrayOf(0L, 3_000L, 10_000L, 30_000L)) {
+            // Give Android a moment to bind it by itself first.
+            for (delay in longArrayOf(4_000L, 15_000L, 40_000L)) {
                 main.postDelayed({
-                    if (needsRestore(app)) Log.i(TAG, "restoring the service after an update: ${enable(app)}")
+                    try {
+                        if (isRunning() || !canWriteSecureSettings(app)) return@postDelayed
+                        val wanted = prefs(app).getBoolean(KEY_WANTED, false)
+                        when {
+                            needsRestore(app) -> Log.i(TAG, "bringing the service back after an update: ${bringBack(app)}")
+                            wanted && isEnabled(app) -> Log.i(TAG, "on but not running - restarting it: ${restart(app)}")
+                        }
+                    } catch (e: Exception) {
+                        Log.w(TAG, "ensureRunning", e)
+                    }
                 }, delay)
             }
+            main.postDelayed({ checksPosted = false }, 41_000L)
         }
 
         /** Wanted, but not connected since the app was last updated. */

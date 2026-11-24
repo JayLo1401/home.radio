@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -806,6 +808,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ],
             ],
             if (section == SettingsSection.system) ...[
+              // At the very top: the Home key - lit up when it doesn't work.
+              if (LauncherService.supported) ...[
+                FocusTraversalOrder(
+                  order: NumericFocusOrder(nextOrder()),
+                  child: const _HomeKeyTile(),
+                ),
+                const SizedBox(height: 16),
+              ],
               // First: which parts there are decides about everything else.
               Text(l.settingsPartsHeading, style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 4),
@@ -967,19 +977,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           launcher.iconPack,
                   icon: Icons.palette_outlined,
                   onTap: () => chooseIconPack(context, ref),
-                ),
-              ),
-              FocusTraversalOrder(
-                order: NumericFocusOrder(nextOrder()),
-                child: _TvNavTile(
-                  label: l.settingsHomeKey,
-                  icon: Icons.home_outlined,
-                  onTap: () async {
-                    await Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const HomeButtonSettingsScreen()),
-                    );
-                    ref.invalidate(permissionEntriesProvider);
-                  },
                 ),
               ),
               ],
@@ -1731,6 +1728,66 @@ class _TvChoiceTileState extends State<_TvChoiceTile> {
 /// radio circle that would read as "not selected/not set up". Shows whether
 /// it's set up ([configured]: green tick / amber hint; null = neither, with
 /// [icon] instead), the current [value] and a chevron.
+/// The Home key's entry: "funktioniert" - or, when it doesn't, amber and
+/// framed so it catches the eye at once. Checked again every few seconds
+/// and when coming back to the app.
+class _HomeKeyTile extends ConsumerStatefulWidget {
+  const _HomeKeyTile();
+
+  @override
+  ConsumerState<_HomeKeyTile> createState() => _HomeKeyTileState();
+}
+
+class _HomeKeyTileState extends ConsumerState<_HomeKeyTile> with WidgetsBindingObserver {
+  Timer? _poll;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _poll = Timer.periodic(const Duration(seconds: 5), (_) => ref.invalidate(homeKeyWorkingProvider));
+  }
+
+  @override
+  void dispose() {
+    _poll?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) ref.invalidate(homeKeyWorkingProvider);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l10n;
+    // Unknown yet: shown neutral, not as an error.
+    final working = ref.watch(homeKeyWorkingProvider).value;
+    final tile = _TvNavTile(
+      label: l.settingsHomeKey,
+      value: working == null ? null : (working ? l.settingsHomeKeyWorking : l.settingsHomeKeyBroken),
+      configured: working,
+      icon: Icons.home_outlined,
+      onTap: () async {
+        await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const HomeButtonSettingsScreen()));
+        ref.invalidate(homeKeyWorkingProvider);
+        ref.invalidate(permissionEntriesProvider);
+      },
+    );
+    if (working != false) return tile;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.amber.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.amber, width: 2),
+      ),
+      child: tile,
+    );
+  }
+}
+
 class _TvNavTile extends StatefulWidget {
   final String label;
   final String? value;

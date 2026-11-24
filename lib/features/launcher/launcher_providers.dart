@@ -212,6 +212,14 @@ class LauncherTilesNotifier extends Notifier<List<LauncherTile>> {
     await _save(tiles);
   }
 
+  /// Move mode's drop: the tile at place [index] of the row as shown
+  /// ([shown]: which tiles are on screen) - see placeLauncherTile.
+  Future<void> place(String id, int index, {bool Function(LauncherTile tile)? shown}) async {
+    final tiles = placeLauncherTile(state, id, index, shown: shown);
+    if (identical(tiles, state)) return;
+    await _save(tiles);
+  }
+
   Future<void> setImage(String id, String? image) async {
     if (!contains(id)) return;
     await _save([for (final t in state) t.id == id ? t.withImage(image) : t]);
@@ -267,6 +275,8 @@ class LauncherGroupsNotifier extends Notifier<List<LauncherGroup>> {
   Future<void> removeTile(String groupId, String tileId) => _edit((g) => g.removeTile(groupId, tileId));
   Future<void> moveTile(String groupId, String tileId, int direction) =>
       _edit((g) => g.moveTile(groupId, tileId, direction));
+  Future<void> placeTile(String groupId, String tileId, int index) =>
+      _edit((g) => g.placeTile(groupId, tileId, index));
   Future<void> moveTileTo(String fromId, String toId, LauncherTile tile) =>
       _edit((g) => g.moveTileTo(fromId, toId, tile));
 

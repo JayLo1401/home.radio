@@ -6,6 +6,7 @@ import 'package:just_audio_media_kit/just_audio_media_kit.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:window_manager/window_manager.dart';
 
+import 'core/native_errors.dart';
 import 'app.dart';
 import 'core/third_party_licenses.dart';
 import 'features/tv/tv_player.dart';
@@ -28,5 +29,7 @@ Future<void> main() async {
   }
   // Which picture path TV takes on this device (Android version).
   await TvPlayer.prepare();
+  // Errors caught instead of crashing: shown as a message.
+  NativeErrors.install();
   runApp(const ProviderScope(child: HomeSystemApp()));
 }

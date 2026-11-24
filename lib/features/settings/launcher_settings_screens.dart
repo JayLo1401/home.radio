@@ -274,6 +274,22 @@ class HomeButtonSettingsScreen extends ConsumerStatefulWidget {
   ConsumerState<HomeButtonSettingsScreen> createState() => _HomeButtonSettingsScreenState();
 }
 
+/// Does the Home key lead to Home System: it is the default home screen, or
+/// the Home key service runs. (Android can leave the service switched on
+/// but not run it after the app's process died - that counts as not
+/// working.) Off the Android TV boxes: always true.
+final homeKeyWorkingProvider = FutureProvider.autoDispose<bool>((ref) async {
+  if (!LauncherService.supported) return true;
+  try {
+    final service = ref.read(launcherServiceProvider);
+    if (await service.isDefaultHome()) return true;
+    final status = await service.homeButtonStatus();
+    return status.serviceEnabled && status.serviceRunning;
+  } catch (_) {
+    return true;
+  }
+});
+
 class _HomeButtonSettingsScreenState extends ConsumerState<HomeButtonSettingsScreen> with WidgetsBindingObserver {
   bool _loaded = false;
   bool _fireTv = false;
@@ -324,9 +340,10 @@ class _HomeButtonSettingsScreenState extends ConsumerState<HomeButtonSettingsScr
       await _refresh();
       return;
     }
-    await Future<void>.delayed(const Duration(seconds: 2));
+    await Future<void>.delayed(const Duration(seconds: 3));
     await _refresh();
     if (mounted) setState(() => _blocked = !_status.serviceEnabled);
+    ref.invalidate(homeKeyWorkingProvider);
   }
 
   @override
@@ -374,25 +391,32 @@ class _HomeButtonSettingsScreenState extends ConsumerState<HomeButtonSettingsScr
                     Text(l.settingsHomeKeyServiceFallback, style: help),
                     const SizedBox(height: 12),
                   ],
-                  state(
-                    _status.serviceEnabled,
-                    l.settingsHomeKeyServiceOn,
-                    l.settingsHomeKeyServiceOff,
-                  ),
+                  if (_status.serviceEnabled && !_status.serviceRunning)
+                    state(false, '', l.settingsHomeKeyNotRunning)
+                  else
+                    state(
+                      _status.serviceEnabled,
+                      l.settingsHomeKeyServiceOn,
+                      l.settingsHomeKeyServiceOff,
+                    ),
                   const SizedBox(height: 8),
                   Text(
                     _fireTv ? l.settingsHomeKeyServiceFireTv : l.settingsHomeKeyServiceOther,
                     style: help,
                   ),
                   const SizedBox(height: 12),
-                  if (!_status.serviceEnabled)
+                  if (!_status.serviceEnabled || !_status.serviceRunning)
                     Align(
                       alignment: Alignment.centerLeft,
                       child: FilledButton.icon(
-                        autofocus: _fireTv,
+                        autofocus: _fireTv || _status.serviceEnabled,
                         onPressed: _enable,
-                        icon: const Icon(Icons.power_settings_new),
-                        label: Text(_status.canEnable ? l.settingsHomeKeyEnable : l.settingsHomeKeyOpenA11y),
+                        icon: Icon(_status.serviceEnabled ? Icons.restart_alt : Icons.power_settings_new),
+                        label: Text(
+                          !_status.canEnable
+                              ? l.settingsHomeKeyOpenA11y
+                              : (_status.serviceEnabled ? l.settingsHomeKeyRestart : l.settingsHomeKeyEnable),
+                        ),
                       ),
                     ),
                   if (!_status.serviceEnabled && (!_status.canEnable || _blocked)) ...[
