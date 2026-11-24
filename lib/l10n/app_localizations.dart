@@ -701,7 +701,7 @@ abstract class AppLocalizations {
   /// No description provided for @dashboardDimOnlyHelp.
   ///
   /// In de, this message translates to:
-  /// **'Das Display wird schwarz und ganz dunkel, schaltet aber nicht ab - so sperrt Android nicht, und beim Zurückkommen erscheint kein Sperrbildschirm (Fire-Tablets). Bewegung, Tippen oder eine Taste holen es sofort zurück.'**
+  /// **'Das Display wird nur schwarz und ganz dunkel, die Hintergrundbeleuchtung bleibt an. Nur nötig, wenn das echte Ausschalten nicht geht - ausgeschaltet wird über die Bedienungshilfe „Home System: Home-Taste“, ein Sperrbildschirm ohne PIN wird beim Einschalten weggewischt.'**
   String get dashboardDimOnlyHelp;
 
   /// No description provided for @dashboardBrightnessHeading.
@@ -1894,6 +1894,18 @@ abstract class AppLocalizations {
   /// **'Unverschlüsselt - nur im eigenen Netz verwenden.'**
   String get nasProtocolFtpHint;
 
+  /// No description provided for @nasProtocolSmb.
+  ///
+  /// In de, this message translates to:
+  /// **'SMB (Windows-Freigabe)'**
+  String get nasProtocolSmb;
+
+  /// No description provided for @nasProtocolSmbHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Windows-PC oder -Server, NAS mit Samba - zeigt alle Freigaben des Servers (SMB 1 bis 2.1).'**
+  String get nasProtocolSmbHint;
+
   /// No description provided for @nasHost.
   ///
   /// In de, this message translates to:
@@ -1947,6 +1959,18 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'Passwort'**
   String get nasPassword;
+
+  /// No description provided for @nasDomain.
+  ///
+  /// In de, this message translates to:
+  /// **'Domäne oder Arbeitsgruppe (meist leer)'**
+  String get nasDomain;
+
+  /// No description provided for @nasSmbLoginHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Ein Konto auf dem Server. Bei einem Microsoft-Konto unter Windows: die E-Mail-Adresse und das Kennwort (nicht die PIN).'**
+  String get nasSmbLoginHint;
 
   /// No description provided for @nasTest.
   ///
@@ -2151,6 +2175,24 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'Der FTP-Server meldet: {reply}'**
   String nasErrorFtp(String reply);
+
+  /// No description provided for @nasErrorSmb.
+  ///
+  /// In de, this message translates to:
+  /// **'Der SMB-Server meldet: {message}'**
+  String nasErrorSmb(String message);
+
+  /// No description provided for @nasErrorSmbConnect.
+  ///
+  /// In de, this message translates to:
+  /// **'Keine SMB-Verbindung möglich - der Server verlangt vielleicht SMB 3 (die App kann SMB 1 bis 2.1).'**
+  String get nasErrorSmbConnect;
+
+  /// No description provided for @nasErrorIsFolder.
+  ///
+  /// In de, this message translates to:
+  /// **'Das ist ein Ordner, keine Datei.'**
+  String get nasErrorIsFolder;
 
   /// No description provided for @nasBackupRunning.
   ///

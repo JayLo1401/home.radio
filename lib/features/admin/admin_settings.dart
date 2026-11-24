@@ -387,7 +387,7 @@ class AdminSettings implements AdminSettingsSource {
               get: () => display.dimOnly,
               set: (v) async {
                 final d = await repo.getDashboardDisplay();
-                await _c.read(dashboardDisplayProvider.notifier).set(d.copyWith(dimOnly: _bool(v) ?? true));
+                await _c.read(dashboardDisplayProvider.notifier).set(d.copyWith(dimOnly: _bool(v) ?? false));
                 return null;
               },
             ),

@@ -54,7 +54,7 @@ class MotionService : Service() {
         val webhookUrl: String,
         val deviceName: String,
         /** "Off" only darkens (see [dim]) - no lock screen afterwards. */
-        val dimOnly: Boolean = true,
+        val dimOnly: Boolean = false,
     )
 
     private val main = Handler(Looper.getMainLooper())
@@ -452,8 +452,8 @@ class MotionService : Service() {
             }
             // A wall tablet shows the dashboard, not the lock screen: one
             // without PIN is swiped away (Fire OS ignores "show over the
-            // lock screen"), once the display is really on.
-            Handler(Looper.getMainLooper()).postDelayed({ HomeButtonService.instance?.swipeAwayLockScreen() }, 700)
+            // lock screen") - HomeButtonService also does on every display-on.
+            HomeButtonService.instance?.unlockSoon()
         }
     }
 }

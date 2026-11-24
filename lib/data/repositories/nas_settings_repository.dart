@@ -35,6 +35,7 @@ class NasSettingsRepository {
   static const _https = 'nas_https';
   static const _basePath = 'nas_base_path';
   static const _user = 'nas_user';
+  static const _domain = 'nas_domain';
   static String _folderKey(NasFolder kind) => 'nas_folder_${kind.name}';
 
   Future<NasSettings> load() async {
@@ -47,6 +48,7 @@ class NasSettingsRepository {
       basePath: await _db.getSetting(_basePath) ?? '',
       user: await _db.getSetting(_user) ?? '',
       password: await _secrets.read(passwordKey) ?? '',
+      domain: await _db.getSetting(_domain) ?? '',
     );
     final folders = <NasFolder, String>{};
     for (final kind in NasFolder.values) {
@@ -72,6 +74,7 @@ class NasSettingsRepository {
     await _db.setSetting(_https, '${config.https}');
     await _db.setSetting(_basePath, config.basePath.trim());
     await _db.setSetting(_user, config.user);
+    await _db.setSetting(_domain, config.domain.trim());
     await _secrets.write(passwordKey, config.password);
   }
 

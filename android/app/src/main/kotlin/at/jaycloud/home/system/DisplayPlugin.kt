@@ -126,7 +126,7 @@ class DisplayPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAw
                     timeoutMinutes = call.argument<Int>("timeoutMinutes") ?: 5,
                     webhookUrl = call.argument<String>("webhookUrl") ?: "",
                     deviceName = call.argument<String>("deviceName") ?: "",
-                    dimOnly = call.argument<Boolean>("dimOnly") ?: true,
+                    dimOnly = call.argument<Boolean>("dimOnly") ?: false,
                 )
                 if (!hasCameraPermission()) return result.success(false)
                 // Over the lock screen once the display came back on by motion.

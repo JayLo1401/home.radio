@@ -30,7 +30,7 @@
   "dashboardRemoteHelp": "Home Assistant can switch the display and reload the dashboard: {url}/api/display/on, …/off, …/api/dashboard/reload (POST, e.g. with rest_command).",
   "dashboardTestOff": "Switch the display off now (test)",
   "dashboardDimOnly": "Only darken the display instead of switching it off",
-  "dashboardDimOnlyHelp": "The display goes black and fully dark but doesn't switch off - so Android doesn't lock and no lock screen appears when it comes back (Fire tablets). Motion, a touch or a key bring it back at once.",
+  "dashboardDimOnlyHelp": "The display only goes black and fully dark, the backlight stays on. Only needed when really switching off doesn't work - that goes through the accessibility service \"Home System: Home key\", and a lock screen without PIN is swiped away when the display comes back.",
   "dashboardBrightnessHeading": "Brightness",
   "dashboardBrightnessSystem": "As set in the system",
   "dashboardBrightnessFixed": "Fixed brightness",

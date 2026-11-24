@@ -1,16 +1,18 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' show min;
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
+import 'package:smb_connect/smb_connect.dart';
 import 'package:xml/xml.dart';
 
 import '../../l10n/l10n.dart';
 
-/// How the app talks to the NAS.
-enum NasProtocol { webdav, ftp }
+/// How the app talks to the NAS. [smb]: Windows file sharing (also Samba).
+enum NasProtocol { webdav, ftp, smb }
 
 /// The NAS folders the user can pick (Settings → NAS).
 /// The NAS folders: [backgrounds] for Home's background pictures, the
@@ -19,12 +21,13 @@ enum NasFolder { backgrounds, pictures, music, videos, movies, backups }
 
 /// Login and address of the home NAS. Remote paths are POSIX style and
 /// absolute ("/", "/Fotos/Wallpaper"); for WebDAV they count from
-/// [basePath] (e.g. "/remote.php/dav/files/jay" on Nextcloud).
+/// [basePath] (e.g. "/remote.php/dav/files/jay" on Nextcloud), for SMB the
+/// first part is the share ("/Daten/Fotos").
 class NasConfig {
   final NasProtocol protocol;
   final String host;
 
-  /// null: the protocol's default (21, 80/443).
+  /// null: the protocol's default (21, 80/443). SMB always uses 445.
   final int? port;
 
   /// WebDAV only.
@@ -35,6 +38,10 @@ class NasConfig {
   final String user;
   final String password;
 
+  /// SMB only: the Windows domain or workgroup of [user]; usually empty
+  /// (the server's own accounts).
+  final String domain;
+
   const NasConfig({
     this.protocol = NasProtocol.webdav,
     this.host = '',
@@ -43,17 +50,28 @@ class NasConfig {
     this.basePath = '',
     this.user = '',
     this.password = '',
+    this.domain = '',
   });
 
   bool get isConfigured => host.trim().isNotEmpty;
 
   /// Identifies the server and login (not the password) - e.g. to tell
   /// whether a cache was filled from the same place.
-  String get identity => '${protocol.name}|${host.trim()}|${port ?? ''}|$https|${normalizeNasPath(basePath)}|$user';
+  String get identity => [
+        protocol.name,
+        host.trim(),
+        port ?? '',
+        https,
+        normalizeNasPath(basePath),
+        user,
+        // Only when set - the identity of existing settings stays the same.
+        if (domain.trim().isNotEmpty) domain.trim(),
+      ].join('|');
 
   NasClient createClient() => switch (protocol) {
         NasProtocol.webdav => WebDavClient(this),
         NasProtocol.ftp => FtpClient(this),
+        NasProtocol.smb => SmbClient(this),
       };
 }
 
@@ -663,4 +681,242 @@ NasEntry? parseListLine(String line, String folder) {
     );
   }
   return null;
+}
+
+// --- SMB ---
+
+/// Windows file sharing (SMB 1, 2.0 and 2.1; also Samba) over
+/// package:smb_connect. "/" lists the server's shares (without the
+/// administrative ones like "C$"), below that the path is share + folder:
+/// "/Daten/Fotos" is the folder "Fotos" in the share "Daten". Hidden
+/// entries (desktop.ini, $RECYCLE.BIN, ...) are left out. One connection,
+/// kept open between calls until [close]; calls run one after the other.
+/// The port is always 445 (the package has no other).
+class SmbClient implements NasClient {
+  SmbClient(this.config);
+
+  final NasConfig config;
+  SmbConnect? _connection;
+  bool _broken = false;
+  Future<void> _queue = Future.value();
+
+  static const port = 445;
+
+  /// Bytes per read/write request (a request must fit into 64 KiB).
+  static const _chunk = 60 * 1024;
+
+  /// The package gives up on an unanswered request after 5 × 3 s by
+  /// itself - this only stops transfers that drag on.
+  static const _smbTransferTimeout = Duration(minutes: 5);
+
+  Future<SmbConnect> _open() async {
+    final host = config.host.trim();
+    // The package swallows the reason of a failed connection - this tells
+    // "not found / refused / no answer" apart first.
+    final probe = await Socket.connect(host, port, timeout: _timeout);
+    probe.destroy();
+    _broken = false;
+    return SmbConnect.connectAuth(
+      host: host,
+      username: config.user.trim(),
+      password: config.password,
+      domain: config.domain.trim(),
+      onDisconnect: (_) => _broken = true,
+    );
+  }
+
+  void _drop() {
+    final connection = _connection;
+    _connection = null;
+    if (connection != null) unawaited(connection.close().catchError((_) {}));
+  }
+
+  /// Runs [action] after the previous call and turns errors into
+  /// [NasException]s; a broken connection is dropped (the server's answers
+  /// like "not found" keep it).
+  Future<T> _run<T>(Future<T> Function(SmbConnect c) action, {Duration timeout = _timeout}) {
+    final result = _queue.then((_) async {
+      try {
+        if (_broken) _drop();
+        return await () async {
+          final connection = _connection ??= await _open();
+          return action(connection);
+        }()
+            .timeout(timeout);
+      } catch (e) {
+        if (!isSmbServerAnswer(e)) _drop();
+        throw describeSmbError(e);
+      }
+    });
+    _queue = result.then((_) {}, onError: (_) {});
+    return result;
+  }
+
+  /// The package's path of [path] in a share; throws for "/" (no share).
+  static String _inShare(String path) {
+    final location = splitSmbPath(path);
+    if (location.share == null || location.path == '/') throw NasException(l10n.nasErrorNotFound);
+    return '/${location.share}${location.path}';
+  }
+
+  @override
+  Future<void> test() => _run((c) async {
+        await c.listShares();
+      });
+
+  @override
+  Future<List<NasEntry>> list(String folder) => _run((c) async {
+        final location = splitSmbPath(folder);
+        final share = location.share;
+        if (share == null) return smbShareEntries([for (final s in await c.listShares()) s.name]);
+        final path = '/$share${location.path == '/' ? '' : location.path}';
+        final dir = await c.file(path);
+        if (!dir.isExists || !dir.isDirectory()) throw NasException(l10n.nasErrorNotFound);
+        final base = normalizeNasPath(folder);
+        return _sorted([
+          for (final f in await c.listFiles(dir))
+            if (!f.isHidden() && f.name.isNotEmpty && f.name != '.' && f.name != '..')
+              NasEntry(
+                name: f.name,
+                path: joinNasPath(base, f.name),
+                isDirectory: f.isDirectory(),
+                size: f.isDirectory() ? null : f.size,
+                modified: f.lastModified > 0 ? DateTime.fromMillisecondsSinceEpoch(f.lastModified, isUtc: true) : null,
+              ),
+        ]);
+      });
+
+  @override
+  Future<Uint8List> read(String path, {int? maxBytes}) => _run((c) async {
+        final file = await c.file(_inShare(path));
+        if (!file.isExists || file.isDirectory()) throw NasException(l10n.nasErrorNotFound);
+        if (maxBytes != null && file.size > maxBytes) throw NasException(l10n.nasErrorTooBig);
+        if (file.size <= 0) return Uint8List(0);
+        final raf = await c.open(file);
+        try {
+          final builder = BytesBuilder(copy: false);
+          while (builder.length < file.size) {
+            builder.add(await raf.read(min(_chunk, file.size - builder.length)));
+          }
+          return builder.takeBytes();
+        } finally {
+          await raf.close();
+        }
+      }, timeout: _smbTransferTimeout);
+
+  /// Replaces the file if it exists (the package can't truncate - the old
+  /// one is deleted first).
+  @override
+  Future<void> write(String path, List<int> bytes) => _run((c) async {
+        final target = _inShare(path);
+        final existing = await c.file(target);
+        if (existing.isExists) {
+          if (existing.isDirectory()) throw NasException(l10n.nasErrorIsFolder);
+          await c.delete(existing);
+        }
+        final file = await c.createFile(target);
+        // The folder above doesn't exist.
+        if (!file.isExists) throw NasException(l10n.nasErrorNotFound);
+        if (bytes.isEmpty) return;
+        final raf = await c.open(file, mode: FileMode.write);
+        try {
+          for (var offset = 0; offset < bytes.length; offset += _chunk) {
+            // writeFrom doesn't move the position by itself.
+            await raf.setPosition(offset);
+            await raf.writeFrom(bytes, offset, min(offset + _chunk, bytes.length));
+          }
+        } finally {
+          await raf.close();
+        }
+      }, timeout: _smbTransferTimeout);
+
+  /// Files only - the package would delete a folder with all its content.
+  @override
+  Future<void> delete(String path) => _run((c) async {
+        final file = await c.file(_inShare(path));
+        if (!file.isExists) return;
+        if (file.isDirectory()) throw NasException(l10n.nasErrorIsFolder);
+        await c.delete(file);
+      });
+
+  @override
+  void close() {
+    // After a running call (closing under it would break it).
+    _queue = _queue.then((_) => _drop());
+  }
+}
+
+/// The share and the path inside it of [path]: "/Daten/Fotos/2026" is
+/// share "Daten", path "/Fotos/2026"; "/Daten" is the share's top
+/// ("/"); "/" is the server itself (share null).
+({String? share, String path}) splitSmbPath(String path) {
+  final parts = normalizeNasPath(path).split('/').where((p) => p.isNotEmpty).toList();
+  if (parts.isEmpty) return (share: null, path: '/');
+  return (share: parts.first, path: '/${parts.skip(1).join('/')}');
+}
+
+/// Shares worth showing - not the administrative/hidden ones ending with
+/// "$" (C$, ADMIN$, IPC$, print$).
+bool isVisibleSmbShare(String name) => name.trim().isNotEmpty && !name.endsWith(r'$');
+
+/// The server's top level: its visible shares as folders, sorted.
+List<NasEntry> smbShareEntries(Iterable<String> shares) => _sorted([
+      for (final name in shares.toSet())
+        if (isVisibleSmbShare(name)) NasEntry(name: name, path: '/$name', isDirectory: true),
+    ]);
+
+/// The text of an error from package:smb_connect - it throws strings,
+/// [Error]s with a message, and Exceptions.
+String smbErrorText(Object e) {
+  if (e is String) return e;
+  if (e is Error) {
+    try {
+      final message = (e as dynamic).message;
+      if (message is String) return message;
+    } catch (_) {}
+  }
+  return '$e';
+}
+
+/// Whether [e] is the server's answer to a request (login refused, file
+/// not found ...) - the connection itself is fine then.
+bool isSmbServerAnswer(Object e) => e is NasException || e is String;
+
+/// Turns errors of package:smb_connect into readable messages. Its errors
+/// carry Windows' status texts (see its NtStatus), sometimes inside a
+/// longer text ("Can't delete /a/b: Access is denied.").
+NasException describeSmbError(Object e) {
+  if (e is NasException) return e;
+  if (e is TimeoutException || e is SocketException) return _describe(e);
+  final text = smbErrorText(e);
+  bool has(List<String> parts) => parts.any(text.contains);
+  if (has(const [
+    'Logon failure',
+    'The specified network password is not correct',
+    'The specified user does not exist',
+    'currently locked out',
+    'must change his password',
+    'Access is denied',
+    'Access denied',
+    'Network access is denied',
+  ])) {
+    return NasException(l10n.nasErrorLogin);
+  }
+  if (has(const [
+    'cannot find the file',
+    'cannot find the path',
+    'network name cannot be found',
+    'network name is no longer available',
+    'The directory name is invalid',
+    'The specified path is invalid',
+    "Can't open file",
+  ])) {
+    return NasException(l10n.nasErrorNotFound);
+  }
+  if (text.contains('The file system is full')) return NasException(l10n.nasErrorFull);
+  // TCP to port 445 worked (see SmbClient._open), but no SMB dialect fits.
+  if (text.startsWith("Can't connect to") || text.contains('not compatible with the server')) {
+    return NasException(l10n.nasErrorSmbConnect);
+  }
+  return NasException(l10n.nasErrorSmb(text));
 }

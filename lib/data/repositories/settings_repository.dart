@@ -610,7 +610,7 @@ class SettingsRepository {
     sensitivity: int.tryParse(await _db.getSetting('motion_sensitivity') ?? '') ?? 5,
     timeoutMinutes: int.tryParse(await _db.getSetting('motion_timeout_min') ?? '') ?? 5,
     webhookUrl: await _db.getSetting('motion_webhook') ?? '',
-    dimOnly: await _db.getSetting('motion_dim_only') != 'false',
+    dimOnly: await _db.getSetting('motion_dim_only') == 'true',
   );
 
   Future<DisplayBrightness> getDisplayBrightness() async {
@@ -808,7 +808,7 @@ class DashboardDisplaySettings {
     this.sensitivity = 5,
     this.timeoutMinutes = 5,
     this.webhookUrl = '',
-    this.dimOnly = true,
+    this.dimOnly = false,
   });
 
   /// Display by motion (camera) on.
@@ -823,9 +823,10 @@ class DashboardDisplaySettings {
   /// Home Assistant webhook for motion on/off, '' = none.
   final String webhookUrl;
 
-  /// "Off" only darkens the display (black, lowest brightness) instead of
-  /// switching it off - Android doesn't lock then, so no lock screen comes
-  /// up when it's back (Fire tablets). Default.
+  /// "Off" only darkens the display (black, lowest brightness - the
+  /// backlight stays on) instead of switching it off. For devices where the
+  /// accessibility service can't switch it off; otherwise really off is
+  /// better (a lock screen without PIN is swiped away when it comes back).
   final bool dimOnly;
 
   DashboardDisplaySettings copyWith({

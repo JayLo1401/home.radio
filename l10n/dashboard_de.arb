@@ -65,7 +65,7 @@
   },
   "dashboardTestOff": "Display jetzt ausschalten (Test)",
   "dashboardDimOnly": "Display nur abdunkeln statt ausschalten",
-  "dashboardDimOnlyHelp": "Das Display wird schwarz und ganz dunkel, schaltet aber nicht ab - so sperrt Android nicht, und beim Zurückkommen erscheint kein Sperrbildschirm (Fire-Tablets). Bewegung, Tippen oder eine Taste holen es sofort zurück.",
+  "dashboardDimOnlyHelp": "Das Display wird nur schwarz und ganz dunkel, die Hintergrundbeleuchtung bleibt an. Nur nötig, wenn das echte Ausschalten nicht geht - ausgeschaltet wird über die Bedienungshilfe „Home System: Home-Taste“, ein Sperrbildschirm ohne PIN wird beim Einschalten weggewischt.",
   "dashboardBrightnessHeading": "Helligkeit",
   "dashboardBrightnessSystem": "Wie im System eingestellt",
   "dashboardBrightnessFixed": "Feste Helligkeit",

@@ -1,6 +1,10 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:home_system/data/services/nas_backup_service.dart';
 import 'package:home_system/data/services/nas_service.dart';
+import 'package:home_system/l10n/l10n.dart';
 
 void main() {
   group('parsePropfind', () {
@@ -143,6 +147,48 @@ void main() {
       expect(parentNasPath('/'), '/');
       expect(WebDavClient(const NasConfig(host: 'nas', port: 5005, basePath: '/dav/')).uriFor('/Ä b', directory: true).toString(),
           'http://nas:5005/dav/%C3%84%20b/');
+    });
+  });
+
+  group('SMB', () {
+    test('path split into share and path', () {
+      expect(splitSmbPath('/'), (share: null, path: '/'));
+      expect(splitSmbPath(''), (share: null, path: '/'));
+      expect(splitSmbPath('/Daten'), (share: 'Daten', path: '/'));
+      expect(splitSmbPath('Daten/'), (share: 'Daten', path: '/'));
+      expect(splitSmbPath('/Daten/Fotos/Urlaub 2026'), (share: 'Daten', path: '/Fotos/Urlaub 2026'));
+      expect(splitSmbPath(r'\ftp_Folder\a\b.json'), (share: 'ftp_Folder', path: '/a/b.json'));
+    });
+
+    test('top level lists the shares without the administrative ones', () {
+      final entries = smbShareEntries(['ThomasL', 'IPC\$', 'backups', 'C\$', 'ADMIN\$', 'print\$', 'Daten', 'LotzApp', 'ftp_Folder', 'Daten']);
+      expect([for (final e in entries) e.name], ['backups', 'Daten', 'ftp_Folder', 'LotzApp', 'ThomasL']);
+      expect(entries.every((e) => e.isDirectory && e.path == '/${e.name}'), isTrue);
+      expect(isVisibleSmbShare('Fotos'), isTrue);
+      expect(isVisibleSmbShare('D\$'), isFalse);
+      expect(isVisibleSmbShare(' '), isFalse);
+    });
+
+    test('readable errors', () {
+      expect(describeSmbError('Logon failure: unknown user name or bad password.').message, l10n.nasErrorLogin);
+      expect(describeSmbError("Can't delete /a/b: Access is denied.").message, l10n.nasErrorLogin);
+      expect(describeSmbError('The system cannot find the path specified.').message, l10n.nasErrorNotFound);
+      expect(describeSmbError('The network name cannot be found.').message, l10n.nasErrorNotFound);
+      expect(describeSmbError('The file system is full.').message, l10n.nasErrorFull);
+      expect(describeSmbError("Can't connect to server").message, l10n.nasErrorSmbConnect);
+      expect(describeSmbError(const SocketException('x', osError: OSError('refused', 10061))).message,
+          l10n.nasErrorRefused);
+      expect(describeSmbError('Something else').message, l10n.nasErrorSmb('Something else'));
+      expect(isSmbServerAnswer('Access is denied.'), isTrue);
+      expect(isSmbServerAnswer(TimeoutException('x')), isFalse);
+    });
+
+    test('identity unchanged without domain', () {
+      const config = NasConfig(protocol: NasProtocol.ftp, host: 'nas', user: 'jay');
+      expect(config.identity, 'ftp|nas||false|/|jay');
+      expect(const NasConfig(protocol: NasProtocol.smb, host: 'server', domain: 'WORKGROUP').identity,
+          'smb|server||false|/||WORKGROUP');
+      expect(const NasConfig(protocol: NasProtocol.smb).createClient(), isA<SmbClient>());
     });
   });
 }

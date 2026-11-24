@@ -346,7 +346,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get dashboardDimOnlyHelp =>
-      'Das Display wird schwarz und ganz dunkel, schaltet aber nicht ab - so sperrt Android nicht, und beim Zurückkommen erscheint kein Sperrbildschirm (Fire-Tablets). Bewegung, Tippen oder eine Taste holen es sofort zurück.';
+      'Das Display wird nur schwarz und ganz dunkel, die Hintergrundbeleuchtung bleibt an. Nur nötig, wenn das echte Ausschalten nicht geht - ausgeschaltet wird über die Bedienungshilfe „Home System: Home-Taste“, ein Sperrbildschirm ohne PIN wird beim Einschalten weggewischt.';
 
   @override
   String get dashboardBrightnessHeading => 'Helligkeit';
@@ -1059,6 +1059,13 @@ class AppLocalizationsDe extends AppLocalizations {
       'Unverschlüsselt - nur im eigenen Netz verwenden.';
 
   @override
+  String get nasProtocolSmb => 'SMB (Windows-Freigabe)';
+
+  @override
+  String get nasProtocolSmbHint =>
+      'Windows-PC oder -Server, NAS mit Samba - zeigt alle Freigaben des Servers (SMB 1 bis 2.1).';
+
+  @override
   String get nasHost => 'Server-Adresse (IP oder Name)';
 
   @override
@@ -1087,6 +1094,13 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get nasPassword => 'Passwort';
+
+  @override
+  String get nasDomain => 'Domäne oder Arbeitsgruppe (meist leer)';
+
+  @override
+  String get nasSmbLoginHint =>
+      'Ein Konto auf dem Server. Bei einem Microsoft-Konto unter Windows: die E-Mail-Adresse und das Kennwort (nicht die PIN).';
 
   @override
   String get nasTest => 'Verbindung testen';
@@ -1212,6 +1226,18 @@ class AppLocalizationsDe extends AppLocalizations {
   String nasErrorFtp(String reply) {
     return 'Der FTP-Server meldet: $reply';
   }
+
+  @override
+  String nasErrorSmb(String message) {
+    return 'Der SMB-Server meldet: $message';
+  }
+
+  @override
+  String get nasErrorSmbConnect =>
+      'Keine SMB-Verbindung möglich - der Server verlangt vielleicht SMB 3 (die App kann SMB 1 bis 2.1).';
+
+  @override
+  String get nasErrorIsFolder => 'Das ist ein Ordner, keine Datei.';
 
   @override
   String get nasBackupRunning => 'Backup auf das NAS …';

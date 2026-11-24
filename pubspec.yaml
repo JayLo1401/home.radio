@@ -69,6 +69,7 @@ dependencies:
   # resolution of the stream; Android keeps ExoPlayer (video_player).
   media_kit: ^1.2.6
   media_kit_video: ^2.0.1
+  smb_connect: ^0.0.9
 
 # video_player's Android side (2.13.0) with one change: ExoPlayer gets a
 # software MP2 decoder for devices without one (Fire TV - most satellite

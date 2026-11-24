@@ -149,7 +149,7 @@
   },
   "dashboardTestOff": "Display jetzt ausschalten (Test)",
   "dashboardDimOnly": "Display nur abdunkeln statt ausschalten",
-  "dashboardDimOnlyHelp": "Das Display wird schwarz und ganz dunkel, schaltet aber nicht ab - so sperrt Android nicht, und beim Zurückkommen erscheint kein Sperrbildschirm (Fire-Tablets). Bewegung, Tippen oder eine Taste holen es sofort zurück.",
+  "dashboardDimOnlyHelp": "Das Display wird nur schwarz und ganz dunkel, die Hintergrundbeleuchtung bleibt an. Nur nötig, wenn das echte Ausschalten nicht geht - ausgeschaltet wird über die Bedienungshilfe „Home System: Home-Taste“, ein Sperrbildschirm ohne PIN wird beim Einschalten weggewischt.",
   "dashboardBrightnessHeading": "Helligkeit",
   "dashboardBrightnessSystem": "Wie im System eingestellt",
   "dashboardBrightnessFixed": "Feste Helligkeit",
@@ -598,6 +598,8 @@
   "nasProtocolWebdavHint": "Synology, QNAP, Nextcloud, Apache/nginx … - über http oder https.",
   "nasProtocolFtp": "FTP",
   "nasProtocolFtpHint": "Unverschlüsselt - nur im eigenen Netz verwenden.",
+  "nasProtocolSmb": "SMB (Windows-Freigabe)",
+  "nasProtocolSmbHint": "Windows-PC oder -Server, NAS mit Samba - zeigt alle Freigaben des Servers (SMB 1 bis 2.1).",
   "nasHost": "Server-Adresse (IP oder Name)",
   "nasHostHint": "z. B. 192.168.1.10",
   "nasPort": "Port (leer = {port})",
@@ -614,6 +616,8 @@
   "nasBasePathHint": "leer, oder z. B. /remote.php/dav/files/NAME",
   "nasUser": "Benutzername",
   "nasPassword": "Passwort",
+  "nasDomain": "Domäne oder Arbeitsgruppe (meist leer)",
+  "nasSmbLoginHint": "Ein Konto auf dem Server. Bei einem Microsoft-Konto unter Windows: die E-Mail-Adresse und das Kennwort (nicht die PIN).",
   "nasTest": "Verbindung testen",
   "nasTestOk": "Verbindung OK - {count} Einträge im Hauptordner.",
   "@nasTestOk": {
@@ -704,6 +708,16 @@
       }
     }
   },
+  "nasErrorSmb": "Der SMB-Server meldet: {message}",
+  "@nasErrorSmb": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "nasErrorSmbConnect": "Keine SMB-Verbindung möglich - der Server verlangt vielleicht SMB 3 (die App kann SMB 1 bis 2.1).",
+  "nasErrorIsFolder": "Das ist ein Ordner, keine Datei.",
   "nasBackupRunning": "Backup auf das NAS …",
   "nasBackupFailed": "Backup auf das NAS fehlgeschlagen ({message}) - das Update läuft trotzdem.",
   "@nasBackupFailed": {

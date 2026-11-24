@@ -45,9 +45,37 @@ class HomeButtonService : AccessibilityService() {
         onHomeLongPress()
     }
 
+    /** The display came on (motion, power key, Home Assistant): away with the lock screen at once. */
+    private val screenOn = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (MotionService.running != null) unlockSoon()
+        }
+    }
+    private var unlockTries = 0
+    private val unlockTry = object : Runnable {
+        override fun run() {
+            if (!swipeAwayLockScreen()) return
+            // The lock screen may not take the swipe in its first moments.
+            if (++unlockTries < 8) handler.postDelayed(this, 200)
+        }
+    }
+
+    /** Swipes the lock screen (without PIN) away now - and again shortly if it's still there. */
+    fun unlockSoon() {
+        handler.removeCallbacks(unlockTry)
+        unlockTries = 0
+        handler.post(unlockTry)
+    }
+
     override fun onServiceConnected() {
         super.onServiceConnected()
         instance = this
+        val filter = android.content.IntentFilter(Intent.ACTION_SCREEN_ON)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(screenOn, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(screenOn, filter)
+        }
         homePackages = findHomePackages()
         homeActivities = findHomeActivities()
         if (FILTER_HOME_KEY) {
@@ -163,14 +191,18 @@ class HomeButtonService : AccessibilityService() {
             lineTo(x, metrics.heightPixels * 0.35f)
         }
         val gesture = android.accessibilityservice.GestureDescription.Builder()
-            .addStroke(android.accessibilityservice.GestureDescription.StrokeDescription(path, 0, 300))
+            .addStroke(android.accessibilityservice.GestureDescription.StrokeDescription(path, 0, 120))
             .build()
         val sent = dispatchGesture(gesture, null, null)
-        Log.i(TAG, "lock screen swipe: $sent")
         return sent
     }
 
     override fun onDestroy() {
+        try {
+            unregisterReceiver(screenOn)
+        } catch (_: Exception) {
+        }
+        handler.removeCallbacks(unlockTry)
         if (instance === this) instance = null
         super.onDestroy()
     }

@@ -347,7 +347,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get dashboardDimOnlyHelp =>
-      'The display goes black and fully dark but doesn\'t switch off - so Android doesn\'t lock and no lock screen appears when it comes back (Fire tablets). Motion, a touch or a key bring it back at once.';
+      'The display only goes black and fully dark, the backlight stays on. Only needed when really switching off doesn\'t work - that goes through the accessibility service \"Home System: Home key\", and a lock screen without PIN is swiped away when the display comes back.';
 
   @override
   String get dashboardBrightnessHeading => 'Brightness';
@@ -1058,6 +1058,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Unencrypted - use only in your own network.';
 
   @override
+  String get nasProtocolSmb => 'SMB (Windows file sharing)';
+
+  @override
+  String get nasProtocolSmbHint =>
+      'Windows PC or server, NAS with Samba - shows all of the server\'s shares (SMB 1 to 2.1).';
+
+  @override
   String get nasHost => 'Server address (IP or name)';
 
   @override
@@ -1086,6 +1093,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get nasPassword => 'Password';
+
+  @override
+  String get nasDomain => 'Domain or workgroup (usually empty)';
+
+  @override
+  String get nasSmbLoginHint =>
+      'An account on the server. For a Microsoft account on Windows: the email address and password (not the PIN).';
 
   @override
   String get nasTest => 'Test connection';
@@ -1210,6 +1224,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String nasErrorFtp(String reply) {
     return 'The FTP server reports: $reply';
   }
+
+  @override
+  String nasErrorSmb(String message) {
+    return 'The SMB server reports: $message';
+  }
+
+  @override
+  String get nasErrorSmbConnect =>
+      'No SMB connection - the server may require SMB 3 (the app speaks SMB 1 to 2.1).';
+
+  @override
+  String get nasErrorIsFolder => 'That\'s a folder, not a file.';
 
   @override
   String get nasBackupRunning => 'Backup to the NAS …';

@@ -26,7 +26,7 @@ IconData _folderIcon(NasFolder kind) => switch (kind) {
       NasFolder.backups => Icons.settings_backup_restore,
     };
 
-/// Settings → System → NAS: the home NAS (WebDAV or FTP) - address, login,
+/// Settings → System → NAS: the home NAS (WebDAV, FTP or SMB) - address, login,
 /// and the folders for pictures, music, videos, movies and backups. Every
 /// change is saved right away.
 class NasSettingsScreen extends ConsumerStatefulWidget {
@@ -42,6 +42,7 @@ class _NasSettingsScreenState extends ConsumerState<NasSettingsScreen> {
   final _basePath = TextEditingController();
   final _user = TextEditingController();
   final _password = TextEditingController();
+  final _domain = TextEditingController();
   NasProtocol _protocol = NasProtocol.webdav;
   bool _https = false;
   bool _loaded = false;
@@ -64,6 +65,7 @@ class _NasSettingsScreenState extends ConsumerState<NasSettingsScreen> {
         _basePath.text = c.basePath;
         _user.text = c.user;
         _password.text = c.password;
+        _domain.text = c.domain;
         _loaded = true;
       });
     }();
@@ -71,7 +73,7 @@ class _NasSettingsScreenState extends ConsumerState<NasSettingsScreen> {
 
   @override
   void dispose() {
-    for (final c in [_host, _port, _basePath, _user, _password]) {
+    for (final c in [_host, _port, _basePath, _user, _password, _domain]) {
       c.dispose();
     }
     super.dispose();
@@ -85,9 +87,19 @@ class _NasSettingsScreenState extends ConsumerState<NasSettingsScreen> {
         basePath: _basePath.text.trim(),
         user: _user.text.trim(),
         password: _password.text,
+        domain: _domain.text.trim(),
       );
 
-  int get _defaultPort => _protocol == NasProtocol.ftp ? 21 : (_https ? 443 : 80);
+  int get _defaultPort => switch (_protocol) {
+        NasProtocol.ftp => 21,
+        NasProtocol.smb => SmbClient.port,
+        NasProtocol.webdav => _https ? 443 : 80,
+      };
+
+  void _setProtocol(NasProtocol protocol) {
+    setState(() => _protocol = protocol);
+    _save();
+  }
 
   Future<void> _save() async {
     setState(() => _testResult = null);
@@ -168,19 +180,19 @@ class _NasSettingsScreenState extends ConsumerState<NasSettingsScreen> {
                     subtitle: l.nasProtocolWebdavHint,
                     selected: _protocol == NasProtocol.webdav,
                     autofocus: true,
-                    onTap: () {
-                      setState(() => _protocol = NasProtocol.webdav);
-                      _save();
-                    },
+                    onTap: () => _setProtocol(NasProtocol.webdav),
                   ),
                   _choice(
                     title: l.nasProtocolFtp,
                     subtitle: l.nasProtocolFtpHint,
                     selected: _protocol == NasProtocol.ftp,
-                    onTap: () {
-                      setState(() => _protocol = NasProtocol.ftp);
-                      _save();
-                    },
+                    onTap: () => _setProtocol(NasProtocol.ftp),
+                  ),
+                  _choice(
+                    title: l.nasProtocolSmb,
+                    subtitle: l.nasProtocolSmbHint,
+                    selected: _protocol == NasProtocol.smb,
+                    onTap: () => _setProtocol(NasProtocol.smb),
                   ),
                   const SizedBox(height: 12),
                   PopupTextField(
@@ -191,17 +203,20 @@ class _NasSettingsScreenState extends ConsumerState<NasSettingsScreen> {
                     keyboardType: TextInputType.url,
                     onSubmitted: (_) => _save(),
                   ),
-                  const SizedBox(height: 12),
-                  PopupTextField(
-                    controller: _port,
-                    label: l.nasPort(_defaultPort),
-                    icon: Icons.numbers,
-                    keyboardType: TextInputType.number,
-                    onSubmitted: (v) {
-                      if (int.tryParse(v.trim()) == null) _port.text = '';
-                      _save();
-                    },
-                  ),
+                  // SMB: always 445 (package:smb_connect has no other port).
+                  if (_protocol != NasProtocol.smb) ...[
+                    const SizedBox(height: 12),
+                    PopupTextField(
+                      controller: _port,
+                      label: l.nasPort(_defaultPort),
+                      icon: Icons.numbers,
+                      keyboardType: TextInputType.number,
+                      onSubmitted: (v) {
+                        if (int.tryParse(v.trim()) == null) _port.text = '';
+                        _save();
+                      },
+                    ),
+                  ],
                   if (_protocol == NasProtocol.webdav) ...[
                     SwitchListTile(
                       title: Text(l.nasHttps),
@@ -235,6 +250,17 @@ class _NasSettingsScreenState extends ConsumerState<NasSettingsScreen> {
                     obscureText: true,
                     onSubmitted: (_) => _save(),
                   ),
+                  if (_protocol == NasProtocol.smb) ...[
+                    const SizedBox(height: 12),
+                    PopupTextField(
+                      controller: _domain,
+                      label: l.nasDomain,
+                      icon: Icons.domain_outlined,
+                      onSubmitted: (_) => _save(),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(l.nasSmbLoginHint, style: help),
+                  ],
                   const SizedBox(height: 12),
                   Row(
                     children: [
