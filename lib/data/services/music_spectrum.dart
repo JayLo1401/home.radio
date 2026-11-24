@@ -95,8 +95,9 @@ class MusicLevelFollower {
   }
 }
 
-/// A generated pulse for when there's no spectrum: slow breathing and a
-/// soft "beat" about every 0.55 s while [playing], calming down when paused.
+/// A generated pulse for when there's no spectrum: slow, even breathing
+/// while [playing] - no made-up beats (they'd never match the music) -
+/// and silence within a second when paused.
 class MusicPulse {
   MusicPulse([int seed = 7]) : _random = math.Random(seed);
 
@@ -106,16 +107,13 @@ class MusicPulse {
 
   /// [t]: seconds since start.
   MusicLevels at(double t, {required bool playing}) {
-    _energy += ((playing ? 1.0 : 0.15) - _energy) * 0.02;
-    var beat = false;
-    if (t >= _nextBeat) {
-      beat = playing;
-      _nextBeat = t + 0.48 + _random.nextDouble() * 0.16;
-    }
+    _energy += ((playing ? 1.0 : 0.0) - _energy) * (playing ? 0.02 : 0.1);
+    const beat = false;
+    if (t >= _nextBeat) _nextBeat = t + 0.48 + _random.nextDouble() * 0.16;
     final phase = (t - (_nextBeat - 0.55)).clamp(0.0, 1.0);
     final kick = math.exp(-phase * 6);
     final breathe = 0.5 + 0.5 * math.sin(t * 0.35);
-    final bass = (0.25 + 0.45 * kick) * _energy;
+    final bass = (0.3 + 0.15 * kick) * _energy;
     final mid = (0.25 + 0.2 * breathe + 0.1 * math.sin(t * 1.7)) * _energy;
     final treble = (0.15 + 0.15 * (0.5 + 0.5 * math.sin(t * 2.9 + 1))) * _energy;
     return MusicLevels(level: (bass + mid + treble) / 3, bass: bass, mid: mid, treble: treble, beat: beat);

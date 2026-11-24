@@ -62,10 +62,15 @@ enum MovieEngine {
 
 /// Film files ExoPlayer can't open (container) or whose usual video it has
 /// no decoder for - they go to libmpv straight on Android, without a failed
-/// first try: Windows Media (wmv, asf), Flash video (flv, f4v - Sorenson /
-/// VP6 picture, F4V brand ExoPlayer doesn't sniff), DivX 3 (.divx), Ogg
-/// video (Theora), raw MPEG-1/2 video.
-const mpvFirstMovieExtensions = {'wmv', 'asf', 'flv', 'f4v', 'divx', 'ogm', 'ogv', 'm1v', 'm2v'};
+/// first try: RealMedia (rm, rmvb, ra - RealVideo, Cook, Sipr), Windows
+/// Media (wmv, asf), Flash video (flv, f4v - Sorenson / VP6 picture, F4V
+/// brand ExoPlayer doesn't sniff), DivX 3 (.divx), Ogg video (Theora), raw
+/// MPEG-1/2 video, DV, Windows Media Center recordings (wtv).
+/// 3GP/3G2 try ExoPlayer first (H.264/AAC from newer phones plays there) and
+/// come to libmpv if the box has no H.263 or AMR decoder.
+const mpvFirstMovieExtensions = {
+  'rm', 'rmvb', 'ra', 'wmv', 'asf', 'flv', 'f4v', 'divx', 'ogm', 'ogv', 'm1v', 'm2v', 'dv', 'wtv', //
+};
 
 /// The player a film starts with: on the PC always libmpv; on Android
 /// ExoPlayer - unless the file's [extension] is one of
@@ -158,6 +163,7 @@ class _ExoMoviePlayer implements MoviePlayer {
     // packages/video_player_android/HOME_MEDIA.md) - initialize throws.
     await _controller.initialize().timeout(timeout);
     await _waitForPicture();
+    await _checkSound();
     if (start > Duration.zero) await _controller.seekTo(start);
     await _controller.play();
     _controller.addListener(_publish);
@@ -181,6 +187,22 @@ class _ExoMoviePlayer implements MoviePlayer {
       throw const MovieEngineException('ExoPlayer: no picture');
     } finally {
       _controller.removeListener(listener);
+    }
+  }
+
+  /// Sound tracks but none of them selected: no decoder here (AMR of old
+  /// 3GP phone videos, RealAudio ...) - ExoPlayer would play the picture
+  /// without sound.
+  Future<void> _checkSound() async {
+    if (!_controller.isAudioTrackSupportAvailable()) return;
+    List<VideoAudioTrack> tracks;
+    try {
+      tracks = await _controller.getAudioTracks();
+    } catch (_) {
+      return;
+    }
+    if (tracks.isNotEmpty && !tracks.any((t) => t.isSelected)) {
+      throw MovieEngineException('ExoPlayer: no decoder for the sound (${tracks.first.codec ?? '?'})');
     }
   }
 

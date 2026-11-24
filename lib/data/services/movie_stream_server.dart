@@ -182,6 +182,8 @@ String movieMimeType(String extension) => switch (extension.toLowerCase()) {
       'asf' => 'video/x-ms-asf',
       'flv' => 'video/x-flv',
       'ogm' || 'ogv' => 'video/ogg',
+      'rm' || 'rmvb' || 'ra' => 'application/vnd.rn-realmedia',
+      'dv' => 'video/dv',
       _ => 'application/octet-stream',
     };
 

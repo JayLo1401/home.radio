@@ -219,6 +219,15 @@ class MusicVisualizerEngine {
   double _gain = 1;
   double _widthScale = 1;
 
+  /// The scenes move on their own clock: at full speed while there's
+  /// sound, nearly still when it's quiet or paused.
+  double _motion = 0;
+  double _activity = 1;
+  double? _lastT;
+
+  /// A flash on each beat, fading within a fraction of a second.
+  double _kick = 0;
+
   static const sceneCount = 5;
   static const fadeSeconds = 3.5;
 
@@ -252,22 +261,29 @@ class MusicVisualizerEngine {
       _skip = false;
       _advance(t);
     }
-    _updateRipples(t, l);
+    final dt = _lastT == null ? 0.0 : (t - _lastT!).clamp(0.0, 0.25);
+    _lastT = t;
+    final target = l.level > 0.03 ? 1.0 : 0.02;
+    _activity += (target - _activity) * (1 - math.exp(-dt * 4));
+    _motion += dt * _activity;
+    _kick = l.beat ? 1.0 : _kick * math.exp(-dt * 7);
+    final m = _motion;
+    _updateRipples(m, l);
     final glow = <ui.Vertices>[];
     final core = <ui.Vertices>[];
     _widthScale = (size.height / 540).clamp(0.6, 2.0);
-    final brightness = 0.6 + 0.5 * l.level;
+    final brightness = 0.55 + 0.45 * l.level + 0.35 * _kick;
     final previous = _previous;
     final f = previous == null ? 1.0 : ((t - _current.start) / fadeSeconds).clamp(0.0, 1.0);
     // Smooth in and out.
     final w = f * f * (3 - 2 * f);
     if (previous != null && w < 1) {
-      _scene(previous, size, t, l, brightness * (1 - w));
+      _scene(previous, size, m, l, brightness * (1 - w));
       _collect(glow, core);
     } else {
       _previous = null;
     }
-    _scene(_current, size, t, l, brightness * w);
+    _scene(_current, size, m, l, brightness * w);
     _collect(glow, core);
     return (glow: glow, core: core);
   }
@@ -282,7 +298,8 @@ class MusicVisualizerEngine {
   void _updateRipples(double t, MusicLevels l) {
     _ripples.removeWhere((r) => t - r.born > 8);
     final gap = t - _lastRipple;
-    if ((l.beat && gap > 0.25) || gap > 2.4) {
+    // On beats - and now and then while there's sound, never in silence.
+    if ((l.beat && gap > 0.25) || (gap > 2.4 && l.level > 0.08)) {
       _ripples.add(_Ripple(t, 0.07 + 0.22 * l.bass));
       _lastRipple = t;
     }
@@ -380,7 +397,9 @@ class MusicVisualizerEngine {
     double surface(double theta, double z) {
       var w = 0.06 * (0.5 + l.mid) * math.sin(z * waveK + t * 3.2 + theta * 2);
       for (final rp in _ripples) {
-        final zr = zFar - (t - rp.born) * speed * 1.4;
+        // Starting a little way off, not at the far end: the beat shows
+        // right away, not seconds later.
+        final zr = 7.0 - (t - rp.born) * speed * 1.4;
         final d = z - zr;
         if (d.abs() > 2) continue;
         w += rp.strength * 1.3 * math.exp(-d * d * 1.5);

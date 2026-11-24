@@ -22,18 +22,19 @@ void registerThirdPartyLicenses() {
       'https://ffmpeg.org - they are separate libraries and can be replaced.\n\n$_lgpl21',
     );
     // Android: the films' player for what ExoPlayer can't play - libmpv
-    // from media_kit_libs_android_video 1.3.8, i.e. the "default" flavour of
-    // https://github.com/media-kit/libmpv-android-video-build v1.1.7. Built
+    // from our copy of media_kit_libs_android_video 1.3.8, which takes the
+    // "full" flavour of https://github.com/media-kit/libmpv-android-video-build
+    // v1.1.11 (packages/media_kit_libs_android_video/HOME_SYSTEM.md). Built
     // without GPL parts (mpv -Dgpl=false; FFmpeg 6.0 --disable-gpl
     // --disable-nonfree --enable-version3, which makes FFmpeg LGPL 3), with
     // these libraries linked in statically: dav1d, libxml2, Mbed TLS, libass,
     // FreeType, FriBidi, HarfBuzz.
     yield const LicenseEntryWithLineBreaks(
       ['libmpv', 'FFmpeg'],
-      'Films on Android that ExoPlayer can\'t play (WMV, FLV, DivX 3, Ogg video, DVD sound in DTS/LPCM ...): '
-      'libmpv with FFmpeg 6.0 (libmpv.so of media_kit_libs_android_video, built by '
-      'https://github.com/media-kit/libmpv-android-video-build v1.1.7, "default" flavour, without GPL '
-      'parts). mpv is licensed under the GNU Lesser General Public License 2.1 or later, FFmpeg in this '
+      'Films on Android that ExoPlayer can\'t play (RealMedia, WMV, FLV, DivX 3, 3GP with H.263/AMR, Ogg '
+      'video, DVD sound in DTS/LPCM ...): libmpv with FFmpeg 6.0 (libmpv.so of media_kit_libs_android_video, '
+      'built by https://github.com/media-kit/libmpv-android-video-build v1.1.11, "full" flavour, without '
+      'GPL parts). mpv is licensed under the GNU Lesser General Public License 2.1 or later, FFmpeg in this '
       'build (--enable-version3) under the GNU Lesser General Public License 3 or later - so the library '
       'as a whole is under the LGPL 3. Sources: https://github.com/mpv-player/mpv, '
       'https://github.com/FFmpeg/FFmpeg (n6.0) and the build scripts above - it is a separate library '

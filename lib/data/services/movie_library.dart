@@ -5,14 +5,15 @@ import 'nas_service.dart';
 /// only (no file is opened for it).
 
 /// Film files by extension (lower case). Home videos from phones and
-/// cameras too: .mts (AVCHD), .3gp, .mov. And the old formats VLC plays
-/// (libmpv takes them on Android - see firstMovieEngine): DivX/Xvid, Windows
-/// Media (asf), Flash video (flv, f4v), Ogg video (ogm, ogv), raw MPEG
-/// video (m1v, m2v, mpe), QuickTime (qt), 3GPP2 (3g2). Not RealMedia
-/// (rm, rmvb): Android's libmpv has no RealVideo decoder.
+/// cameras too: .mts (AVCHD), .3gp, .3g2, .mov. And the old formats VLC
+/// plays (libmpv takes them on Android - see firstMovieEngine): RealMedia
+/// (rm, rmvb, ra), DivX/Xvid, Windows Media (asf), Flash video (flv, f4v),
+/// Ogg video (ogm, ogv), raw MPEG video (m1v, m2v, mpe), QuickTime (qt),
+/// DV, Windows Media Center (wtv). Not .ram: only a link to a stream.
 const movieExtensions = {
   'mp4', 'm4v', 'mkv', 'avi', 'mpg', 'mpeg', 'ts', 'm2ts', 'mts', 'vob', 'wmv', 'mov', 'webm', '3gp', 'iso', //
   'divx', 'xvid', 'asf', 'flv', 'f4v', 'ogm', 'ogv', 'm1v', 'm2v', 'mpe', 'qt', '3g2', //
+  'rm', 'rmvb', 'ra', 'dv', 'wtv', //
 };
 
 const _pictureExtensions = {'jpg', 'jpeg', 'png', 'webp'};

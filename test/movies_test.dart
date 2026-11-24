@@ -253,10 +253,11 @@ void main() {
     });
 
     test('Android: ExoPlayer first, ExoPlayer-unfriendly formats straight to libmpv', () {
-      for (final ext in ['mp4', 'mkv', 'avi', 'xvid', 'ts', 'm2ts', 'mpg', 'vob', 'iso', 'mov', 'webm', '3gp', '']) {
+      // 3GP: ExoPlayer first - libmpv if the box has no H.263 / AMR decoder.
+      for (final ext in ['mp4', 'mkv', 'avi', 'xvid', 'ts', 'm2ts', 'mpg', 'vob', 'iso', 'mov', 'webm', '3gp', '3g2', '']) {
         expect(firstMovieEngine(android: true, extension: ext), MovieEngine.exoPlayer, reason: ext);
       }
-      for (final ext in ['wmv', 'WMV', 'asf', 'flv', 'f4v', 'divx', 'ogm', 'ogv', 'm1v', 'm2v']) {
+      for (final ext in ['rm', 'RMVB', 'ra', 'wmv', 'WMV', 'asf', 'flv', 'f4v', 'divx', 'ogm', 'ogv', 'm1v', 'm2v', 'dv', 'wtv']) {
         expect(firstMovieEngine(android: true, extension: ext), MovieEngine.mpv, reason: ext);
       }
     });
@@ -286,8 +287,12 @@ void main() {
       for (final name in ['a.divx', 'a.XVID', 'a.asf', 'a.flv', 'a.f4v', 'a.ogm', 'a.ogv', 'a.m2v', 'a.qt', 'a.3g2']) {
         expect(isMovieFileName(name), isTrue, reason: name);
       }
-      // No RealVideo decoder in Android's libmpv.
-      expect(isMovieFileName('a.rmvb'), isFalse);
+      // RealPlayer downloads.
+      for (final name in ['a.rm', 'a.RMVB', 'a.ra']) {
+        expect(isMovieFileName(name), isTrue, reason: name);
+      }
+      // A .ram is only a link to a stream.
+      expect(isMovieFileName('a.ram'), isFalse);
       expect(movieMimeType('flv'), 'video/x-flv');
       expect(movieMimeType('divx'), 'video/x-msvideo');
     });
