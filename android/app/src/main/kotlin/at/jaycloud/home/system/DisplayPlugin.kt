@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.media.AudioManager
 import android.os.BatteryManager
 import android.os.Build
 import android.os.Environment
@@ -222,6 +223,19 @@ class DisplayPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAw
                 }
                 main.post { result.success(status) }
             }.start()
+            // The media volume (0..100) - Home Assistant's "Lautstärke".
+            "setVolume" -> {
+                try {
+                    val audio = appContext.getSystemService(AudioManager::class.java)
+                    val max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                    val percent = (call.argument<Int>("percent") ?: 0).coerceIn(0, 100)
+                    audio.setStreamVolume(AudioManager.STREAM_MUSIC, (percent * max + 50) / 100, 0)
+                    result.success(true)
+                } catch (e: Exception) {
+                    Log.w(TAG, "can't set the volume", e)
+                    result.success(false)
+                }
+            }
             "setCameraSharing" -> {
                 MotionService.setSharing(call.argument<Boolean>("on") ?: false)
                 result.success(null)
@@ -249,6 +263,9 @@ class DisplayPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAw
         val memory = ActivityManager.MemoryInfo()
         appContext.getSystemService(ActivityManager::class.java)?.getMemoryInfo(memory)
         val data = StatFs(Environment.getDataDirectory().path)
+        val audio = appContext.getSystemService(AudioManager::class.java)
+        val maxVolume = audio?.getStreamMaxVolume(AudioManager.STREAM_MUSIC) ?: 0
+        val volume = if (audio != null && maxVolume > 0) audio.getStreamVolume(AudioManager.STREAM_MUSIC) * 100 / maxVolume else null
         val b = brightness
         b?.readOnce()
         return mapOf(
@@ -265,6 +282,7 @@ class DisplayPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAw
             "totalStorage" to data.totalBytes,
             "screenOn" to (MotionService.isScreenOn(appContext) && !MotionService.dimmed),
             "hasCamera" to appContext.packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY),
+            "volume" to volume,
         )
     }
 

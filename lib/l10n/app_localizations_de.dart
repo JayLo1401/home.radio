@@ -657,7 +657,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get haIntro =>
-      'Meldet dieses Gerät als eigenes Gerät in Home Assistant an - mit seinem Gerätenamen, Schaltern (Bildschirm, Bewegungserkennung, Helligkeit), Tasten, Nachrichten, Sprachausgabe und Sensoren (Bewegung, Akku, Licht). In Home Assistant braucht es nur die MQTT-Integration mit dem Mosquitto-Add-on, kein YAML. Ausgeschaltet verschwindet das Gerät dort wieder.';
+      'Meldet dieses Gerät als eigenes Gerät in Home Assistant an - mit seinem Gerätenamen, Schaltern (Bildschirm, Bewegungserkennung, Helligkeit), Tasten, Nachrichten, Sprachausgabe, Sensoren (Bewegung, Akku, Licht) und der Wiedergabe (Titel, Play/Pause, Weiter, Sender, Lautstärke, Radio/TV/Musik öffnen). In Home Assistant braucht es nur die MQTT-Integration mit dem Mosquitto-Add-on, kein YAML. Ausgeschaltet verschwindet das Gerät dort wieder.';
 
   @override
   String get haEnabled => 'Mit Home Assistant verbinden';
@@ -778,6 +778,60 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get haLoginSection => 'Home-Assistant-Anmeldung';
+
+  @override
+  String get haPlayback => 'Wiedergabe';
+
+  @override
+  String get haPlaybackPlaying => 'Spielt';
+
+  @override
+  String get haPlaybackPaused => 'Pausiert';
+
+  @override
+  String get haPlaybackIdle => 'Aus';
+
+  @override
+  String get haMediaTitle => 'Titel';
+
+  @override
+  String get haMediaArtist => 'Interpret / Sendung';
+
+  @override
+  String get haMediaSource => 'Quelle';
+
+  @override
+  String get haPlayPause => 'Play/Pause';
+
+  @override
+  String get haStop => 'Stopp';
+
+  @override
+  String get haNext => 'Weiter';
+
+  @override
+  String get haPrevious => 'Zurück';
+
+  @override
+  String get haStation => 'Sender';
+
+  @override
+  String get haVolume => 'Lautstärke';
+
+  @override
+  String get haOpenHome => 'Home öffnen';
+
+  @override
+  String get haOpenRadio => 'Radio öffnen';
+
+  @override
+  String get haOpenTv => 'TV öffnen';
+
+  @override
+  String get haOpenMusic => 'Musik öffnen';
+
+  @override
+  String get haOpenDashboard => 'Haussteuerung öffnen';
 
   @override
   String get iptvListName => 'Internet-TV';

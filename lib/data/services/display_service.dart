@@ -118,6 +118,9 @@ class DisplayService {
   Future<Map<String, Object?>> deviceStatus() async =>
       (await _invoke<Map<Object?, Object?>>('deviceStatus'))?.map((k, v) => MapEntry('$k', v)) ?? const {};
 
+  /// The media volume in percent.
+  Future<bool> setVolume(int percent) async => await _invoke<bool>('setVolume', {'percent': percent}) ?? false;
+
   /// Pictures of the camera for Home Assistant on/off ([cameraFrames]).
   Future<void> setCameraSharing(bool on) => _invoke<void>('setCameraSharing', {'on': on});
 

@@ -8,7 +8,15 @@ import '../data/repositories/settings_repository.dart';
 import '../data/services/admin_server.dart';
 import '../data/services/display_service.dart';
 import '../data/services/ha_mqtt_link.dart';
-import '../features/dashboard/dashboard_screen.dart' show dashboardReloadProvider;
+import 'package:audio_service/audio_service.dart' show AudioProcessingState;
+
+import '../data/models/favorite_channel.dart';
+import '../features/dashboard/dashboard_screen.dart' show DashboardScreen, dashboardReloadProvider;
+import '../features/launcher/launcher_navigation.dart' show hideLauncherWith, showLauncherWith;
+import '../features/launcher/launcher_providers.dart' show RadioCommand, appNavigatorKey, radioCommandProvider;
+import '../features/music/music_screen.dart' show MusicScreen;
+import '../features/tv/tv_screen.dart' show TvScreen;
+import 'music_providers.dart' show musicPlayerProvider;
 import '../l10n/l10n.dart';
 import 'dashboard_providers.dart';
 import 'native_errors.dart' show appMessengerKey;
@@ -73,7 +81,24 @@ final haLinkControllerProvider = Provider<void>((ref) {
   display.screenIsOn.addListener(changed);
   display.dimmed.addListener(changed);
   final lifecycle = AppLifecycleListener(onStateChange: (_) => changed());
+  // What plays (radio, music): title, state, the station.
+  StreamSubscription<Object?>? item;
+  StreamSubscription<Object?>? playback;
+  // Only with the link on - the media session isn't started for nothing.
+  if (settings.enabled) {
+    ref.listen(radioAudioHandlerProvider, (_, handler) {
+      final h = handler.value;
+      if (h == null || item != null) return;
+      item = h.mediaItem.listen((_) => changed());
+      playback = h.playbackState.map((s) => (s.playing, s.processingState)).distinct().listen((_) => changed());
+    }, fireImmediately: true);
+  }
+  ref.listen(currentProgramNumberProvider, (_, _) => changed());
+  // New or renamed favourites: the station list in Home Assistant.
+  ref.listen(favoritesStreamProvider, (_, _) => unawaited(link.rediscover()));
   ref.onDispose(() {
+    unawaited(item?.cancel());
+    unawaited(playback?.cancel());
     unawaited(frames?.cancel());
     display.motion.removeListener(changed);
     display.screenIsOn.removeListener(changed);
@@ -104,6 +129,21 @@ abstract final class HaKeys {
   static const freeMemory = 'free_memory';
   static const freeStorage = 'free_storage';
   static const ip = 'ip';
+  static const playback = 'playback';
+  static const title = 'media_title';
+  static const artist = 'media_artist';
+  static const source = 'media_source';
+  static const playPause = 'play_pause';
+  static const stop = 'stop';
+  static const next = 'next';
+  static const previous = 'previous';
+  static const station = 'station';
+  static const volume = 'volume';
+  static const openHome = 'open_home';
+  static const openRadio = 'open_radio';
+  static const openTv = 'open_tv';
+  static const openMusic = 'open_music';
+  static const openDashboard = 'open_dashboard';
   static const version = 'version';
 }
 
@@ -282,6 +322,7 @@ class _AppHaDevice implements HaDevice {
           },
         ),
       ],
+      ...await _mediaEntities(status),
       HaEntity(component: 'notify', key: HaKeys.message, name: l.haMessage, config: const {'icon': 'mdi:message-text'}),
       HaEntity(
         component: 'binary_sensor',
@@ -333,6 +374,7 @@ class _AppHaDevice implements HaDevice {
         if (freeMemory != null) HaKeys.freeMemory: '${(freeMemory / (1 << 20)).round()}',
         if (freeStorage != null) HaKeys.freeStorage: (freeStorage / (1 << 30)).toStringAsFixed(1),
       },
+      ...await _mediaStates(status),
       HaKeys.foreground: onOff(resumed),
       HaKeys.ip: ip ?? '',
       HaKeys.version: await _ref.read(updateServiceProvider).currentVersion(),
@@ -391,9 +433,163 @@ class _AppHaDevice implements HaDevice {
               behavior: SnackBarBehavior.floating,
             ),
           );
+      case HaKeys.playPause || HaKeys.stop || HaKeys.next || HaKeys.previous:
+        final handler = _ref.read(radioAudioHandlerProvider).value;
+        if (handler == null) return;
+        switch (key) {
+          case HaKeys.playPause:
+            await (handler.playbackState.value.playing ? handler.pause() : handler.play());
+          case HaKeys.stop:
+            await handler.stop();
+          case HaKeys.next:
+            await handler.skipToNext();
+          case HaKeys.previous:
+            await handler.skipToPrevious();
+        }
+      case HaKeys.station:
+        if (value == _noStation) {
+          _ref.read(radioCommandProvider.notifier).send(RadioCommand.stop);
+          return;
+        }
+        final favorites = _ref.read(favoritesStreamProvider).value ?? const [];
+        final channel = favorites.where((c) => _stationLabel(c) == value).firstOrNull;
+        if (channel != null) _ref.read(playRequestProvider.notifier).favorite(channel);
+      case HaKeys.volume:
+        final percent = double.tryParse(value)?.round();
+        if (percent != null) await _display.setVolume(percent.clamp(0, 100));
+      case HaKeys.openHome:
+        showLauncherWith(_ref.read);
+      case HaKeys.openRadio:
+        if (!_ref.read(systemPartsProvider).radio) return;
+        appNavigatorKey.currentState?.popUntil((r) => r.isFirst);
+        hideLauncherWith(_ref.read);
+      case HaKeys.openTv || HaKeys.openMusic || HaKeys.openDashboard:
+        await _openOverLauncher(key);
       default:
         debugPrint('Home Assistant: unknown command $key');
     }
+  }
+
+  static const _noStation = '–';
+
+  /// "3 Ö1" - a favourite as the station list shows it.
+  static String _stationLabel(FavoriteChannel c) => '${c.programNumber} ${c.displayName}';
+
+  /// Playback (radio and music share the media session) and the views -
+  /// what a media box offers Home Assistant.
+  Future<List<HaEntity>> _mediaEntities(Map<String, Object?> status) async {
+    final l = l10n;
+    final parts = _ref.read(systemPartsProvider);
+    if (!parts.radio && !parts.music) return const [];
+    final favorites = parts.radio ? (_ref.read(favoritesStreamProvider).value ?? const []) : const <FavoriteChannel>[];
+    final playStates = [l.haPlaybackPlaying, l.haPlaybackPaused, l.haPlaybackIdle];
+    return [
+      HaEntity(
+        component: 'sensor',
+        key: HaKeys.playback,
+        name: l.haPlayback,
+        config: {'device_class': 'enum', 'options': playStates, 'icon': 'mdi:play-pause'},
+      ),
+      HaEntity(component: 'sensor', key: HaKeys.title, name: l.haMediaTitle, config: const {'icon': 'mdi:music-note'}),
+      HaEntity(component: 'sensor', key: HaKeys.artist, name: l.haMediaArtist, config: const {'icon': 'mdi:account-music'}),
+      HaEntity(component: 'sensor', key: HaKeys.source, name: l.haMediaSource, config: const {'icon': 'mdi:radio'}),
+      HaEntity(component: 'button', key: HaKeys.playPause, name: l.haPlayPause, config: const {'icon': 'mdi:play-pause'}),
+      HaEntity(component: 'button', key: HaKeys.stop, name: l.haStop, config: const {'icon': 'mdi:stop'}),
+      HaEntity(component: 'button', key: HaKeys.next, name: l.haNext, config: const {'icon': 'mdi:skip-next'}),
+      HaEntity(component: 'button', key: HaKeys.previous, name: l.haPrevious, config: const {'icon': 'mdi:skip-previous'}),
+      if (favorites.isNotEmpty)
+        HaEntity(
+          component: 'select',
+          key: HaKeys.station,
+          name: l.haStation,
+          config: {
+            'options': [_noStation, for (final c in favorites) _stationLabel(c)],
+            'icon': 'mdi:radio-tower',
+          },
+        ),
+      if (_android && status['volume'] != null)
+        HaEntity(
+          component: 'number',
+          key: HaKeys.volume,
+          name: l.haVolume,
+          config: const {'min': 0, 'max': 100, 'step': 5, 'unit_of_measurement': '%', 'icon': 'mdi:volume-high'},
+        ),
+      HaEntity(component: 'button', key: HaKeys.openHome, name: l.haOpenHome, config: const {'icon': 'mdi:home'}),
+      if (parts.radio)
+        HaEntity(component: 'button', key: HaKeys.openRadio, name: l.haOpenRadio, config: const {'icon': 'mdi:radio'}),
+      if (parts.tv) HaEntity(component: 'button', key: HaKeys.openTv, name: l.haOpenTv, config: const {'icon': 'mdi:television'}),
+      if (parts.music)
+        HaEntity(component: 'button', key: HaKeys.openMusic, name: l.haOpenMusic, config: const {'icon': 'mdi:music'}),
+      if (_android && parts.dashboard)
+        HaEntity(
+          component: 'button',
+          key: HaKeys.openDashboard,
+          name: l.haOpenDashboard,
+          config: const {'icon': 'mdi:view-dashboard'},
+        ),
+    ];
+  }
+
+  Future<Map<String, String>> _mediaStates(Map<String, Object?> status) async {
+    final l = l10n;
+    final parts = _ref.read(systemPartsProvider);
+    if (!parts.radio && !parts.music) return const {};
+    final handler = _ref.read(radioAudioHandlerProvider).value;
+    final item = handler?.mediaItem.value;
+    final state = handler?.playbackState.value;
+    final active = item != null && state != null && state.processingState != AudioProcessingState.idle;
+    final playback = !active
+        ? l.haPlaybackIdle
+        : state.playing
+            ? l.haPlaybackPlaying
+            : l.haPlaybackPaused;
+    String? station;
+    if (parts.radio) {
+      final program = _ref.read(currentProgramNumberProvider);
+      final favorites = _ref.read(favoritesStreamProvider).value ?? const [];
+      final channel = program == null || (handler?.hasGuest ?? false) || !active
+          ? null
+          : favorites.where((c) => c.programNumber == program).firstOrNull;
+      station = channel == null ? _noStation : _stationLabel(channel);
+    }
+    final volume = status['volume'] as num?;
+    return {
+      HaKeys.playback: playback,
+      HaKeys.title: active ? _cut(item.title) : '',
+      HaKeys.artist: active ? _cut(item.artist ?? '') : '',
+      HaKeys.source: !active ? '' : ((handler?.hasGuest ?? false) ? l.musicTitle : 'Radio'),
+      HaKeys.station: ?station,
+      if (volume != null) HaKeys.volume: '${volume.round()}',
+    };
+  }
+
+  /// Home Assistant keeps at most 255 characters of a state.
+  static String _cut(String text) => text.length <= 250 ? text : '${text.substring(0, 249)}…';
+
+  /// TV, Musik or the Haussteuerung over the launcher - as its tiles open
+  /// them (Back leads to the launcher).
+  Future<void> _openOverLauncher(String key) async {
+    final parts = _ref.read(systemPartsProvider);
+    final allowed = switch (key) {
+      HaKeys.openTv => parts.tv,
+      HaKeys.openMusic => parts.music,
+      _ => parts.dashboard && _android,
+    };
+    if (!allowed) return;
+    showLauncherWith(_ref.read);
+    final nav = appNavigatorKey.currentState;
+    if (nav == null) return;
+    // TV and the Haussteuerung take the speakers (as from the launcher).
+    if (key != HaKeys.openMusic) {
+      _ref.read(radioCommandProvider.notifier).send(RadioCommand.pauseForApp);
+      if (key == HaKeys.openTv) await _ref.read(musicPlayerProvider).pauseForApp();
+    }
+    final Widget page = switch (key) {
+      HaKeys.openTv => const TvScreen(),
+      HaKeys.openMusic => const MusicScreen(),
+      _ => const DashboardScreen(),
+    };
+    unawaited(nav.push(MaterialPageRoute<void>(builder: (_) => page)));
   }
 
   Future<void> _setBrightness(DisplayBrightness Function(DisplayBrightness b) change) async {

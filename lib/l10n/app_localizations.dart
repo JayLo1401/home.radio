@@ -1235,7 +1235,7 @@ abstract class AppLocalizations {
   /// No description provided for @haIntro.
   ///
   /// In de, this message translates to:
-  /// **'Meldet dieses Gerät als eigenes Gerät in Home Assistant an - mit seinem Gerätenamen, Schaltern (Bildschirm, Bewegungserkennung, Helligkeit), Tasten, Nachrichten, Sprachausgabe und Sensoren (Bewegung, Akku, Licht). In Home Assistant braucht es nur die MQTT-Integration mit dem Mosquitto-Add-on, kein YAML. Ausgeschaltet verschwindet das Gerät dort wieder.'**
+  /// **'Meldet dieses Gerät als eigenes Gerät in Home Assistant an - mit seinem Gerätenamen, Schaltern (Bildschirm, Bewegungserkennung, Helligkeit), Tasten, Nachrichten, Sprachausgabe, Sensoren (Bewegung, Akku, Licht) und der Wiedergabe (Titel, Play/Pause, Weiter, Sender, Lautstärke, Radio/TV/Musik öffnen). In Home Assistant braucht es nur die MQTT-Integration mit dem Mosquitto-Add-on, kein YAML. Ausgeschaltet verschwindet das Gerät dort wieder.'**
   String get haIntro;
 
   /// No description provided for @haEnabled.
@@ -1453,6 +1453,114 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'Home-Assistant-Anmeldung'**
   String get haLoginSection;
+
+  /// No description provided for @haPlayback.
+  ///
+  /// In de, this message translates to:
+  /// **'Wiedergabe'**
+  String get haPlayback;
+
+  /// No description provided for @haPlaybackPlaying.
+  ///
+  /// In de, this message translates to:
+  /// **'Spielt'**
+  String get haPlaybackPlaying;
+
+  /// No description provided for @haPlaybackPaused.
+  ///
+  /// In de, this message translates to:
+  /// **'Pausiert'**
+  String get haPlaybackPaused;
+
+  /// No description provided for @haPlaybackIdle.
+  ///
+  /// In de, this message translates to:
+  /// **'Aus'**
+  String get haPlaybackIdle;
+
+  /// No description provided for @haMediaTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Titel'**
+  String get haMediaTitle;
+
+  /// No description provided for @haMediaArtist.
+  ///
+  /// In de, this message translates to:
+  /// **'Interpret / Sendung'**
+  String get haMediaArtist;
+
+  /// No description provided for @haMediaSource.
+  ///
+  /// In de, this message translates to:
+  /// **'Quelle'**
+  String get haMediaSource;
+
+  /// No description provided for @haPlayPause.
+  ///
+  /// In de, this message translates to:
+  /// **'Play/Pause'**
+  String get haPlayPause;
+
+  /// No description provided for @haStop.
+  ///
+  /// In de, this message translates to:
+  /// **'Stopp'**
+  String get haStop;
+
+  /// No description provided for @haNext.
+  ///
+  /// In de, this message translates to:
+  /// **'Weiter'**
+  String get haNext;
+
+  /// No description provided for @haPrevious.
+  ///
+  /// In de, this message translates to:
+  /// **'Zurück'**
+  String get haPrevious;
+
+  /// No description provided for @haStation.
+  ///
+  /// In de, this message translates to:
+  /// **'Sender'**
+  String get haStation;
+
+  /// No description provided for @haVolume.
+  ///
+  /// In de, this message translates to:
+  /// **'Lautstärke'**
+  String get haVolume;
+
+  /// No description provided for @haOpenHome.
+  ///
+  /// In de, this message translates to:
+  /// **'Home öffnen'**
+  String get haOpenHome;
+
+  /// No description provided for @haOpenRadio.
+  ///
+  /// In de, this message translates to:
+  /// **'Radio öffnen'**
+  String get haOpenRadio;
+
+  /// No description provided for @haOpenTv.
+  ///
+  /// In de, this message translates to:
+  /// **'TV öffnen'**
+  String get haOpenTv;
+
+  /// No description provided for @haOpenMusic.
+  ///
+  /// In de, this message translates to:
+  /// **'Musik öffnen'**
+  String get haOpenMusic;
+
+  /// No description provided for @haOpenDashboard.
+  ///
+  /// In de, this message translates to:
+  /// **'Haussteuerung öffnen'**
+  String get haOpenDashboard;
 
   /// No description provided for @iptvListName.
   ///
