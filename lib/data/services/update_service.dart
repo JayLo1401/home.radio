@@ -20,6 +20,106 @@ class AvailableUpdate {
   const AvailableUpdate({required this.version, required this.url, this.sha256});
 }
 
+/// The Android APKs the CI builds, one per ABI (see release.yml) - plus
+/// "universal" with all three.
+const apkAbiVariants = ['arm64-v8a', 'armeabi-v7a', 'x86_64'];
+
+/// The lowest Android the APKs install on (Flutter's minSdk 24).
+const apkMinAndroid = '7.0';
+
+/// The APK variant for a device with these ABIs (Build.SUPPORTED_ABIS, the
+/// preferred first) - the same choice the updater makes.
+String recommendedApkVariant(List<String> abis) =>
+    abis.firstWhere(apkAbiVariants.contains, orElse: () => 'universal');
+
+/// The variant an APK is from its native library folders: one ABI, or
+/// "universal" with several; null if unknown.
+String? installedApkVariant(List<String> apkAbis) => switch (apkAbis.length) {
+      0 => null,
+      1 => apkAbis.single,
+      _ => 'universal',
+    };
+
+/// What this Android device is - to tell which APK fits it.
+class DeviceAppInfo {
+  const DeviceAppInfo({
+    required this.sdk,
+    required this.release,
+    required this.manufacturer,
+    required this.model,
+    this.chip,
+    this.ramBytes,
+    this.abis = const [],
+    this.abis64 = const [],
+    this.apkAbis = const [],
+    this.cpu64 = false,
+  });
+
+  factory DeviceAppInfo.fromMap(Map<Object?, Object?> m) {
+    List<String> list(Object? v) => [for (final x in (v as List?) ?? const []) '$x'];
+    String text(Object? v) => (v as String?)?.trim() ?? '';
+    return DeviceAppInfo(
+      sdk: (m['sdk'] as num?)?.toInt() ?? 0,
+      release: text(m['release']),
+      manufacturer: text(m['manufacturer']),
+      model: text(m['model']),
+      chip: text(m['chip']).isEmpty ? null : text(m['chip']),
+      ramBytes: (m['ram'] as num?)?.toInt(),
+      abis: list(m['abis']),
+      abis64: list(m['abis64']),
+      apkAbis: list(m['apkAbis']),
+      cpu64: m['cpu64'] == true,
+    );
+  }
+
+  /// Android API level and version ("14").
+  final int sdk;
+  final String release;
+  final String manufacturer;
+  final String model;
+  final String? chip;
+  final int? ramBytes;
+
+  /// The system's ABIs, preferred first.
+  final List<String> abis;
+  final List<String> abis64;
+
+  /// The ABIs inside the installed APK.
+  final List<String> apkAbis;
+
+  /// The processor could run 64-bit (also when the system is 32-bit).
+  final bool cpu64;
+
+  bool get system64 => abis64.isNotEmpty;
+
+  /// "Xiaomi MiTV-AFMU0" (without the maker twice).
+  String get name {
+    if (manufacturer.isEmpty) return model;
+    return model.toLowerCase().startsWith(manufacturer.toLowerCase()) ? model : '$manufacturer $model';
+  }
+
+  String get recommended => recommendedApkVariant(abis);
+
+  String? get installed => installedApkVariant(apkAbis);
+
+  /// The installed APK is the one made for this device (or universal - it
+  /// runs, only bigger; the next update brings the fitting one).
+  bool get installedFits => installed == recommended;
+
+  Map<String, Object?> toJson() => {
+        'name': name,
+        'android': release,
+        'sdk': sdk,
+        'chip': chip,
+        'ramBytes': ramBytes,
+        'abis': abis,
+        'system64': system64,
+        'cpu64': cpu64,
+        'installed': installed,
+        'recommended': recommended,
+      };
+}
+
 /// Updates from the Nexus raw repository the CI publishes to (see
 /// .github/workflows/release.yml). Each platform has a manifest at
 /// `<base>/<platform>/release/latest/version.json`:
@@ -71,6 +171,18 @@ class UpdateService {
         }
       }
       return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Android: what the device is (Android version, 32/64-bit, the
+  /// installed APK variant) - null elsewhere or if it can't be read.
+  Future<DeviceAppInfo?> deviceInfo() async {
+    if (!Platform.isAndroid) return null;
+    try {
+      final map = await _channel.invokeMapMethod<Object?, Object?>('deviceInfo');
+      return map == null ? null : DeviceAppInfo.fromMap(map);
     } catch (_) {
       return null;
     }

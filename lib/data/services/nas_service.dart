@@ -1147,17 +1147,31 @@ class SmbClient implements NasClient {
         if (!isSmbServerAnswer(e)) _dropStreams();
         throw describeSmbError(e);
       }
+      // The next read is asked for before a chunk is handed on: the
+      // server's answer travels while the player takes the chunk (one
+      // request at a time per connection - this keeps it busy).
+      final open = raf;
+      Future<Uint8List> readAt(int position) {
+        final next = open.read(min(_chunk, end - position)).timeout(_timeout);
+        // Errors come with the await below - or not at all if the stream
+        // was cancelled meanwhile.
+        next.ignore();
+        return next;
+      }
+
       var position = offset;
-      while (position < end) {
+      Future<Uint8List>? next = readAt(position);
+      while (next != null) {
         final Uint8List chunk;
         try {
-          chunk = await raf.read(min(_chunk, end - position)).timeout(_timeout);
+          chunk = await next;
         } catch (e) {
           if (!isSmbServerAnswer(e)) _dropStreams();
           throw describeSmbError(e);
         }
         if (chunk.isEmpty) return;
         position += chunk.length;
+        next = position < end ? readAt(position) : null;
         yield chunk;
       }
     } finally {

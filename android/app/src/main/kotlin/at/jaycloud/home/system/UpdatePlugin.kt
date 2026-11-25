@@ -1,5 +1,6 @@
 package at.jaycloud.home.system
 
+import android.app.ActivityManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -13,6 +14,7 @@ import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
+import java.util.zip.ZipFile
 
 /**
  * In-place app updates for Dart's UpdateService: the downloaded APK goes to
@@ -38,6 +40,14 @@ class UpdatePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
             "supportedAbis" -> result.success(Build.SUPPORTED_ABIS.toList())
+            "deviceInfo" -> Thread {
+                try {
+                    result.successOnMain(deviceInfo())
+                } catch (e: Exception) {
+                    Log.w(TAG, "deviceInfo failed", e)
+                    result.errorOnMain("DEVICE_INFO", e.message)
+                }
+            }.start()
             "canInstall" -> result.success(canInstall())
             "openInstallPermission" -> {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -71,6 +81,64 @@ class UpdatePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
             }
             else -> result.notImplemented()
         }
+    }
+
+    /**
+     * What decides which APK fits: Android version, the system's ABIs (a
+     * 64-bit chip often runs a 32-bit system on TV boxes - then only
+     * armeabi-v7a works), the ABIs inside the installed APK (several:
+     * universal), chip and memory.
+     */
+    private fun deviceInfo(): Map<String, Any?> {
+        val apkAbis = try {
+            ZipFile(appContext.applicationInfo.sourceDir).use { zip ->
+                zip.entries().asSequence()
+                    .map { it.name }
+                    .filter { it.startsWith("lib/") && it.endsWith(".so") }
+                    .mapNotNull { it.split('/').getOrNull(1) }
+                    .toSortedSet()
+                    .toList()
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "APK not readable", e)
+            emptyList()
+        }
+        // "CPU architecture: 8" - an ARMv8 (64-bit) core, also under a
+        // 32-bit system.
+        val cpu64 = try {
+            File("/proc/cpuinfo").readLines()
+                .mapNotNull { Regex("""^CPU architecture\s*:\s*(\d+)""").find(it)?.groupValues?.get(1)?.toIntOrNull() }
+                .any { it >= 8 }
+        } catch (_: Exception) {
+            false
+        } || Build.SUPPORTED_64_BIT_ABIS.isNotEmpty()
+        val chip = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            listOf(Build.SOC_MANUFACTURER, Build.SOC_MODEL)
+                .filter { it.isNotBlank() && it != Build.UNKNOWN }
+                .joinToString(" ")
+                .ifBlank { Build.HARDWARE }
+        } else {
+            Build.HARDWARE
+        }
+        val ram = try {
+            val memory = ActivityManager.MemoryInfo()
+            (appContext.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager).getMemoryInfo(memory)
+            memory.totalMem
+        } catch (_: Exception) {
+            null
+        }
+        return mapOf(
+            "sdk" to Build.VERSION.SDK_INT,
+            "release" to Build.VERSION.RELEASE,
+            "manufacturer" to Build.MANUFACTURER,
+            "model" to Build.MODEL,
+            "chip" to chip,
+            "ram" to ram,
+            "abis" to Build.SUPPORTED_ABIS.toList(),
+            "abis64" to Build.SUPPORTED_64_BIT_ABIS.toList(),
+            "apkAbis" to apkAbis,
+            "cpu64" to cpu64,
+        )
     }
 
     private fun canInstall(): Boolean =

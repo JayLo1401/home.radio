@@ -1,6 +1,11 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart' show NumberFormat;
 
 import '../../core/dashboard_providers.dart';
+import '../../core/nas_providers.dart';
 import '../../core/pictures_providers.dart';
 import '../../core/providers.dart';
 import '../../data/services/music_library.dart' show MusicRepeat;
@@ -13,6 +18,9 @@ import '../../data/services/admin_server.dart';
 import '../../data/services/display_service.dart';
 import '../../data/services/enigma2_service.dart';
 import '../../data/services/launcher_service.dart';
+import '../../data/services/nas_backup_service.dart';
+import '../../data/services/nas_service.dart';
+import '../../data/services/update_service.dart';
 import '../../data/services/picture_library.dart' show SlideshowOrder;
 import '../../l10n/l10n.dart';
 import '../browser/browser_channel.dart';
@@ -32,13 +40,46 @@ class _Setting {
     this.options = const [],
     this.min,
     this.max,
-  });
+    this.button,
+    this.folder,
+  }) : run = null;
+
+  /// Lines of text to read (nothing to change) - e.g. "Dieses Gerät".
+  _Setting.info({required this.id, required this.label, required List<String> lines})
+      : type = 'info',
+        get = (() => lines),
+        set = _readOnly,
+        help = null,
+        options = const [],
+        min = null,
+        max = null,
+        button = null,
+        run = null,
+        folder = null;
+
+  /// A button ([button]) that does something on the device and says how it
+  /// went - test the NAS, backup to the NAS, look for updates ...
+  _Setting.action({required this.id, required this.label, required String this.button, required this.run, this.help})
+      : type = 'action',
+        get = (() => null),
+        set = _readOnly,
+        options = const [],
+        min = null,
+        max = null,
+        folder = null;
+
+  static Future<String?> _readOnly(Object? _) async => l10n.adminInvalidValue;
 
   final String id;
   final String label;
 
-  /// bool, int, choice, text, secret (write-only: never sent to the page).
+  /// bool, int, choice, text, secret (write-only: never sent to the page),
+  /// info (lines to read), action (a button), folder (a NAS folder: the
+  /// page browses the NAS through AdminSettings.browse).
   final String type;
+  final String? button;
+  final Future<AdminResult> Function()? run;
+  final NasFolder? folder;
   final String? help;
   final List<(String, String)> options;
   final int? min;
@@ -56,9 +97,17 @@ class _Setting {
         if (options.isNotEmpty) 'options': [for (final (v, l) in options) {'value': v, 'label': l}],
         'min': ?min,
         'max': ?max,
+        'button': ?button,
         'value': type == 'secret' ? '' : get(),
       };
 }
+
+/// A group of settings on one area's page, like the headings on the
+/// device's settings pages.
+typedef _Group = ({String area, String title, String? help, List<_Setting> items});
+
+_Group _group(String area, String title, List<_Setting> items, {String? help}) =>
+    (area: area, title: title, help: help, items: items);
 
 /// The settings the admin page (`http://<ip>:1401/`) can change - through
 /// the same providers the app's own settings use, so the device follows at
@@ -72,7 +121,7 @@ class AdminSettings implements AdminSettingsSource {
   static bool? _bool(Object? v) => v is bool ? v : (v is String ? v == 'true' : null);
   static int? _int(Object? v) => v is int ? v : (v is num ? v.toInt() : int.tryParse('$v'));
 
-  Future<List<({String title, List<_Setting> items})>> _groups() async {
+  Future<List<_Group>> _groups() async {
     final l = l10n;
     final parts = _c.read(systemPartsProvider);
     final launcher = _c.read(launcherSettingsProvider);
@@ -144,34 +193,7 @@ class AdminSettings implements AdminSettingsSource {
         );
 
     return [
-      (
-        title: l.systemSettingsTitleSystem,
-        items: [
-          _Setting(
-            id: 'deviceName',
-            label: l.adminDeviceName,
-            type: 'text',
-            get: () => _c.read(deviceNameProvider),
-            set: (v) async {
-              await _c.read(deviceNameProvider.notifier).set('${v ?? ''}');
-              return null;
-            },
-          ),
-          _Setting(
-            id: 'language',
-            label: l.commonLanguage,
-            type: 'choice',
-            options: [
-              ('system', l.commonLanguageSystem),
-              ('de', l.commonLanguageGerman),
-              ('en', l.commonLanguageEnglish),
-            ],
-            get: () => _c.read(languageProvider).name,
-            set: (v) async {
-              await _c.read(languageProvider.notifier).set(AppLanguage.parse('$v'));
-              return null;
-            },
-          ),
+      _group('system', l.settingsPartsHeading, [
           _Setting(
             id: 'partRadio',
             label: l.adminPartRadio,
@@ -244,6 +266,35 @@ class AdminSettings implements AdminSettingsSource {
                 return null;
               },
             ),
+      ]),
+      _group('system', l.settingsDeviceHeading, [
+          _Setting(
+            id: 'deviceName',
+            label: l.adminDeviceName,
+            type: 'text',
+            get: () => _c.read(deviceNameProvider),
+            set: (v) async {
+              await _c.read(deviceNameProvider.notifier).set('${v ?? ''}');
+              return null;
+            },
+          ),
+          _Setting(
+            id: 'language',
+            label: l.commonLanguage,
+            type: 'choice',
+            options: [
+              ('system', l.commonLanguageSystem),
+              ('de', l.commonLanguageGerman),
+              ('en', l.commonLanguageEnglish),
+            ],
+            get: () => _c.read(languageProvider).name,
+            set: (v) async {
+              await _c.read(languageProvider.notifier).set(AppLanguage.parse('$v'));
+              return null;
+            },
+          ),
+      ]),
+      _group('system', l.adminStartScreen, [
           _Setting(
             id: 'startScreen',
             label: l.adminStartScreen,
@@ -280,6 +331,8 @@ class AdminSettings implements AdminSettingsSource {
                 return null;
               },
             ),
+      ]),
+      _group('system', l.settingsDisplayHeading, [
           _Setting(
             id: 'uiScale',
             label: l.adminUiScale,
@@ -305,10 +358,12 @@ class AdminSettings implements AdminSettingsSource {
               return null;
             },
           ),
-        ],
-      ),
+      ]),
+      ...await _systemExtras(),
       if (parts.radio)
         (
+          area: 'radio',
+          help: null,
           title: l.systemSettingsTitleRadio,
           items: [
             _Setting(
@@ -345,6 +400,8 @@ class AdminSettings implements AdminSettingsSource {
         ),
       if (parts.tv)
         (
+          area: 'tv',
+          help: null,
           title: l.systemSettingsTitleTv,
           items: [
             _Setting(
@@ -418,6 +475,8 @@ class AdminSettings implements AdminSettingsSource {
         ),
       if (parts.pictures)
         (
+          area: 'pictures',
+          help: null,
           title: l.picturesSettingsTitle,
           items: [
             _Setting(
@@ -462,6 +521,8 @@ class AdminSettings implements AdminSettingsSource {
         ),
       if (parts.music)
         (
+          area: 'music',
+          help: null,
           title: l.musicSettingsTitle,
           items: [
             _Setting(
@@ -553,6 +614,8 @@ class AdminSettings implements AdminSettingsSource {
         ),
       if (BrowserChannel.supported && parts.browser)
         (
+          area: 'browser',
+          help: null,
           title: l.browserSettingsTitle,
           items: [
             _Setting(
@@ -591,6 +654,8 @@ class AdminSettings implements AdminSettingsSource {
         ),
       if (android && parts.dashboard)
         (
+          area: 'dashboard',
+          help: null,
           title: l.dashboardSettingsTitle,
           items: [
             _Setting(
@@ -712,18 +777,382 @@ class AdminSettings implements AdminSettingsSource {
     ];
   }
 
-  @override
-  Future<List<Map<String, Object?>>> describe() async => [
-        for (final g in await _groups()) {'title': g.title, 'items': [for (final s in g.items) s.toJson()]},
-      ];
+  /// System's pages beyond the switches: the NAS (server, test, folders),
+  /// backup to the NAS, updates and what the device is.
+  Future<List<_Group>> _systemExtras() async {
+    final l = l10n;
+    final nasRepo = _c.read(nasSettingsRepositoryProvider);
+    final nas = await nasRepo.load();
+    final c = nas.config;
+    Future<String?> setNas(NasConfig Function(NasConfig c) change) async {
+      await _c.read(nasSettingsProvider.notifier).setConfig(change((await nasRepo.load()).config));
+      return null;
+    }
+
+    final defaultPort = switch (c.protocol) {
+      NasProtocol.ftp => 21,
+      NasProtocol.smb => SmbClient.port,
+      NasProtocol.webdav => c.https ? 443 : 80,
+    };
+    final hasServer = c.isConfigured;
+    final updates = _c.read(updateServiceProvider);
+    final version = await updates.currentVersion();
+    final device = await updates.deviceInfo();
+    final settingsRepo = _c.read(settingsRepositoryProvider);
+    final auto = await settingsRepo.getAutoUpdate();
+    return [
+      _group('system', l.nasTitle, help: l.nasIntro, [
+        _Setting(
+          id: 'nasProtocol',
+          label: l.adminNasProtocol,
+          type: 'choice',
+          help: switch (c.protocol) {
+            NasProtocol.webdav => l.nasProtocolWebdavHint,
+            NasProtocol.ftp => l.nasProtocolFtpHint,
+            NasProtocol.smb => l.nasProtocolSmbHint,
+          },
+          options: [
+            (NasProtocol.webdav.name, l.nasProtocolWebdav),
+            (NasProtocol.ftp.name, l.nasProtocolFtp),
+            (NasProtocol.smb.name, l.nasProtocolSmb),
+          ],
+          get: () => c.protocol.name,
+          set: (v) {
+            final protocol = NasProtocol.values.where((p) => p.name == v).firstOrNull;
+            if (protocol == null) return Future.value(l.adminInvalidValue);
+            return setNas((x) => _copyNas(x, protocol: protocol));
+          },
+        ),
+        _Setting(
+          id: 'nasHost',
+          label: l.nasHost,
+          help: l.nasHostHint,
+          type: 'text',
+          get: () => c.host,
+          set: (v) => setNas((x) => _copyNas(x, host: '${v ?? ''}'.trim())),
+        ),
+        _Setting(
+          id: 'nasPort',
+          label: l.nasPort(defaultPort),
+          type: 'text',
+          get: () => c.port?.toString() ?? '',
+          set: (v) {
+            final text = '${v ?? ''}'.trim();
+            final port = int.tryParse(text);
+            if (text.isNotEmpty && (port == null || port < 1 || port > 65535)) {
+              return Future.value(l.adminInvalidValue);
+            }
+            return setNas((x) => _copyNas(x, port: port, clearPort: port == null));
+          },
+        ),
+        if (c.protocol == NasProtocol.webdav) ...[
+          _Setting(
+            id: 'nasHttps',
+            label: l.nasHttps,
+            help: l.nasHttpsHint,
+            type: 'bool',
+            get: () => c.https,
+            set: (v) => setNas((x) => _copyNas(x, https: _bool(v) ?? false)),
+          ),
+          _Setting(
+            id: 'nasBasePath',
+            label: l.nasBasePath,
+            help: l.nasBasePathHint,
+            type: 'text',
+            get: () => c.basePath,
+            set: (v) => setNas((x) => _copyNas(x, basePath: '${v ?? ''}'.trim())),
+          ),
+        ],
+        _Setting(
+          id: 'nasUser',
+          label: l.nasUser,
+          type: 'text',
+          get: () => c.user,
+          set: (v) => setNas((x) => _copyNas(x, user: '${v ?? ''}'.trim())),
+        ),
+        _Setting(
+          id: 'nasPassword',
+          label: l.nasPassword,
+          type: 'secret',
+          help: l.adminSecretHelp,
+          get: () => '',
+          set: (v) => setNas((x) => _copyNas(x, password: '${v ?? ''}')),
+        ),
+        if (c.protocol == NasProtocol.smb)
+          _Setting(
+            id: 'nasDomain',
+            label: l.nasDomain,
+            help: l.nasSmbLoginHint,
+            type: 'text',
+            get: () => c.domain,
+            set: (v) => setNas((x) => _copyNas(x, domain: '${v ?? ''}'.trim())),
+          ),
+        _Setting.action(
+          id: 'nasTest',
+          label: l.nasTest,
+          button: l.nasTest,
+          run: () async {
+            final config = (await nasRepo.load()).config;
+            if (!config.isConfigured) return (ok: false, message: l.nasNeedServer);
+            final client = config.createClient();
+            try {
+              final entries = await client.list('/').timeout(const Duration(seconds: 30));
+              return (ok: true, message: l.nasTestOk(entries.length));
+            } on NasException catch (e) {
+              return (ok: false, message: l.nasTestFailed(e.message));
+            } on TimeoutException {
+              return (ok: false, message: l.nasTestFailed(l.nasErrorTimeout));
+            } catch (e) {
+              return (ok: false, message: l.nasTestFailed('$e'));
+            } finally {
+              client.close();
+            }
+          },
+        ),
+      ]),
+      _group('system', l.nasFoldersSection, help: hasServer ? l.adminNasFoldersHint : l.nasNeedServer, [
+        for (final kind in NasFolder.values)
+          _Setting(
+            id: 'nasFolder_${kind.name}',
+            label: nasFolderName(kind),
+            type: 'folder',
+            folder: kind,
+            button: l.adminBrowse,
+            get: () => nas.folders[kind] ?? '',
+            set: (v) async {
+              final path = '${v ?? ''}'.trim();
+              await _c.read(nasSettingsProvider.notifier).setFolder(kind, path.isEmpty ? null : normalizeNasPath(path));
+              return null;
+            },
+          ),
+      ]),
+      _group('system', l.adminNasBackupHeading, help: l.nasBackupsHint(NasBackupService.keep), [
+        _Setting.action(
+          id: 'nasBackupNow',
+          label: l.adminNasBackupNow,
+          button: l.settingsBackupCreate,
+          run: () async {
+            try {
+              final name = await _c.read(nasBackupServiceProvider).backupNow().timeout(const Duration(minutes: 2));
+              return name == null
+                  ? (ok: false, message: l.adminNasBackupNoFolder)
+                  : (ok: true, message: l.adminNasBackupDone(name));
+            } on NasException catch (e) {
+              return (ok: false, message: l.settingsBackupFailed(e.message));
+            } on TimeoutException {
+              return (ok: false, message: l.settingsBackupFailed(l.nasErrorTimeout));
+            } catch (e) {
+              return (ok: false, message: l.settingsBackupFailed('$e'));
+            }
+          },
+        ),
+      ]),
+      _group('system', l.miscUpdatesTitle, [
+        _Setting.info(id: 'updateVersion', label: l.miscUpdateInstalledVersion(version), lines: [
+          if (!UpdateService.supported) l.miscUpdateLocalBuild,
+        ]),
+        if (UpdateService.supported) ...[
+          _Setting(
+            id: 'updateAuto',
+            label: l.miscUpdateAuto,
+            help: l.miscUpdateAutoHint,
+            type: 'bool',
+            get: () => auto,
+            set: (v) async {
+              await settingsRepo.setAutoUpdate(_bool(v) ?? true);
+              return null;
+            },
+          ),
+          _Setting.action(
+            id: 'updateCheck',
+            label: l.adminUpdateCheck,
+            button: l.miscUpdateCheckAgain,
+            run: () async {
+              final update = await updates.check();
+              return (ok: true, message: update == null ? l.miscUpdateUpToDate : l.miscUpdateAvailable(update.version));
+            },
+          ),
+          _Setting.action(
+            id: 'updateInstall',
+            label: l.adminUpdateInstall,
+            help: l.adminUpdateInstallHelp,
+            button: l.miscUpdateNow,
+            run: () async {
+              final update = await updates.check();
+              if (update == null) return (ok: true, message: l.miscUpdateUpToDate);
+              // Downloading takes a while - the page doesn't wait.
+              unawaited(() async {
+                try {
+                  await updates.install(update, beforeInstall: () async {
+                    try {
+                      await _c.read(nasBackupServiceProvider).backupNow().timeout(const Duration(seconds: 30));
+                    } catch (e) {
+                      debugPrint('admin update: NAS backup: $e');
+                    }
+                  });
+                } catch (e) {
+                  debugPrint('admin update: $e');
+                }
+              }());
+              return (ok: true, message: l.adminUpdateStarted(update.version));
+            },
+          ),
+        ],
+      ]),
+      if (device != null)
+        _group('system', l.miscDeviceTitle, [
+          _Setting.info(id: 'deviceInfo', label: device.name, lines: _deviceLines(device, version)),
+          _Setting.info(id: 'apkVariants', label: l.miscDeviceVariantsTitle, lines: [
+            l.miscDeviceVariantArmv7,
+            l.miscDeviceVariantArm64,
+            l.miscDeviceVariantX86,
+            l.miscDeviceVariantUniversal,
+            l.miscDeviceMinAndroid(apkMinAndroid),
+          ]),
+        ]),
+    ];
+  }
+
+  /// "Dieses Gerät" as on the device (Settings → Updates).
+  static List<String> _deviceLines(DeviceAppInfo d, String version) {
+    final l = l10n;
+    final abi = d.abis.isEmpty ? '?' : d.abis.first;
+    final ram = d.ramBytes;
+    final installed = d.installed;
+    return [
+      l.miscDeviceAndroid(d.release, d.sdk),
+      d.system64 ? l.miscDeviceSystem64(abi) : l.miscDeviceSystem32(abi),
+      if (!d.system64 && d.cpu64) l.miscDeviceCpu64On32,
+      if (d.chip != null) l.miscDeviceChip(d.chip!),
+      if (ram != null && ram > 0) l.miscDeviceRam(NumberFormat('0.0', l.localeName).format(ram / (1 << 30))),
+      if (installed != null) l.miscDeviceInstalled(installed),
+      l.miscDeviceRecommended('home_system-$version-${d.recommended}.apk'),
+      if (installed != null)
+        d.installedFits
+            ? l.miscDeviceFits
+            : installed == 'universal'
+                ? l.miscDeviceUniversal
+                : l.miscDeviceOther,
+    ];
+  }
+
+  static NasConfig _copyNas(
+    NasConfig c, {
+    NasProtocol? protocol,
+    String? host,
+    int? port,
+    bool clearPort = false,
+    bool? https,
+    String? basePath,
+    String? user,
+    String? password,
+    String? domain,
+  }) =>
+      NasConfig(
+        protocol: protocol ?? c.protocol,
+        host: host ?? c.host,
+        port: clearPort ? null : (port ?? c.port),
+        https: https ?? c.https,
+        basePath: basePath ?? c.basePath,
+        user: user ?? c.user,
+        password: password ?? c.password,
+        domain: domain ?? c.domain,
+      );
+
+  static String nasFolderName(NasFolder kind) => switch (kind) {
+        NasFolder.backgrounds => l10n.nasFolderBackgrounds,
+        NasFolder.pictures => l10n.nasFolderPictures,
+        NasFolder.music => l10n.nasFolderMusic,
+        NasFolder.videos => l10n.nasFolderVideos,
+        NasFolder.movies => l10n.nasFolderMovies,
+        NasFolder.backups => l10n.nasFolderBackups,
+      };
+
+  /// The areas of the overview - the same as on the device's first
+  /// settings page (logo, title, what's inside; greyed when switched off).
+  List<Map<String, Object?>> _areas() {
+    final l = l10n;
+    final parts = _c.read(systemPartsProvider);
+    Map<String, Object?> area(String id, String logo, String title, String subtitle, {bool enabled = true}) =>
+        {'id': id, 'logo': logo, 'title': title, 'subtitle': enabled ? subtitle : l.settingsAreaOff, 'enabled': enabled};
+    return [
+      area('system', 'home_system_logo', 'System',
+          LauncherService.supported ? l.settingsAreaSystemSubtitle : l.settingsAreaSystemSubtitleNoHomeKey),
+      area('radio', 'radio_logo', 'Radio', l.settingsAreaRadioSubtitle, enabled: parts.radio),
+      area('tv', 'tv_logo', 'TV', l.settingsAreaTvSubtitle, enabled: parts.tv),
+      if (DisplayService.supported)
+        area('dashboard', 'dashboard_logo', l.dashboardTitle, l.dashboardAreaSubtitle, enabled: parts.dashboard),
+      area('pictures', 'pictures_logo', l.picturesTitle, l.picturesAreaSubtitle, enabled: parts.pictures),
+      area('music', 'music_logo', l.musicTitle, l.musicAreaSubtitle, enabled: parts.music),
+      if (BrowserChannel.supported)
+        area('browser', 'browser_logo', l.browserTitle, l.browserAreaSubtitle, enabled: parts.browser),
+    ];
+  }
 
   @override
-  Future<String?> apply(String id, Object? value) async {
+  Future<Map<String, Object?>> describe() async => {
+        'areas': _areas(),
+        'groups': [
+          for (final g in await _groups())
+            {
+              'area': g.area,
+              'title': g.title,
+              'help': ?g.help,
+              'items': [for (final s in g.items) s.toJson()],
+            },
+        ],
+      };
+
+  Future<_Setting?> _find(String id) async {
     for (final g in await _groups()) {
       for (final s in g.items) {
-        if (s.id == id) return s.set(value);
+        if (s.id == id) return s;
       }
     }
-    return l10n.adminUnknownSetting;
+    return null;
+  }
+
+  @override
+  Future<AdminResult> apply(String id, Object? value) async {
+    final s = await _find(id);
+    if (s == null) return (ok: false, message: l10n.adminUnknownSetting);
+    final run = s.run;
+    if (run != null) return run();
+    final error = await s.set(value);
+    return (ok: error == null, message: error);
+  }
+
+  /// The subfolders of [path] on the NAS - for choosing the folder of the
+  /// folder setting [id] on the page.
+  @override
+  Future<Map<String, Object?>> browse(String id, String path) async {
+    final l = l10n;
+    final s = await _find(id);
+    if (s == null || s.folder == null) return {'error': l.adminUnknownSetting};
+    final config = (await _c.read(nasSettingsRepositoryProvider).load()).config;
+    if (!config.isConfigured) return {'error': l.nasNeedServer};
+    final folder = normalizeNasPath(path.isEmpty ? '/' : path);
+    final client = config.createClient();
+    try {
+      final entries = await client.list(folder).timeout(const Duration(seconds: 30));
+      final cut = folder.lastIndexOf('/');
+      return {
+        'path': folder,
+        'parent': folder == '/' ? null : normalizeNasPath(cut <= 0 ? '/' : folder.substring(0, cut)),
+        'folders': [
+          for (final e in entries)
+            if (e.isDirectory) {'name': e.name, 'path': e.path},
+        ],
+        'files': entries.where((e) => !e.isDirectory).length,
+      };
+    } on NasException catch (e) {
+      return {'error': e.message, 'path': folder};
+    } on TimeoutException {
+      return {'error': l.nasErrorTimeout, 'path': folder};
+    } catch (e) {
+      return {'error': '$e', 'path': folder};
+    } finally {
+      client.close();
+    }
   }
 }

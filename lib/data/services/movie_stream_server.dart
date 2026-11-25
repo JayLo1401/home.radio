@@ -108,12 +108,24 @@ class PacketMappedSource implements MovieByteSource {
       if (pending.length < inSize) continue;
       final bytes = pending.takeBytes();
       final whole = bytes.length - bytes.length % inSize;
-      final out = BytesBuilder(copy: false);
-      for (var at = 0; at < whole; at += inSize) {
-        out.add(mapper(Uint8List.sublistView(bytes, at, at + inSize)));
+      final Uint8List mapped;
+      if (inSize == outSize) {
+        // Same size (DVD packs): rewritten where they are, no second copy.
+        for (var at = 0; at < whole; at += inSize) {
+          final packet = Uint8List.sublistView(bytes, at, at + inSize);
+          final result = mapper(packet);
+          if (!identical(result, packet)) bytes.setRange(at, at + inSize, result);
+        }
+        mapped = Uint8List.sublistView(bytes, 0, whole);
+      } else {
+        final out = BytesBuilder(copy: false);
+        for (var at = 0; at < whole; at += inSize) {
+          out.add(mapper(Uint8List.sublistView(bytes, at, at + inSize)));
+        }
+        mapped = out.takeBytes();
       }
       if (whole < bytes.length) pending.add(Uint8List.sublistView(bytes, whole));
-      final piece = emit(out.takeBytes());
+      final piece = emit(mapped);
       if (piece != null) yield piece;
       if (outPosition >= end) return;
     }

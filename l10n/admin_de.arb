@@ -56,5 +56,22 @@
   "adminTvNextUp": "Hinweis „Als Nächstes“",
   "adminMotionTimeout": "Display aus nach (Minuten)",
   "adminMotionTimeoutHelp": "0 = nie",
-  "adminCameraOnDevice": "Der Zugriff auf die Kamera muss einmal am Gerät erlaubt werden: Einstellungen → Haussteuerung."
+  "adminCameraOnDevice": "Der Zugriff auf die Kamera muss einmal am Gerät erlaubt werden: Einstellungen → Haussteuerung.",
+  "adminNasProtocol": "Protokoll",
+  "adminNasFoldersHint": "„Durchsuchen“ wählt einen Ordner auf dem NAS - wie am Gerät.",
+  "adminBrowse": "Durchsuchen…",
+  "adminNasBackupHeading": "Backup aufs NAS",
+  "adminNasBackupNow": "Backup jetzt in den Backup-Ordner legen",
+  "adminNasBackupNoFolder": "Zuerst unter „Ordner“ einen Backup-Ordner wählen.",
+  "adminNasBackupDone": "Backup auf dem NAS gespeichert: {name}",
+  "@adminNasBackupDone": {"placeholders": {"name": {"type": "String"}}},
+  "adminUpdateCheck": "Nach Updates suchen",
+  "adminUpdateInstall": "Update installieren",
+  "adminUpdateInstallHelp": "Lädt die neue Version aufs Gerät; danach fragt Android am Gerät nach der Bestätigung (mit OK auf der Fernbedienung).",
+  "adminUpdateStarted": "Version {version} wird geladen - gleich am Gerät bestätigen.",
+  "@adminUpdateStarted": {"placeholders": {"version": {"type": "String"}}},
+  "adminBack": "Zurück",
+  "adminClose": "Schließen",
+  "adminDeviceOnly": "Nur am Gerät selbst: Empfänger- und Receiversuche, Senderlisten, Home-Taste, Berechtigungen, Hintergründe und Icon-Pakete.",
+  "adminRestoreOpenBanner": "Am Gerät ist „Backup wiederherstellen“ offen - hier die Datei hochladen ›"
 }

@@ -41,8 +41,7 @@ class _AllAppsScreenState extends ConsumerState<AllAppsScreen> with WidgetsBindi
   }
 
   Future<void> _launch(InstalledApp app) async {
-    ref.read(radioCommandProvider.notifier).send(RadioCommand.pauseForApp);
-    ref.read(musicPlayerProvider).pauseForApp();
+    pauseRadioAndMusicForApp(ref);
     await ref.read(launcherServiceProvider).launchApp(app.package);
   }
 

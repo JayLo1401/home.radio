@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart' show NumberFormat;
 
 import '../../core/nas_providers.dart';
 import '../../core/providers.dart';
@@ -106,11 +107,14 @@ class _UpdateSettingsScreenState extends ConsumerState<UpdateSettingsScreen> {
   bool _checking = false;
   bool _checked = false;
   AvailableUpdate? _update;
+  DeviceAppInfo? _device;
 
   @override
   void initState() {
     super.initState();
     () async {
+      final device = await ref.read(updateServiceProvider).deviceInfo();
+      if (mounted) setState(() => _device = device);
       final version = await ref.read(updateServiceProvider).currentVersion();
       final auto = await ref.read(settingsRepositoryProvider).getAutoUpdate();
       if (mounted) {
@@ -192,8 +196,87 @@ class _UpdateSettingsScreenState extends ConsumerState<UpdateSettingsScreen> {
                 ],
               ),
           ],
+          if (_device case final device?) ...[
+            const SizedBox(height: 32),
+            // Focusable: ▼ from the buttons above scrolls it into view.
+            Focus(
+              child: Builder(
+                builder: (context) => AnimatedContainer(
+                  duration: const Duration(milliseconds: 120),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Focus.of(context).hasFocus ? Theme.of(context).colorScheme.primary : Colors.white12,
+                      width: 2,
+                    ),
+                  ),
+                  child: DeviceInfoSection(device: device, version: _version),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
+    );
+  }
+}
+
+/// Settings → Updates on Android: what the device is and which APK fits it
+/// (the same choice the updater makes), with the list of all variants - to
+/// decide on the device itself what to install on others like it.
+class DeviceInfoSection extends StatelessWidget {
+  const DeviceInfoSection({super.key, required this.device, this.version});
+
+  final DeviceAppInfo device;
+  final String? version;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l10n;
+    final theme = Theme.of(context);
+    const hint = TextStyle(color: Colors.white54);
+    final abi = device.abis.isEmpty ? '?' : device.abis.first;
+    final ram = device.ramBytes;
+    final installed = device.installed;
+    final file = 'home_system-${version ?? '<version>'}-${device.recommended}.apk';
+    Widget line(String text, {TextStyle? style}) =>
+        Padding(padding: const EdgeInsets.only(bottom: 4), child: Text(text, style: style));
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(l.miscDeviceTitle, style: theme.textTheme.titleMedium),
+        const SizedBox(height: 8),
+        if (device.name.isNotEmpty) line(device.name),
+        line(l.miscDeviceAndroid(device.release, device.sdk)),
+        line(device.system64 ? l.miscDeviceSystem64(abi) : l.miscDeviceSystem32(abi)),
+        if (!device.system64 && device.cpu64) line(l.miscDeviceCpu64On32, style: hint),
+        if (device.chip != null) line(l.miscDeviceChip(device.chip!)),
+        if (ram != null && ram > 0)
+          line(l.miscDeviceRam(NumberFormat('0.0', Localizations.localeOf(context).toString()).format(ram / (1 << 30)))),
+        if (installed != null) line(l.miscDeviceInstalled(installed)),
+        line(l.miscDeviceRecommended(file), style: const TextStyle(fontWeight: FontWeight.w600)),
+        if (installed != null)
+          line(
+            device.installedFits
+                ? l.miscDeviceFits
+                : installed == 'universal'
+                    ? l.miscDeviceUniversal
+                    : l.miscDeviceOther,
+            style: hint,
+          ),
+        const SizedBox(height: 16),
+        Text(l.miscDeviceVariantsTitle, style: theme.textTheme.titleSmall),
+        const SizedBox(height: 6),
+        for (final text in [
+          l.miscDeviceVariantArmv7,
+          l.miscDeviceVariantArm64,
+          l.miscDeviceVariantX86,
+          l.miscDeviceVariantUniversal,
+          l.miscDeviceMinAndroid(apkMinAndroid),
+        ])
+          line(text, style: hint),
+      ],
     );
   }
 }

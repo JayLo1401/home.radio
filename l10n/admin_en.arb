@@ -49,5 +49,22 @@
   "adminTvNextUp": "\"Up next\" note",
   "adminMotionTimeout": "Display off after (minutes)",
   "adminMotionTimeoutHelp": "0 = never",
-  "adminCameraOnDevice": "Camera access has to be allowed once on the device: Settings → Smart Home."
+  "adminCameraOnDevice": "Camera access has to be allowed once on the device: Settings → Smart Home.",
+  "adminNasProtocol": "Protocol",
+  "adminNasFoldersHint": "“Browse” picks a folder on the NAS - as on the device.",
+  "adminBrowse": "Browse…",
+  "adminNasBackupHeading": "Backup to the NAS",
+  "adminNasBackupNow": "Put a backup into the backup folder now",
+  "adminNasBackupNoFolder": "Choose a backup folder under “Folders” first.",
+  "adminNasBackupDone": "Backup saved on the NAS: {name}",
+  "@adminNasBackupDone": {"placeholders": {"name": {"type": "String"}}},
+  "adminUpdateCheck": "Look for updates",
+  "adminUpdateInstall": "Install update",
+  "adminUpdateInstallHelp": "Downloads the new version to the device; then Android asks for confirmation on the device (OK on the remote).",
+  "adminUpdateStarted": "Downloading version {version} - confirm on the device in a moment.",
+  "@adminUpdateStarted": {"placeholders": {"version": {"type": "String"}}},
+  "adminBack": "Back",
+  "adminClose": "Close",
+  "adminDeviceOnly": "Only on the device itself: tuner and receiver search, station lists, Home key, permissions, backgrounds and icon packs.",
+  "adminRestoreOpenBanner": "“Restore backup” is open on the device - upload the file here ›"
 }

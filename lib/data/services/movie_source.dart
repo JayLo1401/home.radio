@@ -21,7 +21,7 @@ class PreparedMovie {
   });
 
   /// The film's bytes as they are on the NAS.
-  final MovieByteSource base;
+  final NasSegmentsSource base;
 
   /// The file name for the player's address (its extension tells the
   /// format).
@@ -43,17 +43,16 @@ class PreparedMovie {
   /// The bytes for the player: [audio] the DVD sound track to keep;
   /// [exoPlayer]: Android's player (it needs DVD's AC3 without the DVD
   /// header, and plain 188-byte MPEG-TS).
-  MovieByteSource sourceFor({DvdAudioStream? audio, required bool exoPlayer}) {
-    if (isDvdStream) {
-      final filter = DvdPackFilter(keep: audio, stripHeader: exoPlayer);
-      return PacketMappedSource(base, inSize: discPack, outSize: discPack, map: (pack) {
-        filter.apply(pack);
-        return pack;
-      });
-    }
-    if (m2ts && exoPlayer) return PacketMappedSource(base, inSize: 192, outSize: 188, map: m2tsToTs);
-    return base;
-  }
+  MovieByteSource sourceFor({DvdAudioStream? audio, required bool exoPlayer}) =>
+      specFor(audio: audio, exoPlayer: exoPlayer).build(base.client);
+
+  /// The same as plain data - for the stream server's own isolate, which
+  /// builds it with its own NAS connection (see MovieStream).
+  MovieSourceSpec specFor({DvdAudioStream? audio, required bool exoPlayer}) => MovieSourceSpec(
+        segments: base.segments,
+        dvdFilter: isDvdStream ? DvdPackFilter(keep: audio, stripHeader: exoPlayer) : null,
+        m2ts: m2ts && exoPlayer,
+      );
 
   /// The tracks the player can play: ExoPlayer has no DTS or LPCM in
   /// program streams.
@@ -68,6 +67,32 @@ class PreparedMovie {
     final playable = playableAudio(exoPlayer: exoPlayer);
     if (playable.isEmpty) return dvdAudio.firstOrNull;
     return playable.where((a) => a.language == language && a.extension <= 1).firstOrNull ?? playable.first;
+  }
+}
+
+/// What a film's bytes for the player are made of - plain data (no NAS
+/// connection, no sockets), so it can be sent to another isolate:
+/// [segments] on the NAS, rewritten on the way by [dvdFilter] (DVD packs)
+/// or turned from M2TS into MPEG-TS ([m2ts]).
+class MovieSourceSpec {
+  const MovieSourceSpec({required this.segments, this.dvdFilter, this.m2ts = false});
+
+  final List<NasSegment> segments;
+  final DvdPackFilter? dvdFilter;
+  final bool m2ts;
+
+  /// The bytes, read through [client].
+  MovieByteSource build(NasClient client) {
+    final base = NasSegmentsSource(client, segments);
+    final filter = dvdFilter;
+    if (filter != null) {
+      return PacketMappedSource(base, inSize: discPack, outSize: discPack, map: (pack) {
+        filter.apply(pack);
+        return pack;
+      });
+    }
+    if (m2ts) return PacketMappedSource(base, inSize: 192, outSize: 188, map: m2tsToTs);
+    return base;
   }
 }
 

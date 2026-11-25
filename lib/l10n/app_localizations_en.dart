@@ -170,6 +170,60 @@ class AppLocalizationsEn extends AppLocalizations {
       'Camera access has to be allowed once on the device: Settings → Smart Home.';
 
   @override
+  String get adminNasProtocol => 'Protocol';
+
+  @override
+  String get adminNasFoldersHint =>
+      '“Browse” picks a folder on the NAS - as on the device.';
+
+  @override
+  String get adminBrowse => 'Browse…';
+
+  @override
+  String get adminNasBackupHeading => 'Backup to the NAS';
+
+  @override
+  String get adminNasBackupNow => 'Put a backup into the backup folder now';
+
+  @override
+  String get adminNasBackupNoFolder =>
+      'Choose a backup folder under “Folders” first.';
+
+  @override
+  String adminNasBackupDone(String name) {
+    return 'Backup saved on the NAS: $name';
+  }
+
+  @override
+  String get adminUpdateCheck => 'Look for updates';
+
+  @override
+  String get adminUpdateInstall => 'Install update';
+
+  @override
+  String get adminUpdateInstallHelp =>
+      'Downloads the new version to the device; then Android asks for confirmation on the device (OK on the remote).';
+
+  @override
+  String adminUpdateStarted(String version) {
+    return 'Downloading version $version - confirm on the device in a moment.';
+  }
+
+  @override
+  String get adminBack => 'Back';
+
+  @override
+  String get adminClose => 'Close';
+
+  @override
+  String get adminDeviceOnly =>
+      'Only on the device itself: tuner and receiver search, station lists, Home key, permissions, backgrounds and icon packs.';
+
+  @override
+  String get adminRestoreOpenBanner =>
+      '“Restore backup” is open on the device - upload the file here ›';
+
+  @override
   String get browserTitle => 'Browser';
 
   @override
@@ -1186,6 +1240,82 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get miscUpdateCorrupt => 'The downloaded file is corrupt.';
+
+  @override
+  String get miscDeviceTitle => 'This device';
+
+  @override
+  String miscDeviceAndroid(String release, int sdk) {
+    return 'Android $release (API $sdk)';
+  }
+
+  @override
+  String miscDeviceSystem64(String abi) {
+    return 'System: 64-bit ($abi)';
+  }
+
+  @override
+  String miscDeviceSystem32(String abi) {
+    return 'System: 32-bit ($abi)';
+  }
+
+  @override
+  String get miscDeviceCpu64On32 =>
+      'The processor can do 64-bit, but Android runs as 32-bit here - so only the 32-bit version fits.';
+
+  @override
+  String miscDeviceChip(String chip) {
+    return 'Chip: $chip';
+  }
+
+  @override
+  String miscDeviceRam(String gb) {
+    return 'Memory: $gb GB';
+  }
+
+  @override
+  String miscDeviceInstalled(String variant) {
+    return 'Installed: $variant';
+  }
+
+  @override
+  String miscDeviceRecommended(String file) {
+    return 'Matching file: $file';
+  }
+
+  @override
+  String get miscDeviceFits => 'The installed version is the matching one.';
+
+  @override
+  String get miscDeviceUniversal =>
+      'The universal version works but is bigger - the next update brings the matching one.';
+
+  @override
+  String get miscDeviceOther => 'The next update brings the matching version.';
+
+  @override
+  String get miscDeviceVariantsTitle => 'Which file for which device?';
+
+  @override
+  String get miscDeviceVariantArmv7 =>
+      'armeabi-v7a: 32-bit Android - Fire TV Stick, Fire TV sets, most TV boxes (even with a 64-bit chip)';
+
+  @override
+  String get miscDeviceVariantArm64 =>
+      'arm64-v8a: 64-bit Android - Fire tablets, newer phones, tablets and boxes';
+
+  @override
+  String get miscDeviceVariantX86 =>
+      'x86_64: Android on PCs and emulators (Intel/AMD)';
+
+  @override
+  String get miscDeviceVariantUniversal =>
+      'universal: runs everywhere, if unsure (bigger)';
+
+  @override
+  String miscDeviceMinAndroid(String version) {
+    return 'Android $version or newer.';
+  }
 
   @override
   String get miscAllAppsTitle => 'All apps';

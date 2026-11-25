@@ -9,6 +9,8 @@ import 'package:home_system/data/services/movie_disc_image.dart';
 import 'package:home_system/data/services/movie_dvd.dart';
 import 'package:home_system/data/services/movie_library.dart';
 import 'package:home_system/data/services/movie_resume_store.dart';
+import 'package:home_system/data/services/movie_source.dart';
+import 'package:home_system/data/services/movie_stream_isolate.dart';
 import 'package:home_system/data/services/movie_stream_server.dart';
 import 'package:home_system/data/services/nas_service.dart';
 import 'package:home_system/features/movies/movie_player.dart';
@@ -242,6 +244,59 @@ void main() {
       expect(await _all(dvd.read(0, dvd.length)), expected);
       expect(await _all(dvd.read(1000, 3000)), expected.sublist(1000, 3000));
       expect(await _all(dvd.read(4095, 4099)), expected.sublist(4095, 4099));
+    });
+  });
+
+  group('stream in its own isolate', () {
+    test('reads the NAS itself, rewrites DVD packs, new sound track by replace', () async {
+      final packs = Uint8List.fromList([..._dvdPack(), ..._dvdPack(), ..._dvdPack()]);
+      // The "NAS": WebDAV - a plain HTTP server with ranges.
+      final nas = await MovieStreamServer.start(_MemorySource(packs), name: 'x.vob', mime: 'video/mp2p');
+      const ac3 = DvdAudioStream(coding: DvdAudioCoding.ac3, number: 0);
+      final spec = MovieSourceSpec(
+        segments: [NasSegment('/x.vob', 0, packs.length)],
+        dvdFilter: const DvdPackFilter(keep: ac3, stripHeader: true),
+      );
+      Uint8List filtered(DvdPackFilter filter) {
+        final out = Uint8List.fromList(packs);
+        for (var at = 0; at < out.length; at += discPack) {
+          filter.apply(Uint8List.sublistView(out, at, at + discPack));
+        }
+        return out;
+      }
+
+      // The fallback in this isolate would read other bytes - the result
+      // shows the isolate read the NAS on its own.
+      final local = _MemoryNas({'/x.vob': Uint8List(packs.length)});
+      final stream = await MovieStream.start(
+        spec,
+        config: NasConfig(host: '127.0.0.1', port: nas.uri.port),
+        client: local,
+        name: 'movie.mpg',
+        mime: 'video/mp2p',
+        locale: 'de',
+      );
+      final http = HttpClient();
+      try {
+        Future<List<int>> get(Uri uri, [String? range]) async {
+          final request = await http.getUrl(uri);
+          if (range != null) request.headers.set('range', range);
+          final response = await request.close();
+          return [for (final c in await response.toList()) ...c];
+        }
+
+        expect(stream.uri.path, '/0/movie.mpg');
+        expect(await get(stream.uri), filtered(const DvdPackFilter(keep: ac3, stripHeader: true)));
+        expect(await get(stream.uri, 'bytes=1000-4999'), filtered(const DvdPackFilter(keep: ac3, stripHeader: true)).sublist(1000, 5000));
+
+        await stream.replace(MovieSourceSpec(segments: spec.segments, dvdFilter: const DvdPackFilter(keep: ac3)));
+        expect(stream.uri.path, '/1/movie.mpg');
+        expect(await get(stream.uri), filtered(const DvdPackFilter(keep: ac3)));
+      } finally {
+        http.close(force: true);
+        await stream.close();
+        await nas.close();
+      }
     });
   });
 

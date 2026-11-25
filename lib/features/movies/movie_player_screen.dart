@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:video_player/video_player.dart' show Caption, SubRipCaptionFile;
 
 import '../../core/dashboard_providers.dart' show displayServiceProvider;
+import '../../core/music_providers.dart' show pauseRadioAndMusicForApp;
 import '../../core/remote_keys.dart';
 import '../../core/theme.dart';
 import '../../data/services/display_service.dart';
@@ -13,10 +14,9 @@ import '../../data/services/movie_dvd.dart';
 import '../../data/services/movie_library.dart';
 import '../../data/services/movie_resume_store.dart';
 import '../../data/services/movie_source.dart';
-import '../../data/services/movie_stream_server.dart';
+import '../../data/services/movie_stream_isolate.dart';
 import '../../data/services/nas_service.dart';
 import '../../l10n/l10n.dart';
-import '../launcher/launcher_providers.dart' show RadioCommand, radioCommandProvider;
 import '../tv/tv_player.dart' show TvAudioTrack, audioDetails, audioTrackName;
 import '../tv/tv_widgets.dart' show TvRow;
 import 'movie_player.dart';
@@ -56,7 +56,7 @@ Duration movieJumpTarget(Duration position, int direction, List<Duration> chapte
   return chapters[current > 0 ? current - 1 : 0];
 }
 
-/// Plays a film from the NAS full screen: through the [MovieStreamServer]
+/// Plays a film from the NAS full screen: through a [MovieStream]
 /// (byte ranges for seeking; a DVD's VOB parts as one stream, one sound
 /// track at a time), resuming where it was left off.
 ///
@@ -81,7 +81,7 @@ class _MoviePlayerScreenState extends ConsumerState<MoviePlayerScreen> {
   final _focus = FocusNode(debugLabel: 'movie player');
 
   PreparedMovie? _prepared;
-  MovieStreamServer? _server;
+  MovieStream? _server;
   MoviePlayer? _player;
   DvdAudioStream? _dvdAudio;
   String? _error;
@@ -113,8 +113,9 @@ class _MoviePlayerScreenState extends ConsumerState<MoviePlayerScreen> {
   @override
   void initState() {
     super.initState();
-    // The film takes the speakers; the radio plays on when opened again.
-    ref.read(radioCommandProvider.notifier).send(RadioCommand.pauseForApp);
+    // The film takes the speakers: radio and music pause (the radio plays
+    // on when opened again).
+    pauseRadioAndMusicForApp(ref);
     _display.setKeepScreenOn(true);
     WidgetsBinding.instance.addPostFrameCallback((_) => _start());
   }
@@ -159,10 +160,13 @@ class _MoviePlayerScreenState extends ConsumerState<MoviePlayerScreen> {
             prepared.playableAudio(exoPlayer: true).isNotEmpty,
       );
       _dvdAudio = prepared.defaultAudio(exoPlayer: _exo, language: _language);
-      final server = await MovieStreamServer.start(
-        prepared.sourceFor(audio: _dvdAudio, exoPlayer: _exo),
+      final server = await MovieStream.start(
+        prepared.specFor(audio: _dvdAudio, exoPlayer: _exo),
+        config: widget.config,
+        client: _client,
         name: prepared.name,
         mime: prepared.mime,
+        locale: _language,
       );
       if (!mounted) {
         unawaited(server.close());
@@ -240,7 +244,8 @@ class _MoviePlayerScreenState extends ConsumerState<MoviePlayerScreen> {
       });
       await old.dispose();
       if (!mounted) return;
-      server.replaceSource(prepared.sourceFor(audio: _dvdAudio, exoPlayer: false));
+      await server.replace(prepared.specFor(audio: _dvdAudio, exoPlayer: false));
+      if (!mounted) return;
       await _openPlayer(position);
     } finally {
       _switchingEngine = false;
@@ -552,8 +557,9 @@ class _MoviePlayerScreenState extends ConsumerState<MoviePlayerScreen> {
       _dvdAudio = stream;
     });
     await old.dispose();
-    server.replaceSource(prepared.sourceFor(audio: stream, exoPlayer: _exo));
     try {
+      await server.replace(prepared.specFor(audio: stream, exoPlayer: _exo));
+      if (!mounted) return;
       await _openPlayer(position);
     } catch (e) {
       if (mounted) _fail(e);

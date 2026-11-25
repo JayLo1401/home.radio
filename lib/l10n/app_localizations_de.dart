@@ -170,6 +170,60 @@ class AppLocalizationsDe extends AppLocalizations {
       'Der Zugriff auf die Kamera muss einmal am Gerät erlaubt werden: Einstellungen → Haussteuerung.';
 
   @override
+  String get adminNasProtocol => 'Protokoll';
+
+  @override
+  String get adminNasFoldersHint =>
+      '„Durchsuchen“ wählt einen Ordner auf dem NAS - wie am Gerät.';
+
+  @override
+  String get adminBrowse => 'Durchsuchen…';
+
+  @override
+  String get adminNasBackupHeading => 'Backup aufs NAS';
+
+  @override
+  String get adminNasBackupNow => 'Backup jetzt in den Backup-Ordner legen';
+
+  @override
+  String get adminNasBackupNoFolder =>
+      'Zuerst unter „Ordner“ einen Backup-Ordner wählen.';
+
+  @override
+  String adminNasBackupDone(String name) {
+    return 'Backup auf dem NAS gespeichert: $name';
+  }
+
+  @override
+  String get adminUpdateCheck => 'Nach Updates suchen';
+
+  @override
+  String get adminUpdateInstall => 'Update installieren';
+
+  @override
+  String get adminUpdateInstallHelp =>
+      'Lädt die neue Version aufs Gerät; danach fragt Android am Gerät nach der Bestätigung (mit OK auf der Fernbedienung).';
+
+  @override
+  String adminUpdateStarted(String version) {
+    return 'Version $version wird geladen - gleich am Gerät bestätigen.';
+  }
+
+  @override
+  String get adminBack => 'Zurück';
+
+  @override
+  String get adminClose => 'Schließen';
+
+  @override
+  String get adminDeviceOnly =>
+      'Nur am Gerät selbst: Empfänger- und Receiversuche, Senderlisten, Home-Taste, Berechtigungen, Hintergründe und Icon-Pakete.';
+
+  @override
+  String get adminRestoreOpenBanner =>
+      'Am Gerät ist „Backup wiederherstellen“ offen - hier die Datei hochladen ›';
+
+  @override
   String get browserTitle => 'Browser';
 
   @override
@@ -1186,6 +1240,83 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get miscUpdateCorrupt => 'Die heruntergeladene Datei ist beschädigt.';
+
+  @override
+  String get miscDeviceTitle => 'Dieses Gerät';
+
+  @override
+  String miscDeviceAndroid(String release, int sdk) {
+    return 'Android $release (API $sdk)';
+  }
+
+  @override
+  String miscDeviceSystem64(String abi) {
+    return 'System: 64-bit ($abi)';
+  }
+
+  @override
+  String miscDeviceSystem32(String abi) {
+    return 'System: 32-bit ($abi)';
+  }
+
+  @override
+  String get miscDeviceCpu64On32 =>
+      'Der Prozessor kann 64-bit, Android läuft hier aber mit 32-bit - darum passt nur die 32-bit-Version.';
+
+  @override
+  String miscDeviceChip(String chip) {
+    return 'Chip: $chip';
+  }
+
+  @override
+  String miscDeviceRam(String gb) {
+    return 'Arbeitsspeicher: $gb GB';
+  }
+
+  @override
+  String miscDeviceInstalled(String variant) {
+    return 'Installiert: $variant';
+  }
+
+  @override
+  String miscDeviceRecommended(String file) {
+    return 'Passende Datei: $file';
+  }
+
+  @override
+  String get miscDeviceFits => 'Die installierte Version ist die passende.';
+
+  @override
+  String get miscDeviceUniversal =>
+      'Die Universal-Version läuft, ist aber größer - beim nächsten Update holt sich die App die passende.';
+
+  @override
+  String get miscDeviceOther =>
+      'Beim nächsten Update holt sich die App die passende Version.';
+
+  @override
+  String get miscDeviceVariantsTitle => 'Welche Datei für welches Gerät?';
+
+  @override
+  String get miscDeviceVariantArmv7 =>
+      'armeabi-v7a: 32-bit-Android - Fire TV Stick, Fire-TV-Fernseher, die meisten TV-Boxen (auch mit 64-bit-Chip)';
+
+  @override
+  String get miscDeviceVariantArm64 =>
+      'arm64-v8a: 64-bit-Android - Fire-Tablets, neuere Handys, Tablets und Boxen';
+
+  @override
+  String get miscDeviceVariantX86 =>
+      'x86_64: Android auf PCs und Emulatoren (Intel/AMD)';
+
+  @override
+  String get miscDeviceVariantUniversal =>
+      'universal: läuft überall, wenn unklar (größer)';
+
+  @override
+  String miscDeviceMinAndroid(String version) {
+    return 'Ab Android $version.';
+  }
 
   @override
   String get miscAllAppsTitle => 'Alle Apps';

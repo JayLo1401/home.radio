@@ -404,6 +404,96 @@ abstract class AppLocalizations {
   /// **'Der Zugriff auf die Kamera muss einmal am Gerät erlaubt werden: Einstellungen → Haussteuerung.'**
   String get adminCameraOnDevice;
 
+  /// No description provided for @adminNasProtocol.
+  ///
+  /// In de, this message translates to:
+  /// **'Protokoll'**
+  String get adminNasProtocol;
+
+  /// No description provided for @adminNasFoldersHint.
+  ///
+  /// In de, this message translates to:
+  /// **'„Durchsuchen“ wählt einen Ordner auf dem NAS - wie am Gerät.'**
+  String get adminNasFoldersHint;
+
+  /// No description provided for @adminBrowse.
+  ///
+  /// In de, this message translates to:
+  /// **'Durchsuchen…'**
+  String get adminBrowse;
+
+  /// No description provided for @adminNasBackupHeading.
+  ///
+  /// In de, this message translates to:
+  /// **'Backup aufs NAS'**
+  String get adminNasBackupHeading;
+
+  /// No description provided for @adminNasBackupNow.
+  ///
+  /// In de, this message translates to:
+  /// **'Backup jetzt in den Backup-Ordner legen'**
+  String get adminNasBackupNow;
+
+  /// No description provided for @adminNasBackupNoFolder.
+  ///
+  /// In de, this message translates to:
+  /// **'Zuerst unter „Ordner“ einen Backup-Ordner wählen.'**
+  String get adminNasBackupNoFolder;
+
+  /// No description provided for @adminNasBackupDone.
+  ///
+  /// In de, this message translates to:
+  /// **'Backup auf dem NAS gespeichert: {name}'**
+  String adminNasBackupDone(String name);
+
+  /// No description provided for @adminUpdateCheck.
+  ///
+  /// In de, this message translates to:
+  /// **'Nach Updates suchen'**
+  String get adminUpdateCheck;
+
+  /// No description provided for @adminUpdateInstall.
+  ///
+  /// In de, this message translates to:
+  /// **'Update installieren'**
+  String get adminUpdateInstall;
+
+  /// No description provided for @adminUpdateInstallHelp.
+  ///
+  /// In de, this message translates to:
+  /// **'Lädt die neue Version aufs Gerät; danach fragt Android am Gerät nach der Bestätigung (mit OK auf der Fernbedienung).'**
+  String get adminUpdateInstallHelp;
+
+  /// No description provided for @adminUpdateStarted.
+  ///
+  /// In de, this message translates to:
+  /// **'Version {version} wird geladen - gleich am Gerät bestätigen.'**
+  String adminUpdateStarted(String version);
+
+  /// No description provided for @adminBack.
+  ///
+  /// In de, this message translates to:
+  /// **'Zurück'**
+  String get adminBack;
+
+  /// No description provided for @adminClose.
+  ///
+  /// In de, this message translates to:
+  /// **'Schließen'**
+  String get adminClose;
+
+  /// No description provided for @adminDeviceOnly.
+  ///
+  /// In de, this message translates to:
+  /// **'Nur am Gerät selbst: Empfänger- und Receiversuche, Senderlisten, Home-Taste, Berechtigungen, Hintergründe und Icon-Pakete.'**
+  String get adminDeviceOnly;
+
+  /// No description provided for @adminRestoreOpenBanner.
+  ///
+  /// In de, this message translates to:
+  /// **'Am Gerät ist „Backup wiederherstellen“ offen - hier die Datei hochladen ›'**
+  String get adminRestoreOpenBanner;
+
   /// No description provided for @browserTitle.
   ///
   /// In de, this message translates to:
@@ -2085,6 +2175,114 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'Die heruntergeladene Datei ist beschädigt.'**
   String get miscUpdateCorrupt;
+
+  /// No description provided for @miscDeviceTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Dieses Gerät'**
+  String get miscDeviceTitle;
+
+  /// No description provided for @miscDeviceAndroid.
+  ///
+  /// In de, this message translates to:
+  /// **'Android {release} (API {sdk})'**
+  String miscDeviceAndroid(String release, int sdk);
+
+  /// No description provided for @miscDeviceSystem64.
+  ///
+  /// In de, this message translates to:
+  /// **'System: 64-bit ({abi})'**
+  String miscDeviceSystem64(String abi);
+
+  /// No description provided for @miscDeviceSystem32.
+  ///
+  /// In de, this message translates to:
+  /// **'System: 32-bit ({abi})'**
+  String miscDeviceSystem32(String abi);
+
+  /// No description provided for @miscDeviceCpu64On32.
+  ///
+  /// In de, this message translates to:
+  /// **'Der Prozessor kann 64-bit, Android läuft hier aber mit 32-bit - darum passt nur die 32-bit-Version.'**
+  String get miscDeviceCpu64On32;
+
+  /// No description provided for @miscDeviceChip.
+  ///
+  /// In de, this message translates to:
+  /// **'Chip: {chip}'**
+  String miscDeviceChip(String chip);
+
+  /// No description provided for @miscDeviceRam.
+  ///
+  /// In de, this message translates to:
+  /// **'Arbeitsspeicher: {gb} GB'**
+  String miscDeviceRam(String gb);
+
+  /// No description provided for @miscDeviceInstalled.
+  ///
+  /// In de, this message translates to:
+  /// **'Installiert: {variant}'**
+  String miscDeviceInstalled(String variant);
+
+  /// No description provided for @miscDeviceRecommended.
+  ///
+  /// In de, this message translates to:
+  /// **'Passende Datei: {file}'**
+  String miscDeviceRecommended(String file);
+
+  /// No description provided for @miscDeviceFits.
+  ///
+  /// In de, this message translates to:
+  /// **'Die installierte Version ist die passende.'**
+  String get miscDeviceFits;
+
+  /// No description provided for @miscDeviceUniversal.
+  ///
+  /// In de, this message translates to:
+  /// **'Die Universal-Version läuft, ist aber größer - beim nächsten Update holt sich die App die passende.'**
+  String get miscDeviceUniversal;
+
+  /// No description provided for @miscDeviceOther.
+  ///
+  /// In de, this message translates to:
+  /// **'Beim nächsten Update holt sich die App die passende Version.'**
+  String get miscDeviceOther;
+
+  /// No description provided for @miscDeviceVariantsTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Welche Datei für welches Gerät?'**
+  String get miscDeviceVariantsTitle;
+
+  /// No description provided for @miscDeviceVariantArmv7.
+  ///
+  /// In de, this message translates to:
+  /// **'armeabi-v7a: 32-bit-Android - Fire TV Stick, Fire-TV-Fernseher, die meisten TV-Boxen (auch mit 64-bit-Chip)'**
+  String get miscDeviceVariantArmv7;
+
+  /// No description provided for @miscDeviceVariantArm64.
+  ///
+  /// In de, this message translates to:
+  /// **'arm64-v8a: 64-bit-Android - Fire-Tablets, neuere Handys, Tablets und Boxen'**
+  String get miscDeviceVariantArm64;
+
+  /// No description provided for @miscDeviceVariantX86.
+  ///
+  /// In de, this message translates to:
+  /// **'x86_64: Android auf PCs und Emulatoren (Intel/AMD)'**
+  String get miscDeviceVariantX86;
+
+  /// No description provided for @miscDeviceVariantUniversal.
+  ///
+  /// In de, this message translates to:
+  /// **'universal: läuft überall, wenn unklar (größer)'**
+  String get miscDeviceVariantUniversal;
+
+  /// No description provided for @miscDeviceMinAndroid.
+  ///
+  /// In de, this message translates to:
+  /// **'Ab Android {version}.'**
+  String miscDeviceMinAndroid(String version);
 
   /// No description provided for @miscAllAppsTitle.
   ///

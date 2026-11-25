@@ -51,6 +51,35 @@
   "adminMotionTimeout": "Display off after (minutes)",
   "adminMotionTimeoutHelp": "0 = never",
   "adminCameraOnDevice": "Camera access has to be allowed once on the device: Settings → Smart Home.",
+  "adminNasProtocol": "Protocol",
+  "adminNasFoldersHint": "“Browse” picks a folder on the NAS - as on the device.",
+  "adminBrowse": "Browse…",
+  "adminNasBackupHeading": "Backup to the NAS",
+  "adminNasBackupNow": "Put a backup into the backup folder now",
+  "adminNasBackupNoFolder": "Choose a backup folder under “Folders” first.",
+  "adminNasBackupDone": "Backup saved on the NAS: {name}",
+  "@adminNasBackupDone": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "adminUpdateCheck": "Look for updates",
+  "adminUpdateInstall": "Install update",
+  "adminUpdateInstallHelp": "Downloads the new version to the device; then Android asks for confirmation on the device (OK on the remote).",
+  "adminUpdateStarted": "Downloading version {version} - confirm on the device in a moment.",
+  "@adminUpdateStarted": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "adminBack": "Back",
+  "adminClose": "Close",
+  "adminDeviceOnly": "Only on the device itself: tuner and receiver search, station lists, Home key, permissions, backgrounds and icon packs.",
+  "adminRestoreOpenBanner": "“Restore backup” is open on the device - upload the file here ›",
   "browserTitle": "Browser",
   "browserAndroidOnly": "The browser is only available on Android (TV box, tablet, phone).",
   "browserAddress": "Address or search",
@@ -330,6 +359,83 @@
   "miscUpdateInstallCancelled": "Installation cancelled ({code}).",
   "miscUpdateDownloadFailed": "Download failed (HTTP {status}).",
   "miscUpdateCorrupt": "The downloaded file is corrupt.",
+  "miscDeviceTitle": "This device",
+  "miscDeviceAndroid": "Android {release} (API {sdk})",
+  "@miscDeviceAndroid": {
+    "placeholders": {
+      "release": {
+        "type": "String"
+      },
+      "sdk": {
+        "type": "int"
+      }
+    }
+  },
+  "miscDeviceSystem64": "System: 64-bit ({abi})",
+  "@miscDeviceSystem64": {
+    "placeholders": {
+      "abi": {
+        "type": "String"
+      }
+    }
+  },
+  "miscDeviceSystem32": "System: 32-bit ({abi})",
+  "@miscDeviceSystem32": {
+    "placeholders": {
+      "abi": {
+        "type": "String"
+      }
+    }
+  },
+  "miscDeviceCpu64On32": "The processor can do 64-bit, but Android runs as 32-bit here - so only the 32-bit version fits.",
+  "miscDeviceChip": "Chip: {chip}",
+  "@miscDeviceChip": {
+    "placeholders": {
+      "chip": {
+        "type": "String"
+      }
+    }
+  },
+  "miscDeviceRam": "Memory: {gb} GB",
+  "@miscDeviceRam": {
+    "placeholders": {
+      "gb": {
+        "type": "String"
+      }
+    }
+  },
+  "miscDeviceInstalled": "Installed: {variant}",
+  "@miscDeviceInstalled": {
+    "placeholders": {
+      "variant": {
+        "type": "String"
+      }
+    }
+  },
+  "miscDeviceRecommended": "Matching file: {file}",
+  "@miscDeviceRecommended": {
+    "placeholders": {
+      "file": {
+        "type": "String"
+      }
+    }
+  },
+  "miscDeviceFits": "The installed version is the matching one.",
+  "miscDeviceUniversal": "The universal version works but is bigger - the next update brings the matching one.",
+  "miscDeviceOther": "The next update brings the matching version.",
+  "miscDeviceVariantsTitle": "Which file for which device?",
+  "miscDeviceVariantArmv7": "armeabi-v7a: 32-bit Android - Fire TV Stick, Fire TV sets, most TV boxes (even with a 64-bit chip)",
+  "miscDeviceVariantArm64": "arm64-v8a: 64-bit Android - Fire tablets, newer phones, tablets and boxes",
+  "miscDeviceVariantX86": "x86_64: Android on PCs and emulators (Intel/AMD)",
+  "miscDeviceVariantUniversal": "universal: runs everywhere, if unsure (bigger)",
+  "miscDeviceMinAndroid": "Android {version} or newer.",
+  "@miscDeviceMinAndroid": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
   "miscAllAppsTitle": "All apps",
   "miscAllAppsOpen": "Open",
   "miscAllAppsAddFavorite": "Add to favorites",

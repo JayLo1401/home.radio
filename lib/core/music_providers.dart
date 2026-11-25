@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -84,6 +85,22 @@ final musicPlayerProvider = Provider<MusicPlayer>((ref) {
   ref.onDispose(player.dispose);
   return player;
 });
+
+/// A film, TV, another app or a web page with sound takes the speakers:
+/// the radio pauses (and plays on when Radio is opened again) and so does
+/// the music (it stays loaded). Never throws.
+void pauseRadioAndMusicForApp(WidgetRef ref) {
+  try {
+    ref.read(radioCommandProvider.notifier).send(RadioCommand.pauseForApp);
+  } catch (e) {
+    debugPrint('pause radio: $e');
+  }
+  try {
+    unawaited(ref.read(musicPlayerProvider).pauseForApp().catchError((Object e) => debugPrint('pause music: $e')));
+  } catch (e) {
+    debugPrint('pause music: $e');
+  }
+}
 
 /// The player's state for widgets (rebuilds on every change).
 class MusicStateNotifier extends Notifier<MusicState> {

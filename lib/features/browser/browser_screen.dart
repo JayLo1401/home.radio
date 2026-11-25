@@ -6,10 +6,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/music_providers.dart' show pauseRadioAndMusicForApp;
 import '../../core/popup_text_field.dart';
 import '../../core/remote_keys.dart';
 import '../../l10n/l10n.dart';
-import '../launcher/launcher_providers.dart' show RadioCommand, radioCommandProvider;
 import 'browser_channel.dart';
 import 'browser_menu.dart';
 import 'browser_pointer.dart';
@@ -122,8 +122,8 @@ class _BrowserScreenState extends ConsumerState<BrowserScreen> with TickerProvid
       setState(() {});
     });
     c.mediaPlaying.addListener(() {
-      // A page starts playing sound: the radio makes way (as for TV).
-      if (c.mediaPlaying.value) ref.read(radioCommandProvider.notifier).send(RadioCommand.pauseForApp);
+      // A page starts playing sound: radio and music make way (as for TV).
+      if (c.mediaPlaying.value) pauseRadioAndMusicForApp(ref);
     });
     c.url.addListener(() {
       _saveUrl?.cancel();

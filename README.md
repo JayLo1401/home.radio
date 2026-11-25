@@ -246,6 +246,30 @@ erreicht man über das Radio-Symbol oben auf der Startseite.
 - Optional: ein zweites Gerät (z. B. Raspberry Pi) mit angeschlossenem Stick als
   `rtl_tcp`-Quelle im Netzwerk, falls der Stick nicht direkt am TV hängt.
 
+### Welche Datei für welches Gerät?
+
+| Datei | Für |
+|---|---|
+| `home_system-<version>-armeabi-v7a.apk` | 32-bit-Android: Fire TV Stick, Fire-TV-Fernseher, die meisten TV-Boxen (z. B. Xiaomi TV Box) - auch mit 64-bit-Chip, wenn das System 32-bit läuft |
+| `home_system-<version>-arm64-v8a.apk` | 64-bit-Android: Fire-Tablets, neuere Handys, Tablets und Boxen |
+| `home_system-<version>-x86_64.apk` | Android auf PCs und Emulatoren (Intel/AMD) |
+| `home_system-<version>-universal.apk` | alle Geräte, wenn unklar (größer) |
+
+Ab Android 7.0. Am Gerät selbst zeigt **Einstellungen → System → Weiteres →
+Updates → Dieses Gerät** (und die Verwaltungsseite unter System) Android-Version,
+32/64-bit, Chip, Arbeitsspeicher, die installierte Variante und die passende
+Datei. Im Zweifel die Universal-APK installieren - beim nächsten Update holt sich
+die App selbst die passende Variante.
+
+### Verwaltungsseite
+
+`http://<IP-des-Geräts>:1401/` im Heimnetz: dieselben Bereiche wie die
+Einstellungen am Gerät (System, Radio, TV, Haussteuerung, Bilder, Musik,
+Browser) im Look der App - inklusive NAS (Server, Verbindungstest, Ordner per
+Durchsuchen), Backup aufs NAS, Backup herunterladen/wiederherstellen, Updates
+und „Dieses Gerät“. Nur am Gerät selbst: Empfänger- und Receiversuche,
+Senderlisten, Home-Taste, Berechtigungen, Hintergründe und Icon-Pakete.
+
 ## Setup / Build
 Normales Flutter-Projekt, keine API-Keys oder Konfigurationsdateien nötig - alle
 verwendeten Wetter-/Radio-APIs sind kostenlos und schlüssellos.

@@ -458,10 +458,7 @@ class _LauncherScreenState extends ConsumerState<LauncherScreen> {
 
   /// Another app or TV takes the speakers: radio and music pause (the radio
   /// plays on when Radio is opened again).
-  void _pauseForApp() {
-    ref.read(radioCommandProvider.notifier).send(RadioCommand.pauseForApp);
-    ref.read(musicPlayerProvider).pauseForApp();
-  }
+  void _pauseForApp() => pauseRadioAndMusicForApp(ref);
 
   Future<void> _open(LauncherTile tile) async {
     final service = ref.read(launcherServiceProvider);
