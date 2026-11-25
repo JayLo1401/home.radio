@@ -5555,7 +5555,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String tvGuideKeyHint(String optionsKey) {
-    return 'OK umschalten  ·  $optionsKey alle Sendungen  ·  ‹‹ ›› ±3 Std.';
+    return 'OK umschalten  ·  OK lang Erinnerung  ·  $optionsKey alle Sendungen  ·  ‹‹ ›› ±3 Std.';
   }
 
   @override
@@ -5673,4 +5673,60 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get tvRowReceiver => 'Receiver';
+
+  @override
+  String get tvRemindersTitle => 'Ihre Erinnerungen';
+
+  @override
+  String get tvRemindersPick =>
+      'Mehrere Sendungen beginnen gleich - OK wählt, welche Sie sehen möchten.';
+
+  @override
+  String get tvReminderNow => 'jetzt';
+
+  @override
+  String tvReminderInMinutes(int minutes) {
+    return 'in $minutes Min.';
+  }
+
+  @override
+  String tvReminderSwitchIn(int seconds) {
+    return 'Schaltet in $seconds s um';
+  }
+
+  @override
+  String get tvReminderSwitchNow => 'Jetzt umschalten';
+
+  @override
+  String tvReminderSet(String title, String time, String channel) {
+    return 'Erinnerung gesetzt: $title um $time auf $channel';
+  }
+
+  @override
+  String tvReminderRemoved(String title) {
+    return 'Erinnerung entfernt: $title';
+  }
+
+  @override
+  String get tvReminderAlreadyRunning =>
+      'Die Sendung läuft schon - erinnern geht nur an kommende Sendungen.';
+
+  @override
+  String get tvReminderSetHint => 'OK: an diese Sendung erinnern';
+
+  @override
+  String get tvReminderIsSetHint => 'Erinnerung gesetzt - OK entfernt sie';
+
+  @override
+  String get tvReminderRunningHint => 'Läuft gerade';
+
+  @override
+  String get tvReminderSettingsHeading => 'Erinnerungen';
+
+  @override
+  String get tvReminderSettingsHelp =>
+      'Im Programmführer markiert langes OK eine kommende Sendung (in der Sendungsliste eines Kanals: OK) - auch mehrere zur selben Zeit. Kurz vor Beginn erscheint ein Hinweis: bei einer Sendung schaltet TV nach 30 Sekunden von selbst um, bei mehreren wählt man.';
+
+  @override
+  String get tvReminderLead => 'Hinweis vor Beginn';
 }

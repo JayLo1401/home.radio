@@ -6,6 +6,7 @@ import '../models/launcher_tile.dart';
 import '../services/enigma2_service.dart' show Enigma2Config;
 import '../services/picture_library.dart' show SlideshowOrder;
 import '../services/secret_store.dart';
+import '../services/tv_reminders.dart';
 
 /// One configured rtl_tcp server (Settings → Radio-Empfänger).
 class RtlTcpServer {
@@ -848,6 +849,30 @@ class SettingsRepository {
     await _db.setSetting('tv_next_lead', '$leadMinutes');
     await _db.setSetting('tv_next_show', '$showSeconds');
   }
+
+  /// Programmes marked in the guide (TvReminder, as JSON).
+  Future<List<TvReminder>> getTvReminders() async {
+    try {
+      final list = jsonDecode(await _db.getSetting('tv_reminders') ?? '[]');
+      if (list is! List) return const [];
+      return [for (final j in list) ?TvReminder.fromJson(j)];
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  Future<void> setTvReminders(List<TvReminder> reminders) =>
+      _db.setSetting('tv_reminders', jsonEncode([for (final r in reminders) r.toJson()]));
+
+  /// How long before a marked programme the note shows (minutes).
+  static const tvReminderLeadChoices = [1, 2, 3, 5, 10];
+
+  Future<int> getTvReminderLead() async {
+    final v = int.tryParse(await _db.getSetting('tv_reminder_lead') ?? '');
+    return tvReminderLeadChoices.contains(v) ? v! : 2;
+  }
+
+  Future<void> setTvReminderLead(int minutes) => _db.setSetting('tv_reminder_lead', '$minutes');
 
   /// Encrypted channels: switch the receiver itself to them first (its CI
   /// module / card descrambles only the channel it shows). On by default.

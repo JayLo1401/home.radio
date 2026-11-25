@@ -9371,7 +9371,7 @@ abstract class AppLocalizations {
   /// No description provided for @tvGuideKeyHint.
   ///
   /// In de, this message translates to:
-  /// **'OK umschalten  ·  {optionsKey} alle Sendungen  ·  ‹‹ ›› ±3 Std.'**
+  /// **'OK umschalten  ·  OK lang Erinnerung  ·  {optionsKey} alle Sendungen  ·  ‹‹ ›› ±3 Std.'**
   String tvGuideKeyHint(String optionsKey);
 
   /// No description provided for @tvSettingsTitle.
@@ -9553,6 +9553,96 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'Receiver'**
   String get tvRowReceiver;
+
+  /// No description provided for @tvRemindersTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Ihre Erinnerungen'**
+  String get tvRemindersTitle;
+
+  /// No description provided for @tvRemindersPick.
+  ///
+  /// In de, this message translates to:
+  /// **'Mehrere Sendungen beginnen gleich - OK wählt, welche Sie sehen möchten.'**
+  String get tvRemindersPick;
+
+  /// No description provided for @tvReminderNow.
+  ///
+  /// In de, this message translates to:
+  /// **'jetzt'**
+  String get tvReminderNow;
+
+  /// No description provided for @tvReminderInMinutes.
+  ///
+  /// In de, this message translates to:
+  /// **'in {minutes} Min.'**
+  String tvReminderInMinutes(int minutes);
+
+  /// No description provided for @tvReminderSwitchIn.
+  ///
+  /// In de, this message translates to:
+  /// **'Schaltet in {seconds} s um'**
+  String tvReminderSwitchIn(int seconds);
+
+  /// No description provided for @tvReminderSwitchNow.
+  ///
+  /// In de, this message translates to:
+  /// **'Jetzt umschalten'**
+  String get tvReminderSwitchNow;
+
+  /// No description provided for @tvReminderSet.
+  ///
+  /// In de, this message translates to:
+  /// **'Erinnerung gesetzt: {title} um {time} auf {channel}'**
+  String tvReminderSet(String title, String time, String channel);
+
+  /// No description provided for @tvReminderRemoved.
+  ///
+  /// In de, this message translates to:
+  /// **'Erinnerung entfernt: {title}'**
+  String tvReminderRemoved(String title);
+
+  /// No description provided for @tvReminderAlreadyRunning.
+  ///
+  /// In de, this message translates to:
+  /// **'Die Sendung läuft schon - erinnern geht nur an kommende Sendungen.'**
+  String get tvReminderAlreadyRunning;
+
+  /// No description provided for @tvReminderSetHint.
+  ///
+  /// In de, this message translates to:
+  /// **'OK: an diese Sendung erinnern'**
+  String get tvReminderSetHint;
+
+  /// No description provided for @tvReminderIsSetHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Erinnerung gesetzt - OK entfernt sie'**
+  String get tvReminderIsSetHint;
+
+  /// No description provided for @tvReminderRunningHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Läuft gerade'**
+  String get tvReminderRunningHint;
+
+  /// No description provided for @tvReminderSettingsHeading.
+  ///
+  /// In de, this message translates to:
+  /// **'Erinnerungen'**
+  String get tvReminderSettingsHeading;
+
+  /// No description provided for @tvReminderSettingsHelp.
+  ///
+  /// In de, this message translates to:
+  /// **'Im Programmführer markiert langes OK eine kommende Sendung (in der Sendungsliste eines Kanals: OK) - auch mehrere zur selben Zeit. Kurz vor Beginn erscheint ein Hinweis: bei einer Sendung schaltet TV nach 30 Sekunden von selbst um, bei mehreren wählt man.'**
+  String get tvReminderSettingsHelp;
+
+  /// No description provided for @tvReminderLead.
+  ///
+  /// In de, this message translates to:
+  /// **'Hinweis vor Beginn'**
+  String get tvReminderLead;
 }
 
 class _AppLocalizationsDelegate

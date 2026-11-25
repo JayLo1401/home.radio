@@ -33,6 +33,7 @@ import '../launcher/launcher_providers.dart';
 import '../rtlsdr/rtl_sdr_test_screen.dart';
 import 'restore_backup_screen.dart';
 import '../tv/tv_providers.dart';
+import '../tv/tv_reminder_providers.dart' show tvReminderLeadProvider;
 import '../tv/iptv_providers.dart';
 import 'ha_settings_screen.dart';
 import 'iptv_settings_screen.dart';
@@ -1145,6 +1146,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ],
                 ),
               ],
+              const Divider(height: 32),
+              Text(l.tvReminderSettingsHeading, style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 4),
+              Text(l.tvReminderSettingsHelp, style: const TextStyle(color: Colors.white60)),
+              const SizedBox(height: 8),
+              Text(l.tvReminderLead, style: Theme.of(context).textTheme.bodyLarge),
+              Wrap(
+                spacing: 8,
+                children: [
+                  for (final m in SettingsRepository.tvReminderLeadChoices)
+                    FocusTraversalOrder(
+                      order: NumericFocusOrder(nextOrder()),
+                      child: _TvChoiceTile(
+                        compact: true,
+                        label: l.settingsMinutesShort(m),
+                        selected: ref.watch(tvReminderLeadProvider) == m,
+                        onTap: () => ref.read(tvReminderLeadProvider.notifier).set(m),
+                      ),
+                    ),
+                ],
+              ),
             ],
             if (section == SettingsSection.radio) ...[
             const Divider(height: 32),

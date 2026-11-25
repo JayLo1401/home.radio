@@ -29,6 +29,7 @@ import '../browser/browser_settings.dart';
 import '../launcher/launcher_providers.dart';
 import '../settings/ha_settings_screen.dart' show haLinkStatusText;
 import '../tv/tv_providers.dart';
+import '../tv/tv_reminder_providers.dart' show tvReminderLeadProvider;
 
 /// One setting the admin page shows and changes.
 class _Setting {
@@ -460,6 +461,20 @@ class AdminSettings implements AdminSettingsSource {
               help: l.adminSecretHelp,
               get: () => '',
               set: (v) => setTv((c) => copyTv(c, password: '${v ?? ''}')),
+            ),
+            _Setting(
+              id: 'tvReminderLead',
+              label: l.tvReminderLead,
+              help: l.tvReminderSettingsHelp,
+              type: 'choice',
+              options: [for (final m in SettingsRepository.tvReminderLeadChoices) ('$m', l.settingsMinutesShort(m))],
+              get: () => '${_c.read(tvReminderLeadProvider)}',
+              set: (v) async {
+                final m = _int(v);
+                if (m == null || !SettingsRepository.tvReminderLeadChoices.contains(m)) return l.adminInvalidValue;
+                await _c.read(tvReminderLeadProvider.notifier).set(m);
+                return null;
+              },
             ),
             _Setting(
               id: 'tvNextUp',

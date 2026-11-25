@@ -168,7 +168,7 @@
     "description": "Heading of one channel's list of programmes (usually a week)."
   },
   "tvScheduleNoInfo": "Für diesen Sender hat der Receiver keine Programminformation.",
-  "tvGuideKeyHint": "OK umschalten  ·  {optionsKey} alle Sendungen  ·  ‹‹ ›› ±3 Std.",
+  "tvGuideKeyHint": "OK umschalten  ·  OK lang Erinnerung  ·  {optionsKey} alle Sendungen  ·  ‹‹ ›› ±3 Std.",
   "@tvGuideKeyHint": {
     "placeholders": {
       "optionsKey": {
@@ -263,5 +263,24 @@
       }
     }
   },
-  "tvRowReceiver": "Receiver"
+  "tvRowReceiver": "Receiver",
+  "tvRemindersTitle": "Ihre Erinnerungen",
+  "tvRemindersPick": "Mehrere Sendungen beginnen gleich - OK wählt, welche Sie sehen möchten.",
+  "tvReminderNow": "jetzt",
+  "tvReminderInMinutes": "in {minutes} Min.",
+  "@tvReminderInMinutes": {"placeholders": {"minutes": {"type": "int"}}},
+  "tvReminderSwitchIn": "Schaltet in {seconds} s um",
+  "@tvReminderSwitchIn": {"placeholders": {"seconds": {"type": "int"}}},
+  "tvReminderSwitchNow": "Jetzt umschalten",
+  "tvReminderSet": "Erinnerung gesetzt: {title} um {time} auf {channel}",
+  "@tvReminderSet": {"placeholders": {"title": {"type": "String"}, "time": {"type": "String"}, "channel": {"type": "String"}}},
+  "tvReminderRemoved": "Erinnerung entfernt: {title}",
+  "@tvReminderRemoved": {"placeholders": {"title": {"type": "String"}}},
+  "tvReminderAlreadyRunning": "Die Sendung läuft schon - erinnern geht nur an kommende Sendungen.",
+  "tvReminderSetHint": "OK: an diese Sendung erinnern",
+  "tvReminderIsSetHint": "Erinnerung gesetzt - OK entfernt sie",
+  "tvReminderRunningHint": "Läuft gerade",
+  "tvReminderSettingsHeading": "Erinnerungen",
+  "tvReminderSettingsHelp": "Im Programmführer markiert langes OK eine kommende Sendung (in der Sendungsliste eines Kanals: OK) - auch mehrere zur selben Zeit. Kurz vor Beginn erscheint ein Hinweis: bei einer Sendung schaltet TV nach 30 Sekunden von selbst um, bei mehreren wählt man.",
+  "tvReminderLead": "Hinweis vor Beginn"
 }

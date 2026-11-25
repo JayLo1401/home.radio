@@ -19,6 +19,7 @@ import 'core/theme.dart';
 import 'features/launcher/launcher_navigation.dart';
 import 'features/launcher/launcher_providers.dart' show appNavigatorKey;
 import 'features/splash/splash_screen.dart';
+import 'features/tv/tv_reminder_providers.dart' show tvReminderControllerProvider;
 import 'l10n/l10n.dart';
 
 /// Home System: the launcher with Radio and TV as its parts (and
@@ -50,6 +51,8 @@ class HomeSystemApp extends ConsumerWidget {
     ref.watch(brightnessControllerProvider);
     // This device in Home Assistant (MQTT), when switched on.
     ref.watch(haLinkControllerProvider);
+    // TV: the notes of the programmes marked in the guide.
+    ref.watch(tvReminderControllerProvider);
     return MaterialApp(
       title: 'Home System',
       navigatorKey: appNavigatorKey,

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -5,7 +7,9 @@ import 'package:intl/intl.dart';
 import '../../core/theme.dart';
 import '../../data/services/enigma2_service.dart';
 import '../../l10n/l10n.dart';
+import '../../data/services/tv_reminders.dart' show serviceKeyOf;
 import 'tv_providers.dart';
+import 'tv_reminder_providers.dart';
 import 'tv_widgets.dart';
 
 /// A channel's programme guide (from the receiver's EPG, usually a week):
@@ -22,6 +26,25 @@ class TvEpgScreen extends ConsumerStatefulWidget {
 
 class _TvEpgScreenState extends ConsumerState<TvEpgScreen> {
   E2Event? _focused;
+
+  /// OK on a coming programme: reminder on/off (see TvReminderDialog).
+  Future<void> _toggleReminder(E2Event e) async {
+    final l = context.l10n;
+    final messenger = ScaffoldMessenger.of(context);
+    final notifier = ref.read(tvRemindersProvider.notifier);
+    final wasSet = notifier.isSet(widget.channel.ref, e.begin);
+    final ok = await notifier.toggle(e, widget.channel);
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        duration: const Duration(seconds: 3),
+        content: Text(!ok
+            ? l.tvReminderAlreadyRunning
+            : wasSet
+                ? l.tvReminderRemoved(e.title)
+                : l.tvReminderSet(e.title, hhmm(e.begin), widget.channel.name)),
+      ));
+  }
 
   String _day(DateTime t) {
     final l10n = context.l10n;
@@ -40,6 +63,8 @@ class _TvEpgScreenState extends ConsumerState<TvEpgScreen> {
   Widget build(BuildContext context) {
     final config = ref.watch(enigma2ConfigProvider);
     final events = ref.watch(tvChannelEpgProvider(widget.channel.ref));
+    final reminders = {for (final r in ref.watch(tvRemindersProvider)) r.key};
+    bool reminded(E2Event e) => reminders.contains('${serviceKeyOf(widget.channel.ref)}|${e.begin.millisecondsSinceEpoch}');
     final now = DateTime.now();
     return Scaffold(
       backgroundColor: const Color(0xFF05070A),
@@ -99,7 +124,10 @@ class _TvEpgScreenState extends ConsumerState<TvEpgScreen> {
                         autofocus: i == 0,
                         selected: running,
                         onFocused: () => setState(() => _focused = e),
-                        onTap: () => setState(() => _focused = e),
+                        onTap: () {
+                          setState(() => _focused = e);
+                          if (!running) unawaited(_toggleReminder(e));
+                        },
                         child: Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                           child: Row(
@@ -120,6 +148,7 @@ class _TvEpgScreenState extends ConsumerState<TvEpgScreen> {
                                   ],
                                 ),
                               ),
+                              if (reminded(e)) const Icon(Icons.notifications_active, color: brandGreen),
                             ],
                           ),
                         ),
@@ -152,6 +181,15 @@ class _TvEpgScreenState extends ConsumerState<TvEpgScreen> {
                                   '${_day(shown.begin)}  ${hhmm(shown.begin)} – ${hhmm(shown.end)}  ·  '
                                   '${context.l10n.tvMinutes(shown.duration.inMinutes)}',
                                   style: const TextStyle(color: brandGreen, fontSize: 16),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  shown.runsAt(now)
+                                      ? context.l10n.tvReminderRunningHint
+                                      : reminded(shown)
+                                          ? context.l10n.tvReminderIsSetHint
+                                          : context.l10n.tvReminderSetHint,
+                                  style: const TextStyle(color: Colors.white54, fontSize: 15),
                                 ),
                                 const SizedBox(height: 18),
                                 Text(

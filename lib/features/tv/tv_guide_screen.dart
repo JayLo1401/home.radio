@@ -12,6 +12,8 @@ import '../../data/services/enigma2_service.dart';
 import '../../l10n/l10n.dart';
 import 'tv_epg_screen.dart';
 import 'tv_providers.dart';
+import 'tv_reminder_providers.dart';
+import '../../data/services/tv_reminders.dart' show serviceKeyOf;
 import 'tv_widgets.dart';
 
 /// TV's programme guide as on a TV set: time across, the channels of
@@ -208,6 +210,39 @@ class _TvGuideScreenState extends ConsumerState<TvGuideScreen> {
     if (_row < channels.length) Navigator.of(context).pop(channels[_row]);
   }
 
+  /// Holding OK: reminder for the marked programme on/off (a short press
+  /// still switches).
+  static final _okKeys = {
+    LogicalKeyboardKey.select,
+    LogicalKeyboardKey.enter,
+    LogicalKeyboardKey.numpadEnter,
+    LogicalKeyboardKey.gameButtonA,
+  };
+  static const _hold = Duration(milliseconds: 600);
+  DateTime? _okDownAt;
+
+  /// Reminder for [e] on [channel] on/off, with a short note.
+  Future<void> _toggleReminder(E2Channel channel, E2Event? e) async {
+    final l = context.l10n;
+    final messenger = ScaffoldMessenger.of(context);
+    void say(String text) => messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(text), duration: const Duration(seconds: 3)));
+    if (e == null) return;
+    final notifier = ref.read(tvRemindersProvider.notifier);
+    final wasSet = notifier.isSet(channel.ref, e.begin);
+    if (!await notifier.toggle(e, channel)) {
+      say(l.tvReminderAlreadyRunning);
+      return;
+    }
+    say(wasSet ? l.tvReminderRemoved(e.title) : l.tvReminderSet(e.title, hhmm(e.begin), channel.name));
+  }
+
+  void _toggleFocusedReminder() {
+    final channels = _channels;
+    if (_row < channels.length) unawaited(_toggleReminder(channels[_row], _focused));
+  }
+
   void _openChannelList() {
     final channels = _channels;
     if (_row >= channels.length) return;
@@ -215,8 +250,19 @@ class _TvGuideScreenState extends ConsumerState<TvGuideScreen> {
   }
 
   KeyEventResult _onKey(FocusNode node, KeyEvent event) {
-    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
     final key = event.logicalKey;
+    if (_okKeys.contains(key)) {
+      // Decided on release: short = switch, held = reminder.
+      if (event is KeyDownEvent) {
+        _okDownAt = DateTime.now();
+      } else if (event is KeyUpEvent) {
+        final down = _okDownAt;
+        _okDownAt = null;
+        if (down != null) DateTime.now().difference(down) >= _hold ? _toggleFocusedReminder() : _pick();
+      }
+      return KeyEventResult.handled;
+    }
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
     final keys = ref.read(remoteKeysProvider);
     if (key == LogicalKeyboardKey.arrowUp) {
       _moveRow(-1);
@@ -234,8 +280,7 @@ class _TvGuideScreenState extends ConsumerState<TvGuideScreen> {
       _shiftTime(const Duration(hours: 3));
     } else if (key == LogicalKeyboardKey.mediaRewind || key == LogicalKeyboardKey.mediaTrackPrevious) {
       _shiftTime(const Duration(hours: -3));
-    } else if (event is KeyDownEvent &&
-        (key == LogicalKeyboardKey.select || keys.matches(RemoteAction.channelList, key))) {
+    } else if (event is KeyDownEvent && keys.matches(RemoteAction.channelList, key)) {
       _pick();
     } else if (event is KeyDownEvent && keys.matches(RemoteAction.options, key)) {
       _openChannelList();
@@ -262,6 +307,8 @@ class _TvGuideScreenState extends ConsumerState<TvGuideScreen> {
     final config = ref.watch(enigma2ConfigProvider);
     final channels = ref.watch(tvChannelsProvider).value ?? const <E2Channel>[];
     final bouquet = ref.watch(tvCurrentBouquetProvider).value;
+    final reminders = {for (final r in ref.watch(tvRemindersProvider)) r.key};
+    bool reminded(E2Channel c, E2Event e) => reminders.contains('${serviceKeyOf(c.ref)}|${e.begin.millisecondsSinceEpoch}');
     final focused = _focused;
     return Scaffold(
       backgroundColor: const Color(0xFF05070A),
@@ -312,6 +359,8 @@ class _TvGuideScreenState extends ConsumerState<TvGuideScreen> {
                                                 focusedRow: r == _row,
                                                 focusedEvent: r == _row ? focused : null,
                                                 onTap: (e) => _tapCell(r, e),
+                                                onLongPress: (e) => unawaited(_toggleReminder(channels[r], e)),
+                                                reminded: (e) => reminded(channels[r], e),
                                               ),
                                           ],
                                         ),
@@ -332,7 +381,11 @@ class _TvGuideScreenState extends ConsumerState<TvGuideScreen> {
                             );
                           }),
               ),
-              _Details(event: focused, channel: _row < channels.length ? channels[_row] : null),
+              _Details(
+                event: focused,
+                channel: _row < channels.length ? channels[_row] : null,
+                reminded: focused != null && _row < channels.length && reminded(channels[_row], focused),
+              ),
             ],
           ),
         ),
@@ -431,8 +484,12 @@ class _GuideRow extends StatelessWidget {
     required this.focusedRow,
     required this.focusedEvent,
     required this.onTap,
+    required this.onLongPress,
+    required this.reminded,
   });
 
+  final ValueChanged<E2Event> onLongPress;
+  final bool Function(E2Event e) reminded;
   final Enigma2Config config;
   final E2Channel channel;
   final List<E2Event> events;
@@ -504,7 +561,9 @@ class _GuideRow extends StatelessWidget {
                       subtitle: '${hhmm(e.begin)} – ${hhmm(e.end)}',
                       focused: focusedRow && focusedEvent == e,
                       running: e.runsAt(now),
+                      reminded: reminded(e),
                       onTap: () => onTap(e),
+                      onLongPress: () => onLongPress(e),
                     ),
                   ),
               ],
@@ -520,8 +579,18 @@ class _GuideRow extends StatelessWidget {
 }
 
 class _Cell extends StatelessWidget {
-  const _Cell({required this.title, required this.subtitle, required this.focused, required this.running, required this.onTap});
+  const _Cell({
+    required this.title,
+    required this.subtitle,
+    required this.focused,
+    required this.running,
+    required this.onTap,
+    this.reminded = false,
+    this.onLongPress,
+  });
 
+  final bool reminded;
+  final VoidCallback? onLongPress;
   final String title;
   final String? subtitle;
   final bool focused;
@@ -532,6 +601,7 @@ class _Cell extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
+      onLongPress: onLongPress,
       child: Container(
         margin: const EdgeInsets.all(2),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -549,15 +619,25 @@ class _Cell extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  softWrap: false,
-                  style: TextStyle(
-                    color: focused ? Colors.black : Colors.white,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                  )),
+              Row(
+                children: [
+                  if (reminded) ...[
+                    Icon(Icons.notifications_active, size: 16, color: focused ? Colors.black : brandGreen),
+                    const SizedBox(width: 4),
+                  ],
+                  Flexible(
+                    child: Text(title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        softWrap: false,
+                        style: TextStyle(
+                          color: focused ? Colors.black : Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        )),
+                  ),
+                ],
+              ),
               if (subtitle != null)
                 Text(subtitle!,
                     maxLines: 1,
@@ -574,10 +654,11 @@ class _Cell extends StatelessWidget {
 
 /// The marked programme: title, time, what it's about.
 class _Details extends StatelessWidget {
-  const _Details({required this.event, required this.channel});
+  const _Details({required this.event, required this.channel, this.reminded = false});
 
   final E2Event? event;
   final E2Channel? channel;
+  final bool reminded;
 
   @override
   Widget build(BuildContext context) {
@@ -593,6 +674,10 @@ class _Details extends StatelessWidget {
               children: [
                 Row(
                   children: [
+                    if (reminded) ...[
+                      const Icon(Icons.notifications_active, color: brandGreen),
+                      const SizedBox(width: 8),
+                    ],
                     Expanded(
                       child: Text(e.title,
                           maxLines: 1,

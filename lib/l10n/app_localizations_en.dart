@@ -5559,7 +5559,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String tvGuideKeyHint(String optionsKey) {
-    return 'OK watch  ·  $optionsKey all programs  ·  ‹‹ ›› ±3 hrs';
+    return 'OK watch  ·  hold OK reminder  ·  $optionsKey all programs  ·  ‹‹ ›› ±3 hrs';
   }
 
   @override
@@ -5682,4 +5682,60 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get tvRowReceiver => 'Receiver';
+
+  @override
+  String get tvRemindersTitle => 'Your reminders';
+
+  @override
+  String get tvRemindersPick =>
+      'Several programmes are about to begin - OK picks the one to watch.';
+
+  @override
+  String get tvReminderNow => 'now';
+
+  @override
+  String tvReminderInMinutes(int minutes) {
+    return 'in $minutes min';
+  }
+
+  @override
+  String tvReminderSwitchIn(int seconds) {
+    return 'Switching in $seconds s';
+  }
+
+  @override
+  String get tvReminderSwitchNow => 'Switch now';
+
+  @override
+  String tvReminderSet(String title, String time, String channel) {
+    return 'Reminder set: $title at $time on $channel';
+  }
+
+  @override
+  String tvReminderRemoved(String title) {
+    return 'Reminder removed: $title';
+  }
+
+  @override
+  String get tvReminderAlreadyRunning =>
+      'This programme is already on - reminders are for coming programmes.';
+
+  @override
+  String get tvReminderSetHint => 'OK: remind me of this programme';
+
+  @override
+  String get tvReminderIsSetHint => 'Reminder set - OK removes it';
+
+  @override
+  String get tvReminderRunningHint => 'On now';
+
+  @override
+  String get tvReminderSettingsHeading => 'Reminders';
+
+  @override
+  String get tvReminderSettingsHelp =>
+      'In the programme guide, holding OK marks a coming programme (in a channel\'s programme list: OK) - several at the same time too. Shortly before it begins a note appears: for one programme TV switches by itself after 30 seconds, for several you pick.';
+
+  @override
+  String get tvReminderLead => 'Note before the start';
 }

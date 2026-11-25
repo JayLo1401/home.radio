@@ -23,6 +23,7 @@ import 'tv_epg_screen.dart';
 import 'tv_guide_screen.dart';
 import 'tv_player.dart';
 import 'tv_providers.dart';
+import 'tv_reminder_providers.dart';
 import 'tv_widgets.dart';
 
 /// TV: live TV from the Enigma2 receiver (GigaBlue etc.) and Internet-TV
@@ -41,7 +42,10 @@ import 'tv_widgets.dart';
 /// channel by number, Info the programme guide, the options key a menu,
 /// play/pause stops and resumes. All assignable keys: RemoteKeys.
 class TvScreen extends ConsumerStatefulWidget {
-  const TvScreen({super.key});
+  const TvScreen({super.key, this.startServiceRef});
+
+  /// Start with this receiver channel (a reminder) instead of the last one.
+  final String? startServiceRef;
 
   @override
   ConsumerState<TvScreen> createState() => _TvScreenState();
@@ -85,15 +89,43 @@ class _TvScreenState extends ConsumerState<TvScreen> {
   Timer? _nextUpCheck;
   Timer? _nextUpHide;
 
+  late final TvOpenNotifier _open = ref.read(tvOpenProvider.notifier);
+
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeStart());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _open.set(true);
+      _maybeStart();
+    });
     _nextUpCheck = Timer.periodic(const Duration(seconds: 15), (_) => _checkNextUp());
+  }
+
+  /// A reminder's channel while TV is open: back to the picture (closing
+  /// the guide, lists, menus over it) and switch.
+  Future<void> _zapTo(String serviceRef) async {
+    if (!_receiverReady) return;
+    final route = ModalRoute.of(context);
+    if (route != null) Navigator.of(context).popUntil((r) => r == route);
+    final List<E2Channel> channels;
+    try {
+      channels = await ref.read(tvChannelsProvider.future);
+    } catch (_) {
+      return;
+    }
+    final key = serviceKey(serviceRef);
+    final channel = channels.where((c) => serviceKey(c.ref) == key).firstOrNull;
+    if (!mounted || channel == null) return;
+    if (_listVisible) setState(() => _listVisible = false);
+    _focus.requestFocus();
+    if (channel.ref != _current?.ref || _iptv != null) await _tune(channel);
   }
 
   @override
   void dispose() {
+    // After the frame: providers can't change while the tree is torn down.
+    final open = _open;
+    Future.microtask(() => open.set(false));
     _generation++;
     _player?.dispose();
     _session?.close();
@@ -135,6 +167,7 @@ class _TvScreenState extends ConsumerState<TvScreen> {
     if (!mounted) return;
     final iptvFirst = iptv.enabled &&
         fixed == null &&
+        widget.startServiceRef == null &&
         (iptv.favorites.isNotEmpty || last != null) &&
         (!config.configured || iptv.list == TvListKind.iptv);
     if (iptvFirst) {
@@ -161,7 +194,10 @@ class _TvScreenState extends ConsumerState<TvScreen> {
     // A fixed start channel (Einstellungen → TV), else the last one.
     final fixed = await repo.getTvStartChannel();
     final last = await repo.getTvLastChannel();
-    final channel = channels.where((c) => c.ref == fixed).firstOrNull ??
+    // A reminder's channel first.
+    final wanted = widget.startServiceRef == null ? null : serviceKey(widget.startServiceRef!);
+    final channel = channels.where((c) => wanted != null && serviceKey(c.ref) == wanted).firstOrNull ??
+        channels.where((c) => c.ref == fixed).firstOrNull ??
         channels.where((c) => c.ref == last).firstOrNull ??
         channels.first;
     await _tune(channel);
@@ -819,6 +855,9 @@ class _TvScreenState extends ConsumerState<TvScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(tvZapRequestProvider, (_, request) {
+      if (request != null) unawaited(_zapTo(request.$1));
+    });
     // Set up (or changed) while TV is open: start with it.
     ref.listen(enigma2ConfigProvider, (previous, next) {
       if (next == null) return;
