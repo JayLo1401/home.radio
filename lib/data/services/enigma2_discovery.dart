@@ -1,8 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:http/http.dart' as http;
+
+import 'lan_scan.dart';
 
 /// An Enigma2 receiver found in the home network.
 class FoundReceiver {
@@ -31,54 +32,16 @@ class Enigma2Discovery {
   final http.Client _client;
   static const _port = 80;
   static const _streamPort = 8001;
-  static const _connectTimeout = Duration(milliseconds: 700);
-  static const _parallel = 64;
-  static const _maxNetworks = 4;
 
   /// The private /24 networks of this device, e.g. "192.168.100" - the
   /// Wi-Fi/Ethernet ones first (virtual adapters like VMware's come later
   /// and are cut off after [_maxNetworks]).
-  static Future<List<String>> localNetworks() async {
-    final interfaces = await NetworkInterface.list(type: InternetAddressType.IPv4);
-    interfaces.sort((a, b) => _virtual(a.name).compareTo(_virtual(b.name)));
-    final networks = <String>{};
-    for (final i in interfaces) {
-      for (final a in i.addresses) {
-        final p = a.address.split('.');
-        if (p.length != 4 || a.isLoopback || a.isLinkLocal) continue;
-        final first = int.tryParse(p[0]) ?? 0, second = int.tryParse(p[1]) ?? 0;
-        final private = first == 10 || (first == 172 && second >= 16 && second <= 31) || (first == 192 && second == 168);
-        if (private) networks.add('${p[0]}.${p[1]}.${p[2]}');
-      }
-    }
-    return networks.take(_maxNetworks).toList();
-  }
-
-  static int _virtual(String name) =>
-      RegExp('vmware|virtualbox|vbox|hyper-v|vethernet|docker|wsl|tap|tun', caseSensitive: false).hasMatch(name) ? 1 : 0;
+  static Future<List<String>> localNetworks() => LanScan.localNetworks();
 
   /// Scans [networks] (default: [localNetworks]); receivers as they are found.
   /// [onProgress] gets (addresses checked, addresses in total).
-  Stream<FoundReceiver> scan({List<String>? networks, void Function(int done, int total)? onProgress}) async* {
-    final nets = networks ?? await localNetworks();
-    final hosts = [
-      for (final n in nets)
-        for (var i = 1; i < 255; i++) '$n.$i',
-    ];
-    final found = StreamController<FoundReceiver>();
-    var next = 0, done = 0;
-    Future<void> worker() async {
-      while (next < hosts.length) {
-        final host = hosts[next++];
-        final receiver = await _check(host);
-        if (receiver != null && !found.isClosed) found.add(receiver);
-        onProgress?.call(++done, hosts.length);
-      }
-    }
-
-    unawaited(Future.wait([for (var i = 0; i < _parallel; i++) worker()]).whenComplete(found.close));
-    yield* found.stream;
-  }
+  Stream<FoundReceiver> scan({List<String>? networks, void Function(int done, int total)? onProgress}) =>
+      LanScan.scan(_check, networks: networks, onProgress: onProgress);
 
   Future<FoundReceiver?> _check(String host) async {
     if (!await _open(host, _port)) return null;
@@ -102,15 +65,7 @@ class Enigma2Discovery {
     }
   }
 
-  static Future<bool> _open(String host, int port) async {
-    try {
-      final socket = await Socket.connect(host, port, timeout: _connectTimeout);
-      socket.destroy();
-      return true;
-    } catch (_) {
-      return false;
-    }
-  }
+  static Future<bool> _open(String host, int port) => LanScan.isOpen(host, port);
 
   void close() => _client.close();
 }

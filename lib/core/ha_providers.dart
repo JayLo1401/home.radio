@@ -44,10 +44,33 @@ final haLinkSettingsProvider = NotifierProvider<HaLinkNotifier, HaLinkSettings>(
 /// no address known.
 HaBroker? haBrokerFor(HaLinkSettings s, String dashboardUrl) {
   if (!s.enabled) return null;
-  var host = s.host.trim();
-  if (host.isEmpty) host = Uri.tryParse(dashboardUrl.trim())?.host ?? '';
+  var host = mqttHostOf(s.host);
+  var port = s.port;
+  // "192.168.1.5:1884" or "mqtt://...:1884": the port given with it counts
+  // (an http(s) one is Home Assistant's web page, not the broker's).
+  final given = _portOf(s.host);
+  if (given != null && port == HaLinkSettings.defaultPort) port = given;
+  if (host.isEmpty) host = mqttHostOf(dashboardUrl);
   if (host.isEmpty) return null;
-  return HaBroker(host: host, port: s.port, user: s.user.trim(), password: s.password);
+  return HaBroker(host: host, port: port, user: s.user.trim(), password: s.password);
+}
+
+/// The broker's host from what was typed: a plain name or IP, but also
+/// Home Assistant's address pasted as it is ("http://192.168.1.5:8123/")
+/// or "host:port" - only the host.
+String mqttHostOf(String text) {
+  final t = text.trim();
+  if (t.isEmpty) return '';
+  final uri = Uri.tryParse(t.contains('://') ? t : 'mqtt://$t');
+  final host = uri?.host ?? '';
+  return host.isNotEmpty ? host : t.split(RegExp('[/:]')).first;
+}
+
+int? _portOf(String text) {
+  final t = text.trim();
+  if (t.isEmpty || t.startsWith('http://') || t.startsWith('https://')) return null;
+  final uri = Uri.tryParse(t.contains('://') ? t : 'mqtt://$t');
+  return uri != null && uri.hasPort ? uri.port : null;
 }
 
 /// The link itself (one for the app's lifetime).

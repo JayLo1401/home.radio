@@ -8,7 +8,9 @@ import '../../core/providers.dart';
 import '../../data/repositories/settings_repository.dart' show ReceiverMode, RtlTcpServer, RtlTcpServers;
 import '../../data/services/rtl_sdr_service.dart';
 import '../../data/services/rtl_sdr_usb_service.dart';
+import '../../data/services/rtl_tcp_discovery.dart';
 import '../../l10n/l10n.dart';
+import '../shared/lan_search_dialog.dart';
 
 /// "Radio-Empfänger": whether and how DAB+ and FM reach the RTL-SDR receiver
 /// (see [ReceiverMode]) - "Kein Empfänger" for internet radio only.
@@ -138,6 +140,46 @@ class _RtlSdrTestScreenState extends ConsumerState<RtlSdrTestScreen> {
 
   void _add() {
     setState(() => _rows.add(_ServerRow(const RtlTcpServer(host: '', port: 1234))));
+  }
+
+  /// "Im Netzwerk suchen": rtl_tcp servers (port 1234, rtltcp.server with
+  /// all its sticks) - the one picked becomes a row (or its row) and is
+  /// tested.
+  Future<void> _search() async {
+    final t = context.l10n;
+    final found = await showLanSearch<FoundRtlTcp>(
+      context,
+      title: t.lanSearchRtl,
+      noneFound: t.lanSearchRtlNone,
+      search: (onProgress) => findRtlTcp(onProgress: onProgress),
+      row: (f) => (
+        title: [
+          f.stick?.name ?? (f.protocol == RtlTcpProtocol.classic ? 'rtl_tcp' : 'rtltcp.server'),
+          if (f.stick?.location != null) f.stick!.location!,
+        ].join(' · '),
+        subtitle: [
+          '${f.host}:${f.port}',
+          ?f.name,
+          if (f.stick?.antenna != null) t.scannerRtlAntenna(f.stick!.antenna!),
+          if (f.stick?.busyBy != null) t.scannerRtlBusyByShort(f.stick!.busyBy!),
+        ].join(' · '),
+      ),
+    );
+    if (found == null || !mounted) return;
+    var row = _rows.where((r) => r.server.host == found.host && r.server.port == found.port).firstOrNull;
+    if (row == null) {
+      // An empty row (just added) is filled, else a new one.
+      row = _rows.where((r) => r.host.text.trim().isEmpty).firstOrNull;
+      if (row == null) {
+        row = _ServerRow(RtlTcpServer(host: found.host, port: found.port));
+        setState(() => _rows.add(row!));
+      } else {
+        row.host.text = found.host;
+        row.port.text = '${found.port}';
+      }
+      await _save();
+    }
+    await _test(row);
   }
 
   void _remove(int index) {
@@ -306,13 +348,20 @@ class _RtlSdrTestScreenState extends ConsumerState<RtlSdrTestScreen> {
             ],
           ),
         ),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: TextButton.icon(
-            onPressed: _testing != null ? null : _add,
-            icon: const Icon(Icons.add),
-            label: Text(context.l10n.scannerRtlAddServer),
-          ),
+        Wrap(
+          spacing: 8,
+          children: [
+            TextButton.icon(
+              onPressed: _testing != null ? null : _add,
+              icon: const Icon(Icons.add),
+              label: Text(context.l10n.scannerRtlAddServer),
+            ),
+            TextButton.icon(
+              onPressed: _testing != null ? null : _search,
+              icon: const Icon(Icons.travel_explore),
+              label: Text(context.l10n.lanSearchRtl),
+            ),
+          ],
         ),
         Text(context.l10n.scannerRtlTestHint, style: const TextStyle(color: Colors.white54, fontSize: 12)),
       ];

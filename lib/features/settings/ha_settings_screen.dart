@@ -7,8 +7,26 @@ import '../../core/popup_text_field.dart';
 import '../../core/providers.dart';
 import '../../core/system_providers.dart';
 import '../../data/repositories/settings_repository.dart';
+import '../../data/services/ha_discovery.dart';
 import '../../data/services/ha_mqtt_link.dart';
 import '../../l10n/l10n.dart';
+import '../shared/lan_search_dialog.dart';
+
+/// "Home Assistant suchen" (port 8123 in the home network) - the one OK
+/// takes, or null.
+Future<FoundHomeAssistant?> searchHomeAssistant(BuildContext context) {
+  final l = context.l10n;
+  return showLanSearch<FoundHomeAssistant>(
+    context,
+    title: l.lanSearchHa,
+    noneFound: l.lanSearchHaNone,
+    search: (onProgress) => findHomeAssistant(onProgress: onProgress),
+    row: (f) => (
+      title: f.name ?? 'Home Assistant',
+      subtitle: [f.url, if (f.mqtt) l.lanSearchHaMqtt else l.lanSearchHaNoMqtt].join(' · '),
+    ),
+  );
+}
 
 /// The link's state as a line of text (also for the admin page).
 String haLinkStatusText(AppLocalizations l, HaLinkState state, String? error, {required String deviceName, required bool hasHost}) {
@@ -77,6 +95,17 @@ class _HaSettingsScreenState extends ConsumerState<HaSettingsScreen> {
         ));
   }
 
+  /// "Home Assistant suchen": its machine becomes the broker (the
+  /// Mosquitto add-on runs there) - and the Haussteuerung's address, if
+  /// none is set yet.
+  Future<void> _search() async {
+    final found = await searchHomeAssistant(context);
+    if (found == null || !mounted) return;
+    _host.text = found.host;
+    await _save();
+    if (ref.read(dashboardUrlProvider).trim().isEmpty) await ref.read(dashboardUrlProvider.notifier).set(found.url);
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
@@ -131,6 +160,18 @@ class _HaSettingsScreenState extends ConsumerState<HaSettingsScreen> {
                     icon: Icons.dns_outlined,
                     keyboardType: TextInputType.url,
                     onSubmitted: (_) => _save(),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
+                    child: Text(l.haHostHelp, style: help),
+                  ),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: _search,
+                      icon: const Icon(Icons.travel_explore),
+                      label: Text(l.lanSearchHa),
+                    ),
                   ),
                   const SizedBox(height: 12),
                   PopupTextField(

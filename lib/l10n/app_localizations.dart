@@ -1562,6 +1562,12 @@ abstract class AppLocalizations {
   /// **'Haussteuerung öffnen'**
   String get haOpenDashboard;
 
+  /// No description provided for @haHostHelp.
+  ///
+  /// In de, this message translates to:
+  /// **'Nur die IP oder der Name des Rechners mit dem Mosquitto-Add-on, z. B. 192.168.1.5 - nicht die Adresse der Home-Assistant-Seite mit :8123.'**
+  String get haHostHelp;
+
   /// No description provided for @iptvListName.
   ///
   /// In de, this message translates to:
@@ -1933,6 +1939,78 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'Suchen'**
   String get iptvChipSearch;
+
+  /// No description provided for @lanSearchFound.
+  ///
+  /// In de, this message translates to:
+  /// **'{count, plural, =1{Eines gefunden - OK übernimmt es.} other{{count} gefunden - OK übernimmt eines.}}'**
+  String lanSearchFound(int count);
+
+  /// No description provided for @lanSearchButton.
+  ///
+  /// In de, this message translates to:
+  /// **'Suchen'**
+  String get lanSearchButton;
+
+  /// No description provided for @lanSearchHa.
+  ///
+  /// In de, this message translates to:
+  /// **'Home Assistant suchen'**
+  String get lanSearchHa;
+
+  /// No description provided for @lanSearchHaHint.
+  ///
+  /// In de, this message translates to:
+  /// **'im Heimnetz, statt die Adresse einzutippen'**
+  String get lanSearchHaHint;
+
+  /// No description provided for @lanSearchHaNone.
+  ///
+  /// In de, this message translates to:
+  /// **'Kein Home Assistant gefunden (Port 8123). Läuft er und ist er im selben Netz? Sonst die Adresse bitte von Hand eintragen.'**
+  String get lanSearchHaNone;
+
+  /// No description provided for @lanSearchHaMqtt.
+  ///
+  /// In de, this message translates to:
+  /// **'MQTT-Broker läuft dort'**
+  String get lanSearchHaMqtt;
+
+  /// No description provided for @lanSearchHaNoMqtt.
+  ///
+  /// In de, this message translates to:
+  /// **'kein MQTT-Broker (Mosquitto-Add-on?)'**
+  String get lanSearchHaNoMqtt;
+
+  /// No description provided for @lanSearchHaAdminHelp.
+  ///
+  /// In de, this message translates to:
+  /// **'Sucht im Heimnetz nach Home Assistant (dauert ein paar Sekunden). Bei einem Treffer wird er als Broker eingetragen - und als Adresse der Haussteuerung, wenn dort noch keine steht.'**
+  String get lanSearchHaAdminHelp;
+
+  /// No description provided for @lanSearchHaTaken.
+  ///
+  /// In de, this message translates to:
+  /// **'Gefunden und eingetragen: {name} ({url})'**
+  String lanSearchHaTaken(String name, String url);
+
+  /// No description provided for @lanSearchHaSeveral.
+  ///
+  /// In de, this message translates to:
+  /// **'Mehrere gefunden: {list} - bitte die richtige Adresse von Hand eintragen.'**
+  String lanSearchHaSeveral(String list);
+
+  /// No description provided for @lanSearchRtl.
+  ///
+  /// In de, this message translates to:
+  /// **'Im Netzwerk suchen'**
+  String get lanSearchRtl;
+
+  /// No description provided for @lanSearchRtlNone.
+  ///
+  /// In de, this message translates to:
+  /// **'Kein rtl_tcp-Server gefunden (Port 1234). Läuft er und ist er im selben Netz? Ein Server, der gerade von einem anderen Gerät benutzt wird, meldet sich bei klassischem rtl_tcp nicht.'**
+  String get lanSearchRtlNone;
 
   /// No description provided for @launcherAddToGroup.
   ///

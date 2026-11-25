@@ -60,6 +60,14 @@ void main() {
     expect(haBrokerFor(on.copyWith(host: 'mqtt.local', port: 1884), 'http://192.168.100.202:8123/')!.host, 'mqtt.local');
     expect(haBrokerFor(on.copyWith(host: 'mqtt.local', port: 1884), '')!.port, 1884);
     expect(haBrokerFor(on, ''), isNull);
+    // Home Assistant's address pasted into the broker field: only its host.
+    final pasted = haBrokerFor(on.copyWith(host: 'http://192.168.100.202:8123'), '')!;
+    expect((pasted.host, pasted.port), ('192.168.100.202', 1883));
+    expect(haBrokerFor(on.copyWith(host: 'https://ha.local:8123/lovelace/0'), '')!.host, 'ha.local');
+    final withPort = haBrokerFor(on.copyWith(host: '192.168.100.202:1884'), '')!;
+    expect((withPort.host, withPort.port), ('192.168.100.202', 1884));
+    expect(haBrokerFor(on.copyWith(host: 'mqtt://broker.lan:8883'), '')!.port, 8883);
+    expect(haBrokerFor(on.copyWith(host: ' 192.168.100.202 '), '')!.host, '192.168.100.202');
     expect(haBrokerFor(on.copyWith(enabled: false), 'http://192.168.100.202:8123/'), isNull);
   });
 }

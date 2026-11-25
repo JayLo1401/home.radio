@@ -17,6 +17,7 @@ import '../../data/models/launcher_tile.dart';
 import '../../data/repositories/settings_repository.dart';
 import '../../data/services/admin_server.dart';
 import '../../data/services/display_service.dart';
+import '../../data/services/ha_discovery.dart';
 import '../../data/services/enigma2_service.dart';
 import '../../data/services/launcher_service.dart';
 import '../../data/services/nas_backup_service.dart';
@@ -993,9 +994,29 @@ class AdminSettings implements AdminSettingsSource {
         _Setting(
           id: 'haHost',
           label: l.haHost,
+          help: l.haHostHelp,
           type: 'text',
           get: () => ha.host,
           set: (v) => setHa((x) => x.copyWith(host: '${v ?? ''}'.trim())),
+        ),
+        _Setting.action(
+          id: 'haSearch',
+          label: l.lanSearchHa,
+          help: l.lanSearchHaAdminHelp,
+          button: l.lanSearchButton,
+          run: () async {
+            final found = await findHomeAssistant().toList();
+            if (found.isEmpty) return (ok: false, message: l.lanSearchHaNone);
+            if (found.length > 1) {
+              return (ok: true, message: l.lanSearchHaSeveral(found.map((f) => f.name ?? f.host).join(', ')));
+            }
+            final ha = found.single;
+            await setHa((x) => x.copyWith(host: ha.host));
+            if ((await settingsRepo.getDashboardUrl()).trim().isEmpty) {
+              await _c.read(dashboardUrlProvider.notifier).set(ha.url);
+            }
+            return (ok: true, message: l.lanSearchHaTaken(ha.name ?? ha.host, ha.url));
+          },
         ),
         _Setting(
           id: 'haPort',

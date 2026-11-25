@@ -56,6 +56,24 @@ class RtlSdrService {
     return result;
   }
 
+  /// For the network search: what answers on [host]:[port] - the info
+  /// HELLO (rtltcp.server lists its sticks without opening one; a classic
+  /// rtl_tcp answers "RTL0"), then closed at once.
+  static Future<RtlConnectResult> probe(String host, int port, {Duration timeout = const Duration(seconds: 3)}) async {
+    final stats = StreamController<RtlSdrStats>.broadcast();
+    final messages = StreamController<RtlServerMessage>.broadcast();
+    final client = _RtlTcpTestClient(stats, messages, info: true);
+    try {
+      return await client.connect(host, port).timeout(timeout);
+    } catch (_) {
+      return const RtlConnectResult(connected: false);
+    } finally {
+      await client.close();
+      await stats.close();
+      await messages.close();
+    }
+  }
+
   Future<void> setFrequencyHz(int hz) async => _client?.command(0x01, hz);
 
   Future<void> setSampleRateHz(int hz) async => _client?.command(0x02, hz);

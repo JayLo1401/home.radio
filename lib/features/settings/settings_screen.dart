@@ -422,6 +422,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           onTap: _editDashboardUrl,
         ),
       ),
+      FocusTraversalOrder(
+        order: NumericFocusOrder(nextOrder()),
+        child: _TvNavTile(
+          label: l.lanSearchHa,
+          value: l.lanSearchHaHint,
+          icon: Icons.travel_explore,
+          onTap: () async {
+            final found = await searchHomeAssistant(context);
+            if (found != null) await ref.read(dashboardUrlProvider.notifier).set(found.url);
+          },
+        ),
+      ),
       Padding(padding: const EdgeInsets.fromLTRB(12, 4, 12, 0), child: Text(l.dashboardAddressHelp, style: help)),
       const Divider(height: 32),
       Text(l.dashboardDisplayHeading, style: Theme.of(context).textTheme.titleLarge),

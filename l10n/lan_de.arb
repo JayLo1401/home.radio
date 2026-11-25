@@ -1,0 +1,17 @@
+{
+  "lanSearchFound": "{count, plural, =1{Eines gefunden - OK übernimmt es.} other{{count} gefunden - OK übernimmt eines.}}",
+  "@lanSearchFound": {"placeholders": {"count": {"type": "int"}}},
+  "lanSearchButton": "Suchen",
+  "lanSearchHa": "Home Assistant suchen",
+  "lanSearchHaHint": "im Heimnetz, statt die Adresse einzutippen",
+  "lanSearchHaNone": "Kein Home Assistant gefunden (Port 8123). Läuft er und ist er im selben Netz? Sonst die Adresse bitte von Hand eintragen.",
+  "lanSearchHaMqtt": "MQTT-Broker läuft dort",
+  "lanSearchHaNoMqtt": "kein MQTT-Broker (Mosquitto-Add-on?)",
+  "lanSearchHaAdminHelp": "Sucht im Heimnetz nach Home Assistant (dauert ein paar Sekunden). Bei einem Treffer wird er als Broker eingetragen - und als Adresse der Haussteuerung, wenn dort noch keine steht.",
+  "lanSearchHaTaken": "Gefunden und eingetragen: {name} ({url})",
+  "@lanSearchHaTaken": {"placeholders": {"name": {"type": "String"}, "url": {"type": "String"}}},
+  "lanSearchHaSeveral": "Mehrere gefunden: {list} - bitte die richtige Adresse von Hand eintragen.",
+  "@lanSearchHaSeveral": {"placeholders": {"list": {"type": "String"}}},
+  "lanSearchRtl": "Im Netzwerk suchen",
+  "lanSearchRtlNone": "Kein rtl_tcp-Server gefunden (Port 1234). Läuft er und ist er im selben Netz? Ein Server, der gerade von einem anderen Gerät benutzt wird, meldet sich bei klassischem rtl_tcp nicht."
+}

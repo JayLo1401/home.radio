@@ -833,6 +833,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get haOpenDashboard => 'Open Smart Home';
 
   @override
+  String get haHostHelp =>
+      'Only the IP or name of the machine with the Mosquitto add-on, e.g. 192.168.1.5 - not the Home Assistant page address with :8123.';
+
+  @override
   String get iptvListName => 'Internet TV';
 
   @override
@@ -1070,6 +1074,58 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get iptvChipSearch => 'Search';
+
+  @override
+  String lanSearchFound(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count found - OK takes one.',
+      one: 'One found - OK takes it.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get lanSearchButton => 'Search';
+
+  @override
+  String get lanSearchHa => 'Find Home Assistant';
+
+  @override
+  String get lanSearchHaHint =>
+      'in the home network, instead of typing the address';
+
+  @override
+  String get lanSearchHaNone =>
+      'No Home Assistant found (port 8123). Is it running and in the same network? Otherwise please enter the address by hand.';
+
+  @override
+  String get lanSearchHaMqtt => 'MQTT broker runs there';
+
+  @override
+  String get lanSearchHaNoMqtt => 'no MQTT broker (Mosquitto add-on?)';
+
+  @override
+  String get lanSearchHaAdminHelp =>
+      'Looks for Home Assistant in the home network (takes a few seconds). If one is found it becomes the broker - and the Smart Home address if none is set there yet.';
+
+  @override
+  String lanSearchHaTaken(String name, String url) {
+    return 'Found and entered: $name ($url)';
+  }
+
+  @override
+  String lanSearchHaSeveral(String list) {
+    return 'Several found: $list - please enter the right address by hand.';
+  }
+
+  @override
+  String get lanSearchRtl => 'Search the network';
+
+  @override
+  String get lanSearchRtlNone =>
+      'No rtl_tcp server found (port 1234). Is it running and in the same network? A classic rtl_tcp in use by another device doesn\'t answer.';
 
   @override
   String get launcherAddToGroup => 'Add to group …';

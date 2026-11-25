@@ -834,6 +834,10 @@ class AppLocalizationsDe extends AppLocalizations {
   String get haOpenDashboard => 'Haussteuerung öffnen';
 
   @override
+  String get haHostHelp =>
+      'Nur die IP oder der Name des Rechners mit dem Mosquitto-Add-on, z. B. 192.168.1.5 - nicht die Adresse der Home-Assistant-Seite mit :8123.';
+
+  @override
   String get iptvListName => 'Internet-TV';
 
   @override
@@ -1071,6 +1075,57 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get iptvChipSearch => 'Suchen';
+
+  @override
+  String lanSearchFound(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count gefunden - OK übernimmt eines.',
+      one: 'Eines gefunden - OK übernimmt es.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get lanSearchButton => 'Suchen';
+
+  @override
+  String get lanSearchHa => 'Home Assistant suchen';
+
+  @override
+  String get lanSearchHaHint => 'im Heimnetz, statt die Adresse einzutippen';
+
+  @override
+  String get lanSearchHaNone =>
+      'Kein Home Assistant gefunden (Port 8123). Läuft er und ist er im selben Netz? Sonst die Adresse bitte von Hand eintragen.';
+
+  @override
+  String get lanSearchHaMqtt => 'MQTT-Broker läuft dort';
+
+  @override
+  String get lanSearchHaNoMqtt => 'kein MQTT-Broker (Mosquitto-Add-on?)';
+
+  @override
+  String get lanSearchHaAdminHelp =>
+      'Sucht im Heimnetz nach Home Assistant (dauert ein paar Sekunden). Bei einem Treffer wird er als Broker eingetragen - und als Adresse der Haussteuerung, wenn dort noch keine steht.';
+
+  @override
+  String lanSearchHaTaken(String name, String url) {
+    return 'Gefunden und eingetragen: $name ($url)';
+  }
+
+  @override
+  String lanSearchHaSeveral(String list) {
+    return 'Mehrere gefunden: $list - bitte die richtige Adresse von Hand eintragen.';
+  }
+
+  @override
+  String get lanSearchRtl => 'Im Netzwerk suchen';
+
+  @override
+  String get lanSearchRtlNone =>
+      'Kein rtl_tcp-Server gefunden (Port 1234). Läuft er und ist er im selben Netz? Ein Server, der gerade von einem anderen Gerät benutzt wird, meldet sich bei klassischem rtl_tcp nicht.';
 
   @override
   String get launcherAddToGroup => 'Zu Gruppe hinzufügen …';
