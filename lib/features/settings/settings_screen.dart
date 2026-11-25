@@ -9,6 +9,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../core/dashboard_providers.dart';
 import '../../core/display_mode.dart';
+import '../../core/ha_providers.dart';
 import '../../core/providers.dart';
 import '../../core/system_providers.dart';
 import '../../core/theme.dart';
@@ -33,6 +34,7 @@ import '../rtlsdr/rtl_sdr_test_screen.dart';
 import 'restore_backup_screen.dart';
 import '../tv/tv_providers.dart';
 import '../tv/iptv_providers.dart';
+import 'ha_settings_screen.dart';
 import 'iptv_settings_screen.dart';
 import '../browser/browser_channel.dart';
 import '../browser/browser_settings_screen.dart';
@@ -879,6 +881,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const NasSettingsScreen()),
                   ),
+                ),
+              ),
+              FocusTraversalOrder(
+                order: NumericFocusOrder(nextOrder()),
+                child: Consumer(
+                  builder: (context, ref, _) {
+                    final ha = ref.watch(haLinkSettingsProvider);
+                    return _TvNavTile(
+                      label: l.haTitle,
+                      value: ha.enabled ? l.commonOn : l.commonOff,
+                      configured: ha.enabled,
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const HaSettingsScreen()),
+                      ),
+                    );
+                  },
                 ),
               ),
               const Divider(height: 32),

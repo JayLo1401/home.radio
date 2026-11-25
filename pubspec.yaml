@@ -75,6 +75,8 @@ dependencies:
   # FFmpeg build - see packages/media_kit_libs_android_video/HOME_SYSTEM.md.
   media_kit_libs_android_video: 1.3.8
   smb_connect: ^0.0.9
+  mqtt_client: ^10.14.0
+  typed_data: ^1.4.0
 
 # video_player's Android side (2.13.0) with two changes: ExoPlayer gets a
 # software MP2 decoder for devices without one (Fire TV - most satellite

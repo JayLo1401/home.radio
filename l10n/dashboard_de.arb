@@ -54,7 +54,7 @@
   "dashboardHaHeading": "Home Assistant",
   "dashboardWebhook": "Webhook für Bewegung",
   "dashboardWebhookHint": "http://homeassistant.local:8123/api/webhook/flur-tablet",
-  "dashboardWebhookHelp": "Bei Bewegung schickt Home System \"motion\": true, nach einer Minute Ruhe \"motion\": false - als Auslöser für Automationen (Auslöser „Webhook“).",
+  "dashboardWebhookHelp": "Bei Bewegung schickt Home System \"motion\": true, nach einer Minute Ruhe \"motion\": false - als Auslöser für Automationen (Auslöser „Webhook“). Einfacher: System → Home Assistant - dann ist das Gerät mit Bewegungssensor und Schaltern direkt in Home Assistant.",
   "dashboardRemoteHelp": "Home Assistant kann das Display schalten und das Dashboard neu laden: {url}/api/display/on, …/off, …/api/dashboard/reload (POST, z. B. mit rest_command).",
   "@dashboardRemoteHelp": {
     "placeholders": {

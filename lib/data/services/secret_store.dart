@@ -25,7 +25,10 @@ class SecretStore {
   /// 'rtl_tcp_password' - ignored.
   /// Everything a backup carries (see exportAll) - 'nas_password' is
   /// NasSettingsRepository.passwordKey.
-  static const keys = <String>[enigma2PasswordKey, 'nas_password'];
+  static const keys = <String>[enigma2PasswordKey, 'nas_password', haMqttPasswordKey];
+
+  /// The MQTT broker's login for Home Assistant (HaLinkSettings).
+  static const haMqttPasswordKey = 'ha_mqtt_password';
 
   Future<String?> read(String key) async {
     try {

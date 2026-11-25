@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' show NumberFormat;
 
 import '../../core/dashboard_providers.dart';
+import '../../core/ha_providers.dart';
 import '../../core/nas_providers.dart';
 import '../../core/pictures_providers.dart';
 import '../../core/providers.dart';
@@ -26,6 +27,7 @@ import '../../l10n/l10n.dart';
 import '../browser/browser_channel.dart';
 import '../browser/browser_settings.dart';
 import '../launcher/launcher_providers.dart';
+import '../settings/ha_settings_screen.dart' show haLinkStatusText;
 import '../tv/tv_providers.dart';
 
 /// One setting the admin page shows and changes.
@@ -800,6 +802,13 @@ class AdminSettings implements AdminSettingsSource {
     final device = await updates.deviceInfo();
     final settingsRepo = _c.read(settingsRepositoryProvider);
     final auto = await settingsRepo.getAutoUpdate();
+    final ha = await settingsRepo.getHaLink();
+    final haLink = _c.read(haMqttLinkProvider);
+    Future<String?> setHa(HaLinkSettings Function(HaLinkSettings s) change) async {
+      await _c.read(haLinkSettingsProvider.notifier).set(change(await settingsRepo.getHaLink()));
+      return null;
+    }
+
     return [
       _group('system', l.nasTitle, help: l.nasIntro, [
         _Setting(
@@ -946,6 +955,75 @@ class AdminSettings implements AdminSettingsSource {
             }
           },
         ),
+      ]),
+      _group('system', l.haTitle, help: l.haIntro, [
+        _Setting.info(
+          id: 'haStatus',
+          label: haLinkStatusText(
+            l,
+            haLink.state.value,
+            haLink.error.value,
+            deviceName: _c.read(deviceNameProvider),
+            hasHost: haBrokerFor(ha.copyWith(enabled: true), await settingsRepo.getDashboardUrl()) != null,
+          ),
+          lines: const [],
+        ),
+        _Setting(
+          id: 'haEnabled',
+          label: l.haEnabled,
+          type: 'bool',
+          get: () => ha.enabled,
+          set: (v) => setHa((x) => x.copyWith(enabled: _bool(v) ?? false)),
+        ),
+        _Setting(
+          id: 'haHost',
+          label: l.haHost,
+          type: 'text',
+          get: () => ha.host,
+          set: (v) => setHa((x) => x.copyWith(host: '${v ?? ''}'.trim())),
+        ),
+        _Setting(
+          id: 'haPort',
+          label: l.haPort(HaLinkSettings.defaultPort),
+          type: 'text',
+          get: () => ha.port == HaLinkSettings.defaultPort ? '' : '${ha.port}',
+          set: (v) {
+            final text = '${v ?? ''}'.trim();
+            final port = text.isEmpty ? HaLinkSettings.defaultPort : int.tryParse(text);
+            if (port == null || port < 1 || port > 65535) return Future.value(l.adminInvalidValue);
+            return setHa((x) => x.copyWith(port: port));
+          },
+        ),
+        _Setting(
+          id: 'haUser',
+          label: l.haUser,
+          help: l.haLoginHint,
+          type: 'text',
+          get: () => ha.user,
+          set: (v) => setHa((x) => x.copyWith(user: '${v ?? ''}'.trim())),
+        ),
+        _Setting(
+          id: 'haPassword',
+          label: l.nasPassword,
+          type: 'secret',
+          help: l.adminSecretHelp,
+          get: () => '',
+          set: (v) => setHa((x) => x.copyWith(password: '${v ?? ''}')),
+        ),
+        if (DisplayService.supported)
+          _Setting(
+            id: 'haShareCamera',
+            label: l.haShareCamera,
+            help: l.haShareCameraHelp,
+            type: 'bool',
+            get: () => ha.shareCamera,
+            set: (v) async {
+              final on = _bool(v) ?? false;
+              // The camera permission can only be granted on the device.
+              if (on && !await _c.read(displayServiceProvider).hasCameraPermission()) return l.adminCameraOnDevice;
+              return setHa((x) => x.copyWith(shareCamera: on));
+            },
+          ),
       ]),
       _group('system', l.miscUpdatesTitle, [
         _Setting.info(id: 'updateVersion', label: l.miscUpdateInstalledVersion(version), lines: [

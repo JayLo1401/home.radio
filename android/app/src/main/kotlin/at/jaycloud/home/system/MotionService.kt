@@ -121,7 +121,10 @@ class MotionService : Service() {
             stopSelf()
             return
         }
-        val size = smallSize(manager, id)
+        val size = if (shareFrames) shareSize(manager, id) else smallSize(manager, id)
+        sensorOrientation = manager.getCameraCharacteristics(id).get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 0
+        frontCamera = manager.getCameraCharacteristics(id).get(CameraCharacteristics.LENS_FACING) ==
+            CameraCharacteristics.LENS_FACING_FRONT
         val t = HandlerThread("motion").also { it.start() }
         thread = t
         val handler = Handler(t.looper)
@@ -214,6 +217,57 @@ class MotionService : Service() {
         return sizes.filter { it.width >= 160 }.minByOrNull { it.width * it.height } ?: sizes.firstOrNull() ?: Size(320, 240)
     }
 
+    /** For sharing the picture: about 640 pixels across (the grid samples it as before). */
+    private fun shareSize(manager: CameraManager, id: String): Size {
+        val map = manager.getCameraCharacteristics(id).get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
+        val sizes = map?.getOutputSizes(ImageFormat.YUV_420_888)?.toList().orEmpty()
+        return sizes.filter { it.width in 480..960 }.minByOrNull { abs(it.width - 640) }
+            ?: sizes.filter { it.width >= 160 }.minByOrNull { it.width * it.height }
+            ?: Size(640, 480)
+    }
+
+    private var sensorOrientation = 0
+    private var frontCamera = true
+    private var lastSharedAt = 0L
+
+    /** A JPEG of the picture, upright for the display's rotation - for Home Assistant. */
+    private fun shareFrame(image: android.media.Image) {
+        val w = image.width
+        val h = image.height
+        val nv21 = ByteArray(w * h * 3 / 2)
+        val y = image.planes[0]
+        var at = 0
+        for (row in 0 until h) {
+            for (col in 0 until w) nv21[at++] = y.buffer.get(row * y.rowStride + col * y.pixelStride)
+        }
+        val u = image.planes[1]
+        val v = image.planes[2]
+        for (row in 0 until h / 2) {
+            for (col in 0 until w / 2) {
+                nv21[at++] = v.buffer.get(row * v.rowStride + col * v.pixelStride)
+                nv21[at++] = u.buffer.get(row * u.rowStride + col * u.pixelStride)
+            }
+        }
+        val jpeg = java.io.ByteArrayOutputStream()
+        android.graphics.YuvImage(nv21, ImageFormat.NV21, w, h, null).compressToJpeg(android.graphics.Rect(0, 0, w, h), 70, jpeg)
+        var bytes = jpeg.toByteArray()
+        @Suppress("DEPRECATION")
+        val display = (getSystemService(android.view.WindowManager::class.java)).defaultDisplay.rotation * 90
+        val rotation = if (frontCamera) (sensorOrientation + display) % 360 else (sensorOrientation - display + 360) % 360
+        if (rotation != 0) {
+            val bitmap = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+            val turned = android.graphics.Bitmap.createBitmap(
+                bitmap, 0, 0, bitmap.width, bitmap.height, android.graphics.Matrix().apply { postRotate(rotation.toFloat()) }, true,
+            )
+            val out = java.io.ByteArrayOutputStream()
+            turned.compress(android.graphics.Bitmap.CompressFormat.JPEG, 70, out)
+            bytes = out.toByteArray()
+            bitmap.recycle()
+            turned.recycle()
+        }
+        frameListener?.invoke(bytes)
+    }
+
     private fun onImage(r: ImageReader) {
         val image = try {
             r.acquireLatestImage()
@@ -222,6 +276,14 @@ class MotionService : Service() {
         } ?: return
         try {
             val now = SystemClock.elapsedRealtime()
+            if (shareFrames && frameListener != null && now - lastSharedAt >= SHARE_MS) {
+                lastSharedAt = now
+                try {
+                    shareFrame(image)
+                } catch (e: Exception) {
+                    Log.w(TAG, "can't share the picture", e)
+                }
+            }
             if (now - lastFrameAt < FRAME_MS) return
             lastFrameAt = now
             val plane = image.planes[0]
@@ -306,6 +368,8 @@ class MotionService : Service() {
     }
 
     private fun report(motion: Boolean) {
+        // Home Assistant over MQTT (Dart, see HaMqttLink): the motion sensor.
+        motionListener?.invoke(motion)
         val c = config
         val url = c.webhookUrl.trim()
         if (url.isEmpty()) return
@@ -380,6 +444,32 @@ class MotionService : Service() {
             lastInteractionAt = SystemClock.elapsedRealtime()
             if (dimmed) undim()
         }
+
+        /** A picture every [SHARE_MS] for Home Assistant's camera (switch "Kamera teilen"). */
+        @Volatile
+        var shareFrames = false
+            private set
+
+        /** The shared pictures (JPEG) - DisplayPlugin hands them to Dart. */
+        @Volatile
+        var frameListener: ((ByteArray) -> Unit)? = null
+
+        private const val SHARE_MS = 2_000L
+
+        /** Sharing on/off: the camera opens again in the size it needs. */
+        fun setSharing(on: Boolean) {
+            if (shareFrames == on) return
+            shareFrames = on
+            val service = running ?: return
+            service.main.post {
+                service.closeCamera()
+                service.openCamera()
+            }
+        }
+
+        /** Motion on/off (as for the webhook) - DisplayPlugin hands it to Dart. */
+        @Volatile
+        var motionListener: ((Boolean) -> Unit)? = null
 
         /** The display is darkened ([dim]). */
         @Volatile

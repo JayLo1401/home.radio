@@ -8,6 +8,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/dashboard_providers.dart';
+import 'core/ha_providers.dart';
 import 'core/native_errors.dart';
 import 'core/providers.dart';
 import 'core/system_providers.dart';
@@ -47,6 +48,8 @@ class HomeSystemApp extends ConsumerWidget {
     ref.watch(motionControllerProvider);
     // ... and its brightness (fixed / from the light sensor).
     ref.watch(brightnessControllerProvider);
+    // This device in Home Assistant (MQTT), when switched on.
+    ref.watch(haLinkControllerProvider);
     return MaterialApp(
       title: 'Home System',
       navigatorKey: appNavigatorKey,

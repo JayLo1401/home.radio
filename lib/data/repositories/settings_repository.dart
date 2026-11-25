@@ -499,6 +499,26 @@ class SettingsRepository {
   Future<bool> getAutoUpdate() async => (await _db.getSetting(_keyAutoUpdate)) != 'false';
   Future<void> setAutoUpdate(bool value) => _db.setSetting(_keyAutoUpdate, '$value');
 
+  /// Home Assistant over MQTT (see HaMqttLink); the password in the
+  /// [SecretStore].
+  Future<HaLinkSettings> getHaLink() async => HaLinkSettings(
+        enabled: await _db.getSetting('ha_enabled') == 'true',
+        host: await _db.getSetting('ha_host') ?? '',
+        port: int.tryParse(await _db.getSetting('ha_port') ?? '') ?? HaLinkSettings.defaultPort,
+        user: await _db.getSetting('ha_user') ?? '',
+        password: await _secrets.read(SecretStore.haMqttPasswordKey) ?? '',
+        shareCamera: await _db.getSetting('ha_share_camera') == 'true',
+      );
+
+  Future<void> setHaLink(HaLinkSettings value) async {
+    await _db.setSetting('ha_enabled', '${value.enabled}');
+    await _db.setSetting('ha_host', value.host.trim());
+    await _db.setSetting('ha_port', '${value.port}');
+    await _db.setSetting('ha_user', value.user.trim());
+    await _secrets.write(SecretStore.haMqttPasswordKey, value.password);
+    await _db.setSetting('ha_share_camera', '${value.shareCamera}');
+  }
+
   /// Full screen (see applyDisplayMode); off by default.
   Future<bool> getFullscreen() async => (await _db.getSetting(_keyFullscreen)) == 'true';
   Future<void> setFullscreen(bool value) => _db.setSetting(_keyFullscreen, '$value');
@@ -967,4 +987,57 @@ class DisplayBrightness {
         max: max ?? this.max,
         luxForMax: luxForMax ?? this.luxForMax,
       );
+}
+
+/// The link to Home Assistant over MQTT (Settings → System → Home
+/// Assistant): the broker - usually the Mosquitto add-on on the Home
+/// Assistant machine - and its login (a Home Assistant user works there).
+class HaLinkSettings {
+  const HaLinkSettings({
+    this.enabled = false,
+    this.host = '',
+    this.port = defaultPort,
+    this.user = '',
+    this.password = '',
+    this.shareCamera = false,
+  });
+
+  static const defaultPort = 1883;
+
+  final bool enabled;
+
+  /// '' = the Haussteuerung's Home Assistant address.
+  final String host;
+  final int port;
+  /// The Home Assistant login - for the broker (Mosquitto takes Home
+  /// Assistant users) and for logging in to the dashboard by itself.
+  final String user;
+  final String password;
+
+  /// The camera's picture as a camera in Home Assistant (while
+  /// display-by-motion runs).
+  final bool shareCamera;
+
+  HaLinkSettings copyWith({bool? enabled, String? host, int? port, String? user, String? password, bool? shareCamera}) =>
+      HaLinkSettings(
+        enabled: enabled ?? this.enabled,
+        host: host ?? this.host,
+        port: port ?? this.port,
+        user: user ?? this.user,
+        password: password ?? this.password,
+        shareCamera: shareCamera ?? this.shareCamera,
+      );
+
+  @override
+  bool operator ==(Object other) =>
+      other is HaLinkSettings &&
+      other.enabled == enabled &&
+      other.host == host &&
+      other.port == port &&
+      other.user == user &&
+      other.password == password &&
+      other.shareCamera == shareCamera;
+
+  @override
+  int get hashCode => Object.hash(enabled, host, port, user, password, shareCamera);
 }

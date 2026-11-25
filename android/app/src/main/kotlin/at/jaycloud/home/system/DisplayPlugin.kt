@@ -1,12 +1,21 @@
 package at.jaycloud.home.system
 
 import android.app.Activity
+import android.app.ActivityManager
 import android.app.KeyguardManager
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.os.BatteryManager
 import android.os.Build
+import android.os.Environment
 import android.os.Handler
 import android.os.Looper
+import android.os.StatFs
+import android.speech.tts.TextToSpeech
+import android.util.Log
 import android.view.WindowManager
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
@@ -15,6 +24,7 @@ import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.PluginRegistry
+import java.util.Locale
 
 /**
  * The Haussteuerung's display ("home_system/display"): keeping it on while the
@@ -34,10 +44,35 @@ class DisplayPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAw
     private val main = Handler(Looper.getMainLooper())
     private var brightness: BrightnessController? = null
 
+    private var tts: TextToSpeech? = null
+    private var ttsReady = false
+    private val pendingSpeech = mutableListOf<String>()
+
+    /** Display on/off - for Home Assistant (Dart's DisplayService.screenOn). */
+    private val screenReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            val on = intent.action == Intent.ACTION_SCREEN_ON
+            main.post { channel?.invokeMethod("screen", on) }
+        }
+    }
+
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         appContext = binding.applicationContext
         brightness = BrightnessController(appContext)
         channel = MethodChannel(binding.binaryMessenger, "home_system/display").also { it.setMethodCallHandler(this) }
+        MotionService.motionListener = { on -> main.post { channel?.invokeMethod("motion", on) } }
+        MotionService.frameListener = { jpeg -> main.post { channel?.invokeMethod("cameraFrame", jpeg) } }
+        try {
+            appContext.registerReceiver(
+                screenReceiver,
+                IntentFilter().apply {
+                    addAction(Intent.ACTION_SCREEN_ON)
+                    addAction(Intent.ACTION_SCREEN_OFF)
+                },
+            )
+        } catch (e: Exception) {
+            Log.w(TAG, "no screen on/off broadcasts", e)
+        }
         events = EventChannel(binding.binaryMessenger, "home_system/motion").also {
             it.setStreamHandler(object : EventChannel.StreamHandler {
                 override fun onListen(arguments: Any?, sink: EventChannel.EventSink) {
@@ -54,6 +89,15 @@ class DisplayPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAw
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        MotionService.motionListener = null
+        MotionService.frameListener = null
+        try {
+            appContext.unregisterReceiver(screenReceiver)
+        } catch (_: Exception) {
+        }
+        tts?.shutdown()
+        tts = null
+        ttsReady = false
         channel?.setMethodCallHandler(null)
         events?.setStreamHandler(null)
         MotionService.listener = null
@@ -168,7 +212,87 @@ class DisplayPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAw
                 b?.readOnce()
                 result.success(mapOf("hasSensor" to (b?.hasSensor ?: false), "lux" to (b?.lux ?: -1f).toDouble()))
             }
+            // For Home Assistant: battery, light, memory, storage, display.
+            "deviceStatus" -> Thread {
+                val status = try {
+                    deviceStatus()
+                } catch (e: Exception) {
+                    Log.w(TAG, "deviceStatus failed", e)
+                    emptyMap<String, Any?>()
+                }
+                main.post { result.success(status) }
+            }.start()
+            "setCameraSharing" -> {
+                MotionService.setSharing(call.argument<Boolean>("on") ?: false)
+                result.success(null)
+            }
+            "speak" -> {
+                speak(call.argument<String>("text") ?: "")
+                result.success(null)
+            }
+            // Home System in front again (from another app, or the display off).
+            "bringToFront" -> {
+                MotionService.wake(appContext)
+                result.success(true)
+            }
             else -> result.notImplemented()
+        }
+    }
+
+    private fun deviceStatus(): Map<String, Any?> {
+        val battery = appContext.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        val present = battery?.getBooleanExtra(BatteryManager.EXTRA_PRESENT, false) ?: false
+        val level = battery?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+        val scale = battery?.getIntExtra(BatteryManager.EXTRA_SCALE, 100) ?: 100
+        val plugged = (battery?.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) ?: 0) != 0
+        val temperature = battery?.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, Int.MIN_VALUE) ?: Int.MIN_VALUE
+        val memory = ActivityManager.MemoryInfo()
+        appContext.getSystemService(ActivityManager::class.java)?.getMemoryInfo(memory)
+        val data = StatFs(Environment.getDataDirectory().path)
+        val b = brightness
+        b?.readOnce()
+        return mapOf(
+            // TV boxes have no battery (some report one that isn't there).
+            "hasBattery" to (present && level >= 0 && scale > 0),
+            "battery" to if (level >= 0 && scale > 0) level * 100 / scale else null,
+            "plugged" to plugged,
+            "batteryTemperature" to if (temperature != Int.MIN_VALUE) temperature / 10.0 else null,
+            "hasLight" to (b?.hasSensor ?: false),
+            "lux" to (b?.lux ?: -1f).toDouble(),
+            "freeMemory" to memory.availMem,
+            "totalMemory" to memory.totalMem,
+            "freeStorage" to data.availableBytes,
+            "totalStorage" to data.totalBytes,
+            "screenOn" to (MotionService.isScreenOn(appContext) && !MotionService.dimmed),
+            "hasCamera" to appContext.packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY),
+        )
+    }
+
+    /** Text to speech (Home Assistant's notify) - in the device's language. */
+    private fun speak(text: String) {
+        if (text.isBlank()) return
+        val engine = tts
+        if (engine != null && ttsReady) {
+            engine.speak(text, TextToSpeech.QUEUE_ADD, null, "home_system_" + System.nanoTime())
+            return
+        }
+        pendingSpeech.add(text)
+        if (engine != null) return
+        tts = TextToSpeech(appContext) { status ->
+            main.post {
+                ttsReady = status == TextToSpeech.SUCCESS
+                if (!ttsReady) {
+                    Log.w(TAG, "text to speech not available ($status)")
+                    pendingSpeech.clear()
+                    tts?.shutdown()
+                    tts = null
+                    return@post
+                }
+                tts?.language = Locale.getDefault()
+                val queued = pendingSpeech.toList()
+                pendingSpeech.clear()
+                queued.forEach { speak(it) }
+            }
         }
     }
 
@@ -203,6 +327,7 @@ class DisplayPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAw
     }
 
     companion object {
+        private const val TAG = "DisplayPlugin"
         private const val REQUEST_CAMERA = 4712
 
         /** After waking by motion: away with a lock screen without PIN (one with a PIN stays). */

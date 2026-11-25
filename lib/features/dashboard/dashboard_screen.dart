@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -6,6 +7,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+
+import '../../core/providers.dart';
+import '../../data/services/ha_auth.dart';
 
 import '../../core/dashboard_providers.dart';
 import '../../core/loading_wave.dart';
@@ -81,8 +85,40 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     super.dispose();
   }
 
+  /// Logged in by itself once per load - a wrong password doesn't loop.
+  bool _autoLoginTried = false;
+
+  /// Home Assistant's login page and a login in the settings (System → Home
+  /// Assistant): log in with it and open the dashboard again. Without one,
+  /// or if it fails (wrong password, two-factor), the login page stays.
+  Future<bool> _autoLogin(String? pageUrl) async {
+    final controller = _controller;
+    if (controller == null || _autoLoginTried || !isHaLoginPage(pageUrl)) return false;
+    final ha = await ref.read(settingsRepositoryProvider).getHaLink();
+    if (ha.user.trim().isEmpty || ha.password.isEmpty) return false;
+    _autoLoginTried = true;
+    final page = Uri.tryParse(pageUrl!);
+    if (page == null) return false;
+    try {
+      final tokens = await haLoginTokens(page, ha.user.trim(), ha.password);
+      if (!mounted) return true;
+      final json = jsonEncode(jsonEncode(tokens));
+      await controller.runJavaScript('localStorage.setItem("hassTokens", $json);');
+      final target = Uri.tryParse(_url);
+      if (target != null) await controller.loadRequest(target);
+      return true;
+    } on HaAuthException catch (e) {
+      debugPrint('dashboard: automatic login failed ($e)');
+      return false;
+    } catch (e) {
+      debugPrint('dashboard: automatic login: $e');
+      return false;
+    }
+  }
+
   void _load() {
     final url = ref.read(dashboardUrlProvider);
+    _autoLoginTried = false;
     _retryTimer?.cancel();
     setState(() {
       _url = url;
@@ -103,7 +139,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       ..setBackgroundColor(Colors.black)
       ..setNavigationDelegate(
         NavigationDelegate(
-          onPageFinished: (_) {
+          onPageFinished: (pageUrl) async {
+            if (!mounted) return;
+            if (await _autoLogin(pageUrl)) return;
             if (!mounted) return;
             setState(() => _loading = false);
             _grabFocus();

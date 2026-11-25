@@ -186,7 +186,7 @@
   "dashboardHaHeading": "Home Assistant",
   "dashboardWebhook": "Webhook for motion",
   "dashboardWebhookHint": "http://homeassistant.local:8123/api/webhook/hallway-tablet",
-  "dashboardWebhookHelp": "On motion Home System sends \"motion\": true, after a minute without motion \"motion\": false - a trigger for automations (trigger \"Webhook\").",
+  "dashboardWebhookHelp": "On motion Home System sends \"motion\": true, after a minute without motion \"motion\": false - a trigger for automations (trigger \"Webhook\"). Simpler: System → Home Assistant - then the device with its motion sensor and switches is in Home Assistant directly.",
   "dashboardRemoteHelp": "Home Assistant can switch the display and reload the dashboard: {url}/api/display/on, …/off, …/api/dashboard/reload (POST, e.g. with rest_command).",
   "dashboardTestOff": "Switch the display off now (test)",
   "dashboardDimOnly": "Only darken the display instead of switching it off",
@@ -202,6 +202,65 @@
   "dashboardBrightnessHelp": "The light sensor sits behind the glass and often reads low: set \"Full brightness from\" to what it shows in a bright room (see below).",
   "dashboardBrightnessLux": "Light sensor now: {lux} lx",
   "dashboardBrightnessNoSensor": "This device has no light sensor.",
+  "haTitle": "Home Assistant",
+  "haIntro": "Adds this device to Home Assistant as a device of its own - with its device name, switches (screen, motion detection, brightness), buttons, messages, text to speech and sensors (motion, battery, light). Home Assistant only needs the MQTT integration with the Mosquitto add-on, no YAML. Switched off, the device disappears there again.",
+  "haEnabled": "Connect to Home Assistant",
+  "haHost": "MQTT broker (empty = the Smart Home address)",
+  "haPort": "Port (empty = {port})",
+  "@haPort": {
+    "placeholders": {
+      "port": {
+        "type": "int"
+      }
+    }
+  },
+  "haUser": "Home Assistant user",
+  "haLoginHint": "Used for both: the Smart Home dashboard logs in with it by itself, and the Mosquitto add-on accepts Home Assistant users for MQTT too. Best create a user of its own (Settings → People → Users, e.g. “homesystem”, without two-factor).",
+  "haEntitiesHint": "The device then shows up in Home Assistant under Settings → Devices & services → MQTT with its device name.",
+  "haStatusOff": "Off",
+  "haStatusConnecting": "Connecting…",
+  "haStatusConnected": "Connected - in Home Assistant as “{name}”",
+  "@haStatusConnected": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "haStatusNoHost": "No address: enter the MQTT broker here or the Home Assistant address under Smart Home.",
+  "haErrorLogin": "Login refused - check user name and password.",
+  "haErrorUnreachable": "Broker not reachable - is the Mosquitto add-on running? Trying again in 30 seconds.",
+  "haErrorOther": "No connection: {message}",
+  "@haErrorOther": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "haScreen": "Screen",
+  "haMotionDetection": "Motion detection",
+  "haBrightnessMode": "Brightness mode",
+  "haBrightness": "Screen brightness",
+  "haScreenOffTimer": "Screen off after",
+  "haReloadDashboard": "Reload dashboard",
+  "haBringToFront": "Bring to front",
+  "haSpeak": "Text to speech",
+  "haMessage": "On-screen message",
+  "haMotion": "Motion",
+  "haBattery": "Battery",
+  "haPlugged": "Plugged in",
+  "haBatteryTemperature": "Battery temperature",
+  "haLight": "Ambient light",
+  "haForeground": "Home System in front",
+  "haFreeMemory": "Free memory",
+  "haFreeStorage": "Free storage",
+  "haIpAddress": "IP address",
+  "haVersion": "App version",
+  "haCamera": "Camera",
+  "haShareCamera": "Share the camera with Home Assistant",
+  "haShareCameraHelp": "A picture every 2 seconds as a camera entity in Home Assistant - only while motion detection runs (Smart Home).",
+  "haLoginSection": "Home Assistant login",
   "iptvListName": "Internet TV",
   "iptvBrowse": "Find channels",
   "iptvBrowseTitle": "Internet TV – find channels",

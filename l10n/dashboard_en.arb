@@ -26,7 +26,7 @@
   "dashboardHaHeading": "Home Assistant",
   "dashboardWebhook": "Webhook for motion",
   "dashboardWebhookHint": "http://homeassistant.local:8123/api/webhook/hallway-tablet",
-  "dashboardWebhookHelp": "On motion Home System sends \"motion\": true, after a minute without motion \"motion\": false - a trigger for automations (trigger \"Webhook\").",
+  "dashboardWebhookHelp": "On motion Home System sends \"motion\": true, after a minute without motion \"motion\": false - a trigger for automations (trigger \"Webhook\"). Simpler: System → Home Assistant - then the device with its motion sensor and switches is in Home Assistant directly.",
   "dashboardRemoteHelp": "Home Assistant can switch the display and reload the dashboard: {url}/api/display/on, …/off, …/api/dashboard/reload (POST, e.g. with rest_command).",
   "dashboardTestOff": "Switch the display off now (test)",
   "dashboardDimOnly": "Only darken the display instead of switching it off",

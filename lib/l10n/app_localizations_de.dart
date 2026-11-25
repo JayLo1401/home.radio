@@ -598,7 +598,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get dashboardWebhookHelp =>
-      'Bei Bewegung schickt Home System \"motion\": true, nach einer Minute Ruhe \"motion\": false - als Auslöser für Automationen (Auslöser „Webhook“).';
+      'Bei Bewegung schickt Home System \"motion\": true, nach einer Minute Ruhe \"motion\": false - als Auslöser für Automationen (Auslöser „Webhook“). Einfacher: System → Home Assistant - dann ist das Gerät mit Bewegungssensor und Schaltern direkt in Home Assistant.';
 
   @override
   String dashboardRemoteHelp(String url) {
@@ -651,6 +651,133 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get dashboardBrightnessNoSensor =>
       'Dieses Gerät hat keinen Lichtsensor.';
+
+  @override
+  String get haTitle => 'Home Assistant';
+
+  @override
+  String get haIntro =>
+      'Meldet dieses Gerät als eigenes Gerät in Home Assistant an - mit seinem Gerätenamen, Schaltern (Bildschirm, Bewegungserkennung, Helligkeit), Tasten, Nachrichten, Sprachausgabe und Sensoren (Bewegung, Akku, Licht). In Home Assistant braucht es nur die MQTT-Integration mit dem Mosquitto-Add-on, kein YAML. Ausgeschaltet verschwindet das Gerät dort wieder.';
+
+  @override
+  String get haEnabled => 'Mit Home Assistant verbinden';
+
+  @override
+  String get haHost => 'MQTT-Broker (leer = Adresse der Haussteuerung)';
+
+  @override
+  String haPort(int port) {
+    return 'Port (leer = $port)';
+  }
+
+  @override
+  String get haUser => 'Home-Assistant-Benutzer';
+
+  @override
+  String get haLoginHint =>
+      'Gilt für beides: das Dashboard der Haussteuerung meldet sich damit selbst an, und das Mosquitto-Add-on nimmt Home-Assistant-Benutzer auch für MQTT. Am besten einen eigenen Benutzer anlegen (Einstellungen → Personen → Benutzer, z. B. „homesystem“, ohne Zwei-Faktor).';
+
+  @override
+  String get haEntitiesHint =>
+      'Danach erscheint das Gerät in Home Assistant unter Einstellungen → Geräte & Dienste → MQTT mit dem Gerätenamen.';
+
+  @override
+  String get haStatusOff => 'Aus';
+
+  @override
+  String get haStatusConnecting => 'Verbinde…';
+
+  @override
+  String haStatusConnected(String name) {
+    return 'Verbunden - in Home Assistant als „$name“';
+  }
+
+  @override
+  String get haStatusNoHost =>
+      'Keine Adresse: hier den MQTT-Broker eintragen oder unter Haussteuerung die Home-Assistant-Adresse.';
+
+  @override
+  String get haErrorLogin =>
+      'Anmeldung abgelehnt - Benutzername und Passwort prüfen.';
+
+  @override
+  String get haErrorUnreachable =>
+      'Broker nicht erreichbar - läuft das Mosquitto-Add-on? Neuer Versuch in 30 Sekunden.';
+
+  @override
+  String haErrorOther(String message) {
+    return 'Keine Verbindung: $message';
+  }
+
+  @override
+  String get haScreen => 'Bildschirm';
+
+  @override
+  String get haMotionDetection => 'Bewegungserkennung';
+
+  @override
+  String get haBrightnessMode => 'Helligkeitsmodus';
+
+  @override
+  String get haBrightness => 'Bildschirmhelligkeit';
+
+  @override
+  String get haScreenOffTimer => 'Bildschirm aus nach';
+
+  @override
+  String get haReloadDashboard => 'Dashboard neu laden';
+
+  @override
+  String get haBringToFront => 'In den Vordergrund holen';
+
+  @override
+  String get haSpeak => 'Text-zu-Sprache';
+
+  @override
+  String get haMessage => 'Nachricht am Bildschirm';
+
+  @override
+  String get haMotion => 'Bewegung';
+
+  @override
+  String get haBattery => 'Akku';
+
+  @override
+  String get haPlugged => 'Eingesteckt';
+
+  @override
+  String get haBatteryTemperature => 'Akkutemperatur';
+
+  @override
+  String get haLight => 'Umgebungslicht';
+
+  @override
+  String get haForeground => 'Home System im Vordergrund';
+
+  @override
+  String get haFreeMemory => 'Freier Arbeitsspeicher';
+
+  @override
+  String get haFreeStorage => 'Freier Speicherplatz';
+
+  @override
+  String get haIpAddress => 'IP-Adresse';
+
+  @override
+  String get haVersion => 'App-Version';
+
+  @override
+  String get haCamera => 'Kamera';
+
+  @override
+  String get haShareCamera => 'Kamera in Home Assistant teilen';
+
+  @override
+  String get haShareCameraHelp =>
+      'Alle 2 Sekunden ein Bild der Kamera als Kamera-Entität in Home Assistant - nur solange die Bewegungserkennung läuft (Haussteuerung).';
+
+  @override
+  String get haLoginSection => 'Home-Assistant-Anmeldung';
 
   @override
   String get iptvListName => 'Internet-TV';

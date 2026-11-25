@@ -598,7 +598,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get dashboardWebhookHelp =>
-      'On motion Home System sends \"motion\": true, after a minute without motion \"motion\": false - a trigger for automations (trigger \"Webhook\").';
+      'On motion Home System sends \"motion\": true, after a minute without motion \"motion\": false - a trigger for automations (trigger \"Webhook\"). Simpler: System → Home Assistant - then the device with its motion sensor and switches is in Home Assistant directly.';
 
   @override
   String dashboardRemoteHelp(String url) {
@@ -651,6 +651,132 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get dashboardBrightnessNoSensor => 'This device has no light sensor.';
+
+  @override
+  String get haTitle => 'Home Assistant';
+
+  @override
+  String get haIntro =>
+      'Adds this device to Home Assistant as a device of its own - with its device name, switches (screen, motion detection, brightness), buttons, messages, text to speech and sensors (motion, battery, light). Home Assistant only needs the MQTT integration with the Mosquitto add-on, no YAML. Switched off, the device disappears there again.';
+
+  @override
+  String get haEnabled => 'Connect to Home Assistant';
+
+  @override
+  String get haHost => 'MQTT broker (empty = the Smart Home address)';
+
+  @override
+  String haPort(int port) {
+    return 'Port (empty = $port)';
+  }
+
+  @override
+  String get haUser => 'Home Assistant user';
+
+  @override
+  String get haLoginHint =>
+      'Used for both: the Smart Home dashboard logs in with it by itself, and the Mosquitto add-on accepts Home Assistant users for MQTT too. Best create a user of its own (Settings → People → Users, e.g. “homesystem”, without two-factor).';
+
+  @override
+  String get haEntitiesHint =>
+      'The device then shows up in Home Assistant under Settings → Devices & services → MQTT with its device name.';
+
+  @override
+  String get haStatusOff => 'Off';
+
+  @override
+  String get haStatusConnecting => 'Connecting…';
+
+  @override
+  String haStatusConnected(String name) {
+    return 'Connected - in Home Assistant as “$name”';
+  }
+
+  @override
+  String get haStatusNoHost =>
+      'No address: enter the MQTT broker here or the Home Assistant address under Smart Home.';
+
+  @override
+  String get haErrorLogin => 'Login refused - check user name and password.';
+
+  @override
+  String get haErrorUnreachable =>
+      'Broker not reachable - is the Mosquitto add-on running? Trying again in 30 seconds.';
+
+  @override
+  String haErrorOther(String message) {
+    return 'No connection: $message';
+  }
+
+  @override
+  String get haScreen => 'Screen';
+
+  @override
+  String get haMotionDetection => 'Motion detection';
+
+  @override
+  String get haBrightnessMode => 'Brightness mode';
+
+  @override
+  String get haBrightness => 'Screen brightness';
+
+  @override
+  String get haScreenOffTimer => 'Screen off after';
+
+  @override
+  String get haReloadDashboard => 'Reload dashboard';
+
+  @override
+  String get haBringToFront => 'Bring to front';
+
+  @override
+  String get haSpeak => 'Text to speech';
+
+  @override
+  String get haMessage => 'On-screen message';
+
+  @override
+  String get haMotion => 'Motion';
+
+  @override
+  String get haBattery => 'Battery';
+
+  @override
+  String get haPlugged => 'Plugged in';
+
+  @override
+  String get haBatteryTemperature => 'Battery temperature';
+
+  @override
+  String get haLight => 'Ambient light';
+
+  @override
+  String get haForeground => 'Home System in front';
+
+  @override
+  String get haFreeMemory => 'Free memory';
+
+  @override
+  String get haFreeStorage => 'Free storage';
+
+  @override
+  String get haIpAddress => 'IP address';
+
+  @override
+  String get haVersion => 'App version';
+
+  @override
+  String get haCamera => 'Camera';
+
+  @override
+  String get haShareCamera => 'Share the camera with Home Assistant';
+
+  @override
+  String get haShareCameraHelp =>
+      'A picture every 2 seconds as a camera entity in Home Assistant - only while motion detection runs (Smart Home).';
+
+  @override
+  String get haLoginSection => 'Home Assistant login';
 
   @override
   String get iptvListName => 'Internet TV';

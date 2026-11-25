@@ -1133,7 +1133,7 @@ abstract class AppLocalizations {
   /// No description provided for @dashboardWebhookHelp.
   ///
   /// In de, this message translates to:
-  /// **'Bei Bewegung schickt Home System \"motion\": true, nach einer Minute Ruhe \"motion\": false - als Auslöser für Automationen (Auslöser „Webhook“).'**
+  /// **'Bei Bewegung schickt Home System \"motion\": true, nach einer Minute Ruhe \"motion\": false - als Auslöser für Automationen (Auslöser „Webhook“). Einfacher: System → Home Assistant - dann ist das Gerät mit Bewegungssensor und Schaltern direkt in Home Assistant.'**
   String get dashboardWebhookHelp;
 
   /// No description provided for @dashboardRemoteHelp.
@@ -1225,6 +1225,234 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'Dieses Gerät hat keinen Lichtsensor.'**
   String get dashboardBrightnessNoSensor;
+
+  /// No description provided for @haTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Home Assistant'**
+  String get haTitle;
+
+  /// No description provided for @haIntro.
+  ///
+  /// In de, this message translates to:
+  /// **'Meldet dieses Gerät als eigenes Gerät in Home Assistant an - mit seinem Gerätenamen, Schaltern (Bildschirm, Bewegungserkennung, Helligkeit), Tasten, Nachrichten, Sprachausgabe und Sensoren (Bewegung, Akku, Licht). In Home Assistant braucht es nur die MQTT-Integration mit dem Mosquitto-Add-on, kein YAML. Ausgeschaltet verschwindet das Gerät dort wieder.'**
+  String get haIntro;
+
+  /// No description provided for @haEnabled.
+  ///
+  /// In de, this message translates to:
+  /// **'Mit Home Assistant verbinden'**
+  String get haEnabled;
+
+  /// No description provided for @haHost.
+  ///
+  /// In de, this message translates to:
+  /// **'MQTT-Broker (leer = Adresse der Haussteuerung)'**
+  String get haHost;
+
+  /// No description provided for @haPort.
+  ///
+  /// In de, this message translates to:
+  /// **'Port (leer = {port})'**
+  String haPort(int port);
+
+  /// No description provided for @haUser.
+  ///
+  /// In de, this message translates to:
+  /// **'Home-Assistant-Benutzer'**
+  String get haUser;
+
+  /// No description provided for @haLoginHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Gilt für beides: das Dashboard der Haussteuerung meldet sich damit selbst an, und das Mosquitto-Add-on nimmt Home-Assistant-Benutzer auch für MQTT. Am besten einen eigenen Benutzer anlegen (Einstellungen → Personen → Benutzer, z. B. „homesystem“, ohne Zwei-Faktor).'**
+  String get haLoginHint;
+
+  /// No description provided for @haEntitiesHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Danach erscheint das Gerät in Home Assistant unter Einstellungen → Geräte & Dienste → MQTT mit dem Gerätenamen.'**
+  String get haEntitiesHint;
+
+  /// No description provided for @haStatusOff.
+  ///
+  /// In de, this message translates to:
+  /// **'Aus'**
+  String get haStatusOff;
+
+  /// No description provided for @haStatusConnecting.
+  ///
+  /// In de, this message translates to:
+  /// **'Verbinde…'**
+  String get haStatusConnecting;
+
+  /// No description provided for @haStatusConnected.
+  ///
+  /// In de, this message translates to:
+  /// **'Verbunden - in Home Assistant als „{name}“'**
+  String haStatusConnected(String name);
+
+  /// No description provided for @haStatusNoHost.
+  ///
+  /// In de, this message translates to:
+  /// **'Keine Adresse: hier den MQTT-Broker eintragen oder unter Haussteuerung die Home-Assistant-Adresse.'**
+  String get haStatusNoHost;
+
+  /// No description provided for @haErrorLogin.
+  ///
+  /// In de, this message translates to:
+  /// **'Anmeldung abgelehnt - Benutzername und Passwort prüfen.'**
+  String get haErrorLogin;
+
+  /// No description provided for @haErrorUnreachable.
+  ///
+  /// In de, this message translates to:
+  /// **'Broker nicht erreichbar - läuft das Mosquitto-Add-on? Neuer Versuch in 30 Sekunden.'**
+  String get haErrorUnreachable;
+
+  /// No description provided for @haErrorOther.
+  ///
+  /// In de, this message translates to:
+  /// **'Keine Verbindung: {message}'**
+  String haErrorOther(String message);
+
+  /// No description provided for @haScreen.
+  ///
+  /// In de, this message translates to:
+  /// **'Bildschirm'**
+  String get haScreen;
+
+  /// No description provided for @haMotionDetection.
+  ///
+  /// In de, this message translates to:
+  /// **'Bewegungserkennung'**
+  String get haMotionDetection;
+
+  /// No description provided for @haBrightnessMode.
+  ///
+  /// In de, this message translates to:
+  /// **'Helligkeitsmodus'**
+  String get haBrightnessMode;
+
+  /// No description provided for @haBrightness.
+  ///
+  /// In de, this message translates to:
+  /// **'Bildschirmhelligkeit'**
+  String get haBrightness;
+
+  /// No description provided for @haScreenOffTimer.
+  ///
+  /// In de, this message translates to:
+  /// **'Bildschirm aus nach'**
+  String get haScreenOffTimer;
+
+  /// No description provided for @haReloadDashboard.
+  ///
+  /// In de, this message translates to:
+  /// **'Dashboard neu laden'**
+  String get haReloadDashboard;
+
+  /// No description provided for @haBringToFront.
+  ///
+  /// In de, this message translates to:
+  /// **'In den Vordergrund holen'**
+  String get haBringToFront;
+
+  /// No description provided for @haSpeak.
+  ///
+  /// In de, this message translates to:
+  /// **'Text-zu-Sprache'**
+  String get haSpeak;
+
+  /// No description provided for @haMessage.
+  ///
+  /// In de, this message translates to:
+  /// **'Nachricht am Bildschirm'**
+  String get haMessage;
+
+  /// No description provided for @haMotion.
+  ///
+  /// In de, this message translates to:
+  /// **'Bewegung'**
+  String get haMotion;
+
+  /// No description provided for @haBattery.
+  ///
+  /// In de, this message translates to:
+  /// **'Akku'**
+  String get haBattery;
+
+  /// No description provided for @haPlugged.
+  ///
+  /// In de, this message translates to:
+  /// **'Eingesteckt'**
+  String get haPlugged;
+
+  /// No description provided for @haBatteryTemperature.
+  ///
+  /// In de, this message translates to:
+  /// **'Akkutemperatur'**
+  String get haBatteryTemperature;
+
+  /// No description provided for @haLight.
+  ///
+  /// In de, this message translates to:
+  /// **'Umgebungslicht'**
+  String get haLight;
+
+  /// No description provided for @haForeground.
+  ///
+  /// In de, this message translates to:
+  /// **'Home System im Vordergrund'**
+  String get haForeground;
+
+  /// No description provided for @haFreeMemory.
+  ///
+  /// In de, this message translates to:
+  /// **'Freier Arbeitsspeicher'**
+  String get haFreeMemory;
+
+  /// No description provided for @haFreeStorage.
+  ///
+  /// In de, this message translates to:
+  /// **'Freier Speicherplatz'**
+  String get haFreeStorage;
+
+  /// No description provided for @haIpAddress.
+  ///
+  /// In de, this message translates to:
+  /// **'IP-Adresse'**
+  String get haIpAddress;
+
+  /// No description provided for @haVersion.
+  ///
+  /// In de, this message translates to:
+  /// **'App-Version'**
+  String get haVersion;
+
+  /// No description provided for @haCamera.
+  ///
+  /// In de, this message translates to:
+  /// **'Kamera'**
+  String get haCamera;
+
+  /// No description provided for @haShareCamera.
+  ///
+  /// In de, this message translates to:
+  /// **'Kamera in Home Assistant teilen'**
+  String get haShareCamera;
+
+  /// No description provided for @haShareCameraHelp.
+  ///
+  /// In de, this message translates to:
+  /// **'Alle 2 Sekunden ein Bild der Kamera als Kamera-Entität in Home Assistant - nur solange die Bewegungserkennung läuft (Haussteuerung).'**
+  String get haShareCameraHelp;
+
+  /// No description provided for @haLoginSection.
+  ///
+  /// In de, this message translates to:
+  /// **'Home-Assistant-Anmeldung'**
+  String get haLoginSection;
 
   /// No description provided for @iptvListName.
   ///
