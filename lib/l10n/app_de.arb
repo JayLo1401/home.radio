@@ -384,6 +384,7 @@
   "haOpenMusic": "Musik öffnen",
   "haOpenDashboard": "Haussteuerung öffnen",
   "haHostHelp": "Nur die IP oder der Name des Rechners mit dem Mosquitto-Add-on, z. B. 192.168.1.5 - nicht die Adresse der Home-Assistant-Seite mit :8123.",
+  "haLaunchApp": "App starten",
   "iptvListName": "Internet-TV",
   "iptvBrowse": "Sender suchen",
   "iptvBrowseTitle": "Internet-TV – Sender suchen",

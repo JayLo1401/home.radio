@@ -1568,6 +1568,12 @@ abstract class AppLocalizations {
   /// **'Nur die IP oder der Name des Rechners mit dem Mosquitto-Add-on, z. B. 192.168.1.5 - nicht die Adresse der Home-Assistant-Seite mit :8123.'**
   String get haHostHelp;
 
+  /// No description provided for @haLaunchApp.
+  ///
+  /// In de, this message translates to:
+  /// **'App starten'**
+  String get haLaunchApp;
+
   /// No description provided for @iptvListName.
   ///
   /// In de, this message translates to:

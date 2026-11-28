@@ -837,6 +837,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'Only the IP or name of the machine with the Mosquitto add-on, e.g. 192.168.1.5 - not the Home Assistant page address with :8123.';
 
   @override
+  String get haLaunchApp => 'Start app';
+
+  @override
   String get iptvListName => 'Internet TV';
 
   @override

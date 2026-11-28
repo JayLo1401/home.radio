@@ -8,6 +8,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/dashboard_providers.dart';
+import 'core/foreground_part.dart';
 import 'core/ha_providers.dart';
 import 'core/native_errors.dart';
 import 'core/providers.dart';
@@ -56,6 +57,8 @@ class HomeSystemApp extends ConsumerWidget {
     return MaterialApp(
       title: 'Home System',
       navigatorKey: appNavigatorKey,
+      // Which part is on screen - for Home Assistant's switches per app.
+      navigatorObservers: [foregroundPartObserver],
       scaffoldMessengerKey: appMessengerKey,
       debugShowCheckedModeBanner: false,
       theme: buildTvTheme(),
