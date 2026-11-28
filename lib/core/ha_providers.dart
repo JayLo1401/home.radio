@@ -788,12 +788,12 @@ class _AppHaDevice implements HaDevice {
     showLauncherWith(_ref.read);
     final nav = appNavigatorKey.currentState;
     if (nav == null) return;
-    // TV and the Haussteuerung take the speakers (as from the launcher);
-    // music, pictures, films and the browser leave the radio playing until
-    // they play something themselves.
-    if (type == LauncherTile.tvType || type == LauncherTile.dashboardType) {
+    // TV takes the speakers (as from the launcher); radio and music play on
+    // in the Haussteuerung, and pictures, films and the browser leave them
+    // playing until they play something themselves.
+    if (type == LauncherTile.tvType) {
       _ref.read(radioCommandProvider.notifier).send(RadioCommand.pauseForApp);
-      if (type == LauncherTile.tvType) await _pauseMusic();
+      await _pauseMusic();
     }
     final Widget page = switch (type) {
       LauncherTile.tvType => const TvScreen(),

@@ -673,6 +673,63 @@ class AppLocalizationsDe extends AppLocalizations {
       'Dieses Gerät hat keinen Lichtsensor.';
 
   @override
+  String get dashboardPopupHeading => 'Wiedergabe-Popup';
+
+  @override
+  String get dashboardPopupShow => 'Wiedergabe-Popup anzeigen';
+
+  @override
+  String get dashboardPopupHelp =>
+      'Radio und Musik spielen in der Haussteuerung weiter. Das schmale Popup über dem Dashboard hat immer eine Home-Taste und zeigt, solange etwas spielt, Sender oder Titel mit Zurück, Pause, Stopp und Weiter. Fernbedienung: Pfeil zum Popup am Rand des Dashboards oder Info-Taste, zurück mit dem Pfeil in die andere Richtung oder Zurück. Play/Pause, Stopp, Weiter und Zurück der Fernbedienung wirken immer.';
+
+  @override
+  String get dashboardPopupPosition => 'Position';
+
+  @override
+  String get dashboardPopupBottomCenter => 'Unten Mitte';
+
+  @override
+  String get dashboardPopupBottomLeft => 'Unten links';
+
+  @override
+  String get dashboardPopupBottomRight => 'Unten rechts';
+
+  @override
+  String get dashboardPopupTopCenter => 'Oben Mitte';
+
+  @override
+  String get dashboardPopupTopLeft => 'Oben links';
+
+  @override
+  String get dashboardPopupTopRight => 'Oben rechts';
+
+  @override
+  String get dashboardPopupHome => 'Home';
+
+  @override
+  String get dashboardPopupPlay => 'Wiedergabe';
+
+  @override
+  String get dashboardPopupPause => 'Pause';
+
+  @override
+  String get dashboardPopupStop => 'Stopp';
+
+  @override
+  String get dashboardPopupNext => 'Weiter';
+
+  @override
+  String get dashboardPopupPrevious => 'Zurück';
+
+  @override
+  String get dashboardPopupHintBottom =>
+      'Fernbedienung: ▼ am unteren Rand oder Info wählt diese Leiste, ▲ oder Zurück führt zurück ins Dashboard.';
+
+  @override
+  String get dashboardPopupHintTop =>
+      'Fernbedienung: ▲ am oberen Rand oder Info wählt diese Leiste, ▼ oder Zurück führt zurück ins Dashboard.';
+
+  @override
   String get haTitle => 'Home Assistant';
 
   @override

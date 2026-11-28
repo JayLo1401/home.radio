@@ -1305,6 +1305,12 @@ class DabRtlSdrPlugin :
         if (handleFmCall(call, result)) return
         if (handleNbCall(call, result)) return
         when (call.method) {
+            "setKeepOnFocusLoss" -> {
+                // The Haussteuerung's web page may take the audio focus for a
+                // sound - DAB+/FM play on meanwhile.
+                DabAacPlayer.keepOnFocusLoss = call.argument<Boolean>("keep") ?: false
+                result.success(null)
+            }
             "setServer" -> {
                 val host = call.argument<String>("host") ?: "127.0.0.1"
                 val port = call.argument<Int>("port") ?: 1234

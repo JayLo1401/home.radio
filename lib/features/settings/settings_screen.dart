@@ -29,6 +29,7 @@ import '../../data/models/launcher_tile.dart';
 import '../../data/repositories/settings_repository.dart';
 import '../../data/services/desktop/hrdab_desktop.dart';
 import '../../data/services/launcher_service.dart';
+import '../dashboard/dashboard_mini_player.dart' show dashboardPopupPositionLabel;
 import '../launcher/launcher_providers.dart';
 import '../rtlsdr/rtl_sdr_test_screen.dart';
 import 'restore_backup_screen.dart';
@@ -377,8 +378,31 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     await ref.read(weatherDisplaySettingsProvider.notifier).setSunScale(next);
   }
 
-  /// Settings → Haussteuerung: the dashboard's address, display by motion,
-  /// Home Assistant's side.
+  /// Where the playback popup sits over the Haussteuerung.
+  Future<void> _pickPopupPosition() async {
+    final l = context.l10n;
+    final current = ref.read(dashboardPopupProvider);
+    final picked = await showDialog<DashboardPopupPosition>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: Text(l.dashboardPopupPosition),
+        children: [
+          for (final p in DashboardPopupPosition.values)
+            ListTile(
+              autofocus: p == current.position,
+              leading: Icon(p == current.position ? Icons.radio_button_checked : Icons.radio_button_unchecked),
+              title: Text(dashboardPopupPositionLabel(l, p), style: const TextStyle(fontSize: 18)),
+              onTap: () => Navigator.of(context).pop(p),
+            ),
+        ],
+      ),
+    );
+    if (picked == null || !mounted) return;
+    await ref.read(dashboardPopupProvider.notifier).set(ref.read(dashboardPopupProvider).copyWith(position: picked));
+  }
+
+  /// Settings → Haussteuerung: the dashboard's address, the playback popup,
+  /// display by motion, Home Assistant's side.
   List<Widget> _dashboardSection(
     BuildContext context,
     double Function() nextOrder,
@@ -388,6 +412,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final url = ref.watch(dashboardUrlProvider);
     final display = ref.watch(dashboardDisplayProvider);
     final notifier = ref.read(dashboardDisplayProvider.notifier);
+    final popup = ref.watch(dashboardPopupProvider);
+    final popupNotifier = ref.read(dashboardPopupProvider.notifier);
     const help = TextStyle(color: Colors.white60);
     Widget stepper(String label, String value, void Function(int) onChange) => Padding(
           padding: const EdgeInsets.only(top: 12),
@@ -435,6 +461,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ),
       ),
       Padding(padding: const EdgeInsets.fromLTRB(12, 4, 12, 0), child: Text(l.dashboardAddressHelp, style: help)),
+      const Divider(height: 32),
+      Text(l.dashboardPopupHeading, style: Theme.of(context).textTheme.titleLarge),
+      const SizedBox(height: 8),
+      tileToggle(l.dashboardPopupShow, popup.show, (v) => popupNotifier.set(popup.copyWith(show: v))),
+      if (popup.show)
+        FocusTraversalOrder(
+          order: NumericFocusOrder(nextOrder()),
+          child: _TvNavTile(
+            label: l.dashboardPopupPosition,
+            value: dashboardPopupPositionLabel(l, popup.position),
+            icon: Icons.picture_in_picture_alt_outlined,
+            onTap: _pickPopupPosition,
+          ),
+        ),
+      Padding(padding: const EdgeInsets.fromLTRB(12, 4, 12, 0), child: Text(l.dashboardPopupHelp, style: help)),
       const Divider(height: 32),
       Text(l.dashboardDisplayHeading, style: Theme.of(context).textTheme.titleLarge),
       const SizedBox(height: 8),

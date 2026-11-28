@@ -673,6 +673,63 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dashboardBrightnessNoSensor => 'This device has no light sensor.';
 
   @override
+  String get dashboardPopupHeading => 'Playback popup';
+
+  @override
+  String get dashboardPopupShow => 'Show playback popup';
+
+  @override
+  String get dashboardPopupHelp =>
+      'Radio and music keep playing in the home control. The slim popup over the dashboard always has a Home button and, while something plays, shows the station or track with previous, pause, stop and next. Remote: the arrow towards the popup at the dashboard\'s edge or the Info key, back with the opposite arrow or Back. The remote\'s play/pause, stop, next and previous keys always work.';
+
+  @override
+  String get dashboardPopupPosition => 'Position';
+
+  @override
+  String get dashboardPopupBottomCenter => 'Bottom centre';
+
+  @override
+  String get dashboardPopupBottomLeft => 'Bottom left';
+
+  @override
+  String get dashboardPopupBottomRight => 'Bottom right';
+
+  @override
+  String get dashboardPopupTopCenter => 'Top centre';
+
+  @override
+  String get dashboardPopupTopLeft => 'Top left';
+
+  @override
+  String get dashboardPopupTopRight => 'Top right';
+
+  @override
+  String get dashboardPopupHome => 'Home';
+
+  @override
+  String get dashboardPopupPlay => 'Play';
+
+  @override
+  String get dashboardPopupPause => 'Pause';
+
+  @override
+  String get dashboardPopupStop => 'Stop';
+
+  @override
+  String get dashboardPopupNext => 'Next';
+
+  @override
+  String get dashboardPopupPrevious => 'Previous';
+
+  @override
+  String get dashboardPopupHintBottom =>
+      'Remote: ▼ at the bottom edge or Info selects this bar, ▲ or Back returns to the dashboard.';
+
+  @override
+  String get dashboardPopupHintTop =>
+      'Remote: ▲ at the top edge or Info selects this bar, ▼ or Back returns to the dashboard.';
+
+  @override
   String get haTitle => 'Home Assistant';
 
   @override

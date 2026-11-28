@@ -83,5 +83,23 @@
       }
     }
   },
-  "dashboardBrightnessNoSensor": "Dieses Gerät hat keinen Lichtsensor."
+  "dashboardBrightnessNoSensor": "Dieses Gerät hat keinen Lichtsensor.",
+  "dashboardPopupHeading": "Wiedergabe-Popup",
+  "dashboardPopupShow": "Wiedergabe-Popup anzeigen",
+  "dashboardPopupHelp": "Radio und Musik spielen in der Haussteuerung weiter. Das schmale Popup über dem Dashboard hat immer eine Home-Taste und zeigt, solange etwas spielt, Sender oder Titel mit Zurück, Pause, Stopp und Weiter. Fernbedienung: Pfeil zum Popup am Rand des Dashboards oder Info-Taste, zurück mit dem Pfeil in die andere Richtung oder Zurück. Play/Pause, Stopp, Weiter und Zurück der Fernbedienung wirken immer.",
+  "dashboardPopupPosition": "Position",
+  "dashboardPopupBottomCenter": "Unten Mitte",
+  "dashboardPopupBottomLeft": "Unten links",
+  "dashboardPopupBottomRight": "Unten rechts",
+  "dashboardPopupTopCenter": "Oben Mitte",
+  "dashboardPopupTopLeft": "Oben links",
+  "dashboardPopupTopRight": "Oben rechts",
+  "dashboardPopupHome": "Home",
+  "dashboardPopupPlay": "Wiedergabe",
+  "dashboardPopupPause": "Pause",
+  "dashboardPopupStop": "Stopp",
+  "dashboardPopupNext": "Weiter",
+  "dashboardPopupPrevious": "Zurück",
+  "dashboardPopupHintBottom": "Fernbedienung: ▼ am unteren Rand oder Info wählt diese Leiste, ▲ oder Zurück führt zurück ins Dashboard.",
+  "dashboardPopupHintTop": "Fernbedienung: ▲ am oberen Rand oder Info wählt diese Leiste, ▼ oder Zurück führt zurück ins Dashboard."
 }

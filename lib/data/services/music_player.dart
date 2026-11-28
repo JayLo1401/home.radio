@@ -12,6 +12,7 @@ import 'package:path_provider/path_provider.dart';
 import '../../l10n/l10n.dart';
 import '../models/music_track.dart';
 import '../repositories/nas_settings_repository.dart';
+import 'audio_focus_guard.dart';
 import 'music_cover.dart';
 import 'music_index.dart';
 import 'music_library.dart';
@@ -359,7 +360,7 @@ class MusicPlayer implements MediaSessionGuest {
       await session.configure(const AudioSessionConfiguration.music());
       // Another app took the speakers (see AudioPlayerService).
       session.interruptionEventStream.listen((event) {
-        if (event.begin) _player?.pause();
+        if (AudioFocusGuard.shouldPause(event)) _player?.pause();
       });
     } catch (e) {
       debugPrint('music session: $e');
