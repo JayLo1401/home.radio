@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/repositories/settings_repository.dart';
@@ -31,6 +32,34 @@ class SlideshowSettingsNotifier extends Notifier<SlideshowSettings> {
 
 final slideshowSettingsProvider =
     NotifierProvider<SlideshowSettingsNotifier, SlideshowSettings>(SlideshowSettingsNotifier.new);
+
+/// Bilder: videos in the pictures folders are shown too (the switch in its
+/// top bar, Einstellungen → Bilder, the admin page) - off until switched on.
+class PicturesShowVideosNotifier extends Notifier<bool> {
+  @override
+  bool build() {
+    try {
+      ref
+          .watch(settingsRepositoryProvider)
+          .getPicturesShowVideos()
+          .then<void>((v) => state = v, onError: (Object e) => debugPrint('pictures show videos: $e'));
+    } catch (e) {
+      debugPrint('pictures show videos: $e');
+    }
+    return false;
+  }
+
+  Future<void> set(bool value) async {
+    state = value;
+    try {
+      await ref.read(settingsRepositoryProvider).setPicturesShowVideos(value);
+    } catch (e) {
+      debugPrint('pictures show videos: $e');
+    }
+  }
+}
+
+final picturesShowVideosProvider = NotifierProvider<PicturesShowVideosNotifier, bool>(PicturesShowVideosNotifier.new);
 
 /// Where each folder's slideshow was last (the 30 most recent folders), so
 /// the next start can go on from there. In the settings table - small, and

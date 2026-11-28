@@ -2889,7 +2889,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String picturesSlideshowHint(String options) {
-    return '← → zurück/vor · OK Pause · $options Einstellungen · Zurück beendet';
+    return '← → zurück/vor · OK oder ↑ ↓ Musik und Anzeigedauer · ⏯ Pause · $options Einstellungen · Zurück beendet';
   }
 
   @override
@@ -2921,7 +2921,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get picturesMusicHelp =>
-      'Radio und Musik laufen während der Diashow einfach weiter.';
+      'Radio und Musik laufen während der Diashow einfach weiter - nur während eines Videos mit Ton pausieren sie.';
 
   @override
   String get picturesSlideshowHeading => 'Diashow';
@@ -2944,6 +2944,63 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get picturesResumeRestart => 'Von vorne';
+
+  @override
+  String get picturesShowVideos => 'Videos anzeigen';
+
+  @override
+  String picturesVideoCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Videos',
+      one: '1 Video',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String picturesMediaInThisFolder(String pictures, String videos) {
+    return '$pictures und $videos in diesem Ordner - OK auf einem Bild startet die Diashow ab dort, OK auf einem Video spielt es ab';
+  }
+
+  @override
+  String picturesVideosInThisFolder(String videos) {
+    return '$videos in diesem Ordner - OK spielt ein Video ab, ⏯ startet die Diashow ab dort';
+  }
+
+  @override
+  String get picturesMediaPictures => 'Nur Bilder wiedergeben';
+
+  @override
+  String get picturesMediaBoth => 'Bilder und Videos wiedergeben';
+
+  @override
+  String get picturesMediaVideos => 'Nur Videos wiedergeben';
+
+  @override
+  String get picturesNoVideosFound =>
+      'Hier sind keine Videos - auch nicht in den Unterordnern.';
+
+  @override
+  String get picturesNoMediaFound =>
+      'Hier sind keine Bilder und keine Videos - auch nicht in den Unterordnern.';
+
+  @override
+  String get picturesDisplayDuration => 'Anzeigedauer';
+
+  @override
+  String get picturesNothingPlaying =>
+      'Gerade läuft keine Musik und kein Radio. Starte Musik oder Radio, dann lässt sie sich hier steuern.';
+
+  @override
+  String get picturesPopupHint => '← → wählen · OK · Zurück schließt';
+
+  @override
+  String get picturesPreviousStation => 'Voriger Sender';
+
+  @override
+  String get picturesNextStation => 'Nächster Sender';
 
   @override
   String get radioErrorConnectionLost =>

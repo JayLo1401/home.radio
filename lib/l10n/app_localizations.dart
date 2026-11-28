@@ -4975,7 +4975,7 @@ abstract class AppLocalizations {
   /// No description provided for @picturesSlideshowHint.
   ///
   /// In de, this message translates to:
-  /// **'← → zurück/vor · OK Pause · {options} Einstellungen · Zurück beendet'**
+  /// **'← → zurück/vor · OK oder ↑ ↓ Musik und Anzeigedauer · ⏯ Pause · {options} Einstellungen · Zurück beendet'**
   String picturesSlideshowHint(String options);
 
   /// No description provided for @picturesInterval.
@@ -5029,7 +5029,7 @@ abstract class AppLocalizations {
   /// No description provided for @picturesMusicHelp.
   ///
   /// In de, this message translates to:
-  /// **'Radio und Musik laufen während der Diashow einfach weiter.'**
+  /// **'Radio und Musik laufen während der Diashow einfach weiter - nur während eines Videos mit Ton pausieren sie.'**
   String get picturesMusicHelp;
 
   /// No description provided for @picturesSlideshowHeading.
@@ -5055,6 +5055,90 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'Von vorne'**
   String get picturesResumeRestart;
+
+  /// No description provided for @picturesShowVideos.
+  ///
+  /// In de, this message translates to:
+  /// **'Videos anzeigen'**
+  String get picturesShowVideos;
+
+  /// No description provided for @picturesVideoCount.
+  ///
+  /// In de, this message translates to:
+  /// **'{count, plural, =1{1 Video} other{{count} Videos}}'**
+  String picturesVideoCount(int count);
+
+  /// No description provided for @picturesMediaInThisFolder.
+  ///
+  /// In de, this message translates to:
+  /// **'{pictures} und {videos} in diesem Ordner - OK auf einem Bild startet die Diashow ab dort, OK auf einem Video spielt es ab'**
+  String picturesMediaInThisFolder(String pictures, String videos);
+
+  /// No description provided for @picturesVideosInThisFolder.
+  ///
+  /// In de, this message translates to:
+  /// **'{videos} in diesem Ordner - OK spielt ein Video ab, ⏯ startet die Diashow ab dort'**
+  String picturesVideosInThisFolder(String videos);
+
+  /// No description provided for @picturesMediaPictures.
+  ///
+  /// In de, this message translates to:
+  /// **'Nur Bilder wiedergeben'**
+  String get picturesMediaPictures;
+
+  /// No description provided for @picturesMediaBoth.
+  ///
+  /// In de, this message translates to:
+  /// **'Bilder und Videos wiedergeben'**
+  String get picturesMediaBoth;
+
+  /// No description provided for @picturesMediaVideos.
+  ///
+  /// In de, this message translates to:
+  /// **'Nur Videos wiedergeben'**
+  String get picturesMediaVideos;
+
+  /// No description provided for @picturesNoVideosFound.
+  ///
+  /// In de, this message translates to:
+  /// **'Hier sind keine Videos - auch nicht in den Unterordnern.'**
+  String get picturesNoVideosFound;
+
+  /// No description provided for @picturesNoMediaFound.
+  ///
+  /// In de, this message translates to:
+  /// **'Hier sind keine Bilder und keine Videos - auch nicht in den Unterordnern.'**
+  String get picturesNoMediaFound;
+
+  /// No description provided for @picturesDisplayDuration.
+  ///
+  /// In de, this message translates to:
+  /// **'Anzeigedauer'**
+  String get picturesDisplayDuration;
+
+  /// No description provided for @picturesNothingPlaying.
+  ///
+  /// In de, this message translates to:
+  /// **'Gerade läuft keine Musik und kein Radio. Starte Musik oder Radio, dann lässt sie sich hier steuern.'**
+  String get picturesNothingPlaying;
+
+  /// No description provided for @picturesPopupHint.
+  ///
+  /// In de, this message translates to:
+  /// **'← → wählen · OK · Zurück schließt'**
+  String get picturesPopupHint;
+
+  /// No description provided for @picturesPreviousStation.
+  ///
+  /// In de, this message translates to:
+  /// **'Voriger Sender'**
+  String get picturesPreviousStation;
+
+  /// No description provided for @picturesNextStation.
+  ///
+  /// In de, this message translates to:
+  /// **'Nächster Sender'**
+  String get picturesNextStation;
 
   /// No description provided for @radioErrorConnectionLost.
   ///

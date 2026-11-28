@@ -657,14 +657,25 @@ class SettingsRepository {
   // --- Bilder ---
 
   /// Seconds a slideshow shows each picture.
-  static const slideshowIntervals = [5, 8, 12, 20, 30, 60];
+  static const slideshowIntervals = [3, 5, 8, 10, 15, 20, 30, 60];
   static const defaultSlideshowInterval = 8;
+
+  /// [seconds] as one of [slideshowIntervals] - the nearest (a value of an
+  /// earlier version, e.g. 12), or the default when there is none.
+  static int slideshowIntervalOf(int? seconds) {
+    if (seconds == null || seconds <= 0) return defaultSlideshowInterval;
+    var best = slideshowIntervals.first;
+    for (final s in slideshowIntervals) {
+      if ((s - seconds).abs() < (best - seconds).abs()) best = s;
+    }
+    return best;
+  }
 
   Future<SlideshowSettings> getSlideshowSettings() async {
     final interval = int.tryParse(await _db.getSetting('slideshow_interval') ?? '');
     final order = await _db.getSetting('slideshow_order');
     return SlideshowSettings(
-      intervalSeconds: slideshowIntervals.contains(interval) ? interval! : defaultSlideshowInterval,
+      intervalSeconds: slideshowIntervalOf(interval),
       order: SlideshowOrder.values.firstWhere((o) => o.name == order, orElse: () => SlideshowOrder.folders),
       blurredBackground: await _db.getSetting('slideshow_blur') != 'false',
     );
@@ -675,6 +686,11 @@ class SettingsRepository {
     await _db.setSetting('slideshow_order', value.order.name);
     await _db.setSetting('slideshow_blur', '${value.blurredBackground}');
   }
+
+  /// Bilder: videos in the pictures folders are shown too (the switch in
+  /// its top bar) - off until switched on.
+  Future<bool> getPicturesShowVideos() async => await _db.getSetting('pictures_show_videos') == 'true';
+  Future<void> setPicturesShowVideos(bool value) => _db.setSetting('pictures_show_videos', '$value');
 
   // --- Haussteuerung ---
 

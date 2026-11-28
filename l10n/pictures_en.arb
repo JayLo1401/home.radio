@@ -58,7 +58,7 @@
   "picturesNoneFound": "There are no pictures here - not in the subfolders either.",
   "picturesStillSearching": "still looking …",
   "picturesPaused": "Paused",
-  "picturesSlideshowHint": "← → back/next · OK pause · {options} settings · Back ends",
+  "picturesSlideshowHint": "← → back/next · OK or ↑ ↓ music and display time · ⏯ pause · {options} settings · Back ends",
   "@picturesSlideshowHint": {
     "placeholders": {
       "options": {
@@ -81,7 +81,7 @@
   "picturesOrderNextTime": "The order applies from the next slideshow.",
   "picturesBlur": "Fill the edges with the blurred picture",
   "picturesFolder": "Pictures folder",
-  "picturesMusicHelp": "Radio and music simply keep playing during the slideshow.",
+  "picturesMusicHelp": "Radio and music simply play on during the slideshow - they only pause while a video with sound plays.",
   "picturesSlideshowHeading": "Slideshow",
   "picturesInThisFolder": "{count, plural, =1{1 picture in this folder} other{{count} pictures in this folder}} - OK on a picture starts the slideshow from there",
   "@picturesInThisFolder": {
@@ -102,5 +102,43 @@
       }
     }
   },
-  "picturesResumeRestart": "From the start"
+  "picturesResumeRestart": "From the start",
+  "picturesShowVideos": "Show videos",
+  "picturesVideoCount": "{count, plural, =1{1 video} other{{count} videos}}",
+  "@picturesVideoCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "picturesMediaInThisFolder": "{pictures} and {videos} in this folder - OK on a picture starts the slideshow from there, OK on a video plays it",
+  "@picturesMediaInThisFolder": {
+    "placeholders": {
+      "pictures": {
+        "type": "String"
+      },
+      "videos": {
+        "type": "String"
+      }
+    }
+  },
+  "picturesVideosInThisFolder": "{videos} in this folder - OK plays a video, ⏯ starts the slideshow from there",
+  "@picturesVideosInThisFolder": {
+    "placeholders": {
+      "videos": {
+        "type": "String"
+      }
+    }
+  },
+  "picturesMediaPictures": "Pictures only",
+  "picturesMediaBoth": "Pictures and videos",
+  "picturesMediaVideos": "Videos only",
+  "picturesNoVideosFound": "There are no videos here - not in the subfolders either.",
+  "picturesNoMediaFound": "There are no pictures or videos here - not in the subfolders either.",
+  "picturesDisplayDuration": "Display time",
+  "picturesNothingPlaying": "No music or radio is playing right now. Start music or the radio to control it here.",
+  "picturesPopupHint": "← → choose · OK · Back closes",
+  "picturesPreviousStation": "Previous station",
+  "picturesNextStation": "Next station"
 }

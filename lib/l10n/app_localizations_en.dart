@@ -2882,7 +2882,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String picturesSlideshowHint(String options) {
-    return '← → back/next · OK pause · $options settings · Back ends';
+    return '← → back/next · OK or ↑ ↓ music and display time · ⏯ pause · $options settings · Back ends';
   }
 
   @override
@@ -2914,7 +2914,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get picturesMusicHelp =>
-      'Radio and music simply keep playing during the slideshow.';
+      'Radio and music simply play on during the slideshow - they only pause while a video with sound plays.';
 
   @override
   String get picturesSlideshowHeading => 'Slideshow';
@@ -2937,6 +2937,63 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get picturesResumeRestart => 'From the start';
+
+  @override
+  String get picturesShowVideos => 'Show videos';
+
+  @override
+  String picturesVideoCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count videos',
+      one: '1 video',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String picturesMediaInThisFolder(String pictures, String videos) {
+    return '$pictures and $videos in this folder - OK on a picture starts the slideshow from there, OK on a video plays it';
+  }
+
+  @override
+  String picturesVideosInThisFolder(String videos) {
+    return '$videos in this folder - OK plays a video, ⏯ starts the slideshow from there';
+  }
+
+  @override
+  String get picturesMediaPictures => 'Pictures only';
+
+  @override
+  String get picturesMediaBoth => 'Pictures and videos';
+
+  @override
+  String get picturesMediaVideos => 'Videos only';
+
+  @override
+  String get picturesNoVideosFound =>
+      'There are no videos here - not in the subfolders either.';
+
+  @override
+  String get picturesNoMediaFound =>
+      'There are no pictures or videos here - not in the subfolders either.';
+
+  @override
+  String get picturesDisplayDuration => 'Display time';
+
+  @override
+  String get picturesNothingPlaying =>
+      'No music or radio is playing right now. Start music or the radio to control it here.';
+
+  @override
+  String get picturesPopupHint => '← → choose · OK · Back closes';
+
+  @override
+  String get picturesPreviousStation => 'Previous station';
+
+  @override
+  String get picturesNextStation => 'Next station';
 
   @override
   String get radioErrorConnectionLost =>
