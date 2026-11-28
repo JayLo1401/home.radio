@@ -14,6 +14,7 @@ import '../../data/models/iptv_channel.dart';
 import '../../data/services/enigma2_service.dart';
 import '../../data/services/tv_stream_session.dart';
 import '../../l10n/l10n.dart';
+import '../launcher/launcher_navigation.dart' show showLauncher;
 import '../home/connection_chain.dart' show ConnectionChain, LinkState, LinkView;
 import '../settings/settings_screen.dart';
 import '../settings/tv_settings_screen.dart';
@@ -141,9 +142,20 @@ class _TvScreenState extends ConsumerState<TvScreen> {
     }
   }
 
+  /// Home System out of sight (the system's Home key, another app, the
+  /// window minimised): TV ends - back to Home, nothing plays on unseen.
+  late final AppLifecycleListener _lifecycle = AppLifecycleListener(onHide: _onAppHidden);
+
+  void _onAppHidden() {
+    if (!mounted) return;
+    debugPrint('TV: app hidden - TV ends');
+    showLauncher(ref);
+  }
+
   @override
   void initState() {
     super.initState();
+    _lifecycle;
     // Timeshift's settings loaded before the first channel starts.
     ref.read(tvTimeshiftProvider);
     ref.read(tvTimeshiftMemoryProvider);
@@ -192,6 +204,7 @@ class _TvScreenState extends ConsumerState<TvScreen> {
     final open = _open;
     Future.microtask(() => open.set(false));
     _generation++;
+    _lifecycle.dispose();
     _setFrameRate(0);
     _player?.dispose();
     _session?.close();
