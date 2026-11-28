@@ -402,5 +402,7 @@
   "settingsTvListTextNormal": "Normal",
   "settingsTvListTextLarge": "Groß",
   "settingsTvListTextExtraLarge": "Sehr groß",
-  "settingsTvViewHelp": "Wie lange Sender und Sendung nach dem Umschalten unten eingeblendet bleiben, und wie groß die Senderliste schreibt – vor allem die Zeile mit der laufenden Sendung."
+  "settingsTvViewHelp": "Wie lange Sender und Sendung nach dem Umschalten unten eingeblendet bleiben, und wie groß die Senderliste schreibt – vor allem die Zeile mit der laufenden Sendung.",
+  "settingsTvListInfo": "Senderliste mit Info rechts",
+  "settingsTvListInfoHelp": "Die Senderliste steht in der Mitte, rechts daneben immer Sendung, Beschreibung und was danach kommt – für den markierten Sender. OK auf dem laufenden Sender führt zurück zum Bild (oder startet ihn neu, wenn er kein Bild hat). Aus: die Senderliste am Rand wie bisher."
 }

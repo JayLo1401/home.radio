@@ -914,20 +914,24 @@ class SettingsRepository {
   Future<bool> getTvZapEncrypted() async => await _db.getSetting('tv_zap_encrypted') != 'false';
   Future<void> setTvZapEncrypted(bool value) => _db.setSetting('tv_zap_encrypted', '$value');
 
-  /// How long the info bar shows after switching channels (seconds) and
-  /// how big the channel list writes - see [TvViewSettings].
+  /// How long the info bar shows after switching channels (seconds), how
+  /// big the channel list writes and whether it shows in the middle with
+  /// the marked channel's info beside it - see [TvViewSettings].
   Future<TvViewSettings> getTvView() async {
     final seconds = int.tryParse(await _db.getSetting('tv_info_seconds') ?? '');
     final text = await _db.getSetting('tv_list_text');
+    final info = await _db.getSetting('tv_list_info');
     return TvViewSettings(
       infoSeconds: TvViewSettings.infoSecondChoices.contains(seconds) ? seconds! : TvViewSettings.defaults.infoSeconds,
       listText: TvListTextSize.values.where((v) => v.name == text).firstOrNull ?? TvViewSettings.defaults.listText,
+      listInfo: info == null ? TvViewSettings.defaults.listInfo : info != 'false',
     );
   }
 
   Future<void> setTvView(TvViewSettings value) async {
     await _db.setSetting('tv_info_seconds', '${value.infoSeconds}');
     await _db.setSetting('tv_list_text', value.listText.name);
+    await _db.setSetting('tv_list_info', '${value.listInfo}');
   }
 
   /// The remote's keys per action (see RemoteKeys): action name -> logical
@@ -1168,25 +1172,37 @@ enum TvListTextSize {
   final double factor;
 }
 
-/// TV: the info bar's time after switching, the channel list's writing.
+/// TV: the info bar's time after switching, the channel list's writing
+/// and its layout.
 @immutable
 class TvViewSettings {
-  const TvViewSettings({required this.infoSeconds, required this.listText});
+  const TvViewSettings({required this.infoSeconds, required this.listText, this.listInfo = true});
 
-  static const defaults = TvViewSettings(infoSeconds: 6, listText: TvListTextSize.large);
+  static const defaults = TvViewSettings(infoSeconds: 6, listText: TvListTextSize.large, listInfo: true);
 
   static const infoSecondChoices = [2, 3, 4, 5, 6, 8, 10, 15, 20, 30];
 
   final int infoSeconds;
   final TvListTextSize listText;
 
-  TvViewSettings copyWith({int? infoSeconds, TvListTextSize? listText}) =>
-      TvViewSettings(infoSeconds: infoSeconds ?? this.infoSeconds, listText: listText ?? this.listText);
+  /// "Senderliste mit Info rechts": the channel list in the middle, the
+  /// marked channel's programme beside it (OK on the channel on air goes
+  /// back to the picture); off: the list at the side as before.
+  final bool listInfo;
+
+  TvViewSettings copyWith({int? infoSeconds, TvListTextSize? listText, bool? listInfo}) => TvViewSettings(
+        infoSeconds: infoSeconds ?? this.infoSeconds,
+        listText: listText ?? this.listText,
+        listInfo: listInfo ?? this.listInfo,
+      );
 
   @override
   bool operator ==(Object other) =>
-      other is TvViewSettings && other.infoSeconds == infoSeconds && other.listText == listText;
+      other is TvViewSettings &&
+      other.infoSeconds == infoSeconds &&
+      other.listText == listText &&
+      other.listInfo == listInfo;
 
   @override
-  int get hashCode => Object.hash(infoSeconds, listText);
+  int get hashCode => Object.hash(infoSeconds, listText, listInfo);
 }

@@ -143,6 +143,19 @@
     "description": "Before the start time and title of the programme after the current one."
   },
   "tvChannelListKeyHint": "OK abspielen (laufender Sender: Info)  ·  OK lang Optionen (verschieben)  ·  → Programm  ·  ← schließen",
+  "tvChannelListInfoKeyHint": "OK abspielen (laufender Sender: zurück zum Bild)  ·  OK lang Optionen (verschieben)  ·  → Programm  ·  ← schließen",
+  "tvListOnAir": "Läuft gerade – OK zurück zum Bild",
+  "@tvListOnAir": {
+    "description": "Channel list with info: the channel on air plays fine, OK closes the list."
+  },
+  "tvListRetune": "Kein Bild – OK startet den Sender neu",
+  "@tvListRetune": {
+    "description": "Channel list with info: the channel on air does not play (stopped, error, stream lost), OK tunes it again."
+  },
+  "tvListLater": "Danach",
+  "@tvListLater": {
+    "description": "Heading over the next programmes in the info beside the channel list."
+  },
   "tvMoveKeyHint": "↑/↓ verschieben  ·  OK fertig  ·  Zurück abbrechen",
   "tvChannelPlay": "Abspielen",
   "tvChannelInfo": "Was läuft",

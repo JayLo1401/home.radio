@@ -1192,6 +1192,10 @@ class AppLocalizationsDe extends AppLocalizations {
       'OK abspielen (laufender Sender: Info)  ·  → Optionen (verschieben, entfernen)  ·  ← schließen';
 
   @override
+  String get iptvChannelListInfoKeyHint =>
+      'OK abspielen (laufender Sender: zurück zum Bild)  ·  → Optionen (verschieben, entfernen)  ·  ← schließen';
+
+  @override
   String get iptvMove => 'Verschieben';
 
   @override
@@ -5746,6 +5750,13 @@ class AppLocalizationsDe extends AppLocalizations {
       'Wie lange Sender und Sendung nach dem Umschalten unten eingeblendet bleiben, und wie groß die Senderliste schreibt – vor allem die Zeile mit der laufenden Sendung.';
 
   @override
+  String get settingsTvListInfo => 'Senderliste mit Info rechts';
+
+  @override
+  String get settingsTvListInfoHelp =>
+      'Die Senderliste steht in der Mitte, rechts daneben immer Sendung, Beschreibung und was danach kommt – für den markierten Sender. OK auf dem laufenden Sender führt zurück zum Bild (oder startet ihn neu, wenn er kein Bild hat). Aus: die Senderliste am Rand wie bisher.';
+
+  @override
   String get systemStartDashboard => 'Haussteuerung anzeigen (Wandtablet)';
 
   @override
@@ -5939,6 +5950,19 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get tvChannelListKeyHint =>
       'OK abspielen (laufender Sender: Info)  ·  OK lang Optionen (verschieben)  ·  → Programm  ·  ← schließen';
+
+  @override
+  String get tvChannelListInfoKeyHint =>
+      'OK abspielen (laufender Sender: zurück zum Bild)  ·  OK lang Optionen (verschieben)  ·  → Programm  ·  ← schließen';
+
+  @override
+  String get tvListOnAir => 'Läuft gerade – OK zurück zum Bild';
+
+  @override
+  String get tvListRetune => 'Kein Bild – OK startet den Sender neu';
+
+  @override
+  String get tvListLater => 'Danach';
 
   @override
   String get tvMoveKeyHint =>

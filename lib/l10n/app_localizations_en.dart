@@ -1191,6 +1191,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'OK play (current channel: info)  ·  → Options (move, remove)  ·  ← close';
 
   @override
+  String get iptvChannelListInfoKeyHint =>
+      'OK play (current channel: back to the picture)  ·  → Options (move, remove)  ·  ← close';
+
+  @override
   String get iptvMove => 'Move';
 
   @override
@@ -5746,6 +5750,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'How long channel and programme stay at the bottom after switching, and how big the channel list writes – above all the line with the programme on now.';
 
   @override
+  String get settingsTvListInfo => 'Channel list with info on the right';
+
+  @override
+  String get settingsTvListInfoHelp =>
+      'The channel list sits in the middle with the marked channel\'s programme, description and what comes next always beside it. OK on the channel on air goes back to the picture (or tunes it again if it shows no picture). Off: the channel list at the side as before.';
+
+  @override
   String get systemStartDashboard => 'Show Smart Home (wall tablet)';
 
   @override
@@ -5945,6 +5956,19 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get tvChannelListKeyHint =>
       'OK play (current channel: info)  ·  hold OK options (move)  ·  → Guide  ·  ← close';
+
+  @override
+  String get tvChannelListInfoKeyHint =>
+      'OK play (current channel: back to the picture)  ·  hold OK options (move)  ·  → Guide  ·  ← close';
+
+  @override
+  String get tvListOnAir => 'On now – OK back to the picture';
+
+  @override
+  String get tvListRetune => 'No picture – OK tunes the channel again';
+
+  @override
+  String get tvListLater => 'Later';
 
   @override
   String get tvMoveKeyHint => '↑/↓ move  ·  OK done  ·  Back cancels';

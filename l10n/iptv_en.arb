@@ -27,6 +27,7 @@
   "iptvFavoriteNumber": "No. {number}",
   "iptvEmptyList": "No Internet TV channels yet. Use “Find channels” above: there OK plays a channel, ★ adds it to this list.",
   "iptvChannelListKeyHint": "OK play (current channel: info)  ·  → Options (move, remove)  ·  ← close",
+  "iptvChannelListInfoKeyHint": "OK play (current channel: back to the picture)  ·  → Options (move, remove)  ·  ← close",
   "iptvMove": "Move",
   "iptvMoveHint": "↑/↓ move  ·  OK done",
   "iptvChangeNumber": "Change number…",

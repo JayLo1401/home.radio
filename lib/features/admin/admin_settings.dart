@@ -561,6 +561,14 @@ class AdminSettings implements AdminSettingsSource {
                 return setTvView((t) => t.copyWith(listText: size));
               },
             ),
+            _Setting(
+              id: 'tvListInfo',
+              label: l.settingsTvListInfo,
+              help: l.settingsTvListInfoHelp,
+              type: 'bool',
+              get: () => tvView.listInfo,
+              set: (v) => setTvView((t) => t.copyWith(listInfo: _bool(v) ?? true)),
+            ),
           ],
         ),
       if (parts.pictures)

@@ -2162,6 +2162,12 @@ abstract class AppLocalizations {
   /// **'OK abspielen (laufender Sender: Info)  ·  → Optionen (verschieben, entfernen)  ·  ← schließen'**
   String get iptvChannelListKeyHint;
 
+  /// No description provided for @iptvChannelListInfoKeyHint.
+  ///
+  /// In de, this message translates to:
+  /// **'OK abspielen (laufender Sender: zurück zum Bild)  ·  → Optionen (verschieben, entfernen)  ·  ← schließen'**
+  String get iptvChannelListInfoKeyHint;
+
   /// No description provided for @iptvMove.
   ///
   /// In de, this message translates to:
@@ -9694,6 +9700,18 @@ abstract class AppLocalizations {
   /// **'Wie lange Sender und Sendung nach dem Umschalten unten eingeblendet bleiben, und wie groß die Senderliste schreibt – vor allem die Zeile mit der laufenden Sendung.'**
   String get settingsTvViewHelp;
 
+  /// No description provided for @settingsTvListInfo.
+  ///
+  /// In de, this message translates to:
+  /// **'Senderliste mit Info rechts'**
+  String get settingsTvListInfo;
+
+  /// No description provided for @settingsTvListInfoHelp.
+  ///
+  /// In de, this message translates to:
+  /// **'Die Senderliste steht in der Mitte, rechts daneben immer Sendung, Beschreibung und was danach kommt – für den markierten Sender. OK auf dem laufenden Sender führt zurück zum Bild (oder startet ihn neu, wenn er kein Bild hat). Aus: die Senderliste am Rand wie bisher.'**
+  String get settingsTvListInfoHelp;
+
   /// No description provided for @systemStartDashboard.
   ///
   /// In de, this message translates to:
@@ -10015,6 +10033,30 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'OK abspielen (laufender Sender: Info)  ·  OK lang Optionen (verschieben)  ·  → Programm  ·  ← schließen'**
   String get tvChannelListKeyHint;
+
+  /// No description provided for @tvChannelListInfoKeyHint.
+  ///
+  /// In de, this message translates to:
+  /// **'OK abspielen (laufender Sender: zurück zum Bild)  ·  OK lang Optionen (verschieben)  ·  → Programm  ·  ← schließen'**
+  String get tvChannelListInfoKeyHint;
+
+  /// Channel list with info: the channel on air plays fine, OK closes the list.
+  ///
+  /// In de, this message translates to:
+  /// **'Läuft gerade – OK zurück zum Bild'**
+  String get tvListOnAir;
+
+  /// Channel list with info: the channel on air does not play (stopped, error, stream lost), OK tunes it again.
+  ///
+  /// In de, this message translates to:
+  /// **'Kein Bild – OK startet den Sender neu'**
+  String get tvListRetune;
+
+  /// Heading over the next programmes in the info beside the channel list.
+  ///
+  /// In de, this message translates to:
+  /// **'Danach'**
+  String get tvListLater;
 
   /// No description provided for @tvMoveKeyHint.
   ///
