@@ -376,6 +376,11 @@ class _TvScreenState extends ConsumerState<TvScreen> {
       );
     });
     _showInfo();
+    // "Als Nächstes" is for watching on, not for switching: the old
+    // channel's note goes, this one's next programme isn't announced now.
+    _switchedAt = DateTime.now();
+    _nextUpHide?.cancel();
+    _nextUp = null;
     _checkNextUp();
     // The old picture goes in the background - it mustn't hold up the new one.
     if (oldPlayer != null) unawaited(oldPlayer.dispose());
@@ -551,6 +556,9 @@ class _TvScreenState extends ConsumerState<TvScreen> {
     final t = context.l10n;
     // Internet streams come in any rate - the system decides.
     _setFrameRate(0);
+    // The receiver channel's "Als Nächstes" goes with it.
+    _nextUpHide?.cancel();
+    _nextUp = null;
     final generation = ++_generation;
     bool stale() => !mounted || generation != _generation;
     final oldPlayer = _player, oldSession = _session;
@@ -932,6 +940,9 @@ class _TvScreenState extends ConsumerState<TvScreen> {
   /// Shortly before the next programme on this channel starts (Einstellungen
   /// → TV → "Als Nächstes"), a note says what's coming - once per
   /// programme, for the set time.
+  /// When the channel was switched - [_checkNextUp] keeps quiet a minute.
+  DateTime _switchedAt = DateTime(0);
+
   void _checkNextUp() {
     final settings = ref.read(tvNextUpProvider);
     final channel = _current;
@@ -944,6 +955,8 @@ class _TvScreenState extends ConsumerState<TvScreen> {
     final until = next.begin.difference(now);
     if (key == _nextUpShownFor || until.isNegative || until > Duration(minutes: settings.leadMinutes)) return;
     _nextUpShownFor = key;
+    // Just switched to it: already in its last minutes - counts as told.
+    if (now.difference(_switchedAt) < const Duration(minutes: 1)) return;
     _nextUpHide?.cancel();
     setState(() => _nextUp = next);
     _nextUpHide = Timer(Duration(seconds: settings.showSeconds), () {
@@ -1308,7 +1321,11 @@ class _TvScreenState extends ConsumerState<TvScreen> {
                       if (player case final TvTimeshiftPlayer ts when !_listVisible)
                         Positioned(top: 32, left: 40, child: TvTimeshiftIndicator(player: ts)),
                       if (_nextUp != null && !_listVisible)
-                        Positioned(top: 32, right: 40, child: _NextUpNote(event: _nextUp!)),
+                        Positioned(
+                          top: 32,
+                          right: 40,
+                          child: _NextUpNote(event: _nextUp!, config: config, channel: _current),
+                        ),
                       if (banner != null && !_listVisible)
                         Positioned(left: 0, right: 0, bottom: 0, child: banner),
                       // The channel list ends above the info bar, which stays
@@ -1377,13 +1394,34 @@ class _Message extends StatelessWidget {
 
 /// "Als Nächstes": the next programme, a few minutes before it starts.
 class _NextUpNote extends StatelessWidget {
-  const _NextUpNote({required this.event});
+  const _NextUpNote({required this.event, required this.config, required this.channel});
 
   final E2Event event;
+
+  /// For the channel's logo beside it.
+  final Enigma2Config? config;
+  final E2Channel? channel;
 
   @override
   Widget build(BuildContext context) {
     final minutes = event.begin.difference(DateTime.now()).inMinutes;
+    final config = this.config, channel = this.channel;
+    final text = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(minutes <= 0 ? context.l10n.tvNextUpNow : context.l10n.tvNextUpInMinutes(minutes),
+            style: const TextStyle(color: brandGreen, fontSize: 15, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 4),
+        Text('${hhmm(event.begin)}  ${event.title}',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+        if (event.shortDescription.trim().isNotEmpty)
+          Text(event.shortDescription.trim(),
+              maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white60, fontSize: 15)),
+      ],
+    );
     return Container(
       constraints: const BoxConstraints(maxWidth: 560),
       padding: const EdgeInsets.fromLTRB(20, 14, 22, 16),
@@ -1392,22 +1430,17 @@ class _NextUpNote extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         border: const Border(left: BorderSide(color: brandGreen, width: 5)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(minutes <= 0 ? context.l10n.tvNextUpNow : context.l10n.tvNextUpInMinutes(minutes),
-              style: const TextStyle(color: brandGreen, fontSize: 15, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 4),
-          Text('${hhmm(event.begin)}  ${event.title}',
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
-          if (event.shortDescription.trim().isNotEmpty)
-            Text(event.shortDescription.trim(),
-                maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white60, fontSize: 15)),
-        ],
-      ),
+      child: config == null || channel == null
+          ? text
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // The channel's logo, as in the channel list.
+                Picon(config: config, channel: channel, width: 96, height: 58),
+                const SizedBox(width: 16),
+                Flexible(child: text),
+              ],
+            ),
     );
   }
 }
