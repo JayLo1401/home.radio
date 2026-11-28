@@ -838,6 +838,9 @@ class AppLocalizationsDe extends AppLocalizations {
       'Nur die IP oder der Name des Rechners mit dem Mosquitto-Add-on, z. B. 192.168.1.5 - nicht die Adresse der Home-Assistant-Seite mit :8123.';
 
   @override
+  String get haLaunchApp => 'App starten';
+
+  @override
   String get iptvListName => 'Internet-TV';
 
   @override

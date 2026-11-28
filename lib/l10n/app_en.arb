@@ -280,6 +280,7 @@
   "haOpenMusic": "Open Music",
   "haOpenDashboard": "Open Smart Home",
   "haHostHelp": "Only the IP or name of the machine with the Mosquitto add-on, e.g. 192.168.1.5 - not the Home Assistant page address with :8123.",
+  "haLaunchApp": "Start app",
   "iptvListName": "Internet TV",
   "iptvBrowse": "Find channels",
   "iptvBrowseTitle": "Internet TV – find channels",

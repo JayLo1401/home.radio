@@ -11,11 +11,25 @@ import '../data/services/ha_mqtt_link.dart';
 import 'package:audio_service/audio_service.dart' show AudioProcessingState;
 
 import '../data/models/favorite_channel.dart';
+import '../data/models/launcher_group.dart';
+import '../data/models/launcher_tile.dart';
+import '../data/services/launcher_service.dart' show LauncherService;
+import '../features/browser/browser_screen.dart' show BrowserScreen;
 import '../features/dashboard/dashboard_screen.dart' show DashboardScreen, dashboardReloadProvider;
 import '../features/launcher/launcher_navigation.dart' show hideLauncherWith, showLauncherWith;
-import '../features/launcher/launcher_providers.dart' show RadioCommand, appNavigatorKey, radioCommandProvider;
+import '../features/launcher/launcher_providers.dart'
+    show
+        RadioCommand,
+        appNavigatorKey,
+        launcherGroupsProvider,
+        launcherServiceProvider,
+        launcherTilesProvider,
+        radioCommandProvider;
+import '../features/movies/movies_screen.dart' show MoviesScreen;
 import '../features/music/music_screen.dart' show MusicScreen;
+import '../features/pictures/pictures_screen.dart' show PicturesScreen;
 import '../features/tv/tv_screen.dart' show TvScreen;
+import 'foreground_part.dart' show foregroundPartObserver;
 import 'music_providers.dart' show musicPlayerProvider;
 import '../l10n/l10n.dart';
 import 'dashboard_providers.dart';
@@ -119,7 +133,26 @@ final haLinkControllerProvider = Provider<void>((ref) {
   ref.listen(currentProgramNumberProvider, (_, _) => changed());
   // New or renamed favourites: the station list in Home Assistant.
   ref.listen(favoritesStreamProvider, (_, _) => unawaited(link.rediscover()));
+  // Another part on screen: the switches per app.
+  foregroundPartObserver.part.addListener(changed);
+  // Apps added to or removed from Home: the list of "App starten".
+  if (LauncherService.supported) {
+    String appList() => [
+          for (final a in haLauncherApps(ref.read(launcherTilesProvider), ref.read(launcherGroupsProvider))) a.label,
+        ].join('\n');
+    var apps = appList();
+    void appsChanged() {
+      final now = appList();
+      if (now == apps) return;
+      apps = now;
+      unawaited(link.rediscover());
+    }
+
+    ref.listen(launcherTilesProvider, (_, _) => appsChanged());
+    ref.listen(launcherGroupsProvider, (_, _) => appsChanged());
+  }
   ref.onDispose(() {
+    foregroundPartObserver.part.removeListener(changed);
     unawaited(item?.cancel());
     unawaited(playback?.cancel());
     unawaited(frames?.cancel());
@@ -168,6 +201,44 @@ abstract final class HaKeys {
   static const openMusic = 'open_music';
   static const openDashboard = 'open_dashboard';
   static const version = 'version';
+  static const appRadio = 'app_radio';
+  static const appTv = 'app_tv';
+  static const appDashboard = 'app_dashboard';
+  static const appPictures = 'app_pictures';
+  static const appMovies = 'app_movies';
+  static const appMusic = 'app_music';
+  static const appBrowser = 'app_browser';
+  static const launchApp = 'launch_app';
+
+  /// The switch of each of Home System's parts (on: it's on screen), by
+  /// its LauncherTile type.
+  static const appSwitches = {
+    LauncherTile.radioType: appRadio,
+    LauncherTile.tvType: appTv,
+    LauncherTile.dashboardType: appDashboard,
+    LauncherTile.picturesType: appPictures,
+    LauncherTile.moviesType: appMovies,
+    LauncherTile.musicType: appMusic,
+    LauncherTile.browserType: appBrowser,
+  };
+}
+
+/// The Android apps on Home (the favourites' row and the groups), each once
+/// and with a label of its own - the options of "App starten".
+List<({String label, String package})> haLauncherApps(List<LauncherTile> favourites, List<LauncherGroup> groups) {
+  final apps = <({String label, String package})>[];
+  final packages = <String>{};
+  for (final tile in [...favourites, for (final g in groups) ...g.tiles]) {
+    final package = tile.package;
+    if (!tile.isApp || package == null || package.isEmpty || !packages.add(package)) continue;
+    var label = tile.displayLabel.trim();
+    if (label.isEmpty || label == _AppHaDevice._noStation) label = package;
+    if (apps.any((a) => a.label == label)) label = '$label ($package)';
+    apps.add((label: label, package: package));
+    // Home Assistant's select stays usable.
+    if (apps.length >= 100) break;
+  }
+  return apps;
 }
 
 /// Home System as Home Assistant sees it - with what this device has (a
@@ -346,6 +417,7 @@ class _AppHaDevice implements HaDevice {
         ),
       ],
       ...await _mediaEntities(status),
+      ..._appEntities(),
       HaEntity(component: 'notify', key: HaKeys.message, name: l.haMessage, config: const {'icon': 'mdi:message-text'}),
       HaEntity(
         component: 'binary_sensor',
@@ -398,6 +470,7 @@ class _AppHaDevice implements HaDevice {
         if (freeStorage != null) HaKeys.freeStorage: (freeStorage / (1 << 30)).toStringAsFixed(1),
       },
       ...await _mediaStates(status),
+      ..._appStates(resumed),
       HaKeys.foreground: onOff(resumed),
       HaKeys.ip: ip ?? '',
       HaKeys.version: await _ref.read(updateServiceProvider).currentVersion(),
@@ -407,6 +480,11 @@ class _AppHaDevice implements HaDevice {
   @override
   Future<void> command(String key, String payload) async {
     final value = payload.trim();
+    final part = _partOfSwitch(key);
+    if (part != null) {
+      if (value == 'ON' || value == 'OFF') await _switchPart(part, on: value == 'ON');
+      return;
+    }
     switch (key) {
       case HaKeys.screen:
         if (value == 'ON') {
@@ -483,11 +561,15 @@ class _AppHaDevice implements HaDevice {
       case HaKeys.openHome:
         showLauncherWith(_ref.read);
       case HaKeys.openRadio:
-        if (!_ref.read(systemPartsProvider).radio) return;
-        appNavigatorKey.currentState?.popUntil((r) => r.isFirst);
-        hideLauncherWith(_ref.read);
-      case HaKeys.openTv || HaKeys.openMusic || HaKeys.openDashboard:
-        await _openOverLauncher(key);
+        await _openPart(LauncherTile.radioType);
+      case HaKeys.openTv:
+        await _openPart(LauncherTile.tvType);
+      case HaKeys.openMusic:
+        await _openPart(LauncherTile.musicType);
+      case HaKeys.openDashboard:
+        await _openPart(LauncherTile.dashboardType);
+      case HaKeys.launchApp:
+        await _launchApp(value);
       default:
         debugPrint('Home Assistant: unknown command $key');
     }
@@ -589,30 +671,168 @@ class _AppHaDevice implements HaDevice {
   /// Home Assistant keeps at most 255 characters of a state.
   static String _cut(String text) => text.length <= 250 ? text : '${text.substring(0, 249)}…';
 
-  /// TV, Musik or the Haussteuerung over the launcher - as its tiles open
-  /// them (Back leads to the launcher).
-  Future<void> _openOverLauncher(String key) async {
+  /// Whether the part of [type] (a LauncherTile type) is on in the settings
+  /// and works here - the Haussteuerung only on Android.
+  bool _partAvailable(String type) {
     final parts = _ref.read(systemPartsProvider);
-    final allowed = switch (key) {
-      HaKeys.openTv => parts.tv,
-      HaKeys.openMusic => parts.music,
-      _ => parts.dashboard && _android,
+    return switch (type) {
+      LauncherTile.radioType => parts.radio,
+      LauncherTile.tvType => parts.tv,
+      LauncherTile.dashboardType => parts.dashboard && _android,
+      LauncherTile.picturesType => parts.pictures,
+      LauncherTile.moviesType => parts.movies,
+      LauncherTile.musicType => parts.music,
+      LauncherTile.browserType => parts.browser,
+      _ => false,
     };
-    if (!allowed) return;
+  }
+
+  /// The part whose switch [key] is, or null.
+  static String? _partOfSwitch(String key) {
+    for (final MapEntry(key: type, value: switchKey) in HaKeys.appSwitches.entries) {
+      if (switchKey == key) return type;
+    }
+    return null;
+  }
+
+  static bool get _resumed => WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
+
+  /// A switch per part, for those switched on (see [_partAvailable]) - on
+  /// while it's on screen.
+  List<HaEntity> _appEntities() {
+    final l = l10n;
+    const icons = {
+      LauncherTile.radioType: 'mdi:radio',
+      LauncherTile.tvType: 'mdi:television',
+      LauncherTile.dashboardType: 'mdi:view-dashboard',
+      LauncherTile.picturesType: 'mdi:image-multiple',
+      LauncherTile.moviesType: 'mdi:movie-open',
+      LauncherTile.musicType: 'mdi:music',
+      LauncherTile.browserType: 'mdi:web',
+    };
+    final apps = LauncherService.supported ? _launcherApps() : const <({String label, String package})>[];
+    return [
+      for (final MapEntry(key: type, value: key) in HaKeys.appSwitches.entries)
+        if (_partAvailable(type))
+          HaEntity(
+            component: 'switch',
+            key: key,
+            // As its tile is called: Radio, TV, Haussteuerung, Bilder ...
+            name: switch (type) {
+              LauncherTile.radioType => 'Radio',
+              LauncherTile.tvType => 'TV',
+              LauncherTile.dashboardType => l.dashboardTitle,
+              LauncherTile.picturesType => l.picturesTitle,
+              LauncherTile.moviesType => l.moviesTitle,
+              LauncherTile.musicType => l.musicTitle,
+              _ => l.browserTitle,
+            },
+            config: {'icon': icons[type]},
+          ),
+      if (apps.isNotEmpty)
+        HaEntity(
+          component: 'select',
+          key: HaKeys.launchApp,
+          name: l.haLaunchApp,
+          config: {
+            'options': [_noStation, for (final a in apps) a.label],
+            'icon': 'mdi:apps',
+          },
+        ),
+    ];
+  }
+
+  Map<String, String> _appStates(bool resumed) {
+    final inFront = resumed ? foregroundPartObserver.part.value : null;
+    return {
+      for (final MapEntry(key: type, value: key) in HaKeys.appSwitches.entries)
+        if (_partAvailable(type)) key: inFront == type ? 'ON' : 'OFF',
+      // Nothing chosen: every choice starts its app, the same one again too.
+      if (LauncherService.supported) HaKeys.launchApp: _noStation,
+    };
+  }
+
+  List<({String label, String package})> _launcherApps() =>
+      haLauncherApps(_ref.read(launcherTilesProvider), _ref.read(launcherGroupsProvider));
+
+  /// A part's switch: on opens it as its tile does (Home System comes to
+  /// the front first), off goes back to Home - only from that part, nothing
+  /// else stops.
+  Future<void> _switchPart(String type, {required bool on}) async {
+    final shown = foregroundPartObserver.part.value == type;
+    if (!on) {
+      if (shown) showLauncherWith(_ref.read);
+      return;
+    }
+    if (!_partAvailable(type)) return;
+    if (_android && !_resumed) {
+      try {
+        await _display.bringToFront();
+      } catch (e) {
+        debugPrint('Home Assistant: to the front: $e');
+      }
+    }
+    if (shown) return;
+    await _openPart(type);
+  }
+
+  /// A part as Home's tile opens it: Radio (the screen under Home), the
+  /// others over Home (Back leads there).
+  Future<void> _openPart(String type) async {
+    if (!_partAvailable(type)) return;
+    if (type == LauncherTile.radioType) {
+      appNavigatorKey.currentState?.popUntil((r) => r.isFirst);
+      hideLauncherWith(_ref.read);
+      return;
+    }
     showLauncherWith(_ref.read);
     final nav = appNavigatorKey.currentState;
     if (nav == null) return;
-    // TV and the Haussteuerung take the speakers (as from the launcher).
-    if (key != HaKeys.openMusic) {
+    // TV and the Haussteuerung take the speakers (as from the launcher);
+    // music, pictures, films and the browser leave the radio playing until
+    // they play something themselves.
+    if (type == LauncherTile.tvType || type == LauncherTile.dashboardType) {
       _ref.read(radioCommandProvider.notifier).send(RadioCommand.pauseForApp);
-      if (key == HaKeys.openTv) await _ref.read(musicPlayerProvider).pauseForApp();
+      if (type == LauncherTile.tvType) await _pauseMusic();
     }
-    final Widget page = switch (key) {
-      HaKeys.openTv => const TvScreen(),
-      HaKeys.openMusic => const MusicScreen(),
-      _ => const DashboardScreen(),
+    final Widget page = switch (type) {
+      LauncherTile.tvType => const TvScreen(),
+      LauncherTile.dashboardType => const DashboardScreen(),
+      LauncherTile.picturesType => const PicturesScreen(),
+      LauncherTile.moviesType => const MoviesScreen(),
+      LauncherTile.musicType => const MusicScreen(),
+      _ => const BrowserScreen(),
     };
     unawaited(nav.push(MaterialPageRoute<void>(builder: (_) => page)));
+  }
+
+  Future<void> _pauseMusic() async {
+    try {
+      await _ref.read(musicPlayerProvider).pauseForApp();
+    } catch (e) {
+      debugPrint('Home Assistant: pause music: $e');
+    }
+  }
+
+  /// "App starten": the app with that label from Home, as its tile starts
+  /// it - radio and music pause, the app gets the screen.
+  Future<void> _launchApp(String label) async {
+    if (!LauncherService.supported || label.isEmpty || label == _noStation) return;
+    final app = _launcherApps().where((a) => a.label == label).firstOrNull;
+    if (app == null) return;
+    _ref.read(radioCommandProvider.notifier).send(RadioCommand.pauseForApp);
+    await _pauseMusic();
+    var ok = false;
+    try {
+      ok = await _ref.read(launcherServiceProvider).launchApp(app.package);
+    } catch (e) {
+      debugPrint('Home Assistant: start ${app.package}: $e');
+    }
+    if (!ok) {
+      appMessengerKey.currentState
+        ?..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(l10n.settingsLauncherNotInstalled(label))));
+    }
   }
 
   Future<void> _setBrightness(DisplayBrightness Function(DisplayBrightness b) change) async {
