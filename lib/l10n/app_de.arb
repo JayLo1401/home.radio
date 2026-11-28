@@ -15,17 +15,7 @@
   "adminBackupDownload": "Backup erstellen & herunterladen",
   "adminRestoreHeading": "Backup wiederherstellen",
   "adminRestoreHow": "Zum Wiederherstellen am Gerät Einstellungen → System → Backup wiederherstellen öffnen (oder im Einrichtungsassistenten „Backup wiederherstellen“ wählen). Hier erscheint dann das Hochladen.",
-  "adminRestoreReady": "Das Gerät ist bereit. Alle aktuellen Favoriten, Sender und Einstellungen werden ersetzt, danach startet Home System neu.",
-  "adminRestoreButton": "Backup einspielen",
   "adminRestoring": "Wird eingespielt …",
-  "adminConfirmRestore": "Backup „{file}“ einspielen? Alle aktuellen Daten des Geräts werden ersetzt.",
-  "@adminConfirmRestore": {
-    "placeholders": {
-      "file": {
-        "type": "String"
-      }
-    }
-  },
   "adminRestoreLocked": "Wiederherstellen ist gerade nicht freigegeben - am Gerät „Backup wiederherstellen“ öffnen.",
   "adminFileTooBig": "Die Datei ist zu groß für ein Backup.",
   "adminFileInvalid": "Die Datei ist kein gültiges Backup.",
@@ -87,6 +77,72 @@
   "adminClose": "Schließen",
   "adminDeviceOnly": "Nur am Gerät selbst: Empfänger- und Receiversuche, Senderlisten, Home-Taste, Berechtigungen, Hintergründe und Icon-Pakete.",
   "adminRestoreOpenBanner": "Am Gerät ist „Backup wiederherstellen“ offen - hier die Datei hochladen ›",
+  "backupAreaSystem": "Systemeinstellungen",
+  "backupAreaSystemHint": "Start-Option, Anzeige, Sprache, Teile an/aus, Launcher-Kacheln, Tasten der Fernbedienung, Updates",
+  "backupAreaTv": "TV-Einstellungen",
+  "backupAreaTvHint": "Receiver mit Anmeldung, Internet-TV, Senderlisten, Erinnerungen, „Als Nächstes“",
+  "backupAreaRadio": "Radio-Einstellungen",
+  "backupAreaRadioHint": "Favoriten, DAB+- und UKW-Sender, Startsender",
+  "backupAreaRadioCounts": "{favorites} Favoriten, {dab} DAB+-Sender, {fm} UKW-Sender",
+  "@backupAreaRadioCounts": {
+    "placeholders": {
+      "favorites": {
+        "type": "int"
+      },
+      "dab": {
+        "type": "int"
+      },
+      "fm": {
+        "type": "int"
+      }
+    }
+  },
+  "backupAreaMusic": "Musik",
+  "backupAreaMusicHint": "Zufall, Wiederholen, Visualizer, Unterordner",
+  "backupAreaMedia": "Filme/Bilder",
+  "backupAreaMediaHint": "Diashow und die Einstellungen für Filme und Bilder",
+  "backupAreaNas": "NAS",
+  "backupAreaNasHint": "Server, Anmeldung mit Passwort und die gewählten Ordner",
+  "backupAreaDashboard": "Haussteuerung/Dashboard",
+  "backupAreaDashboardHint": "Dashboard-Adresse, Display per Bewegung, Helligkeit",
+  "backupAreaHa": "Home Assistant",
+  "backupAreaHaHint": "MQTT-Verbindung und Anmeldung mit Passwort, Kamera teilen",
+  "backupAreaSdr": "Funk/SDR",
+  "backupAreaSdrHint": "rtl_tcp-Server, Funk-Bänder, Flugzeuge, Sensoren",
+  "backupAreaWeather": "Wetter/Hintergrund",
+  "backupAreaWeatherHint": "Wetter, Regenradar, Sonne & Mond, Hintergrundbilder",
+  "backupAreaBrowser": "Webbrowser",
+  "backupAreaBrowserHint": "Startseite, Lesezeichen, Suchmaschine, Werbeblocker",
+  "backupAreaOther": "Sonstiges",
+  "backupAreaOtherHint": "Weitere Einstellungen, die zu keinem der Bereiche gehören",
+  "backupSelectTitle": "Was soll übernommen werden?",
+  "backupSelectHint": "Nur die angekreuzten Bereiche werden durch die aus dem Backup ersetzt - alles andere bleibt, wie es ist. Danach startet Home System neu.",
+  "backupSelectCreated": "Erstellt: {date}",
+  "@backupSelectCreated": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "backupSelectAreas": "Bereiche",
+  "backupDeviceNameHelp": "Dieses Gerät heißt zurzeit „{name}“ - leer lassen behält den Namen.",
+  "@backupDeviceNameHelp": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "backupDeviceNameHelpNone": "Leer lassen behält den aktuellen Namen.",
+  "backupApply": "Übernehmen",
+  "backupNothingSelected": "Nichts ausgewählt - mindestens einen Bereich ankreuzen oder einen Gerätenamen eintragen.",
+  "backupNothingInside": "Das Backup enthält keine Einstellungen.",
+  "backupExpired": "Das Backup ist nicht mehr geladen - bitte noch einmal auswählen.",
+  "backupReading": "Wird gelesen …",
+  "backupPickedFile": "Ausgewählte Datei",
+  "backupAdminOpen": "Backup öffnen",
+  "backupAdminReady": "Das Gerät ist bereit. Eine Backup-Datei wählen oder ein Backup vom NAS - vor dem Einspielen lässt sich auswählen, was übernommen wird.",
   "browserTitle": "Browser",
   "browserAndroidOnly": "Den Browser gibt es nur auf Android (TV-Box, Tablet, Handy).",
   "browserAddress": "Adresse oder Suche",
@@ -3424,17 +3480,6 @@
   },
   "settingsRestoreBusy": "Das Gerät spielt gerade schon ein Backup ein.",
   "settingsRestoreFromWebDone": "Backup von der Verwaltungsseite eingespielt - App startet neu …",
-  "settingsRestoreConfirmTitle": "Backup wiederherstellen?",
-  "settingsRestoreConfirmText": "{what}\n\nAlle aktuellen Favoriten, DAB+ Sender und Einstellungen werden ersetzt. Danach startet die App neu.",
-  "@settingsRestoreConfirmText": {
-    "description": "The backup file name, or the sentence settingsRestorePickedFile.",
-    "placeholders": {
-      "what": {
-        "type": "String"
-      }
-    }
-  },
-  "settingsRestoreButton": "Wiederherstellen",
   "settingsRestoreDone": "Backup wiederhergestellt - App startet neu …",
   "settingsRestoreNoPicker": "Dieses Gerät hat keine Dateiauswahl. Bitte stattdessen „Zugriff auf alle Dateien“ erlauben.",
   "settingsRestoreFailed": "Wiederherstellen fehlgeschlagen: {message}",
@@ -3445,7 +3490,6 @@
       }
     }
   },
-  "settingsRestorePickedFile": "Die ausgewählte Datei wird eingespielt.",
   "settingsRestoreNoAllFilesSetting": "Dieses Gerät bietet die Einstellung „Zugriff auf alle Dateien“ nicht an.",
   "settingsRestoreViaAdmin": "Über die Verwaltungsseite",
   "settingsRestoreNoNetwork": "Keine Netzwerkverbindung - die Verwaltungsseite ist nicht erreichbar.",

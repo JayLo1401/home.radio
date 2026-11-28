@@ -14,17 +14,7 @@
   "adminBackupDownload": "Backup erstellen & herunterladen",
   "adminRestoreHeading": "Backup wiederherstellen",
   "adminRestoreHow": "Zum Wiederherstellen am Gerät Einstellungen → System → Backup wiederherstellen öffnen (oder im Einrichtungsassistenten „Backup wiederherstellen“ wählen). Hier erscheint dann das Hochladen.",
-  "adminRestoreReady": "Das Gerät ist bereit. Alle aktuellen Favoriten, Sender und Einstellungen werden ersetzt, danach startet Home System neu.",
-  "adminRestoreButton": "Backup einspielen",
   "adminRestoring": "Wird eingespielt …",
-  "adminConfirmRestore": "Backup „{file}“ einspielen? Alle aktuellen Daten des Geräts werden ersetzt.",
-  "@adminConfirmRestore": {
-    "placeholders": {
-      "file": {
-        "type": "String"
-      }
-    }
-  },
   "adminRestoreLocked": "Wiederherstellen ist gerade nicht freigegeben - am Gerät „Backup wiederherstellen“ öffnen.",
   "adminFileTooBig": "Die Datei ist zu groß für ein Backup.",
   "adminFileInvalid": "Die Datei ist kein gültiges Backup.",

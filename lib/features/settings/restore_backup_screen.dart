@@ -12,6 +12,7 @@ import '../../data/services/admin_server.dart';
 import '../../data/services/backup_service.dart';
 import '../../data/services/nas_service.dart';
 import '../../l10n/l10n.dart';
+import 'restore_selection_dialog.dart';
 
 /// Saves a backup into Download/HomeSystem (Documents/HomeSystem on the PC)
 /// and says where it went - Settings → System → "Backup erstellen".
@@ -153,12 +154,13 @@ class _RestoreBackupScreenState extends ConsumerState<RestoreBackupScreen> with 
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
-  /// An upload from the admin page - the confirmation happened there.
-  Future<void> _restoreFromWeb(String content) async {
+  /// A backup chosen on the admin page, with what to take over - the
+  /// selection happened there.
+  Future<void> _restoreFromWeb(String content, BackupRestoreSelection selection) async {
     if (_busy) throw BackupFormatException(l10n.settingsRestoreBusy);
     setState(() => _busy = true);
     try {
-      await ref.read(backupServiceProvider).restoreJson(content);
+      await ref.read(backupServiceProvider).restoreJson(content, selection: selection);
     } catch (_) {
       if (mounted) setState(() => _busy = false);
       rethrow;
@@ -168,71 +170,55 @@ class _RestoreBackupScreenState extends ConsumerState<RestoreBackupScreen> with 
     Future<void>.delayed(const Duration(milliseconds: 1500), () => ref.read(backupServiceProvider).restartApp());
   }
 
-  Future<bool> _confirmRestore(String what) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(context.l10n.settingsRestoreConfirmTitle),
-        content: Text(context.l10n.settingsRestoreConfirmText(what)),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: Text(context.l10n.commonCancel)),
-          FilledButton(
-            autofocus: true,
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text(context.l10n.settingsRestoreButton),
-          ),
-        ],
-      ),
-    );
-    return ok == true;
-  }
-
-  Future<void> _runRestore(Future<bool> Function() restore) async {
+  /// Reads a backup ([load] returns its text, null if the user cancelled),
+  /// shows what it contains (see showRestoreSelectionDialog), restores the
+  /// chosen areas and restarts the app. Errors end up as a message - the
+  /// data stays as it was.
+  Future<void> _restoreWithSelection(String source, Future<String?> Function() load) async {
+    final l = context.l10n;
+    final service = ref.read(backupServiceProvider);
     setState(() => _busy = true);
     try {
-      if (!await restore()) return;
-      _snack(l10n.settingsRestoreDone);
+      final content = await load();
+      if (content == null || !mounted) return;
+      final preview = service.inspect(content);
+      final currentName = await ref.read(settingsRepositoryProvider).getDeviceName();
+      if (!mounted) return;
+      setState(() => _busy = false);
+      final created = preview.createdAt;
+      final selection = await showRestoreSelectionDialog(
+        context,
+        source: created == null ? source : '$source · ${l.backupSelectCreated(_formatDate(created.toLocal()))}',
+        preview: preview,
+        currentName: currentName,
+      );
+      if (selection == null || !mounted) return;
+      setState(() => _busy = true);
+      await service.restoreJson(content, selection: selection);
+      _snack(l.settingsRestoreDone);
       await Future<void>.delayed(const Duration(milliseconds: 1200));
-      await ref.read(backupServiceProvider).restartApp();
+      await service.restartApp();
     } on BackupFormatException catch (e) {
       _snack(e.message);
+    } on NasException catch (e) {
+      _snack(l.nasRestoreDownloadFailed(e.message));
     } on PlatformException catch (e) {
-      _snack(
-        e.code == 'NO_PICKER' ? l10n.settingsRestoreNoPicker : l10n.settingsRestoreFailed('${e.message}'),
-      );
+      _snack(e.code == 'NO_PICKER' ? l.settingsRestoreNoPicker : l.settingsRestoreFailed('${e.message}'));
+    } catch (e) {
+      _snack(l.settingsRestoreFailed('$e'));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
 
-  Future<void> _restore(BackupFile file) async {
-    if (!await _confirmRestore(file.name)) return;
-    await _runRestore(() async {
-      await ref.read(backupServiceProvider).restore(file);
-      return true;
-    });
-  }
+  Future<void> _restore(BackupFile file) =>
+      _restoreWithSelection(file.name, () => ref.read(backupServiceProvider).read(file));
 
-  Future<void> _restoreFromNas(NasEntry file) async {
-    final l = context.l10n;
-    if (!await _confirmRestore(file.name)) return;
-    await _runRestore(() async {
-      final String content;
-      try {
-        content = await ref.read(nasBackupServiceProvider).download(file);
-      } on NasException catch (e) {
-        _snack(l.nasRestoreDownloadFailed(e.message));
-        return false;
-      }
-      await ref.read(backupServiceProvider).restoreJson(content);
-      return true;
-    });
-  }
+  Future<void> _restoreFromNas(NasEntry file) =>
+      _restoreWithSelection(file.name, () => ref.read(nasBackupServiceProvider).download(file));
 
-  Future<void> _restoreFromPicker() async {
-    if (!await _confirmRestore(context.l10n.settingsRestorePickedFile)) return;
-    await _runRestore(() => ref.read(backupServiceProvider).restoreFromPicker());
-  }
+  Future<void> _restoreFromPicker() =>
+      _restoreWithSelection(context.l10n.backupPickedFile, () => ref.read(backupServiceProvider).pick());
 
   Future<void> _requestAllFilesAccess() async {
     final opened = await ref.read(backupServiceProvider).requestAllFilesAccess();

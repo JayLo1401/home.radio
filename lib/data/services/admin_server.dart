@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show debugPrint;
@@ -8,10 +9,20 @@ import 'package:flutter/services.dart' show MethodChannel, rootBundle;
 
 import '../../l10n/l10n.dart';
 import 'backup_service.dart';
+import 'nas_service.dart';
 
-/// Called with an uploaded backup while the restore screen is open. Throws
-/// [BackupFormatException] if the file isn't a usable backup.
-typedef WebRestoreHandler = Future<void> Function(String content);
+/// Called with a backup chosen on the admin page and what to take over from
+/// it, while the restore screen is open. Throws [BackupFormatException] if
+/// the file isn't a usable backup.
+typedef WebRestoreHandler = Future<void> Function(String content, BackupRestoreSelection selection);
+
+/// The backups in the NAS backup folder for the admin page's restore:
+/// [list] newest first, null if no backup folder is set (throws
+/// [NasException]); [read] one of them.
+typedef AdminNasBackupHooks = ({
+  Future<List<NasEntry>?> Function() list,
+  Future<String> Function(NasEntry file) read,
+});
 
 /// How a change or an action on the admin page went; [message] null: the
 /// page says "saved".
@@ -53,9 +64,12 @@ typedef AdminDisplayHooks = ({
 });
 
 /// The device's admin page, `http://<ip>:1401/` in the home network:
-/// create and download a backup at any time; upload one only while the
-/// device shows "Backup wiederherstellen" ([restoreHandler] is set) - from
-/// the setup wizard or Settings → System. Change settings ([settings]), and
+/// create and download a backup at any time; restore one (uploaded or from
+/// the NAS backup folder, [nasBackups]) only while the device shows "Backup
+/// wiederherstellen" ([restoreHandler] is set) - from the setup wizard or
+/// Settings → System: the page first shows what the backup contains, per
+/// area (see BackupArea), and only the ticked areas are applied. Change
+/// settings ([settings]), and
 /// for the Haussteuerung switch the display (`POST /api/display/on|off`,
 /// `/api/dashboard/reload` - e.g. Home Assistant's rest_command).
 class AdminServer {
@@ -80,6 +94,12 @@ class AdminServer {
   /// Set by the app once it runs (app.dart).
   AdminSettingsSource? settings;
   AdminDisplayHooks? display;
+  AdminNasBackupHooks? nasBackups;
+
+  /// The backup read for the selection (uploaded or from the NAS) until
+  /// it's applied - one at a time, [token] ties the selection to it.
+  ({String token, String content, DateTime at})? _pending;
+  static const _pendingFor = Duration(minutes: 30);
 
   bool get running => _server != null;
 
@@ -237,8 +257,14 @@ class AdminServer {
           response.headers.contentType = ContentType.json;
           response.headers.set('Content-Disposition', 'attachment; filename="$name"');
           response.write(content);
-        case ('POST', '/api/restore'):
-          await _restore(request);
+        case ('POST', '/api/restore/inspect'):
+          await _inspectUpload(request);
+        case ('GET', '/api/restore/nas'):
+          await _listNasBackups(response);
+        case ('POST', '/api/restore/inspect-nas'):
+          await _inspectNas(request);
+        case ('POST', '/api/restore/apply'):
+          await _applyRestore(request);
         default:
           response.statusCode = HttpStatus.notFound;
           response.write(l10n.adminNotFound);
@@ -285,17 +311,28 @@ class AdminServer {
     _json(response, {'ok': result.ok, 'message': result.message ?? (result.ok ? l10n.adminSaved : l10n.adminInvalidValue)});
   }
 
-  Future<void> _restore(HttpRequest request) async {
-    final response = request.response;
-    final handler = restoreHandler;
-    if (handler == null) {
-      response.statusCode = HttpStatus.forbidden;
-      _json(response, {
-        'ok': false,
-        'message': l10n.adminRestoreLocked,
-      });
-      return;
+  // ---- restore: read a backup, show what's in it, apply the selection ----
+
+  /// Refuses (403) unless the device shows "Backup wiederherstellen".
+  bool _restoreLocked(HttpResponse response) {
+    if (restoreHandler != null) return false;
+    response.statusCode = HttpStatus.forbidden;
+    _json(response, {'ok': false, 'message': l10n.adminRestoreLocked});
+    return true;
+  }
+
+  static Future<Object?> _jsonBody(HttpRequest request) async {
+    try {
+      return jsonDecode(await utf8.decodeStream(request));
+    } on FormatException {
+      return null;
     }
+  }
+
+  /// An uploaded backup file: checked and kept for the selection.
+  Future<void> _inspectUpload(HttpRequest request) async {
+    final response = request.response;
+    if (_restoreLocked(response)) return;
     final bytes = BytesBuilder(copy: false);
     await for (final chunk in request) {
       bytes.add(chunk);
@@ -313,12 +350,132 @@ class AdminServer {
       _json(response, {'ok': false, 'message': l10n.adminFileInvalid});
       return;
     }
+    await _preview(response, content);
+  }
+
+  /// `{ok, folder, files: [{name, modified}]}` - the NAS backup folder's
+  /// backups; folder false if none is set.
+  Future<void> _listNasBackups(HttpResponse response) async {
+    if (_restoreLocked(response)) return;
+    final hooks = nasBackups;
     try {
-      await handler(content);
+      final files = hooks == null ? null : await hooks.list().timeout(const Duration(seconds: 30));
+      _json(response, {
+        'ok': true,
+        'folder': files != null,
+        'files': [
+          for (final f in files ?? const <NasEntry>[]) {'name': f.name, 'modified': f.modified?.toIso8601String()},
+        ],
+      });
+    } catch (e) {
+      final message = switch (e) {
+        NasException() => e.message,
+        TimeoutException() => l10n.nasErrorTimeout,
+        _ => '$e',
+      };
+      _json(response, {'ok': false, 'message': l10n.nasRestoreLoadFailed(message)});
+    }
+  }
+
+  /// A backup from the NAS backup folder (`{name}`): loaded, checked and
+  /// kept for the selection. Only names in the folder's list are read.
+  Future<void> _inspectNas(HttpRequest request) async {
+    final response = request.response;
+    if (_restoreLocked(response)) return;
+    final body = await _jsonBody(request);
+    final name = body is Map ? body['name'] : null;
+    final hooks = nasBackups;
+    if (name is! String || hooks == null) {
+      response.statusCode = HttpStatus.badRequest;
+      _json(response, {'ok': false, 'message': l10n.adminInvalidValue});
+      return;
+    }
+    final String content;
+    try {
+      final file = (await hooks.list().timeout(const Duration(seconds: 30)) ?? const <NasEntry>[])
+          .where((f) => f.name == name)
+          .firstOrNull;
+      if (file == null) {
+        _json(response, {'ok': false, 'message': l10n.nasRestoreDownloadFailed(l10n.adminNotFound)});
+        return;
+      }
+      content = await hooks.read(file).timeout(const Duration(minutes: 2));
+    } catch (e) {
+      final message = switch (e) {
+        NasException() => e.message,
+        TimeoutException() => l10n.nasErrorTimeout,
+        _ => '$e',
+      };
+      _json(response, {'ok': false, 'message': l10n.nasRestoreDownloadFailed(message)});
+      return;
+    }
+    await _preview(response, content);
+  }
+
+  /// Checks [content] and answers with what it contains - `{ok, token,
+  /// deviceName, currentName, createdAt, areas: [{id, title, summary}]}`;
+  /// the backup is kept until it's applied or another one is read.
+  Future<void> _preview(HttpResponse response, String content) async {
+    final BackupPreview preview;
+    try {
+      preview = backup.inspect(content);
+    } on BackupFormatException catch (e) {
+      response.statusCode = HttpStatus.badRequest;
+      _json(response, {'ok': false, 'message': e.message});
+      return;
+    }
+    final l = l10n;
+    final random = Random.secure();
+    final token = [for (var i = 0; i < 16; i++) random.nextInt(256).toRadixString(16).padLeft(2, '0')].join();
+    _pending = (token: token, content: content, at: DateTime.now());
+    _json(response, {
+      'ok': true,
+      'token': token,
+      'deviceName': preview.deviceName,
+      'currentName': await deviceName(),
+      'createdAt': preview.createdAt?.toIso8601String(),
+      'areas': [
+        for (final a in preview.areas) {'id': a.name, 'title': backupAreaTitle(l, a), 'summary': backupAreaSummary(l, a, preview)},
+      ],
+    });
+  }
+
+  /// `{token, areas: [id, ...], deviceName}`: restores the chosen areas of
+  /// the backup read before, through the restore screen.
+  Future<void> _applyRestore(HttpRequest request) async {
+    final response = request.response;
+    if (_restoreLocked(response)) return;
+    final handler = restoreHandler!;
+    final body = await _jsonBody(request);
+    if (body is! Map || body['token'] is! String || body['areas'] is! List) {
+      response.statusCode = HttpStatus.badRequest;
+      _json(response, {'ok': false, 'message': l10n.adminInvalidValue});
+      return;
+    }
+    final pending = _pending;
+    if (pending == null || pending.token != body['token'] || DateTime.now().difference(pending.at) > _pendingFor) {
+      _json(response, {'ok': false, 'message': l10n.backupExpired});
+      return;
+    }
+    final areas = <BackupArea>{
+      for (final id in body['areas'] as List)
+        if (id is String) ?BackupArea.byName(id),
+    };
+    final name = body['deviceName'] is String ? (body['deviceName'] as String).trim() : '';
+    if (areas.isEmpty && (name.isEmpty || name == (await deviceName()).trim())) {
+      _json(response, {'ok': false, 'message': l10n.backupNothingSelected});
+      return;
+    }
+    try {
+      await handler(pending.content, BackupRestoreSelection(areas: areas, deviceName: name));
+      _pending = null;
       _json(response, {'ok': true, 'message': l10n.adminRestored});
     } on BackupFormatException catch (e) {
       response.statusCode = HttpStatus.badRequest;
       _json(response, {'ok': false, 'message': e.message});
+    } catch (e) {
+      debugPrint('AdminServer: restore: $e');
+      _json(response, {'ok': false, 'message': l10n.commonError('$e')});
     }
   }
 
@@ -340,7 +497,13 @@ class AdminServer {
       'saved': l.adminSaved,
       'offline': l.adminOffline,
       'restoring': l.adminRestoring,
-      'confirmRestore': l.adminConfirmRestore('%FILE%'),
+      'reading': l.backupReading,
+      'created': l.backupSelectCreated('%DATE%'),
+      'nameHelp': l.backupDeviceNameHelp('%NAME%'),
+      'nameHelpNone': l.backupDeviceNameHelpNone,
+      'nothingSelected': l.backupNothingSelected,
+      'nothingInside': l.backupNothingInside,
+      'nasNone': l.nasRestoreNone,
       'unchanged': l.adminSecretPlaceholder,
       'settings': l.systemTileSettingsShort,
       'notChosen': l.nasFolderNotChosen,
@@ -435,6 +598,12 @@ class AdminServer {
   .ok { color: var(--primary); }
   .err { color: var(--warn); }
   .block { padding: 12px 16px; }
+  h3.sub { font-size: 18px; font-weight: 600; margin: 22px 0 6px; }
+  /* Restore: the areas to take over. */
+  .row.check { cursor: pointer; }
+  input[type=checkbox] { width: 24px; height: 24px; margin: 0; accent-color: var(--primary); cursor: pointer; flex: none; }
+  input[type=checkbox]:focus-visible { outline: 3px solid var(--primary); outline-offset: 3px; }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
   .note { color: var(--faint); font-size: 14px; margin-top: 28px; }
   /* Folder browser (like the device's: up, subfolders, choose). */
   dialog { width: min(560px, calc(100% - 32px)); max-height: 80vh; padding: 0; border: 0; border-radius: 24px; background: #1a211c; color: #fff; }
@@ -442,9 +611,9 @@ class AdminServer {
   dialog header { padding: 20px 24px 8px; }
   dialog header h3 { margin: 0; font-size: 22px; font-weight: 400; }
   dialog .list { max-height: 50vh; overflow: auto; padding: 0 12px; }
-  dialog .item { display: flex; gap: 14px; align-items: center; width: 100%; padding: 12px; border-radius: 10px; border: 2px solid transparent;
+  .item { display: flex; gap: 14px; align-items: center; width: 100%; padding: 12px; border-radius: 10px; border: 2px solid transparent;
     background: none; color: #fff; font: inherit; text-align: left; cursor: pointer; }
-  dialog .item:hover, dialog .item:focus-visible { outline: none; border-color: var(--primary); background: rgba(139,214,161,.15); }
+  .item:hover, .item:focus-visible { outline: none; border-color: var(--primary); background: rgba(139,214,161,.15); }
   dialog footer { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 24px 20px; flex-wrap: wrap; }
   footer.page { text-align: center; color: var(--muted); font-size: 13px; margin-top: 40px; }
   footer.page .by { color: var(--brand); font-weight: 600; }
@@ -498,9 +667,30 @@ class AdminServer {
     <div class="block">
       <div id="locked"><p class="muted">${e(l.adminRestoreHow)}</p></div>
       <div id="open" hidden>
-        <p class="muted">${e(l.adminRestoreReady)}</p>
-        <input type="file" id="file" accept=".json,application/json">
-        <button class="btn" id="send" disabled style="margin-top:12px">${e(l.adminRestoreButton)}</button>
+        <div id="pick">
+          <p class="muted">${e(l.backupAdminReady)}</p>
+          <input type="file" id="file" accept=".json,application/json">
+          <button class="btn" id="send" disabled style="margin-top:12px">${e(l.backupAdminOpen)}</button>
+          <div id="nasBox" hidden>
+            <h3 class="sub">${e(l.nasRestoreSection)}</h3>
+            <div id="nasList"></div>
+          </div>
+        </div>
+        <div id="select" hidden>
+          <h3 class="sub">${e(l.backupSelectTitle)}</h3>
+          <p class="path" id="selFrom"></p>
+          <p class="ghelp">${e(l.backupSelectHint)}</p>
+          <div class="row">
+            <div class="left"><label class="label" for="selName">${e(l.adminDeviceName)}</label><span class="help" id="selNameHelp"></span></div>
+            <div class="right"><input type="text" id="selName" maxlength="60" autocomplete="off"></div>
+          </div>
+          <h3 class="sub">${e(l.backupSelectAreas)}</h3>
+          <div id="selAreas"></div>
+          <div class="actions">
+            <button class="btn" id="selApply">${e(l.backupApply)}</button>
+            <button class="btn alt" id="selCancel">${e(l.commonCancel)}</button>
+          </div>
+        </div>
       </div>
       <p class="msg" id="msg"></p>
     </div>
@@ -524,6 +714,7 @@ class AdminServer {
   let editing = false;
   let data = { areas: [], groups: [] };
   let status = {};
+  let restoreOpen = false;
 
   async function loadStatus() {
     if (done) return;
@@ -536,6 +727,9 @@ class AdminServer {
       el('open').hidden = !status.restore;
       el('locked').hidden = status.restore;
       el('restoreBanner').hidden = !status.restore;
+      if (status.restore && !restoreOpen) loadNasBackups();
+      if (!status.restore && restoreOpen) closeSelection();
+      restoreOpen = !!status.restore;
       const box = el('displayBox');
       if (box.parentElement && box.parentElement.id === 'page') box.hidden = !status.display;
     } catch (e) { /* device restarting or offline */ }
@@ -741,26 +935,98 @@ class AdminServer {
       } catch (e) { el('displayMsg').className = 'msg err'; el('displayMsg').textContent = T.offline; }
     });
   }
-  el('file').addEventListener('change', () => { el('send').disabled = !el('file').files.length; });
-  el('send').addEventListener('click', async () => {
-    const file = el('file').files[0];
-    if (!file) return;
-    if (!confirm(T.confirmRestore.replace('%FILE%', file.name))) return;
-    el('send').disabled = true;
-    el('msg').className = 'msg';
-    el('msg').textContent = T.restoring;
-    try {
-      const r = await fetch('/api/restore', { method: 'POST', body: file, headers: { 'Content-Type': 'application/json' } });
-      const j = await r.json();
-      el('msg').className = 'msg ' + (j.ok ? 'ok' : 'err');
-      el('msg').textContent = j.message;
-      if (j.ok) { done = true; el('open').hidden = true; setTimeout(() => { done = false; }, 15000); }
-      else el('send').disabled = false;
-    } catch (e) {
-      el('msg').className = 'msg err';
-      el('msg').textContent = T.offline;
-      el('send').disabled = false;
+  // Restore: read a backup (file or NAS), choose what to take over, apply.
+  let pending = null;
+  function msg(text, cls) { el('msg').className = 'msg' + (cls ? ' ' + cls : ''); el('msg').textContent = text || ''; }
+  function fmtDate(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return isNaN(d) ? iso : d.toLocaleString(document.documentElement.lang, { dateStyle: 'medium', timeStyle: 'short' });
+  }
+  async function loadNasBackups() {
+    let j;
+    try { j = await (await fetch('/api/restore/nas', { cache: 'no-store' })).json(); } catch (e) { return; }
+    el('nasBox').hidden = !!j.ok && !j.folder;
+    const list = el('nasList'); list.textContent = '';
+    const note = (cls, text) => { const p = document.createElement('p'); p.className = cls; p.textContent = text; list.appendChild(p); };
+    if (!j.ok) { note('msg err', j.message); return; }
+    if (!(j.files || []).length) { note('muted', T.nasNone); return; }
+    for (const f of j.files) {
+      const b = document.createElement('button'); b.className = 'item';
+      const ic = document.createElement('span'); ic.textContent = '☁';
+      const tx = document.createElement('span');
+      const t = document.createElement('span'); t.textContent = f.modified ? fmtDate(f.modified) : f.name; tx.appendChild(t);
+      if (f.modified) { const n = document.createElement('span'); n.className = 'path'; n.style.display = 'block'; n.textContent = f.name; tx.appendChild(n); }
+      b.append(ic, tx);
+      b.addEventListener('click', () => inspect('/api/restore/inspect-nas', JSON.stringify({ name: f.name }), f.name));
+      list.appendChild(b);
     }
+  }
+  async function inspect(url, body, fileName) {
+    msg(T.reading);
+    el('send').disabled = true;
+    try {
+      const j = await (await fetch(url, { method: 'POST', body, headers: { 'Content-Type': 'application/json' } })).json();
+      if (!j.ok) { msg(j.message, 'err'); return; }
+      msg('');
+      showSelection(j, fileName);
+    } catch (e) {
+      msg(T.offline, 'err');
+    } finally {
+      el('send').disabled = !el('file').files.length;
+    }
+  }
+  function showSelection(j, fileName) {
+    pending = j;
+    el('pick').hidden = true; el('select').hidden = false;
+    el('selFrom').textContent = fileName + (j.createdAt ? ' · ' + T.created.replace('%DATE%', fmtDate(j.createdAt)) : '');
+    const name = el('selName');
+    name.value = j.deviceName || '';
+    name.placeholder = j.currentName || '';
+    el('selNameHelp').textContent = j.currentName ? T.nameHelp.replace('%NAME%', j.currentName) : T.nameHelpNone;
+    const box = el('selAreas'); box.textContent = '';
+    if (!j.areas.length) { const p = document.createElement('p'); p.className = 'muted block'; p.textContent = T.nothingInside; box.appendChild(p); }
+    for (const a of j.areas) {
+      const r = document.createElement('label'); r.className = 'row check';
+      const left = document.createElement('span'); left.className = 'left';
+      const t = document.createElement('span'); t.className = 'label'; t.textContent = a.title;
+      const h = document.createElement('span'); h.className = 'help'; h.textContent = a.summary;
+      left.append(t, h);
+      const right = document.createElement('span'); right.className = 'right';
+      const c = document.createElement('input'); c.type = 'checkbox'; c.checked = true; c.dataset.area = a.id;
+      right.appendChild(c);
+      r.append(left, right);
+      box.appendChild(r);
+    }
+    el('select').scrollIntoView({ block: 'start' });
+    name.focus();
+  }
+  function closeSelection() { pending = null; el('select').hidden = true; el('pick').hidden = false; }
+  el('selCancel').addEventListener('click', () => { closeSelection(); msg(''); el('send').focus(); });
+  el('selName').addEventListener('keydown', (ev) => { if (ev.key === 'Enter') el('selApply').focus(); });
+  el('selApply').addEventListener('click', async () => {
+    if (!pending) return;
+    const areas = [...el('selAreas').querySelectorAll('input[type=checkbox]')].filter((c) => c.checked).map((c) => c.dataset.area);
+    const name = el('selName').value.trim();
+    if (!areas.length && (!name || name === (pending.currentName || '').trim())) { msg(T.nothingSelected, 'err'); return; }
+    el('selApply').disabled = true;
+    msg(T.restoring);
+    try {
+      const r = await fetch('/api/restore/apply', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: pending.token, areas, deviceName: name }) });
+      const j = await r.json();
+      msg(j.message, j.ok ? 'ok' : 'err');
+      if (j.ok) { done = true; closeSelection(); el('open').hidden = true; setTimeout(() => { done = false; }, 15000); }
+    } catch (e) {
+      msg(T.offline, 'err');
+    } finally {
+      el('selApply').disabled = false;
+    }
+  });
+  el('file').addEventListener('change', () => { el('send').disabled = !el('file').files.length; });
+  el('send').addEventListener('click', () => {
+    const file = el('file').files[0];
+    if (file) inspect('/api/restore/inspect', file, file.name);
   });
 
   el('back').addEventListener('click', () => { location.hash = ''; });

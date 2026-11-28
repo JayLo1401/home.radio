@@ -15,10 +15,7 @@
   "adminBackupDownload": "Create & download backup",
   "adminRestoreHeading": "Restore a backup",
   "adminRestoreHow": "To restore, open Settings → System → Restore backup on the device (or choose \"Restore backup\" in the setup wizard). The upload then appears here.",
-  "adminRestoreReady": "The device is ready. All current favorites, stations and settings will be replaced, then Home System restarts.",
-  "adminRestoreButton": "Restore backup",
   "adminRestoring": "Restoring …",
-  "adminConfirmRestore": "Restore backup \"{file}\"? All current data on the device will be replaced.",
   "adminRestoreLocked": "Restoring isn't enabled right now - open \"Restore backup\" on the device.",
   "adminFileTooBig": "The file is too big for a backup.",
   "adminFileInvalid": "The file isn't a valid backup.",
@@ -80,6 +77,72 @@
   "adminClose": "Close",
   "adminDeviceOnly": "Only on the device itself: tuner and receiver search, station lists, Home key, permissions, backgrounds and icon packs.",
   "adminRestoreOpenBanner": "“Restore backup” is open on the device - upload the file here ›",
+  "backupAreaSystem": "System settings",
+  "backupAreaSystemHint": "Start option, display, language, parts on/off, launcher tiles, remote control buttons, updates",
+  "backupAreaTv": "TV settings",
+  "backupAreaTvHint": "Receiver with login, internet TV, channel lists, reminders, “Up next”",
+  "backupAreaRadio": "Radio settings",
+  "backupAreaRadioHint": "Favourites, DAB+ and FM stations, start station",
+  "backupAreaRadioCounts": "{favorites} favourites, {dab} DAB+ stations, {fm} FM stations",
+  "@backupAreaRadioCounts": {
+    "placeholders": {
+      "favorites": {
+        "type": "int"
+      },
+      "dab": {
+        "type": "int"
+      },
+      "fm": {
+        "type": "int"
+      }
+    }
+  },
+  "backupAreaMusic": "Music",
+  "backupAreaMusicHint": "Shuffle, repeat, visualizer, subfolders",
+  "backupAreaMedia": "Movies/Pictures",
+  "backupAreaMediaHint": "Slideshow and the settings for movies and pictures",
+  "backupAreaNas": "NAS",
+  "backupAreaNasHint": "Server, login with password and the chosen folders",
+  "backupAreaDashboard": "Home control/Dashboard",
+  "backupAreaDashboardHint": "Dashboard address, display by motion, brightness",
+  "backupAreaHa": "Home Assistant",
+  "backupAreaHaHint": "MQTT connection and login with password, camera sharing",
+  "backupAreaSdr": "Radio scanner/SDR",
+  "backupAreaSdrHint": "rtl_tcp servers, listening bands, aircraft, sensors",
+  "backupAreaWeather": "Weather/Background",
+  "backupAreaWeatherHint": "Weather, rain radar, sun & moon, background pictures",
+  "backupAreaBrowser": "Web browser",
+  "backupAreaBrowserHint": "Home page, bookmarks, search engine, ad blocker",
+  "backupAreaOther": "Other",
+  "backupAreaOtherHint": "Further settings that belong to none of the areas",
+  "backupSelectTitle": "What should be restored?",
+  "backupSelectHint": "Only the ticked areas are replaced by those from the backup - everything else stays as it is. Home System restarts afterwards.",
+  "backupSelectCreated": "Created: {date}",
+  "@backupSelectCreated": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "backupSelectAreas": "Areas",
+  "backupDeviceNameHelp": "This device is currently called “{name}” - leave empty to keep the name.",
+  "@backupDeviceNameHelp": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "backupDeviceNameHelpNone": "Leave empty to keep the current name.",
+  "backupApply": "Apply",
+  "backupNothingSelected": "Nothing selected - tick at least one area or enter a device name.",
+  "backupNothingInside": "The backup contains no settings.",
+  "backupExpired": "The backup is no longer loaded - please choose it again.",
+  "backupReading": "Reading …",
+  "backupPickedFile": "Selected file",
+  "backupAdminOpen": "Open backup",
+  "backupAdminReady": "The device is ready. Choose a backup file or a backup from the NAS - before restoring you can choose what is taken over.",
   "browserTitle": "Browser",
   "browserAndroidOnly": "The browser is only available on Android (TV box, tablet, phone).",
   "browserAddress": "Address or search",
@@ -1724,13 +1787,9 @@
   "settingsRestoreReadFailed": "Backups couldn't be read ({message}).",
   "settingsRestoreBusy": "The device is already restoring a backup.",
   "settingsRestoreFromWebDone": "Backup from the admin page restored - the app restarts …",
-  "settingsRestoreConfirmTitle": "Restore backup?",
-  "settingsRestoreConfirmText": "{what}\n\nAll current favorites, DAB+ stations and settings will be replaced. The app then restarts.",
-  "settingsRestoreButton": "Restore",
   "settingsRestoreDone": "Backup restored - the app restarts …",
   "settingsRestoreNoPicker": "This device has no file picker. Please allow \"All files access\" instead.",
   "settingsRestoreFailed": "Restore failed: {message}",
-  "settingsRestorePickedFile": "The selected file will be restored.",
   "settingsRestoreNoAllFilesSetting": "This device doesn't offer the \"All files access\" setting.",
   "settingsRestoreViaAdmin": "Via the admin page",
   "settingsRestoreNoNetwork": "No network connection - the admin page can't be reached.",

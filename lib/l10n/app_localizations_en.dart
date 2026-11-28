@@ -56,19 +56,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'To restore, open Settings → System → Restore backup on the device (or choose \"Restore backup\" in the setup wizard). The upload then appears here.';
 
   @override
-  String get adminRestoreReady =>
-      'The device is ready. All current favorites, stations and settings will be replaced, then Home System restarts.';
-
-  @override
-  String get adminRestoreButton => 'Restore backup';
-
-  @override
   String get adminRestoring => 'Restoring …';
-
-  @override
-  String adminConfirmRestore(String file) {
-    return 'Restore backup \"$file\"? All current data on the device will be replaced.';
-  }
 
   @override
   String get adminRestoreLocked =>
@@ -222,6 +210,145 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get adminRestoreOpenBanner =>
       '“Restore backup” is open on the device - upload the file here ›';
+
+  @override
+  String get backupAreaSystem => 'System settings';
+
+  @override
+  String get backupAreaSystemHint =>
+      'Start option, display, language, parts on/off, launcher tiles, remote control buttons, updates';
+
+  @override
+  String get backupAreaTv => 'TV settings';
+
+  @override
+  String get backupAreaTvHint =>
+      'Receiver with login, internet TV, channel lists, reminders, “Up next”';
+
+  @override
+  String get backupAreaRadio => 'Radio settings';
+
+  @override
+  String get backupAreaRadioHint =>
+      'Favourites, DAB+ and FM stations, start station';
+
+  @override
+  String backupAreaRadioCounts(int favorites, int dab, int fm) {
+    return '$favorites favourites, $dab DAB+ stations, $fm FM stations';
+  }
+
+  @override
+  String get backupAreaMusic => 'Music';
+
+  @override
+  String get backupAreaMusicHint => 'Shuffle, repeat, visualizer, subfolders';
+
+  @override
+  String get backupAreaMedia => 'Movies/Pictures';
+
+  @override
+  String get backupAreaMediaHint =>
+      'Slideshow and the settings for movies and pictures';
+
+  @override
+  String get backupAreaNas => 'NAS';
+
+  @override
+  String get backupAreaNasHint =>
+      'Server, login with password and the chosen folders';
+
+  @override
+  String get backupAreaDashboard => 'Home control/Dashboard';
+
+  @override
+  String get backupAreaDashboardHint =>
+      'Dashboard address, display by motion, brightness';
+
+  @override
+  String get backupAreaHa => 'Home Assistant';
+
+  @override
+  String get backupAreaHaHint =>
+      'MQTT connection and login with password, camera sharing';
+
+  @override
+  String get backupAreaSdr => 'Radio scanner/SDR';
+
+  @override
+  String get backupAreaSdrHint =>
+      'rtl_tcp servers, listening bands, aircraft, sensors';
+
+  @override
+  String get backupAreaWeather => 'Weather/Background';
+
+  @override
+  String get backupAreaWeatherHint =>
+      'Weather, rain radar, sun & moon, background pictures';
+
+  @override
+  String get backupAreaBrowser => 'Web browser';
+
+  @override
+  String get backupAreaBrowserHint =>
+      'Home page, bookmarks, search engine, ad blocker';
+
+  @override
+  String get backupAreaOther => 'Other';
+
+  @override
+  String get backupAreaOtherHint =>
+      'Further settings that belong to none of the areas';
+
+  @override
+  String get backupSelectTitle => 'What should be restored?';
+
+  @override
+  String get backupSelectHint =>
+      'Only the ticked areas are replaced by those from the backup - everything else stays as it is. Home System restarts afterwards.';
+
+  @override
+  String backupSelectCreated(String date) {
+    return 'Created: $date';
+  }
+
+  @override
+  String get backupSelectAreas => 'Areas';
+
+  @override
+  String backupDeviceNameHelp(String name) {
+    return 'This device is currently called “$name” - leave empty to keep the name.';
+  }
+
+  @override
+  String get backupDeviceNameHelpNone =>
+      'Leave empty to keep the current name.';
+
+  @override
+  String get backupApply => 'Apply';
+
+  @override
+  String get backupNothingSelected =>
+      'Nothing selected - tick at least one area or enter a device name.';
+
+  @override
+  String get backupNothingInside => 'The backup contains no settings.';
+
+  @override
+  String get backupExpired =>
+      'The backup is no longer loaded - please choose it again.';
+
+  @override
+  String get backupReading => 'Reading …';
+
+  @override
+  String get backupPickedFile => 'Selected file';
+
+  @override
+  String get backupAdminOpen => 'Open backup';
+
+  @override
+  String get backupAdminReady =>
+      'The device is ready. Choose a backup file or a backup from the NAS - before restoring you can choose what is taken over.';
 
   @override
   String get browserTitle => 'Browser';
@@ -5277,17 +5404,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Backup from the admin page restored - the app restarts …';
 
   @override
-  String get settingsRestoreConfirmTitle => 'Restore backup?';
-
-  @override
-  String settingsRestoreConfirmText(String what) {
-    return '$what\n\nAll current favorites, DAB+ stations and settings will be replaced. The app then restarts.';
-  }
-
-  @override
-  String get settingsRestoreButton => 'Restore';
-
-  @override
   String get settingsRestoreDone => 'Backup restored - the app restarts …';
 
   @override
@@ -5298,9 +5414,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String settingsRestoreFailed(String message) {
     return 'Restore failed: $message';
   }
-
-  @override
-  String get settingsRestorePickedFile => 'The selected file will be restored.';
 
   @override
   String get settingsRestoreNoAllFilesSetting =>

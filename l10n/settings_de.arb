@@ -341,17 +341,6 @@
   },
   "settingsRestoreBusy": "Das Gerät spielt gerade schon ein Backup ein.",
   "settingsRestoreFromWebDone": "Backup von der Verwaltungsseite eingespielt - App startet neu …",
-  "settingsRestoreConfirmTitle": "Backup wiederherstellen?",
-  "settingsRestoreConfirmText": "{what}\n\nAlle aktuellen Favoriten, DAB+ Sender und Einstellungen werden ersetzt. Danach startet die App neu.",
-  "@settingsRestoreConfirmText": {
-    "description": "The backup file name, or the sentence settingsRestorePickedFile.",
-    "placeholders": {
-      "what": {
-        "type": "String"
-      }
-    }
-  },
-  "settingsRestoreButton": "Wiederherstellen",
   "settingsRestoreDone": "Backup wiederhergestellt - App startet neu …",
   "settingsRestoreNoPicker": "Dieses Gerät hat keine Dateiauswahl. Bitte stattdessen „Zugriff auf alle Dateien“ erlauben.",
   "settingsRestoreFailed": "Wiederherstellen fehlgeschlagen: {message}",
@@ -362,7 +351,6 @@
       }
     }
   },
-  "settingsRestorePickedFile": "Die ausgewählte Datei wird eingespielt.",
   "settingsRestoreNoAllFilesSetting": "Dieses Gerät bietet die Einstellung „Zugriff auf alle Dateien“ nicht an.",
   "settingsRestoreViaAdmin": "Über die Verwaltungsseite",
   "settingsRestoreNoNetwork": "Keine Netzwerkverbindung - die Verwaltungsseite ist nicht erreichbar.",

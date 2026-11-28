@@ -56,19 +56,7 @@ class AppLocalizationsDe extends AppLocalizations {
       'Zum Wiederherstellen am Gerät Einstellungen → System → Backup wiederherstellen öffnen (oder im Einrichtungsassistenten „Backup wiederherstellen“ wählen). Hier erscheint dann das Hochladen.';
 
   @override
-  String get adminRestoreReady =>
-      'Das Gerät ist bereit. Alle aktuellen Favoriten, Sender und Einstellungen werden ersetzt, danach startet Home System neu.';
-
-  @override
-  String get adminRestoreButton => 'Backup einspielen';
-
-  @override
   String get adminRestoring => 'Wird eingespielt …';
-
-  @override
-  String adminConfirmRestore(String file) {
-    return 'Backup „$file“ einspielen? Alle aktuellen Daten des Geräts werden ersetzt.';
-  }
 
   @override
   String get adminRestoreLocked =>
@@ -222,6 +210,146 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get adminRestoreOpenBanner =>
       'Am Gerät ist „Backup wiederherstellen“ offen - hier die Datei hochladen ›';
+
+  @override
+  String get backupAreaSystem => 'Systemeinstellungen';
+
+  @override
+  String get backupAreaSystemHint =>
+      'Start-Option, Anzeige, Sprache, Teile an/aus, Launcher-Kacheln, Tasten der Fernbedienung, Updates';
+
+  @override
+  String get backupAreaTv => 'TV-Einstellungen';
+
+  @override
+  String get backupAreaTvHint =>
+      'Receiver mit Anmeldung, Internet-TV, Senderlisten, Erinnerungen, „Als Nächstes“';
+
+  @override
+  String get backupAreaRadio => 'Radio-Einstellungen';
+
+  @override
+  String get backupAreaRadioHint =>
+      'Favoriten, DAB+- und UKW-Sender, Startsender';
+
+  @override
+  String backupAreaRadioCounts(int favorites, int dab, int fm) {
+    return '$favorites Favoriten, $dab DAB+-Sender, $fm UKW-Sender';
+  }
+
+  @override
+  String get backupAreaMusic => 'Musik';
+
+  @override
+  String get backupAreaMusicHint =>
+      'Zufall, Wiederholen, Visualizer, Unterordner';
+
+  @override
+  String get backupAreaMedia => 'Filme/Bilder';
+
+  @override
+  String get backupAreaMediaHint =>
+      'Diashow und die Einstellungen für Filme und Bilder';
+
+  @override
+  String get backupAreaNas => 'NAS';
+
+  @override
+  String get backupAreaNasHint =>
+      'Server, Anmeldung mit Passwort und die gewählten Ordner';
+
+  @override
+  String get backupAreaDashboard => 'Haussteuerung/Dashboard';
+
+  @override
+  String get backupAreaDashboardHint =>
+      'Dashboard-Adresse, Display per Bewegung, Helligkeit';
+
+  @override
+  String get backupAreaHa => 'Home Assistant';
+
+  @override
+  String get backupAreaHaHint =>
+      'MQTT-Verbindung und Anmeldung mit Passwort, Kamera teilen';
+
+  @override
+  String get backupAreaSdr => 'Funk/SDR';
+
+  @override
+  String get backupAreaSdrHint =>
+      'rtl_tcp-Server, Funk-Bänder, Flugzeuge, Sensoren';
+
+  @override
+  String get backupAreaWeather => 'Wetter/Hintergrund';
+
+  @override
+  String get backupAreaWeatherHint =>
+      'Wetter, Regenradar, Sonne & Mond, Hintergrundbilder';
+
+  @override
+  String get backupAreaBrowser => 'Webbrowser';
+
+  @override
+  String get backupAreaBrowserHint =>
+      'Startseite, Lesezeichen, Suchmaschine, Werbeblocker';
+
+  @override
+  String get backupAreaOther => 'Sonstiges';
+
+  @override
+  String get backupAreaOtherHint =>
+      'Weitere Einstellungen, die zu keinem der Bereiche gehören';
+
+  @override
+  String get backupSelectTitle => 'Was soll übernommen werden?';
+
+  @override
+  String get backupSelectHint =>
+      'Nur die angekreuzten Bereiche werden durch die aus dem Backup ersetzt - alles andere bleibt, wie es ist. Danach startet Home System neu.';
+
+  @override
+  String backupSelectCreated(String date) {
+    return 'Erstellt: $date';
+  }
+
+  @override
+  String get backupSelectAreas => 'Bereiche';
+
+  @override
+  String backupDeviceNameHelp(String name) {
+    return 'Dieses Gerät heißt zurzeit „$name“ - leer lassen behält den Namen.';
+  }
+
+  @override
+  String get backupDeviceNameHelpNone =>
+      'Leer lassen behält den aktuellen Namen.';
+
+  @override
+  String get backupApply => 'Übernehmen';
+
+  @override
+  String get backupNothingSelected =>
+      'Nichts ausgewählt - mindestens einen Bereich ankreuzen oder einen Gerätenamen eintragen.';
+
+  @override
+  String get backupNothingInside => 'Das Backup enthält keine Einstellungen.';
+
+  @override
+  String get backupExpired =>
+      'Das Backup ist nicht mehr geladen - bitte noch einmal auswählen.';
+
+  @override
+  String get backupReading => 'Wird gelesen …';
+
+  @override
+  String get backupPickedFile => 'Ausgewählte Datei';
+
+  @override
+  String get backupAdminOpen => 'Backup öffnen';
+
+  @override
+  String get backupAdminReady =>
+      'Das Gerät ist bereit. Eine Backup-Datei wählen oder ein Backup vom NAS - vor dem Einspielen lässt sich auswählen, was übernommen wird.';
 
   @override
   String get browserTitle => 'Browser';
@@ -5275,17 +5403,6 @@ class AppLocalizationsDe extends AppLocalizations {
       'Backup von der Verwaltungsseite eingespielt - App startet neu …';
 
   @override
-  String get settingsRestoreConfirmTitle => 'Backup wiederherstellen?';
-
-  @override
-  String settingsRestoreConfirmText(String what) {
-    return '$what\n\nAlle aktuellen Favoriten, DAB+ Sender und Einstellungen werden ersetzt. Danach startet die App neu.';
-  }
-
-  @override
-  String get settingsRestoreButton => 'Wiederherstellen';
-
-  @override
   String get settingsRestoreDone =>
       'Backup wiederhergestellt - App startet neu …';
 
@@ -5297,10 +5414,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String settingsRestoreFailed(String message) {
     return 'Wiederherstellen fehlgeschlagen: $message';
   }
-
-  @override
-  String get settingsRestorePickedFile =>
-      'Die ausgewählte Datei wird eingespielt.';
 
   @override
   String get settingsRestoreNoAllFilesSetting =>

@@ -1,9 +1,12 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:home_system/data/db/database.dart';
 import 'package:home_system/data/services/admin_server.dart';
 import 'package:home_system/data/services/backup_service.dart';
+import 'package:home_system/data/services/nas_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -58,6 +61,83 @@ void main() {
     } finally {
       client.close(force: true);
       await server.stop();
+    }
+  });
+
+  test('admin page restore: read a backup (upload or NAS), show its areas, apply the selection', () async {
+    final db = AppDatabase.forTesting(NativeDatabase.memory());
+    final backup = BackupService(db);
+    await db.setSetting('device_name', 'Altes Gerät');
+    await db.setSetting('tv_reminders', '[]');
+    await db.setSetting('music_shuffle', 'true');
+    final (name: _, :content) = await backup.export();
+    await db.setSetting('device_name', 'Wohnzimmer');
+
+    final server = AdminServer(backup: backup, deviceName: () async => 'Wohnzimmer', version: () async => '1.23.0', bindPort: 0)
+      ..nasBackups = (
+        list: () async => [const NasEntry(name: 'home_system_backup_a.json', path: '/Backups/home_system_backup_a.json', isDirectory: false)],
+        read: (file) async => file.path == '/Backups/home_system_backup_a.json' ? content : throw StateError('wrong file'),
+      );
+    await server.start();
+    final client = HttpClient();
+    final applied = <(String, BackupRestoreSelection)>[];
+    try {
+      Future<(int, Map<String, dynamic>)> call(String method, String path, [Object? body]) async {
+        final request = await client.open(method, '127.0.0.1', server.boundPort!, path);
+        if (body != null) {
+          request.headers.contentType = ContentType.json;
+          request.write(body is String ? body : jsonEncode(body));
+        }
+        final response = await request.close();
+        return (response.statusCode, jsonDecode(await utf8.decodeStream(response)) as Map<String, dynamic>);
+      }
+
+      // Locked until the device shows "Backup wiederherstellen".
+      expect((await call('POST', '/api/restore/inspect', content)).$1, 403);
+      expect((await call('GET', '/api/restore/nas')).$1, 403);
+      expect((await call('POST', '/api/restore/apply', {'token': 'x', 'areas': []})).$1, 403);
+
+      server.restoreHandler = (content, selection) async => applied.add((content, selection));
+      final (_, preview) = await call('POST', '/api/restore/inspect', content);
+      expect(preview['ok'], isTrue);
+      expect(preview['deviceName'], 'Altes Gerät');
+      expect(preview['currentName'], 'Wohnzimmer');
+      expect([for (final a in preview['areas'] as List) a['id']], ['tv', 'music']);
+      expect((preview['areas'] as List).first['title'], isNotEmpty);
+
+      expect((await call('POST', '/api/restore/inspect', 'kein Backup')).$2['ok'], isFalse);
+      // A file read again replaces the one before - its token is void.
+      final (_, again) = await call('POST', '/api/restore/inspect', content);
+      expect((await call('POST', '/api/restore/apply', {'token': preview['token'], 'areas': ['tv']})).$2['ok'], isFalse);
+      // Nothing ticked and the name unchanged: nothing to do.
+      expect((await call('POST', '/api/restore/apply', {'token': again['token'], 'areas': [], 'deviceName': 'Wohnzimmer'})).$2['ok'],
+          isFalse);
+      expect(applied, isEmpty);
+
+      final (_, done) = await call('POST', '/api/restore/apply', {
+        'token': again['token'],
+        'areas': ['tv', 'unknown'],
+        'deviceName': ' Küche ',
+      });
+      expect(done['ok'], isTrue);
+      expect(applied.single.$1, content);
+      expect(applied.single.$2.areas, {BackupArea.tv});
+      expect(applied.single.$2.deviceName, 'Küche');
+      // Used up.
+      expect((await call('POST', '/api/restore/apply', {'token': again['token'], 'areas': ['tv']})).$2['ok'], isFalse);
+
+      // From the NAS: only files of the backup folder's list.
+      final (_, nas) = await call('GET', '/api/restore/nas');
+      expect(nas['folder'], isTrue);
+      expect([for (final f in nas['files'] as List) f['name']], ['home_system_backup_a.json']);
+      expect((await call('POST', '/api/restore/inspect-nas', {'name': '../../secret.json'})).$2['ok'], isFalse);
+      final (_, fromNas) = await call('POST', '/api/restore/inspect-nas', {'name': 'home_system_backup_a.json'});
+      expect(fromNas['ok'], isTrue);
+      expect(fromNas['deviceName'], 'Altes Gerät');
+    } finally {
+      client.close(force: true);
+      await server.stop();
+      await db.close();
     }
   });
 }
