@@ -2576,6 +2576,12 @@ abstract class AppLocalizations {
   /// **'OK: App öffnen  ·  ☰ oder OK lange drücken: Favorit, Gruppe, App-Info (beenden, deinstallieren)'**
   String get launcherAllAppsHelp;
 
+  /// No description provided for @launcherAllAppsHelpDesktop.
+  ///
+  /// In de, this message translates to:
+  /// **'OK oder Klick: App öffnen  ·  ☰, Rechtsklick oder OK lange drücken: Favorit, Gruppe'**
+  String get launcherAllAppsHelpDesktop;
+
   /// No description provided for @launcherMoveTile.
   ///
   /// In de, this message translates to:

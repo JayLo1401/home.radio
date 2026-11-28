@@ -1458,6 +1458,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'OK: open app  ·  ☰ or hold OK: favorite, group, app info (force stop, uninstall)';
 
   @override
+  String get launcherAllAppsHelpDesktop =>
+      'OK or click: open app  ·  ☰, right-click or hold OK: favorite, group';
+
+  @override
   String get launcherMoveTile => 'Move';
 
   @override

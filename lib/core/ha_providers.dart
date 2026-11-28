@@ -135,8 +135,9 @@ final haLinkControllerProvider = Provider<void>((ref) {
   ref.listen(favoritesStreamProvider, (_, _) => unawaited(link.rediscover()));
   // Another part on screen: the switches per app.
   foregroundPartObserver.part.addListener(changed);
-  // Apps added to or removed from Home: the list of "App starten".
-  if (LauncherService.supported) {
+  // Apps added to or removed from Home: the list of "App starten" (Android
+  // apps on the TV box, Start menu apps on Windows).
+  if (LauncherService.appsSupported) {
     String appList() => [
           for (final a in haLauncherApps(ref.read(launcherTilesProvider), ref.read(launcherGroupsProvider))) a.label,
         ].join('\n');
@@ -223,8 +224,9 @@ abstract final class HaKeys {
   };
 }
 
-/// The Android apps on Home (the favourites' row and the groups), each once
-/// and with a label of its own - the options of "App starten".
+/// The apps on Home (the favourites' row and the groups) - Android apps on
+/// the TV box, Start menu apps on Windows -, each once and with a label of
+/// its own: the options of "App starten".
 List<({String label, String package})> haLauncherApps(List<LauncherTile> favourites, List<LauncherGroup> groups) {
   final apps = <({String label, String package})>[];
   final packages = <String>{};
@@ -710,7 +712,7 @@ class _AppHaDevice implements HaDevice {
       LauncherTile.musicType: 'mdi:music',
       LauncherTile.browserType: 'mdi:web',
     };
-    final apps = LauncherService.supported ? _launcherApps() : const <({String label, String package})>[];
+    final apps = LauncherService.appsSupported ? _launcherApps() : const <({String label, String package})>[];
     return [
       for (final MapEntry(key: type, value: key) in HaKeys.appSwitches.entries)
         if (_partAvailable(type))
@@ -748,7 +750,7 @@ class _AppHaDevice implements HaDevice {
       for (final MapEntry(key: type, value: key) in HaKeys.appSwitches.entries)
         if (_partAvailable(type)) key: inFront == type ? 'ON' : 'OFF',
       // Nothing chosen: every choice starts its app, the same one again too.
-      if (LauncherService.supported) HaKeys.launchApp: _noStation,
+      if (LauncherService.appsSupported) HaKeys.launchApp: _noStation,
     };
   }
 
@@ -817,7 +819,7 @@ class _AppHaDevice implements HaDevice {
   /// "App starten": the app with that label from Home, as its tile starts
   /// it - radio and music pause, the app gets the screen.
   Future<void> _launchApp(String label) async {
-    if (!LauncherService.supported || label.isEmpty || label == _noStation) return;
+    if (!LauncherService.appsSupported || label.isEmpty || label == _noStation) return;
     final app = _launcherApps().where((a) => a.label == label).firstOrNull;
     if (app == null) return;
     _ref.read(radioCommandProvider.notifier).send(RadioCommand.pauseForApp);
