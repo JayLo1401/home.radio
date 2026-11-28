@@ -1374,8 +1374,9 @@ class _StreamFacts extends StatelessWidget {
       spacing: 8,
       runSpacing: 6,
       children: [
-        if (picture.isNotEmpty) _Chip(icon: Icons.hd_outlined, text: picture),
-        if (soundText != null) _Chip(icon: Icons.audiotrack, text: '$soundText$more'),
+        if (picture.isNotEmpty) _Chip(icon: Icons.hd_outlined, text: picture, color: tvPictureColor(info.grade)),
+        if (soundText != null)
+          _Chip(icon: Icons.audiotrack, text: '$soundText$more', color: tvSoundColor(sound?.details)),
         if (transcoded case final transcoded?)
           _Chip(
             icon: transcoded ? Icons.compress : Icons.verified_outlined,
@@ -1386,6 +1387,27 @@ class _StreamFacts extends StatelessWidget {
     );
   }
 }
+
+/// Quality colours as in Radio (muted, green best): Full HD / UHD green,
+/// HD yellow, SD orange.
+Color tvPictureColor(String? grade) => switch (grade) {
+      'UHD' || 'Full HD' => _qualityHue(120),
+      'HD' => _qualityHue(55),
+      'SD' => _qualityHue(30),
+      _ => Colors.white70,
+    };
+
+/// 5.1 / 7.1 green, stereo yellow, mono orange (from the track's details,
+/// e.g. "Dolby Digital 5.1").
+Color tvSoundColor(String? details) {
+  final d = details ?? '';
+  if (d.contains('5.1') || d.contains('7.1')) return _qualityHue(120);
+  if (d.contains('Stereo')) return _qualityHue(55);
+  if (d.contains('Mono')) return _qualityHue(30);
+  return Colors.white70;
+}
+
+Color _qualityHue(double hue) => HSVColor.fromAHSV(1, hue, 0.55, 0.95).toColor();
 
 class _Chip extends StatelessWidget {
   const _Chip({required this.icon, required this.text, this.color = Colors.white70});
