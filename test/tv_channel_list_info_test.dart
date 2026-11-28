@@ -46,8 +46,9 @@ void main() {
     test('wide screen: the list exactly in the middle', () {
       final at = channelListInfoLayout(1920);
       expect(at.listLeft + at.listWidth / 2, 960);
-      expect(at.infoLeft, greaterThan(at.listLeft + at.listWidth));
-      expect(at.infoLeft + at.infoWidth, lessThanOrEqualTo(1920));
+      // Right next to the list, up to the right edge - no gaps.
+      expect(at.infoLeft, at.listLeft + at.listWidth);
+      expect(at.infoLeft + at.infoWidth, 1920);
       expect(at.infoWidth, greaterThanOrEqualTo(300));
     });
 
@@ -57,7 +58,8 @@ void main() {
         expect(at.infoWidth, greaterThanOrEqualTo(300), reason: '$w');
         expect(at.listLeft, greaterThan(0), reason: '$w');
         expect(at.listLeft + at.listWidth / 2, lessThanOrEqualTo(w / 2), reason: '$w');
-        expect(at.infoLeft + at.infoWidth, lessThanOrEqualTo(w), reason: '$w');
+        expect(at.infoLeft, at.listLeft + at.listWidth, reason: '$w');
+        expect(at.infoLeft + at.infoWidth, w, reason: '$w');
       }
     });
 

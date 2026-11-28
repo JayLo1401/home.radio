@@ -43,23 +43,20 @@ bool tvChannelPlays({required bool hasPlayer, required bool loading, required bo
     !stopped && !failed && (hasPlayer || loading);
 
 /// Where the channel list and the info beside it go across [width]: the
-/// list in the middle, the info to its right - the list moves left as far
-/// as the info needs. On a narrow screen the info is left out
-/// ([infoWidth] 0) and the list takes it all.
+/// list in the middle, the info right next to it up to the screen's right
+/// edge (no gaps) - the list moves left as far as the info needs. On a
+/// narrow screen the info is left out ([infoWidth] 0) and the list takes
+/// it all.
 ({double listLeft, double listWidth, double infoLeft, double infoWidth}) channelListInfoLayout(double width) {
-  const margin = 24.0, gap = 16.0, minInfo = 300.0, maxInfo = 640.0;
+  const minInfo = 300.0;
   final listWidth = (width * 0.4).clamp(380.0, 620.0);
-  if (width - 2 * margin - gap - minInfo < listWidth) {
+  if (width - minInfo < listWidth) {
     return (listLeft: 0.0, listWidth: width, infoLeft: width, infoWidth: 0.0);
   }
   var listLeft = (width - listWidth) / 2;
-  var room = width - margin - (listLeft + listWidth + gap);
-  if (room < minInfo) {
-    listLeft = width - margin - minInfo - gap - listWidth;
-    room = minInfo;
-  }
-  final infoWidth = room.clamp(minInfo, maxInfo);
-  return (listLeft: listLeft, listWidth: listWidth, infoLeft: listLeft + listWidth + gap, infoWidth: infoWidth);
+  if (width - (listLeft + listWidth) < minInfo) listLeft = width - minInfo - listWidth;
+  final infoLeft = listLeft + listWidth;
+  return (listLeft: listLeft, listWidth: listWidth, infoLeft: infoLeft, infoWidth: width - infoLeft);
 }
 
 /// What an Internet-TV channel is: country, categories, languages - in

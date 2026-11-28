@@ -168,8 +168,8 @@ class E2Event {
       title: title,
       begin: DateTime.fromMillisecondsSinceEpoch(begin * 1000),
       duration: Duration(seconds: duration),
-      shortDescription: htmlUnescape(j['shortdesc'] as String? ?? ''),
-      longDescription: htmlUnescape(j['longdesc'] as String? ?? ''),
+      shortDescription: epgText(j['shortdesc'] as String? ?? ''),
+      longDescription: epgText(j['longdesc'] as String? ?? ''),
       id: _int(j['id']),
     );
   }
@@ -420,3 +420,9 @@ String htmlUnescape(String s) {
     };
   });
 }
+
+/// An EPG text as shown: HTML entities resolved, and line breaks that come
+/// as a literal backslash-n ("Österreich\nReality-Doku") or as DVB's
+/// control code 0x8A made real line breaks.
+String epgText(String s) =>
+    htmlUnescape(s).replaceAll(r'\n', '\n').replaceAll('\u008a', '\n').replaceAll(RegExp(r'\n{3,}'), '\n\n');
