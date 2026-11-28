@@ -426,9 +426,18 @@ class TvTimeshiftPlayer implements TvPlayer {
   /// The remote's keys while a receiver channel plays - true if [event]
   /// (down or repeat) was one: ⏯ / ⏸ / ▶ pause and play on, ⏪ goes back a
   /// minute, ⏩ forward (live: the next channel, as before), ← / → ten
-  /// seconds while not live, ■ back to live.
+  /// seconds while not live, ■ back to live. On a PC keyboard: Space is ⏯,
+  /// J / L a minute back / forward, End back to live.
+  /// The PC keyboard's stand-ins for the remote's media keys.
+  static final _pcKeys = {
+    LogicalKeyboardKey.space: LogicalKeyboardKey.mediaPlayPause,
+    LogicalKeyboardKey.keyJ: LogicalKeyboardKey.mediaRewind,
+    LogicalKeyboardKey.keyL: LogicalKeyboardKey.mediaFastForward,
+    LogicalKeyboardKey.end: LogicalKeyboardKey.mediaStop,
+  };
+
   bool handleKey(KeyEvent event) {
-    final key = event.logicalKey;
+    final key = _pcKeys[event.logicalKey] ?? event.logicalKey;
     final repeat = event is KeyRepeatEvent;
     final shifted = state.value.shifted;
     if (key == LogicalKeyboardKey.mediaPlayPause) {

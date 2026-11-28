@@ -6334,7 +6334,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get tvShiftKeyHint =>
-      '‹ › ±10 s  ·  ‹‹ ›› ±1 min  ·  ⏯ pause  ·  Stop: live';
+      '‹ › ±10 s  ·  ‹‹ ›› ±1 min  ·  ⏯/Space pause  ·  Stop/End: live  ·  PC: J/L ±1 min';
 
   @override
   String get tvShiftBackToLive => 'Back to live';

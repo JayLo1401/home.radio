@@ -4114,7 +4114,7 @@
   "tvRecOkActionsHint": "OK: Erinnern oder Aufnehmen",
   "tvShiftTitle": "Timeshift",
   "tvShiftLive": "Live",
-  "tvShiftKeyHint": "‹ › ±10 s  ·  ‹‹ ›› ±1 Min.  ·  ⏯ Pause  ·  Stopp: Live",
+  "tvShiftKeyHint": "‹ › ±10 s  ·  ‹‹ ›› ±1 Min.  ·  ⏯/Leertaste Pause  ·  Stopp/Ende: Live  ·  PC: J/L ±1 Min.",
   "tvShiftBackToLive": "Zurück zu Live",
   "tvShiftNothingYet": "Timeshift: noch nichts zwischengespeichert.",
   "tvShiftPlayFailed": "Timeshift: die Stelle lässt sich nicht abspielen.",

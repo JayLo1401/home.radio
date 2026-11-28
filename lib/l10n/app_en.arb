@@ -2183,7 +2183,7 @@
   "tvRecOkActionsHint": "OK: remind or record",
   "tvShiftTitle": "Timeshift",
   "tvShiftLive": "Live",
-  "tvShiftKeyHint": "‹ › ±10 s  ·  ‹‹ ›› ±1 min  ·  ⏯ pause  ·  Stop: live",
+  "tvShiftKeyHint": "‹ › ±10 s  ·  ‹‹ ›› ±1 min  ·  ⏯/Space pause  ·  Stop/End: live  ·  PC: J/L ±1 min",
   "tvShiftBackToLive": "Back to live",
   "tvShiftNothingYet": "Timeshift: nothing buffered yet.",
   "tvShiftPlayFailed": "Timeshift: that part can't be played.",

@@ -10649,7 +10649,7 @@ abstract class AppLocalizations {
   /// No description provided for @tvShiftKeyHint.
   ///
   /// In de, this message translates to:
-  /// **'‹ › ±10 s  ·  ‹‹ ›› ±1 Min.  ·  ⏯ Pause  ·  Stopp: Live'**
+  /// **'‹ › ±10 s  ·  ‹‹ ›› ±1 Min.  ·  ⏯/Leertaste Pause  ·  Stopp/Ende: Live  ·  PC: J/L ±1 Min.'**
   String get tvShiftKeyHint;
 
   /// No description provided for @tvShiftBackToLive.
