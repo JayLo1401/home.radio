@@ -7,6 +7,8 @@ import '../../core/theme.dart';
 import '../../data/models/iptv_channel.dart';
 import '../../data/services/enigma2_service.dart';
 
+export 'tv_progress_bar.dart';
+
 String hhmm(DateTime t) => '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
 
 /// A channel's picon from the receiver (OpenWebif), its name's initials
@@ -109,30 +111,6 @@ String shortChannelName(String name) {
   if (parts.length <= 1 || oneLine.length <= 8) return oneLine;
   // Two lines: the first word, then the rest.
   return '${parts.first}\n${parts.skip(1).join(' ')}';
-}
-
-/// How far a programme has got, in Radio's green.
-class EventProgress extends StatelessWidget {
-  const EventProgress({super.key, required this.event, this.width});
-
-  final E2Event event;
-  final double? width;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: width,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(3),
-        child: LinearProgressIndicator(
-          value: event.progressAt(DateTime.now()),
-          minHeight: 5,
-          backgroundColor: Colors.white24,
-          valueColor: const AlwaysStoppedAnimation(brandGreen),
-        ),
-      ),
-    );
-  }
 }
 
 /// A focusable row with the app's focus frame (remote first).
