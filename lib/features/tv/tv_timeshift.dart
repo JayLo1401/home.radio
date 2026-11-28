@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import '../../core/loading_wave.dart';
 import '../../core/nas_providers.dart';
 import '../../core/providers.dart';
 import '../../core/system_providers.dart' show deviceNameProvider;
@@ -206,6 +207,11 @@ class TvTimeshiftPlayer implements TvPlayer {
   final TvStreamSession _session;
   final TimeshiftBuffer _buffer;
   final ValueNotifier<TvPlayer> _current;
+
+  /// Between two players: the old one closed, the new one not showing yet
+  /// (only ever one video decoder - a second one at the same time froze
+  /// libmpv on Windows, and weak TV boxes have only one).
+  final _gap = ValueNotifier(false);
   final _info = ValueNotifier(const TvPlayerInfo());
   final state = ValueNotifier(const TvTimeshiftState());
   StreamSubscription<List<int>>? _subscription;
@@ -378,6 +384,18 @@ class TvTimeshiftPlayer implements TvPlayer {
     try {
       final server = await (_server ??= TimeshiftServer.start(_buffer));
       if (_disposed || swap != _swap) return;
+      // The player on screen goes first - never two decoding at once.
+      final old = _current.value;
+      if (!_gap.value) {
+        _unfollow(old);
+        if (_direct) {
+          _direct = false;
+          _session.stopFeedingPlayer();
+        }
+        _gap.value = true;
+        await _disposePlayer(old);
+        if (_disposed || swap != _swap) return;
+      }
       final next = player = TvPlayer(server.uriAt(offset), const {});
       await next.start(timeout: const Duration(seconds: 15));
     } catch (e) {
@@ -394,14 +412,9 @@ class TvTimeshiftPlayer implements TvPlayer {
       unawaited(player.dispose().catchError((Object _) {}));
       return;
     }
-    final old = _current.value;
-    _unfollow(old);
     _current.value = player;
+    _gap.value = false;
     _follow(player);
-    if (_direct) {
-      _direct = false;
-      _session.stopFeedingPlayer();
-    }
     _paused = false;
     _busy = false;
     _seekTarget = null;
@@ -410,14 +423,18 @@ class TvTimeshiftPlayer implements TvPlayer {
     _publish();
     final audio = _audioId;
     if (audio != null) unawaited(player.selectAudio(audio).catchError((Object _) {}));
-    unawaited(_disposePlayer(old));
   }
+
+  /// The players closed already (each only once).
+  final _closed = Expando<bool>();
 
   Future<void> _disposePlayer(TvPlayer player) async {
     if (identical(player, _live)) {
       if (_liveDisposed) return;
       _liveDisposed = true;
     }
+    if (_closed[player] == true) return;
+    _closed[player] = true;
     try {
       await player.dispose();
     } catch (_) {}
@@ -481,9 +498,16 @@ class TvTimeshiftPlayer implements TvPlayer {
   Future<void> start({Duration timeout = const Duration(seconds: 20)}) => _live.start(timeout: timeout);
 
   @override
-  Widget view() => ValueListenableBuilder<TvPlayer>(
-        valueListenable: _current,
-        builder: (context, player, _) => KeyedSubtree(key: ObjectKey(player), child: player.view()),
+  Widget view() => ValueListenableBuilder<bool>(
+        valueListenable: _gap,
+        builder: (context, gap, _) => gap
+            // The old player closed, the new one starting: black with the
+            // loading wave (a moment).
+            ? const ColoredBox(color: Colors.black, child: Center(child: LoadingWave()))
+            : ValueListenableBuilder<TvPlayer>(
+                valueListenable: _current,
+                builder: (context, player, _) => KeyedSubtree(key: ObjectKey(player), child: player.view()),
+              ),
       );
 
   @override
