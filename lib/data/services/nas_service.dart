@@ -16,8 +16,9 @@ enum NasProtocol { webdav, ftp, smb }
 
 /// The NAS folders the user can pick (Settings → NAS).
 /// The NAS folders: [backgrounds] for Home's background pictures, the
-/// others for playing files later (and [backups]).
-enum NasFolder { backgrounds, pictures, music, videos, movies, backups }
+/// others for playing files later (and [backups]); [recordings]: where the
+/// receiver records to (its NAS share), [timeshift]: TV's timeshift buffer.
+enum NasFolder { backgrounds, pictures, music, videos, movies, backups, recordings, timeshift }
 
 /// Login and address of the home NAS. Remote paths are POSIX style and
 /// absolute ("/", "/Fotos/Wallpaper"); for WebDAV they count from

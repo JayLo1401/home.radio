@@ -8,7 +8,9 @@ import '../../core/theme.dart';
 import '../../data/services/enigma2_service.dart';
 import '../../l10n/l10n.dart';
 import '../../data/services/tv_reminders.dart' show serviceKeyOf;
+import 'tv_programme_actions.dart';
 import 'tv_providers.dart';
+import 'tv_recording_providers.dart';
 import 'tv_reminder_providers.dart';
 import 'tv_widgets.dart';
 
@@ -27,24 +29,9 @@ class TvEpgScreen extends ConsumerStatefulWidget {
 class _TvEpgScreenState extends ConsumerState<TvEpgScreen> {
   E2Event? _focused;
 
-  /// OK on a coming programme: reminder on/off (see TvReminderDialog).
-  Future<void> _toggleReminder(E2Event e) async {
-    final l = context.l10n;
-    final messenger = ScaffoldMessenger.of(context);
-    final notifier = ref.read(tvRemindersProvider.notifier);
-    final wasSet = notifier.isSet(widget.channel.ref, e.begin);
-    final ok = await notifier.toggle(e, widget.channel);
-    messenger
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-        duration: const Duration(seconds: 3),
-        content: Text(!ok
-            ? l.tvReminderAlreadyRunning
-            : wasSet
-                ? l.tvReminderRemoved(e.title)
-                : l.tvReminderSet(e.title, hhmm(e.begin), widget.channel.name)),
-      ));
-  }
+  /// OK on a programme: remind of it / record it (see
+  /// showTvProgrammeActions).
+  Future<void> _actions(E2Event e) => showTvProgrammeActions(context, ref, channel: widget.channel, event: e);
 
   String _day(DateTime t) {
     final l10n = context.l10n;
@@ -65,6 +52,8 @@ class _TvEpgScreenState extends ConsumerState<TvEpgScreen> {
     final events = ref.watch(tvChannelEpgProvider(widget.channel.ref));
     final reminders = {for (final r in ref.watch(tvRemindersProvider)) r.key};
     bool reminded(E2Event e) => reminders.contains('${serviceKeyOf(widget.channel.ref)}|${e.begin.millisecondsSinceEpoch}');
+    final timers = ref.watch(tvTimersProvider).value;
+    bool recorded(E2Event e) => isRecorded(timers, widget.channel.ref, e);
     final now = DateTime.now();
     return Scaffold(
       backgroundColor: const Color(0xFF05070A),
@@ -126,7 +115,7 @@ class _TvEpgScreenState extends ConsumerState<TvEpgScreen> {
                         onFocused: () => setState(() => _focused = e),
                         onTap: () {
                           setState(() => _focused = e);
-                          if (!running) unawaited(_toggleReminder(e));
+                          unawaited(_actions(e));
                         },
                         child: Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -148,7 +137,8 @@ class _TvEpgScreenState extends ConsumerState<TvEpgScreen> {
                                   ],
                                 ),
                               ),
-                              if (reminded(e)) const Icon(Icons.notifications_active, color: brandGreen),
+                              if (recorded(e)) ...[const SizedBox(width: 8), const TvRecordDot(size: 14)],
+                              if (reminded(e)) ...[const SizedBox(width: 8), const Icon(Icons.notifications_active, color: brandGreen)],
                             ],
                           ),
                         ),
@@ -184,11 +174,12 @@ class _TvEpgScreenState extends ConsumerState<TvEpgScreen> {
                                 ),
                                 const SizedBox(height: 8),
                                 Text(
-                                  shown.runsAt(now)
-                                      ? context.l10n.tvReminderRunningHint
-                                      : reminded(shown)
-                                          ? context.l10n.tvReminderIsSetHint
-                                          : context.l10n.tvReminderSetHint,
+                                  [
+                                    if (shown.runsAt(now)) context.l10n.tvReminderRunningHint,
+                                    if (recorded(shown)) context.l10n.tvRecIsRecorded,
+                                    if (reminded(shown)) context.l10n.tvRecIsReminded,
+                                    context.l10n.tvRecOkActionsHint,
+                                  ].join('  ·  '),
                                   style: const TextStyle(color: Colors.white54, fontSize: 15),
                                 ),
                                 const SizedBox(height: 18),

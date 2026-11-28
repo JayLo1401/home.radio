@@ -2429,6 +2429,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get nasFolderBackups => 'Backups';
 
   @override
+  String get nasFolderRecordings => 'Recordings';
+
+  @override
+  String get nasFolderTimeshift => 'Timeshift';
+
+  @override
   String get nasFolderNotChosen => 'Not chosen';
 
   @override
@@ -6116,4 +6122,230 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get tvReminderLead => 'Note before the start';
+
+  @override
+  String get tvRecSettingsTitle => 'Recordings & timeshift';
+
+  @override
+  String get tvRecRecordingsTitle => 'Recordings';
+
+  @override
+  String get tvRecTimersTitle => 'Scheduled recordings';
+
+  @override
+  String get tvRecReminderOn => 'Remind me';
+
+  @override
+  String get tvRecReminderOff => 'Delete reminder';
+
+  @override
+  String get tvRecRecord => 'Record';
+
+  @override
+  String get tvRecRecordRest => 'Record (from now)';
+
+  @override
+  String get tvRecRecordNow => 'Record current programme';
+
+  @override
+  String get tvRecDeleteTimer => 'Delete recording';
+
+  @override
+  String get tvRecDeleteTimerQuestion => 'Delete scheduled recording?';
+
+  @override
+  String get tvRecRunningNow => 'Recording now';
+
+  @override
+  String get tvRecTimerDisabled => 'disabled';
+
+  @override
+  String get tvRecEnded => 'This programme is over already.';
+
+  @override
+  String tvRecFailed(String error) {
+    return 'That didn\'t work: $error';
+  }
+
+  @override
+  String tvRecSet(String title, String time, String channel) {
+    return 'Recording scheduled: $title at $time on $channel';
+  }
+
+  @override
+  String tvRecTimerDeleted(String title) {
+    return 'Recording deleted: $title';
+  }
+
+  @override
+  String get tvRecRefused => 'The receiver refused the recording';
+
+  @override
+  String get tvRecConflict => 'Recording conflict';
+
+  @override
+  String tvRecReceiverSays(String message) {
+    return 'Receiver: $message';
+  }
+
+  @override
+  String get tvRecConflictsWith => 'Overlaps with:';
+
+  @override
+  String get tvRecConflictHint =>
+      'With one satellite cable the receiver can only record channels of the same band at once. Delete one of the recordings under “Scheduled recordings” and try again.';
+
+  @override
+  String get tvRecTimersEmpty =>
+      'No recordings scheduled.\nIn the programme guide: hold OK on a programme → “Record”.';
+
+  @override
+  String get tvRecTimersHint =>
+      'OK: delete recording. The receiver records by itself - in standby too.';
+
+  @override
+  String get tvRecRecordingsEmpty => 'No recordings found.';
+
+  @override
+  String tvRecRecordingsHint(String optionsKey) {
+    return 'OK play  ·  hold OK or $optionsKey delete';
+  }
+
+  @override
+  String get tvRecNoSource =>
+      'Neither a receiver nor a NAS folder “Recordings” is set up (Settings → TV or Settings → NAS).';
+
+  @override
+  String get tvRecSourceNas => 'NAS';
+
+  @override
+  String get tvRecSourceReceiver => 'Receiver';
+
+  @override
+  String get tvRecPlay => 'Play';
+
+  @override
+  String get tvRecDeleteRecording => 'Delete recording';
+
+  @override
+  String get tvRecDeleteRecordingQuestion => 'Delete this recording for good?';
+
+  @override
+  String tvRecRecordingDeleted(String title) {
+    return 'Deleted: $title';
+  }
+
+  @override
+  String get tvRecStillRecording =>
+      'Still recording - plays what has been recorded so far.';
+
+  @override
+  String get tvRecReceiverLocation => 'Receiver\'s recording location';
+
+  @override
+  String get tvRecLocationHint =>
+      'The receiver records by itself, in standby too. For the app to play recordings straight from the NAS: mount the NAS share on the receiver and choose it as recording location, then set the same folder here as NAS folder “Recordings”. Without it the app shows the receiver\'s list and plays through the receiver.';
+
+  @override
+  String get tvRecNasFolder => 'NAS folder “Recordings”';
+
+  @override
+  String get tvRecNasFolderMissing => 'not chosen - Settings → NAS';
+
+  @override
+  String get tvRecStreamCut =>
+      'The receiver ended the stream - does a recording need the tuner? Reconnecting …';
+
+  @override
+  String tvRecStreamLost(String channel) {
+    return 'Stream of “$channel” ended - a recording probably needs the tuner. OK or another channel tries again.';
+  }
+
+  @override
+  String get tvRecOnlyReceiver =>
+      'Only the receiver\'s channels can be recorded.';
+
+  @override
+  String tvRecGuideKeyHint(String optionsKey) {
+    return 'OK switch  ·  hold OK remind/record  ·  $optionsKey all programmes  ·  ‹‹ ›› ±3 h';
+  }
+
+  @override
+  String get tvRecIsRecorded => 'Recording scheduled';
+
+  @override
+  String get tvRecIsReminded => 'Reminder set';
+
+  @override
+  String get tvRecOkActionsHint => 'OK: remind or record';
+
+  @override
+  String get tvShiftTitle => 'Timeshift';
+
+  @override
+  String get tvShiftLive => 'Live';
+
+  @override
+  String get tvShiftKeyHint =>
+      '‹ › ±10 s  ·  ‹‹ ›› ±1 min  ·  ⏯ pause  ·  Stop: live';
+
+  @override
+  String get tvShiftBackToLive => 'Back to live';
+
+  @override
+  String get tvShiftNothingYet => 'Timeshift: nothing buffered yet.';
+
+  @override
+  String get tvShiftPlayFailed => 'Timeshift: that part can\'t be played.';
+
+  @override
+  String get tvShiftTooSlow =>
+      'Timeshift: the NAS can\'t keep up - continuing in memory.';
+
+  @override
+  String get tvShiftWriteFailed =>
+      'Timeshift: can\'t store (full?) - continuing in memory.';
+
+  @override
+  String get tvShiftNoNasFolder =>
+      'Timeshift: no NAS folder “Timeshift” chosen - using memory.';
+
+  @override
+  String get tvShiftSettingsHelp =>
+      'Pause and rewind live TV: the app keeps the receiver\'s stream itself (the receiver\'s own timeshift only applies to its HDMI picture). Starting a channel doesn\'t wait for it.';
+
+  @override
+  String get tvShiftModeOff => 'Off';
+
+  @override
+  String get tvShiftModeMemory => 'Memory';
+
+  @override
+  String tvShiftModeMemoryInfo(int mb, int hd, int sd) {
+    return '$mb MB - about $hd min of HD, $sd min of SD';
+  }
+
+  @override
+  String get tvShiftModeLocal => 'Local storage';
+
+  @override
+  String get tvShiftModeLocalInfo =>
+      'In the app\'s cache on this device - HD takes about 4 GB per hour.';
+
+  @override
+  String get tvShiftModeNas => 'NAS folder “Timeshift”';
+
+  @override
+  String get tvShiftNasFolderMissing => 'Folder not chosen - Settings → NAS';
+
+  @override
+  String get tvShiftMaxMinutes => 'Rewind at most';
+
+  @override
+  String get tvShiftMaxMinutesHelp =>
+      'Older parts are deleted continuously, everything when switching or leaving. If the storage can\'t keep up, it continues in memory.';
+
+  @override
+  String get tvShiftKeysHelp =>
+      'Remote: ⏯ pauses and resumes, ‹‹ rewinds a minute, ‹ › ten seconds (while not live), ›› forward - up to live, Stop jumps to live.';
 }

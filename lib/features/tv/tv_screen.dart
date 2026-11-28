@@ -23,9 +23,13 @@ import 'tv_channel_move.dart';
 import 'tv_epg_screen.dart';
 import 'tv_guide_screen.dart';
 import 'tv_player.dart';
+import 'tv_programme_actions.dart';
 import 'tv_providers.dart';
+import 'tv_recordings_screen.dart';
 import 'tv_reminder_providers.dart';
 import 'tv_signal_badge.dart';
+import 'tv_timers_screen.dart';
+import 'tv_timeshift.dart';
 import 'tv_tuning_overlay.dart';
 import 'tv_widgets.dart';
 
@@ -44,6 +48,9 @@ import 'tv_widgets.dart';
 /// bouquet), the channel keys and ⏪/⏩ switch straight away, digits pick a
 /// channel by number, Info the programme guide, the options key a menu,
 /// play/pause stops and resumes. All assignable keys: RemoteKeys.
+/// With timeshift on (Einstellungen → TV → Aufnahmen & Timeshift) the
+/// receiver's channels pause and rewind instead (TvTimeshiftPlayer.handleKey);
+/// ⏺ records the programme on air by the receiver.
 class TvScreen extends ConsumerStatefulWidget {
   const TvScreen({super.key, this.startServiceRef});
 
@@ -101,6 +108,9 @@ class _TvScreenState extends ConsumerState<TvScreen> {
   @override
   void initState() {
     super.initState();
+    // Timeshift's settings loaded before the first channel starts.
+    ref.read(tvTimeshiftProvider);
+    ref.read(tvTimeshiftMemoryProvider);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _open.set(true);
       _maybeStart();
@@ -284,7 +294,9 @@ class _TvScreenState extends ConsumerState<TvScreen> {
       return;
     }
     _session = session;
-    final player = TvPlayer(session.uri, const {});
+    _watchStreamCuts(session, channel, stale);
+    // Timeshift (Einstellungen → TV): fills behind the scenes.
+    final player = withTvTimeshift(ref, TvPlayer(session.uri, const {}), session);
     final starting = player.start(timeout: const Duration(seconds: 25));
     Future<void> giveUp(String message, {required bool atReceiver}) async {
       starting.ignore();
@@ -477,6 +489,37 @@ class _TvScreenState extends ConsumerState<TvScreen> {
     _fail(t.iptvErrorNoPicture(channel.name), atReceiver: false);
   }
 
+  /// The receiver may end a running stream when a recording needs the
+  /// tuner ("Streaming bei Aufnahmen beenden"): a note while it's fetched
+  /// anew, the error if it doesn't come back.
+  void _watchStreamCuts(TvStreamSession session, E2Channel channel, bool Function() stale) {
+    session.interruptions.addListener(() {
+      if (!stale()) _showNote(context.l10n.tvRecStreamCut);
+    });
+    unawaited(session.lost.then((_) {
+      if (mounted && !stale()) _fail(context.l10n.tvRecStreamLost(channel.name), atReceiver: true);
+    }));
+  }
+
+  /// The record key / the menu: the programme on air recorded by the
+  /// receiver (or its timer deleted).
+  Future<void> _recordCurrent() async {
+    final channel = _current;
+    if (channel == null || _iptv != null) {
+      _showNote(context.l10n.tvRecOnlyReceiver);
+      return;
+    }
+    final now = nowNextFor(ref.read(tvNowNextProvider).value ?? const {}, channel, DateTime.now()).now;
+    if (now == null) {
+      _showNote(context.l10n.tvNoProgramInfo);
+      return;
+    }
+    await toggleTvRecording(context, ref, channel: channel, event: now);
+  }
+
+  Future<void> _openRecordings() =>
+      Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const TvRecordingsScreen()));
+
   static Future<bool> _clearWithin(TvStreamSession session, Duration limit) async {
     try {
       await session.clear.timeout(limit);
@@ -616,6 +659,27 @@ class _TvScreenState extends ConsumerState<TvScreen> {
                 subtitle: Text(_player?.info.value.selectedAudio?.label ?? ''),
               ),
             ),
+          if (_player case final TvTimeshiftPlayer ts when ts.state.value.shifted)
+            TvRow(
+              onTap: () => Navigator.of(context).pop('live'),
+              child: ListTile(leading: const Icon(Icons.skip_next), title: Text(context.l10n.tvShiftBackToLive)),
+            ),
+          if (_current != null)
+            TvRow(
+              onTap: () => Navigator.of(context).pop('record'),
+              child: ListTile(
+                leading: const Icon(Icons.fiber_manual_record, color: tvRecordRed),
+                title: Text(context.l10n.tvRecRecordNow),
+              ),
+            ),
+          TvRow(
+            onTap: () => Navigator.of(context).pop('recordings'),
+            child: ListTile(leading: const Icon(Icons.video_library_outlined), title: Text(context.l10n.tvRecRecordingsTitle)),
+          ),
+          TvRow(
+            onTap: () => Navigator.of(context).pop('timers'),
+            child: ListTile(leading: const Icon(Icons.schedule), title: Text(context.l10n.tvRecTimersTitle)),
+          ),
         ],
       ),
     );
@@ -623,6 +687,12 @@ class _TvScreenState extends ConsumerState<TvScreen> {
     if (choice == 'guide') await _openGuide(_current);
     if (choice == 'epg') _openEpg();
     if (choice == 'audio') await _chooseAudio();
+    if (choice == 'live' && _player is TvTimeshiftPlayer) await (_player! as TvTimeshiftPlayer).goLive();
+    if (choice == 'record') await _recordCurrent();
+    if (choice == 'recordings') await _openRecordings();
+    if (choice == 'timers' && mounted) {
+      await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const TvTimersScreen()));
+    }
   }
 
   /// The options key on an Internet-TV channel: into / out of the
@@ -808,6 +878,12 @@ class _TvScreenState extends ConsumerState<TvScreen> {
     // The channel list is open but hasn't got the focus yet: the keys
     // mustn't switch channels behind it (Back/Esc still closes it).
     if (_listVisible) return key == LogicalKeyboardKey.escape ? KeyEventResult.ignored : KeyEventResult.handled;
+    // Timeshift: pause, rewind, back to live (see TvTimeshiftPlayer).
+    if (_player case final TvTimeshiftPlayer ts when _iptv == null && ts.handleKey(event)) return KeyEventResult.handled;
+    if (key == LogicalKeyboardKey.mediaRecord) {
+      if (event is KeyDownEvent) unawaited(_recordCurrent());
+      return KeyEventResult.handled;
+    }
     // Up/down open the channel list - OK there plays the marked channel.
     if (key == LogicalKeyboardKey.arrowUp || key == LogicalKeyboardKey.arrowDown) {
       if (event is KeyDownEvent) setState(() => _listVisible = true);
@@ -973,6 +1049,8 @@ class _TvScreenState extends ConsumerState<TvScreen> {
                           child: Text(_digits,
                               style: const TextStyle(color: Colors.white, fontSize: 64, fontWeight: FontWeight.bold, shadows: [Shadow(blurRadius: 12)])),
                         ),
+                      if (player case final TvTimeshiftPlayer ts when !_listVisible)
+                        Positioned(top: 32, left: 40, child: TvTimeshiftIndicator(player: ts)),
                       if (_nextUp != null && !_listVisible)
                         Positioned(top: 32, right: 40, child: _NextUpNote(event: _nextUp!)),
                       if ((_infoVisible || _error != null || _link != null) && hasChannel && !_listVisible)

@@ -11,7 +11,9 @@ import '../../core/theme.dart';
 import '../../data/services/enigma2_service.dart';
 import '../../l10n/l10n.dart';
 import 'tv_epg_screen.dart';
+import 'tv_programme_actions.dart';
 import 'tv_providers.dart';
+import 'tv_recording_providers.dart';
 import 'tv_reminder_providers.dart';
 import '../../data/services/tv_reminders.dart' show serviceKeyOf;
 import 'tv_widgets.dart';
@@ -210,7 +212,7 @@ class _TvGuideScreenState extends ConsumerState<TvGuideScreen> {
     if (_row < channels.length) Navigator.of(context).pop(channels[_row]);
   }
 
-  /// Holding OK: reminder for the marked programme on/off (a short press
+  /// Holding OK: remind of / record the marked programme (a short press
   /// still switches).
   static final _okKeys = {
     LogicalKeyboardKey.select,
@@ -221,26 +223,24 @@ class _TvGuideScreenState extends ConsumerState<TvGuideScreen> {
   static const _hold = Duration(milliseconds: 600);
   DateTime? _okDownAt;
 
-  /// Reminder for [e] on [channel] on/off, with a short note.
-  Future<void> _toggleReminder(E2Channel channel, E2Event? e) async {
-    final l = context.l10n;
-    final messenger = ScaffoldMessenger.of(context);
-    void say(String text) => messenger
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(text), duration: const Duration(seconds: 3)));
+  /// Remind / record [e] on [channel] (holding OK, a long click).
+  Future<void> _actions(E2Channel channel, E2Event? e) async {
     if (e == null) return;
-    final notifier = ref.read(tvRemindersProvider.notifier);
-    final wasSet = notifier.isSet(channel.ref, e.begin);
-    if (!await notifier.toggle(e, channel)) {
-      say(l.tvReminderAlreadyRunning);
-      return;
-    }
-    say(wasSet ? l.tvReminderRemoved(e.title) : l.tvReminderSet(e.title, hhmm(e.begin), channel.name));
+    await showTvProgrammeActions(context, ref, channel: channel, event: e);
+    if (mounted) _focus.requestFocus();
   }
 
-  void _toggleFocusedReminder() {
+  void _focusedActions() {
     final channels = _channels;
-    if (_row < channels.length) unawaited(_toggleReminder(channels[_row], _focused));
+    if (_row < channels.length) unawaited(_actions(channels[_row], _focused));
+  }
+
+  /// The record key: the marked programme recorded (or its timer deleted).
+  void _recordFocused() {
+    final channels = _channels;
+    final e = _focused;
+    if (_row >= channels.length || e == null) return;
+    unawaited(toggleTvRecording(context, ref, channel: channels[_row], event: e));
   }
 
   void _openChannelList() {
@@ -252,13 +252,13 @@ class _TvGuideScreenState extends ConsumerState<TvGuideScreen> {
   KeyEventResult _onKey(FocusNode node, KeyEvent event) {
     final key = event.logicalKey;
     if (_okKeys.contains(key)) {
-      // Decided on release: short = switch, held = reminder.
+      // Decided on release: short = switch, held = remind / record.
       if (event is KeyDownEvent) {
         _okDownAt = DateTime.now();
       } else if (event is KeyUpEvent) {
         final down = _okDownAt;
         _okDownAt = null;
-        if (down != null) DateTime.now().difference(down) >= _hold ? _toggleFocusedReminder() : _pick();
+        if (down != null) DateTime.now().difference(down) >= _hold ? _focusedActions() : _pick();
       }
       return KeyEventResult.handled;
     }
@@ -280,6 +280,8 @@ class _TvGuideScreenState extends ConsumerState<TvGuideScreen> {
       _shiftTime(const Duration(hours: 3));
     } else if (key == LogicalKeyboardKey.mediaRewind || key == LogicalKeyboardKey.mediaTrackPrevious) {
       _shiftTime(const Duration(hours: -3));
+    } else if (key == LogicalKeyboardKey.mediaRecord) {
+      if (event is KeyDownEvent) _recordFocused();
     } else if (event is KeyDownEvent && keys.matches(RemoteAction.channelList, key)) {
       _pick();
     } else if (event is KeyDownEvent && keys.matches(RemoteAction.options, key)) {
@@ -309,6 +311,7 @@ class _TvGuideScreenState extends ConsumerState<TvGuideScreen> {
     final bouquet = ref.watch(tvCurrentBouquetProvider).value;
     final reminders = {for (final r in ref.watch(tvRemindersProvider)) r.key};
     bool reminded(E2Channel c, E2Event e) => reminders.contains('${serviceKeyOf(c.ref)}|${e.begin.millisecondsSinceEpoch}');
+    final timers = ref.watch(tvTimersProvider).value;
     final focused = _focused;
     return Scaffold(
       backgroundColor: const Color(0xFF05070A),
@@ -359,8 +362,9 @@ class _TvGuideScreenState extends ConsumerState<TvGuideScreen> {
                                                 focusedRow: r == _row,
                                                 focusedEvent: r == _row ? focused : null,
                                                 onTap: (e) => _tapCell(r, e),
-                                                onLongPress: (e) => unawaited(_toggleReminder(channels[r], e)),
+                                                onLongPress: (e) => unawaited(_actions(channels[r], e)),
                                                 reminded: (e) => reminded(channels[r], e),
+                                                recorded: (e) => isRecorded(timers, channels[r].ref, e),
                                               ),
                                           ],
                                         ),
@@ -385,6 +389,7 @@ class _TvGuideScreenState extends ConsumerState<TvGuideScreen> {
                 event: focused,
                 channel: _row < channels.length ? channels[_row] : null,
                 reminded: focused != null && _row < channels.length && reminded(channels[_row], focused),
+                recorded: focused != null && _row < channels.length && isRecorded(timers, channels[_row].ref, focused),
               ),
             ],
           ),
@@ -421,7 +426,7 @@ class _TopBar extends ConsumerWidget {
             const Spacer(),
             Text(
               // ‹‹ ›› rather than ⏪⏩, which Android draws as coloured emoji.
-              context.l10n.tvGuideKeyHint(remoteKeyHint(keys, RemoteAction.options)),
+              context.l10n.tvRecGuideKeyHint(remoteKeyHint(keys, RemoteAction.options)),
               style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 14),
             ),
             const SizedBox(width: 20),
@@ -486,10 +491,12 @@ class _GuideRow extends StatelessWidget {
     required this.onTap,
     required this.onLongPress,
     required this.reminded,
+    required this.recorded,
   });
 
   final ValueChanged<E2Event> onLongPress;
   final bool Function(E2Event e) reminded;
+  final bool Function(E2Event e) recorded;
   final Enigma2Config config;
   final E2Channel channel;
   final List<E2Event> events;
@@ -562,6 +569,7 @@ class _GuideRow extends StatelessWidget {
                       focused: focusedRow && focusedEvent == e,
                       running: e.runsAt(now),
                       reminded: reminded(e),
+                      recorded: recorded(e),
                       onTap: () => onTap(e),
                       onLongPress: () => onLongPress(e),
                     ),
@@ -586,10 +594,12 @@ class _Cell extends StatelessWidget {
     required this.running,
     required this.onTap,
     this.reminded = false,
+    this.recorded = false,
     this.onLongPress,
   });
 
   final bool reminded;
+  final bool recorded;
   final VoidCallback? onLongPress;
   final String title;
   final String? subtitle;
@@ -621,6 +631,10 @@ class _Cell extends StatelessWidget {
             children: [
               Row(
                 children: [
+                  if (recorded) ...[
+                    const TvRecordDot(size: 10),
+                    const SizedBox(width: 5),
+                  ],
                   if (reminded) ...[
                     Icon(Icons.notifications_active, size: 16, color: focused ? Colors.black : brandGreen),
                     const SizedBox(width: 4),
@@ -654,11 +668,12 @@ class _Cell extends StatelessWidget {
 
 /// The marked programme: title, time, what it's about.
 class _Details extends StatelessWidget {
-  const _Details({required this.event, required this.channel, this.reminded = false});
+  const _Details({required this.event, required this.channel, this.reminded = false, this.recorded = false});
 
   final E2Event? event;
   final E2Channel? channel;
   final bool reminded;
+  final bool recorded;
 
   @override
   Widget build(BuildContext context) {
@@ -674,6 +689,10 @@ class _Details extends StatelessWidget {
               children: [
                 Row(
                   children: [
+                    if (recorded) ...[
+                      const TvRecordDot(size: 14),
+                      const SizedBox(width: 8),
+                    ],
                     if (reminded) ...[
                       const Icon(Icons.notifications_active, color: brandGreen),
                       const SizedBox(width: 8),

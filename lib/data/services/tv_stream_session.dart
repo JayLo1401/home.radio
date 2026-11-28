@@ -44,6 +44,20 @@ class TvStreamSession {
   bool _reopen = false;
   bool _playerConnected = false;
 
+  /// Timeshift: every chunk of the descrambled stream, as the player gets
+  /// it - and whether the player still gets it ([stopFeedingPlayer]).
+  final _tap = StreamController<List<int>>.broadcast(sync: true);
+  bool _feedPlayer = true;
+
+  /// How often the running stream broke off and is fetched anew - e.g.
+  /// the receiver ended it because a recording needs the tuner ("Streaming
+  /// bei Aufnahmen beenden").
+  final interruptions = ValueNotifier<int>(0);
+  final _lost = Completer<void>();
+
+  /// A new connection's first data may start inside a packet.
+  bool _alignNext = false;
+
   static Future<TvStreamSession> open(Uri upstream, Map<String, String> headers) async {
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     final session = TvStreamSession._(server, upstream, headers);
@@ -72,6 +86,23 @@ class TvStreamSession {
   /// the band/polarisation the receiver itself is tuned to). Switching the
   /// receiver to the channel helps; the session keeps trying meanwhile.
   Future<void> get refused => _refused.future;
+
+  /// The descrambled stream from its first clear packet on (timeshift
+  /// keeps it).
+  Stream<List<int>> get clearData => _tap.stream;
+
+  /// The player paused for timeshift: the stream no longer piles up for
+  /// it (it plays on from the timeshift buffer); [clearData] goes on.
+  void stopFeedingPlayer() => _feedPlayer = false;
+
+  void _emit(List<int> chunk) {
+    if (_feedPlayer) _data.add(chunk);
+    if (_tap.hasListener) _tap.add(chunk);
+  }
+
+  /// Completes when the stream broke off after it ran and doesn't come
+  /// back (the tuner stays taken).
+  Future<void> get lost => _lost.future;
 
   /// Drops the running connection and fetches the stream anew - after the
   /// receiver was switched to the channel, if this one stays scrambled.
@@ -124,7 +155,8 @@ class TvStreamSession {
           if (_closed) break;
           if (_clear.isCompleted) {
             gotData = true;
-            _data.add(chunk);
+            _emit(_alignNext ? alignToTsPacket(chunk) : chunk);
+            _alignNext = false;
             continue;
           }
           final result = probe.add(chunk);
@@ -139,7 +171,7 @@ class TvStreamSession {
             // recognises MPEG-TS only by sync bytes every 188 bytes from the
             // start ("None of the available extractors could read the
             // stream").
-            _data.add(alignToTsPacket(chunk));
+            _emit(alignToTsPacket(chunk));
           } else if (result == StreamScrambling.scrambled && !_verdict.isCompleted) {
             _verdict.complete(StreamScrambling.scrambled);
           }
@@ -151,6 +183,10 @@ class TvStreamSession {
       }
       if (_closed) break;
       if (_reopen) continue;
+      if (_clear.isCompleted) {
+        if (gotData) interruptions.value++;
+        _alignNext = true;
+      }
       // The receiver ended the stream, sent nothing or turned the request
       // down - again, a few times in a row; a stream that was flowing just
       // goes on on the new connection (the player bridges the gap).
@@ -158,7 +194,11 @@ class TvStreamSession {
       if (!gotData && !_refused.isCompleted) _refused.complete();
       if (failures >= 8) {
         if (!_verdict.isCompleted) _verdict.complete(StreamScrambling.unknown);
-        if (!_clear.isCompleted) _clear.completeError(const SocketException('Der Receiver liefert keinen Stream'));
+        if (_clear.isCompleted) {
+          if (!_lost.isCompleted) _lost.complete();
+        } else {
+          _clear.completeError(const SocketException('Der Receiver liefert keinen Stream'));
+        }
         break;
       }
       await Future<void>.delayed(const Duration(milliseconds: 400));
@@ -176,6 +216,7 @@ class TvStreamSession {
     }
     // Not awaited: with the player gone, nobody takes the end of the data.
     unawaited(_data.close());
+    unawaited(_tap.close());
     await _server.close(force: true);
   }
 }
