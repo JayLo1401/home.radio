@@ -1548,8 +1548,22 @@ class _InfoBanner extends ConsumerWidget {
                 if (lookingAhead) ...[
                   _later(context, ref),
                 ] else if (now != null) ...[
-                  Text('${hhmm(now.begin)} – ${hhmm(now.end)}   ${now.title}',
-                      maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 20)),
+                  // The time in the progress bar's colour (green → red).
+                  Text.rich(
+                    TextSpan(children: [
+                      TextSpan(
+                        text: '${hhmm(now.begin)} – ${hhmm(now.end)}',
+                        style: TextStyle(
+                          color: programmeProgressColor(now.progressAt(DateTime.now())),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      TextSpan(text: '   ${now.title}'),
+                    ]),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Colors.white, fontSize: 20),
+                  ),
                   const SizedBox(height: 8),
                   EventProgress(event: now, width: 520),
                 ] else
