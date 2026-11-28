@@ -10,6 +10,7 @@ import '../../core/nas_providers.dart';
 import '../../core/pictures_providers.dart';
 import '../../core/providers.dart';
 import '../../data/services/music_library.dart' show MusicRepeat;
+import '../../data/repositories/nas_settings_repository.dart';
 import '../../data/repositories/music_settings_repository.dart';
 import '../../core/music_providers.dart';
 import '../../core/system_providers.dart';
@@ -936,7 +937,7 @@ class AdminSettings implements AdminSettingsSource {
         ),
       ]),
       _group('system', l.nasFoldersSection, help: hasServer ? l.adminNasFoldersHint : l.nasNeedServer, [
-        for (final kind in NasFolder.values)
+        for (final kind in singleNasFolders)
           _Setting(
             id: 'nasFolder_${kind.name}',
             label: nasFolderName(kind),
@@ -950,6 +951,9 @@ class AdminSettings implements AdminSettingsSource {
               return null;
             },
           ),
+      ]),
+      _group('system', l.nasMovieFoldersSection, help: hasServer ? l.adminMovieFoldersHint : l.nasNeedServer, [
+        ..._movieFolderSettings(nas.movieFolders),
       ]),
       _group('system', l.adminNasBackupHeading, help: l.nasBackupsHint(NasBackupService.keep), [
         _Setting.action(
@@ -1173,6 +1177,68 @@ class AdminSettings implements AdminSettingsSource {
         domain: domain ?? c.domain,
       );
 
+  /// Settings → NAS → Film-Ordner: per folder its place on the NAS
+  /// (Durchsuchen, × removes it), its name and its place in the list; then
+  /// a row to add one.
+  List<_Setting> _movieFolderSettings(List<MovieFolder> folders) {
+    final l = l10n;
+    final nas = _c.read(nasSettingsProvider.notifier);
+    return [
+      for (final (i, folder) in folders.indexed) ...[
+        _Setting(
+          id: 'movieFolder_$i',
+          label: folder.label,
+          type: 'folder',
+          button: l.adminBrowse,
+          get: () => folder.path,
+          set: (v) async {
+            final path = '${v ?? ''}'.trim();
+            path.isEmpty ? await nas.removeMovieFolder(i) : await nas.setMovieFolderPath(i, path);
+            return null;
+          },
+        ),
+        _Setting(
+          id: 'movieFolderName_$i',
+          label: l.adminMovieFolderName,
+          help: l.adminMovieFolderNameHelp,
+          type: 'text',
+          get: () => folder.name,
+          set: (v) async {
+            await nas.renameMovieFolder(i, '${v ?? ''}');
+            return null;
+          },
+        ),
+        if (folders.length > 1)
+          _Setting(
+            id: 'movieFolderPosition_$i',
+            label: l.adminMovieFolderPosition,
+            type: 'choice',
+            options: [for (var p = 0; p < folders.length; p++) ('$p', '${p + 1}')],
+            get: () => '$i',
+            set: (v) async {
+              final to = _int(v);
+              if (to == null || to < 0 || to >= folders.length) return l.adminInvalidValue;
+              await nas.moveMovieFolder(i, to);
+              return null;
+            },
+          ),
+      ],
+      _Setting(
+        id: 'movieFolderAdd',
+        label: l.adminMovieFolderAdd,
+        help: l.adminMovieFolderAddHelp,
+        type: 'folder',
+        button: l.adminBrowse,
+        get: () => '',
+        set: (v) async {
+          final path = '${v ?? ''}'.trim();
+          if (path.isNotEmpty) await nas.addMovieFolder(path);
+          return null;
+        },
+      ),
+    ];
+  }
+
   static String nasFolderName(NasFolder kind) => switch (kind) {
         NasFolder.backgrounds => l10n.nasFolderBackgrounds,
         NasFolder.pictures => l10n.nasFolderPictures,
@@ -1242,7 +1308,8 @@ class AdminSettings implements AdminSettingsSource {
   Future<Map<String, Object?>> browse(String id, String path) async {
     final l = l10n;
     final s = await _find(id);
-    if (s == null || s.folder == null) return {'error': l.adminUnknownSetting};
+    // Also the film folders (no NasFolder of their own).
+    if (s == null || s.type != 'folder') return {'error': l.adminUnknownSetting};
     final config = (await _c.read(nasSettingsRepositoryProvider).load()).config;
     if (!config.isConfigured) return {'error': l.nasNeedServer};
     final folder = normalizeNasPath(path.isEmpty ? '/' : path);

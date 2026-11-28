@@ -44,7 +44,7 @@
     }
   },
   "nasFoldersSection": "Ordner",
-  "nasFoldersHint": "OK wählt einen Ordner auf dem NAS. Musik, Videos und Filme sind für später (Abspielen vom Server).",
+  "nasFoldersHint": "OK wählt einen Ordner auf dem NAS.",
   "nasNeedServer": "Zuerst die Server-Adresse eintragen.",
   "nasFolderPictures": "Bilder",
   "nasFolderMusic": "Musik",
@@ -211,6 +211,24 @@
       },
       "total": {
         "type": "int"
+      }
+    }
+  },
+  "nasMovieFoldersSection": "Film-Ordner",
+  "nasMovieFoldersHint": "Beliebig viele Ordner für Filme - jeder ist dort ein eigener Bereich, in dieser Reihenfolge. OK auf einem Ordner: umbenennen, anderen Ordner wählen, verschieben oder entfernen.",
+  "nasMovieFoldersEmpty": "Noch kein Film-Ordner.",
+  "nasMovieFolderAdd": "Film-Ordner hinzufügen",
+  "nasMovieFolderName": "Name in Filme",
+  "nasMovieFolderRename": "Umbenennen",
+  "nasMovieFolderChange": "Anderen Ordner wählen",
+  "nasMovieFolderUp": "Nach oben",
+  "nasMovieFolderDown": "Nach unten",
+  "nasMovieFolderRemove": "Entfernen",
+  "nasMovieFolderSaveFailed": "Die Film-Ordner konnten nicht gespeichert werden: {error}",
+  "@nasMovieFolderSaveFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
       }
     }
   }

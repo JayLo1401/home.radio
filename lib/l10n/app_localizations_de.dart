@@ -224,6 +224,26 @@ class AppLocalizationsDe extends AppLocalizations {
       'Am Gerät ist „Backup wiederherstellen“ offen - hier die Datei hochladen ›';
 
   @override
+  String get adminMovieFoldersHint =>
+      'Jeder Ordner ist in Filme ein eigener Bereich, in dieser Reihenfolge. „Durchsuchen“ wählt einen anderen Ordner, × entfernt ihn aus der Liste.';
+
+  @override
+  String get adminMovieFolderName => 'Name in Filme';
+
+  @override
+  String get adminMovieFolderNameHelp => 'Leer: der Name des Ordners';
+
+  @override
+  String get adminMovieFolderPosition => 'Platz in der Liste';
+
+  @override
+  String get adminMovieFolderAdd => 'Film-Ordner hinzufügen';
+
+  @override
+  String get adminMovieFolderAddHelp =>
+      'Er heißt dann wie der Ordner - oben änderbar.';
+
+  @override
   String get browserTitle => 'Browser';
 
   @override
@@ -1724,7 +1744,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get moviesNotSetUp =>
-      'Die Filme kommen vom NAS. Unter Einstellungen → NAS den Server eintragen und die Ordner „Filme“ und/oder „Videos“ wählen.';
+      'Die Filme kommen vom NAS. Unter Einstellungen → NAS den Server eintragen und unter „Film-Ordner“ einen oder mehrere Ordner hinzufügen.';
 
   @override
   String get moviesOpenNasSettings => 'NAS einrichten';
@@ -2206,8 +2226,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get nasFoldersSection => 'Ordner';
 
   @override
-  String get nasFoldersHint =>
-      'OK wählt einen Ordner auf dem NAS. Musik, Videos und Filme sind für später (Abspielen vom Server).';
+  String get nasFoldersHint => 'OK wählt einen Ordner auf dem NAS.';
 
   @override
   String get nasNeedServer => 'Zuerst die Server-Adresse eintragen.';
@@ -2400,6 +2419,42 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String nasBgSyncProgress(int loaded, int total) {
     return 'Bild $loaded von $total wird geladen …';
+  }
+
+  @override
+  String get nasMovieFoldersSection => 'Film-Ordner';
+
+  @override
+  String get nasMovieFoldersHint =>
+      'Beliebig viele Ordner für Filme - jeder ist dort ein eigener Bereich, in dieser Reihenfolge. OK auf einem Ordner: umbenennen, anderen Ordner wählen, verschieben oder entfernen.';
+
+  @override
+  String get nasMovieFoldersEmpty => 'Noch kein Film-Ordner.';
+
+  @override
+  String get nasMovieFolderAdd => 'Film-Ordner hinzufügen';
+
+  @override
+  String get nasMovieFolderName => 'Name in Filme';
+
+  @override
+  String get nasMovieFolderRename => 'Umbenennen';
+
+  @override
+  String get nasMovieFolderChange => 'Anderen Ordner wählen';
+
+  @override
+  String get nasMovieFolderUp => 'Nach oben';
+
+  @override
+  String get nasMovieFolderDown => 'Nach unten';
+
+  @override
+  String get nasMovieFolderRemove => 'Entfernen';
+
+  @override
+  String nasMovieFolderSaveFailed(String error) {
+    return 'Die Film-Ordner konnten nicht gespeichert werden: $error';
   }
 
   @override

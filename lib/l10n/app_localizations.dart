@@ -494,6 +494,42 @@ abstract class AppLocalizations {
   /// **'Am Gerät ist „Backup wiederherstellen“ offen - hier die Datei hochladen ›'**
   String get adminRestoreOpenBanner;
 
+  /// No description provided for @adminMovieFoldersHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Jeder Ordner ist in Filme ein eigener Bereich, in dieser Reihenfolge. „Durchsuchen“ wählt einen anderen Ordner, × entfernt ihn aus der Liste.'**
+  String get adminMovieFoldersHint;
+
+  /// No description provided for @adminMovieFolderName.
+  ///
+  /// In de, this message translates to:
+  /// **'Name in Filme'**
+  String get adminMovieFolderName;
+
+  /// No description provided for @adminMovieFolderNameHelp.
+  ///
+  /// In de, this message translates to:
+  /// **'Leer: der Name des Ordners'**
+  String get adminMovieFolderNameHelp;
+
+  /// No description provided for @adminMovieFolderPosition.
+  ///
+  /// In de, this message translates to:
+  /// **'Platz in der Liste'**
+  String get adminMovieFolderPosition;
+
+  /// No description provided for @adminMovieFolderAdd.
+  ///
+  /// In de, this message translates to:
+  /// **'Film-Ordner hinzufügen'**
+  String get adminMovieFolderAdd;
+
+  /// No description provided for @adminMovieFolderAddHelp.
+  ///
+  /// In de, this message translates to:
+  /// **'Er heißt dann wie der Ordner - oben änderbar.'**
+  String get adminMovieFolderAddHelp;
+
   /// No description provided for @browserTitle.
   ///
   /// In de, this message translates to:
@@ -3013,7 +3049,7 @@ abstract class AppLocalizations {
   /// No description provided for @moviesNotSetUp.
   ///
   /// In de, this message translates to:
-  /// **'Die Filme kommen vom NAS. Unter Einstellungen → NAS den Server eintragen und die Ordner „Filme“ und/oder „Videos“ wählen.'**
+  /// **'Die Filme kommen vom NAS. Unter Einstellungen → NAS den Server eintragen und unter „Film-Ordner“ einen oder mehrere Ordner hinzufügen.'**
   String get moviesNotSetUp;
 
   /// No description provided for @moviesOpenNasSettings.
@@ -3847,7 +3883,7 @@ abstract class AppLocalizations {
   /// No description provided for @nasFoldersHint.
   ///
   /// In de, this message translates to:
-  /// **'OK wählt einen Ordner auf dem NAS. Musik, Videos und Filme sind für später (Abspielen vom Server).'**
+  /// **'OK wählt einen Ordner auf dem NAS.'**
   String get nasFoldersHint;
 
   /// No description provided for @nasNeedServer.
@@ -4155,6 +4191,72 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'Bild {loaded} von {total} wird geladen …'**
   String nasBgSyncProgress(int loaded, int total);
+
+  /// No description provided for @nasMovieFoldersSection.
+  ///
+  /// In de, this message translates to:
+  /// **'Film-Ordner'**
+  String get nasMovieFoldersSection;
+
+  /// No description provided for @nasMovieFoldersHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Beliebig viele Ordner für Filme - jeder ist dort ein eigener Bereich, in dieser Reihenfolge. OK auf einem Ordner: umbenennen, anderen Ordner wählen, verschieben oder entfernen.'**
+  String get nasMovieFoldersHint;
+
+  /// No description provided for @nasMovieFoldersEmpty.
+  ///
+  /// In de, this message translates to:
+  /// **'Noch kein Film-Ordner.'**
+  String get nasMovieFoldersEmpty;
+
+  /// No description provided for @nasMovieFolderAdd.
+  ///
+  /// In de, this message translates to:
+  /// **'Film-Ordner hinzufügen'**
+  String get nasMovieFolderAdd;
+
+  /// No description provided for @nasMovieFolderName.
+  ///
+  /// In de, this message translates to:
+  /// **'Name in Filme'**
+  String get nasMovieFolderName;
+
+  /// No description provided for @nasMovieFolderRename.
+  ///
+  /// In de, this message translates to:
+  /// **'Umbenennen'**
+  String get nasMovieFolderRename;
+
+  /// No description provided for @nasMovieFolderChange.
+  ///
+  /// In de, this message translates to:
+  /// **'Anderen Ordner wählen'**
+  String get nasMovieFolderChange;
+
+  /// No description provided for @nasMovieFolderUp.
+  ///
+  /// In de, this message translates to:
+  /// **'Nach oben'**
+  String get nasMovieFolderUp;
+
+  /// No description provided for @nasMovieFolderDown.
+  ///
+  /// In de, this message translates to:
+  /// **'Nach unten'**
+  String get nasMovieFolderDown;
+
+  /// No description provided for @nasMovieFolderRemove.
+  ///
+  /// In de, this message translates to:
+  /// **'Entfernen'**
+  String get nasMovieFolderRemove;
+
+  /// No description provided for @nasMovieFolderSaveFailed.
+  ///
+  /// In de, this message translates to:
+  /// **'Die Film-Ordner konnten nicht gespeichert werden: {error}'**
+  String nasMovieFolderSaveFailed(String error);
 
   /// No description provided for @permissionsTitle.
   ///

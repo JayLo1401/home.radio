@@ -7,6 +7,7 @@ import '../../data/repositories/nas_settings_repository.dart';
 import '../../data/services/nas_backup_service.dart';
 import '../../data/services/nas_service.dart';
 import '../../l10n/l10n.dart';
+import 'movie_folders_section.dart';
 
 String nasFolderLabel(BuildContext context, NasFolder kind) => switch (kind) {
       NasFolder.backgrounds => context.l10n.nasFolderBackgrounds,
@@ -27,7 +28,7 @@ IconData _folderIcon(NasFolder kind) => switch (kind) {
     };
 
 /// Settings → System → NAS: the home NAS (WebDAV, FTP or SMB) - address, login,
-/// and the folders for pictures, music, videos, movies and backups. Every
+/// the folders for pictures, music and backups, and the film folders. Every
 /// change is saved right away.
 class NasSettingsScreen extends ConsumerStatefulWidget {
   const NasSettingsScreen({super.key});
@@ -278,7 +279,7 @@ class _NasSettingsScreenState extends ConsumerState<NasSettingsScreen> {
                   Text(l.nasFoldersSection, style: Theme.of(context).textTheme.titleMedium),
                   Text(hasServer ? l.nasFoldersHint : l.nasNeedServer, style: help),
                   const SizedBox(height: 8),
-                  for (final kind in NasFolder.values)
+                  for (final kind in singleNasFolders)
                     Row(
                       children: [
                         Expanded(
@@ -304,6 +305,8 @@ class _NasSettingsScreenState extends ConsumerState<NasSettingsScreen> {
                   Text(l.nasBackupsHint(NasBackupService.keep), style: help),
                   const SizedBox(height: 4),
                   Text(l.nasPicturesHint, style: help),
+                  const Divider(height: 32),
+                  MovieFoldersSection(config: () => _config, enabled: hasServer),
                 ],
               ),
             ),

@@ -87,6 +87,12 @@
   "adminClose": "Schließen",
   "adminDeviceOnly": "Nur am Gerät selbst: Empfänger- und Receiversuche, Senderlisten, Home-Taste, Berechtigungen, Hintergründe und Icon-Pakete.",
   "adminRestoreOpenBanner": "Am Gerät ist „Backup wiederherstellen“ offen - hier die Datei hochladen ›",
+  "adminMovieFoldersHint": "Jeder Ordner ist in Filme ein eigener Bereich, in dieser Reihenfolge. „Durchsuchen“ wählt einen anderen Ordner, × entfernt ihn aus der Liste.",
+  "adminMovieFolderName": "Name in Filme",
+  "adminMovieFolderNameHelp": "Leer: der Name des Ordners",
+  "adminMovieFolderPosition": "Platz in der Liste",
+  "adminMovieFolderAdd": "Film-Ordner hinzufügen",
+  "adminMovieFolderAddHelp": "Er heißt dann wie der Ordner - oben änderbar.",
   "browserTitle": "Browser",
   "browserAndroidOnly": "Den Browser gibt es nur auf Android (TV-Box, Tablet, Handy).",
   "browserAddress": "Adresse oder Suche",
@@ -1005,7 +1011,7 @@
   },
   "moviesTitle": "Filme",
   "moviesNotSetUpTitle": "Noch kein Film-Ordner",
-  "moviesNotSetUp": "Die Filme kommen vom NAS. Unter Einstellungen → NAS den Server eintragen und die Ordner „Filme“ und/oder „Videos“ wählen.",
+  "moviesNotSetUp": "Die Filme kommen vom NAS. Unter Einstellungen → NAS den Server eintragen und unter „Film-Ordner“ einen oder mehrere Ordner hinzufügen.",
   "moviesOpenNasSettings": "NAS einrichten",
   "moviesEmpty": "In diesem Ordner sind keine Filme.",
   "moviesListError": "Der Ordner lässt sich nicht lesen: {error}",
@@ -1308,7 +1314,7 @@
     }
   },
   "nasFoldersSection": "Ordner",
-  "nasFoldersHint": "OK wählt einen Ordner auf dem NAS. Musik, Videos und Filme sind für später (Abspielen vom Server).",
+  "nasFoldersHint": "OK wählt einen Ordner auf dem NAS.",
   "nasNeedServer": "Zuerst die Server-Adresse eintragen.",
   "nasFolderPictures": "Bilder",
   "nasFolderMusic": "Musik",
@@ -1475,6 +1481,24 @@
       },
       "total": {
         "type": "int"
+      }
+    }
+  },
+  "nasMovieFoldersSection": "Film-Ordner",
+  "nasMovieFoldersHint": "Beliebig viele Ordner für Filme - jeder ist dort ein eigener Bereich, in dieser Reihenfolge. OK auf einem Ordner: umbenennen, anderen Ordner wählen, verschieben oder entfernen.",
+  "nasMovieFoldersEmpty": "Noch kein Film-Ordner.",
+  "nasMovieFolderAdd": "Film-Ordner hinzufügen",
+  "nasMovieFolderName": "Name in Filme",
+  "nasMovieFolderRename": "Umbenennen",
+  "nasMovieFolderChange": "Anderen Ordner wählen",
+  "nasMovieFolderUp": "Nach oben",
+  "nasMovieFolderDown": "Nach unten",
+  "nasMovieFolderRemove": "Entfernen",
+  "nasMovieFolderSaveFailed": "Die Film-Ordner konnten nicht gespeichert werden: {error}",
+  "@nasMovieFolderSaveFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
       }
     }
   },

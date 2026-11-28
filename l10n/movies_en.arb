@@ -1,7 +1,7 @@
 {
   "moviesTitle": "Movies",
   "moviesNotSetUpTitle": "No movie folder yet",
-  "moviesNotSetUp": "Movies come from the NAS. Under Settings → NAS, enter the server and choose the folders “Movies” and/or “Videos”.",
+  "moviesNotSetUp": "Movies come from the NAS. Under Settings → NAS, enter the server and add one or more folders under “Movie folders”.",
   "moviesOpenNasSettings": "Set up NAS",
   "moviesEmpty": "There are no movies in this folder.",
   "moviesListError": "The folder can't be read: {error}",
