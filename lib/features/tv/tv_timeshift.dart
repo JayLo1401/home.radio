@@ -557,14 +557,74 @@ String formatTimeshiftDelay(Duration d) {
 
 /// Timeshift on screen (top left): paused / behind live, where in the
 /// buffer, and the keys - only while not live (or with a note).
-class TvTimeshiftIndicator extends StatelessWidget {
+class TvTimeshiftIndicator extends StatefulWidget {
   const TvTimeshiftIndicator({super.key, required this.player});
 
   final TvTimeshiftPlayer player;
 
   @override
-  Widget build(BuildContext context) => ValueListenableBuilder<TvTimeshiftState>(
-        valueListenable: player.state,
+  State<TvTimeshiftIndicator> createState() => _TvTimeshiftIndicatorState();
+}
+
+/// Shown while paused, seeking, switching or with a note; once it plays
+/// on behind live it stays a few seconds, then hides (the next key shows
+/// it again).
+class _TvTimeshiftIndicatorState extends State<TvTimeshiftIndicator> {
+  static const _linger = Duration(seconds: 4);
+  Timer? _hide;
+  bool _visible = true;
+  Object? _was;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.player.state.addListener(_onState);
+    _onState();
+  }
+
+  @override
+  void didUpdateWidget(TvTimeshiftIndicator old) {
+    super.didUpdateWidget(old);
+    if (!identical(old.player, widget.player)) {
+      old.player.state.removeListener(_onState);
+      widget.player.state.addListener(_onState);
+      _was = null;
+      _onState();
+    }
+  }
+
+  @override
+  void dispose() {
+    _hide?.cancel();
+    widget.player.state.removeListener(_onState);
+    super.dispose();
+  }
+
+  void _onState() {
+    final s = widget.player.state.value;
+    final active = s.paused || s.busy || s.seeking != 0 || s.message != null;
+    // What matters for showing it (not the delay ticking every second).
+    final key = (s.paused, s.busy, s.seeking, s.message);
+    if (key == _was) return;
+    _was = key;
+    _hide?.cancel();
+    if (!_visible) setState(() => _visible = true);
+    if (!active) {
+      _hide = Timer(_linger, () {
+        if (mounted) setState(() => _visible = false);
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedOpacity(
+        opacity: _visible ? 1 : 0,
+        duration: const Duration(milliseconds: 300),
+        child: _content(context),
+      );
+
+  Widget _content(BuildContext context) => ValueListenableBuilder<TvTimeshiftState>(
+        valueListenable: widget.player.state,
         builder: (context, s, _) {
           if (!s.shifted && s.message == null) return const SizedBox.shrink();
           final l = context.l10n;
