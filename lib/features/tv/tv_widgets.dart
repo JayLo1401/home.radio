@@ -2,11 +2,13 @@ import 'dart:async';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/ok_long_press.dart';
 import '../../core/theme.dart';
 import '../../data/models/iptv_channel.dart';
 import '../../data/services/enigma2_service.dart';
+import 'tv_providers.dart' show tvStreamKnowledgeProvider;
 
 export 'tv_progress_bar.dart';
 
@@ -211,5 +213,49 @@ class _TvClockState extends State<TvClock> {
   Widget build(BuildContext context) => Text(
         hhmm(_now),
         style: widget.style ?? const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700),
+      );
+}
+
+/// A small lock after the name of a channel known to be encrypted (the app
+/// learns it the first time the channel comes scrambled - the receiver's
+/// channel list doesn't say).
+class TvEncryptedLock extends ConsumerWidget {
+  const TvEncryptedLock({super.key, required this.serviceRef, this.size = 16});
+
+  final String serviceRef;
+  final double size;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final known = ref.watch(tvStreamKnowledgeProvider);
+    return ListenableBuilder(
+      listenable: known,
+      builder: (context, _) => known.isEncrypted(serviceRef)
+          ? Padding(
+              padding: EdgeInsets.only(left: size * 0.4),
+              child: Icon(Icons.lock, size: size, color: Colors.white54),
+            )
+          : const SizedBox.shrink(),
+    );
+  }
+}
+
+/// A channel's name with [TvEncryptedLock] right after it (the name shortens
+/// with "…" first, the lock stays).
+class TvChannelName extends StatelessWidget {
+  const TvChannelName(this.text, {super.key, required this.serviceRef, required this.style, this.maxLines = 1});
+
+  final String text;
+  final String serviceRef;
+  final TextStyle style;
+  final int maxLines;
+
+  @override
+  Widget build(BuildContext context) => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Flexible(child: Text(text, maxLines: maxLines, overflow: TextOverflow.ellipsis, style: style)),
+          TvEncryptedLock(serviceRef: serviceRef, size: (style.fontSize ?? 16) * 0.75),
+        ],
       );
 }

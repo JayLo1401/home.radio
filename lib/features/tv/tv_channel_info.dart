@@ -283,16 +283,22 @@ class TvChannelInfoPanelState extends ConsumerState<TvChannelInfoPanel> {
           Picon(config: widget.config, channel: channel, width: 120, height: 72),
         const SizedBox(width: 16),
         Expanded(
-          child: Text(
-            iptv != null
-                ? (widget.iptvNumber == null ? iptv.name : '${widget.iptvNumber} · ${iptv.name}')
-                : channel == null
-                    ? ''
-                    : '${channel.number} · ${channel.name}',
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(color: Colors.white, fontSize: 24 * nameScale, fontWeight: FontWeight.bold),
-          ),
+          child: iptv == null && channel != null
+              ? Align(
+                  alignment: Alignment.centerLeft,
+                  child: TvChannelName(
+                    '${channel.number} · ${channel.name}',
+                    serviceRef: channel.ref,
+                    maxLines: 2,
+                    style: TextStyle(color: Colors.white, fontSize: 24 * nameScale, fontWeight: FontWeight.bold),
+                  ),
+                )
+              : Text(
+                  iptv != null ? (widget.iptvNumber == null ? iptv.name : '${widget.iptvNumber} · ${iptv.name}') : '',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: Colors.white, fontSize: 24 * nameScale, fontWeight: FontWeight.bold),
+                ),
         ),
       ],
     );

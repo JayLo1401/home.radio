@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers.dart';
@@ -83,9 +84,17 @@ final tvViewProvider = NotifierProvider<TvViewNotifier, TvViewSettings>(TvViewNo
 /// The channels (service references) whose stream came scrambled - the
 /// receiver is switched to them right away next time, without waiting for
 /// the stream to show it. Kept in the settings.
-class TvStreamKnowledge {
+/// Listenable: the lock beside encrypted channels (TvEncryptedLock)
+/// appears as soon as a channel turns out to be one.
+class TvStreamKnowledge extends ChangeNotifier {
   TvStreamKnowledge(this._repo) {
-    _repo.getTvEncryptedChannels().then(_encrypted.addAll);
+    _repo.getTvEncryptedChannels().then((refs) {
+      if (refs.isEmpty) return;
+      _encrypted.addAll(refs);
+      notifyListeners();
+    }).catchError((Object e) {
+      debugPrint('TV encrypted channels: $e');
+    });
   }
 
   final SettingsRepository _repo;
@@ -94,7 +103,10 @@ class TvStreamKnowledge {
   bool isEncrypted(String serviceRef) => _encrypted.contains(serviceRef);
 
   void markEncrypted(String serviceRef) {
-    if (_encrypted.add(serviceRef)) _repo.setTvEncryptedChannels(_encrypted);
+    if (_encrypted.add(serviceRef)) {
+      _repo.setTvEncryptedChannels(_encrypted);
+      notifyListeners();
+    }
   }
 }
 

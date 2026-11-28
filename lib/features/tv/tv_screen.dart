@@ -1650,7 +1650,8 @@ class _InfoBanner extends ConsumerWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('${channel.number} · ${channel.name}',
+                TvChannelName('${channel.number} · ${channel.name}',
+                    serviceRef: channel.ref,
                     style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 6),
                 // What's on comes from the bouquet's now and next, loaded
@@ -2409,9 +2410,8 @@ class _ChannelListState extends ConsumerState<_ChannelList> with TvChannelMoveMi
                               mainAxisAlignment: MainAxisAlignment.center,
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(c.name,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
+                                TvChannelName(c.name,
+                                    serviceRef: c.ref,
                                     style: TextStyle(color: Colors.white, fontSize: 18 * nameScale, fontWeight: FontWeight.w600)),
                                 if (event != null) ...[
                                   const SizedBox(height: 2),
@@ -2760,7 +2760,9 @@ class _ProgrammeInfo extends StatelessWidget {
           Picon(config: config, channel: channel, width: 76, height: 46),
           const SizedBox(width: 14),
           Expanded(
-            child: Text('${channel.number} · ${channel.name}',
+            child: TvChannelName('${channel.number} · ${channel.name}',
+                serviceRef: channel.ref,
+                maxLines: 2,
                 style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
           ),
         ],
