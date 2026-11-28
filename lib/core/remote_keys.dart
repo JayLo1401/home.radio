@@ -22,7 +22,11 @@ enum RemoteAction {
   options,
 
   /// TV: choosing the sound track.
-  audio;
+  audio,
+
+  /// TV: the channel's HbbTV app (red button) - also in TV's options
+  /// (☰ or OK held) for remotes without a red key.
+  hbbtv;
 
   /// The action's name in the app's language.
   String get label => switch (this) {
@@ -30,6 +34,7 @@ enum RemoteAction {
         RemoteAction.guide => l10n.miscActionGuide,
         RemoteAction.options => l10n.miscActionOptions,
         RemoteAction.audio => l10n.miscActionAudio,
+        RemoteAction.hbbtv => l10n.miscActionHbbtv,
       };
 
   /// The standard keys: the remote's, plus a letter on the PC's keyboard.
@@ -43,6 +48,7 @@ enum RemoteAction {
         RemoteAction.guide => const [LogicalKeyboardKey.info, LogicalKeyboardKey.guide, LogicalKeyboardKey.keyE],
         RemoteAction.options => const [LogicalKeyboardKey.contextMenu, LogicalKeyboardKey.keyO],
         RemoteAction.audio => const [LogicalKeyboardKey.mediaAudioTrack, LogicalKeyboardKey.keyA],
+        RemoteAction.hbbtv => const [LogicalKeyboardKey.colorF0Red, LogicalKeyboardKey.keyR],
       };
 }
 

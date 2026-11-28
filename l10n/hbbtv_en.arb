@@ -1,0 +1,33 @@
+{
+  "hbbtvMenuEntry": "HbbTV (red button)",
+  "hbbtvSearching": "Looking for HbbTV…",
+  "hbbtvLoading": "Loading the HbbTV app of “{channel}”…",
+  "@hbbtvLoading": {
+    "placeholders": {
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "hbbtvCloseHint": "Red or Back closes",
+  "hbbtvNone": "“{channel}” has no HbbTV app",
+  "@hbbtvNone": {
+    "placeholders": {
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "hbbtvLoadFailed": "The HbbTV app can't be loaded: {error}",
+  "@hbbtvLoadFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "hbbtvOffline": "no internet connection",
+  "hbbtvTimeout": "the server doesn't answer",
+  "hbbtvAndroidOnly": "HbbTV is only available on Android devices",
+  "hbbtvReceiverOnly": "HbbTV is only available on the receiver's channels"
+}

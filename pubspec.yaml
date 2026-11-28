@@ -53,6 +53,9 @@ dependencies:
   audio_session: ^0.2.4
   audio_service: ^0.18.19
   webview_flutter: ^4.14.1
+  # HbbTV in TV: autoplay of the apps' videos (they start from key presses
+  # the app sends, not from a touch) - only on its Android controller.
+  webview_flutter_android: ^4.14.1
   ffi: ^2.2.0
   just_audio_media_kit: ^2.1.0
   # The full libmpv (audio and video): TV's picture on Windows - the

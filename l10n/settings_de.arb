@@ -276,6 +276,8 @@
   "settingsAboutMapsData": "Kartenkacheln © OpenStreetMap-Mitwirkende, Daten unter der Open Database License (ODbL), über tile.openstreetmap.org",
   "settingsAboutAircraft": "Flugzeugdaten (ADS-B)",
   "settingsAboutAircraftData": "Flugzeugtypen, Halter und Flugrouten über adsbdb.com",
+  "settingsAboutHbbtv": "HbbTV (rote Taste im TV)",
+  "settingsAboutHbbtvData": "Die HbbTV-Anwendungen kommen von den Sendern selbst (ARD, ZDF, ORF, ServusTV …) über das Internet; ihre Adresse aus dem Sendesignal (AIT), sonst aus einer kleinen eingebauten Liste der Startadressen, die diese Sender selbst ausstrahlen.",
   "settingsBgTitle": "Hintergrund von Home",
   "settingsBgGradientsHint": "Mitgelieferte Farbverläufe (Nordlicht, Abendrot, Ozean, …) - ohne Internet.",
   "settingsBgPhotos": "Landschaftsfotos aus dem Internet",

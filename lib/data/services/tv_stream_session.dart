@@ -36,6 +36,7 @@ class TvStreamSession {
   final Uri _upstream;
   final Map<String, String> _headers;
   final _data = StreamController<List<int>>();
+  final _tap = StreamController<List<int>>.broadcast();
   final _verdict = Completer<StreamScrambling>();
   final _clear = Completer<void>();
   final _refused = Completer<void>();
@@ -66,6 +67,10 @@ class TvStreamSession {
   Future<void> get clear => _clear.future;
 
   bool get isClear => _clear.isCompleted;
+
+  /// The receiver's data as it comes, for a look on the way (HbbTV's AIT) -
+  /// only fed while someone listens.
+  Stream<List<int>> get tap => _tap.stream;
 
   /// The receiver ended a request without sending anything - typically no
   /// tuner free that can get the channel (FBC tuners on one cable only get
@@ -122,6 +127,7 @@ class TvStreamSession {
         // stops) - then a new connection, rather than waiting for ever.
         await for (final chunk in response.stream.timeout(const Duration(seconds: 5))) {
           if (_closed) break;
+          if (_tap.hasListener) _tap.add(chunk);
           if (_clear.isCompleted) {
             gotData = true;
             _data.add(chunk);
@@ -176,6 +182,7 @@ class TvStreamSession {
     }
     // Not awaited: with the player gone, nobody takes the end of the data.
     unawaited(_data.close());
+    unawaited(_tap.close());
     await _server.close(force: true);
   }
 }

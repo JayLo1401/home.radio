@@ -1,0 +1,33 @@
+{
+  "hbbtvMenuEntry": "HbbTV-Angebot",
+  "hbbtvSearching": "HbbTV wird gesucht…",
+  "hbbtvLoading": "HbbTV von „{channel}“ wird geladen…",
+  "@hbbtvLoading": {
+    "placeholders": {
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "hbbtvCloseHint": "Rot oder Zurück schließt",
+  "hbbtvNone": "„{channel}“ bietet kein HbbTV an",
+  "@hbbtvNone": {
+    "placeholders": {
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "hbbtvLoadFailed": "Die HbbTV-Anwendung lässt sich nicht laden: {error}",
+  "@hbbtvLoadFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "hbbtvOffline": "keine Internetverbindung",
+  "hbbtvTimeout": "der Server antwortet nicht",
+  "hbbtvAndroidOnly": "HbbTV gibt es nur auf Android-Geräten",
+  "hbbtvReceiverOnly": "HbbTV gibt es nur bei Sendern vom Receiver"
+}

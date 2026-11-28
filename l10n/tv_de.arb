@@ -121,7 +121,7 @@
   },
   "tvNotSetUpIntro": "Fernsehen vom eigenen Sat-Receiver: Senderlisten, Senderlogos und Programmführer kommen direkt vom Enigma2-Receiver (z. B. GigaBlue, VU+, Dreambox mit OpenWebif) im Heimnetz.",
   "tvSetUpReceiver": "Receiver einrichten",
-  "tvBannerKeyHint": "{channelListKey} Senderliste  ·  {guideKey} Programm  ·  {optionsKey} Optionen",
+  "tvBannerKeyHint": "{channelListKey} Senderliste  ·  {guideKey} Programm  ·  {optionsKey} oder OK lang Optionen",
   "@tvBannerKeyHint": {
     "description": "Key hint in the info banner; the placeholders are the names of the assigned remote keys.",
     "placeholders": {

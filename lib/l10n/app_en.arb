@@ -280,6 +280,37 @@
   "haOpenMusic": "Open Music",
   "haOpenDashboard": "Open Smart Home",
   "haHostHelp": "Only the IP or name of the machine with the Mosquitto add-on, e.g. 192.168.1.5 - not the Home Assistant page address with :8123.",
+  "hbbtvMenuEntry": "HbbTV (red button)",
+  "hbbtvSearching": "Looking for HbbTV…",
+  "hbbtvLoading": "Loading the HbbTV app of “{channel}”…",
+  "@hbbtvLoading": {
+    "placeholders": {
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "hbbtvCloseHint": "Red or Back closes",
+  "hbbtvNone": "“{channel}” has no HbbTV app",
+  "@hbbtvNone": {
+    "placeholders": {
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "hbbtvLoadFailed": "The HbbTV app can't be loaded: {error}",
+  "@hbbtvLoadFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "hbbtvOffline": "no internet connection",
+  "hbbtvTimeout": "the server doesn't answer",
+  "hbbtvAndroidOnly": "HbbTV is only available on Android devices",
+  "hbbtvReceiverOnly": "HbbTV is only available on the receiver's channels",
   "iptvListName": "Internet TV",
   "iptvBrowse": "Find channels",
   "iptvBrowseTitle": "Internet TV – find channels",
@@ -441,6 +472,7 @@
   "miscActionGuide": "Program guide (TV)",
   "miscActionOptions": "Options (tile on Home, TV)",
   "miscActionAudio": "Audio track (TV)",
+  "miscActionHbbtv": "HbbTV, red button (TV)",
   "miscKeyMenu": "☰ Menu",
   "miscKeySearch": "Search",
   "miscKeyRed": "Red",
@@ -1688,6 +1720,8 @@
   "settingsAboutMapsData": "Map tiles © OpenStreetMap contributors, data under the Open Database License (ODbL), via tile.openstreetmap.org",
   "settingsAboutAircraft": "Aircraft data (ADS-B)",
   "settingsAboutAircraftData": "Aircraft types, owners and routes via adsbdb.com",
+  "settingsAboutHbbtv": "HbbTV (red key in TV)",
+  "settingsAboutHbbtvData": "The HbbTV apps come from the channels themselves (ARD, ZDF, ORF, ServusTV …) over the internet; their address from the broadcast signal (AIT), else from a small built-in list of the start addresses these channels broadcast themselves.",
   "settingsBgTitle": "Home background",
   "settingsBgGradientsHint": "Built-in color gradients (Northern lights, Sunset, Ocean, …) - no internet needed.",
   "settingsBgPhotos": "Landscape photos from the internet",
@@ -1799,7 +1833,7 @@
   "tvNextUpInMinutes": "Up next · in {minutes} min",
   "tvNotSetUpIntro": "TV from your own satellite receiver: channel lists, channel logos and the TV guide come straight from the Enigma2 receiver (e.g. GigaBlue, VU+, Dreambox with OpenWebif) in your home network.",
   "tvSetUpReceiver": "Set up receiver",
-  "tvBannerKeyHint": "{channelListKey} Channel list  ·  {guideKey} Guide  ·  {optionsKey} Options",
+  "tvBannerKeyHint": "{channelListKey} Channel list  ·  {guideKey} Guide  ·  {optionsKey} or hold OK Options",
   "tvNoProgramInfo": "No program info",
   "tvNoProgramInfoSentence": "No program info.",
   "tvThen": "Next",

@@ -838,6 +838,42 @@ class AppLocalizationsDe extends AppLocalizations {
       'Nur die IP oder der Name des Rechners mit dem Mosquitto-Add-on, z. B. 192.168.1.5 - nicht die Adresse der Home-Assistant-Seite mit :8123.';
 
   @override
+  String get hbbtvMenuEntry => 'HbbTV-Angebot';
+
+  @override
+  String get hbbtvSearching => 'HbbTV wird gesucht…';
+
+  @override
+  String hbbtvLoading(String channel) {
+    return 'HbbTV von „$channel“ wird geladen…';
+  }
+
+  @override
+  String get hbbtvCloseHint => 'Rot oder Zurück schließt';
+
+  @override
+  String hbbtvNone(String channel) {
+    return '„$channel“ bietet kein HbbTV an';
+  }
+
+  @override
+  String hbbtvLoadFailed(String error) {
+    return 'Die HbbTV-Anwendung lässt sich nicht laden: $error';
+  }
+
+  @override
+  String get hbbtvOffline => 'keine Internetverbindung';
+
+  @override
+  String get hbbtvTimeout => 'der Server antwortet nicht';
+
+  @override
+  String get hbbtvAndroidOnly => 'HbbTV gibt es nur auf Android-Geräten';
+
+  @override
+  String get hbbtvReceiverOnly => 'HbbTV gibt es nur bei Sendern vom Receiver';
+
+  @override
   String get iptvListName => 'Internet-TV';
 
   @override
@@ -1360,6 +1396,9 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get miscActionAudio => 'Tonspur (TV)';
+
+  @override
+  String get miscActionHbbtv => 'HbbTV-Angebot, Red Button (TV)';
 
   @override
   String get miscKeyMenu => '☰ Menü';
@@ -5139,6 +5178,13 @@ class AppLocalizationsDe extends AppLocalizations {
       'Flugzeugtypen, Halter und Flugrouten über adsbdb.com';
 
   @override
+  String get settingsAboutHbbtv => 'HbbTV (rote Taste im TV)';
+
+  @override
+  String get settingsAboutHbbtvData =>
+      'Die HbbTV-Anwendungen kommen von den Sendern selbst (ARD, ZDF, ORF, ServusTV …) über das Internet; ihre Adresse aus dem Sendesignal (AIT), sonst aus einer kleinen eingebauten Liste der Startadressen, die diese Sender selbst ausstrahlen.';
+
+  @override
   String get settingsBgTitle => 'Hintergrund von Home';
 
   @override
@@ -5556,7 +5602,7 @@ class AppLocalizationsDe extends AppLocalizations {
     String guideKey,
     String optionsKey,
   ) {
-    return '$channelListKey Senderliste  ·  $guideKey Programm  ·  $optionsKey Optionen';
+    return '$channelListKey Senderliste  ·  $guideKey Programm  ·  $optionsKey oder OK lang Optionen';
   }
 
   @override

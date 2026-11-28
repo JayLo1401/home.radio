@@ -137,6 +137,8 @@
   "settingsAboutMapsData": "Map tiles © OpenStreetMap contributors, data under the Open Database License (ODbL), via tile.openstreetmap.org",
   "settingsAboutAircraft": "Aircraft data (ADS-B)",
   "settingsAboutAircraftData": "Aircraft types, owners and routes via adsbdb.com",
+  "settingsAboutHbbtv": "HbbTV (red key in TV)",
+  "settingsAboutHbbtvData": "The HbbTV apps come from the channels themselves (ARD, ZDF, ORF, ServusTV …) over the internet; their address from the broadcast signal (AIT), else from a small built-in list of the start addresses these channels broadcast themselves.",
   "settingsBgTitle": "Home background",
   "settingsBgGradientsHint": "Built-in color gradients (Northern lights, Sunset, Ocean, …) - no internet needed.",
   "settingsBgPhotos": "Landscape photos from the internet",

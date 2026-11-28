@@ -36,7 +36,7 @@
   "tvNextUpInMinutes": "Up next · in {minutes} min",
   "tvNotSetUpIntro": "TV from your own satellite receiver: channel lists, channel logos and the TV guide come straight from the Enigma2 receiver (e.g. GigaBlue, VU+, Dreambox with OpenWebif) in your home network.",
   "tvSetUpReceiver": "Set up receiver",
-  "tvBannerKeyHint": "{channelListKey} Channel list  ·  {guideKey} Guide  ·  {optionsKey} Options",
+  "tvBannerKeyHint": "{channelListKey} Channel list  ·  {guideKey} Guide  ·  {optionsKey} or hold OK Options",
   "tvNoProgramInfo": "No program info",
   "tvNoProgramInfoSentence": "No program info.",
   "tvThen": "Next",
