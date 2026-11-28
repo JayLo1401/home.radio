@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme.dart';
 import '../../data/services/enigma2_service.dart';
 import '../../l10n/l10n.dart';
+import 'hbbtv_overlay.dart';
 import 'tv_channel_order.dart';
 import 'tv_providers.dart';
 import 'tv_widgets.dart';
@@ -139,6 +140,7 @@ mixin TvChannelMoveMixin<W extends ConsumerStatefulWidget> on ConsumerState<W> {
     required int startRow,
     required VoidCallback onPlay,
     required VoidCallback onGuide,
+    VoidCallback? onHbbtv,
   }) async {
     final t = context.l10n;
     final bouquet = ref.read(tvCurrentBouquetProvider).value;
@@ -161,6 +163,8 @@ mixin TvChannelMoveMixin<W extends ConsumerStatefulWidget> on ConsumerState<W> {
             onTap: () => Navigator.of(context).pop('guide'),
             child: ListTile(leading: const Icon(Icons.view_list), title: Text(t.tvGuide)),
           ),
+          // HbbTV of the channel on screen (remotes without a red key).
+          if (isCurrent && onHbbtv != null) hbbtvOptionsRow(context, () => Navigator.of(context).pop('hbbtv')),
           if (count > 1)
             TvRow(
               onTap: () => Navigator.of(context).pop('move'),
@@ -188,6 +192,8 @@ mixin TvChannelMoveMixin<W extends ConsumerStatefulWidget> on ConsumerState<W> {
         onPlay();
       case 'guide':
         onGuide();
+      case 'hbbtv':
+        onHbbtv?.call();
       case 'move':
         startChannelMove(channel, startRow: startRow);
       case 'reset':

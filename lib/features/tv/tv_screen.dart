@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/country_names_de.dart';
 import '../../core/providers.dart';
+import '../../core/ok_long_press.dart';
 import '../../core/remote_keys.dart';
 import '../../core/theme.dart';
 import '../../data/models/iptv_channel.dart';
@@ -17,6 +18,7 @@ import '../home/connection_chain.dart' show ConnectionChain, LinkState, LinkView
 import '../settings/settings_screen.dart';
 import '../settings/tv_settings_screen.dart';
 import '../shared/program_number_dialog.dart';
+import 'hbbtv_overlay.dart';
 import 'iptv_browse_screen.dart';
 import 'iptv_providers.dart';
 import 'tv_channel_move.dart';
@@ -104,6 +106,36 @@ class _TvScreenState extends ConsumerState<TvScreen> {
   Timer? _nextUpHide;
 
   late final TvOpenNotifier _open = ref.read(tvOpenProvider.notifier);
+
+  /// HbbTV (red key) is open over this receiver channel - see [HbbtvOverlay].
+  String? _hbbtvFor;
+  final _hbbtvKey = GlobalKey<HbbtvOverlayState>();
+
+  /// The HbbTV app stopped the live picture (its own video plays).
+  bool _hbbtvStoppedLive = false;
+
+  void _openHbbtv() {
+    final c = _current;
+    if (c == null || _iptv != null) return _showNote(context.l10n.hbbtvReceiverOnly);
+    setState(() => _hbbtvFor = c.ref);
+  }
+
+  void _closeHbbtv() {
+    if (_hbbtvFor == null) return;
+    setState(() => _hbbtvFor = null);
+    _focus.requestFocus();
+    _hbbtvLive(true);
+  }
+
+  void _hbbtvLive(bool on) {
+    if (!on && !_stopped && _player != null) {
+      _hbbtvStoppedLive = true;
+      _togglePlay();
+    } else if (on && _hbbtvStoppedLive) {
+      _hbbtvStoppedLive = false;
+      if (_stopped) _togglePlay();
+    }
+  }
 
   @override
   void initState() {
@@ -659,6 +691,7 @@ class _TvScreenState extends ConsumerState<TvScreen> {
                 subtitle: Text(_player?.info.value.selectedAudio?.label ?? ''),
               ),
             ),
+          if (_current != null) hbbtvOptionsRow(context, () => Navigator.of(context).pop('hbbtv')),
           if (_player case final TvTimeshiftPlayer ts when ts.state.value.shifted)
             TvRow(
               onTap: () => Navigator.of(context).pop('live'),
@@ -687,6 +720,7 @@ class _TvScreenState extends ConsumerState<TvScreen> {
     if (choice == 'guide') await _openGuide(_current);
     if (choice == 'epg') _openEpg();
     if (choice == 'audio') await _chooseAudio();
+    if (choice == 'hbbtv') _openHbbtv();
     if (choice == 'live' && _player is TvTimeshiftPlayer) await (_player! as TvTimeshiftPlayer).goLive();
     if (choice == 'record') await _recordCurrent();
     if (choice == 'recordings') await _openRecordings();
@@ -872,6 +906,13 @@ class _TvScreenState extends ConsumerState<TvScreen> {
     },
   };
 
+  static final _okKeys = {
+    LogicalKeyboardKey.select,
+    LogicalKeyboardKey.enter,
+    LogicalKeyboardKey.numpadEnter,
+    LogicalKeyboardKey.gameButtonA,
+  };
+
   KeyEventResult _onKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
     final key = event.logicalKey;
@@ -883,6 +924,11 @@ class _TvScreenState extends ConsumerState<TvScreen> {
     if (key == LogicalKeyboardKey.mediaRecord) {
       if (event is KeyDownEvent) unawaited(_recordCurrent());
       return KeyEventResult.handled;
+    }
+    // OK: decided on release by the OkLongPress around - short the channel
+    // list, held the options (remotes with just the D-Pad and OK).
+    if (_okKeys.contains(key) && ref.read(remoteKeysProvider).matches(RemoteAction.channelList, key)) {
+      return KeyEventResult.ignored;
     }
     // Up/down open the channel list - OK there plays the marked channel.
     if (key == LogicalKeyboardKey.arrowUp || key == LogicalKeyboardKey.arrowDown) {
@@ -919,6 +965,9 @@ class _TvScreenState extends ConsumerState<TvScreen> {
       case RemoteAction.audio:
         _chooseAudio();
         return KeyEventResult.handled;
+      case RemoteAction.hbbtv:
+        _openHbbtv();
+        return KeyEventResult.handled;
       case null:
     }
     // → in the picture: what's on later on this channel, one programme per
@@ -945,7 +994,15 @@ class _TvScreenState extends ConsumerState<TvScreen> {
   }
 
   void _onBack() {
-    if (_listVisible) {
+    final hbbtv = _hbbtvKey.currentState;
+    // Left behind by a channel change: just forgotten.
+    if (_hbbtvFor != null && hbbtv == null) {
+      _hbbtvFor = null;
+      _hbbtvStoppedLive = false;
+    }
+    if (hbbtv != null) {
+      unawaited(hbbtv.back());
+    } else if (_listVisible) {
       setState(() => _listVisible = false);
       _focus.requestFocus();
     } else if (_infoVisible) {
@@ -1012,17 +1069,21 @@ class _TvScreenState extends ConsumerState<TvScreen> {
                 : Stack(
                     fit: StackFit.expand,
                     children: [
-                      Focus(
-                        focusNode: _focus,
-                        autofocus: true,
-                        onKeyEvent: _onKey,
-                        // The mouse on the PC: click = channel list, right
-                        // click = programme / sound track.
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTap: () => setState(() => _listVisible = true),
-                          onSecondaryTap: _openOptions,
-                          child: player != null ? player.view() : const SizedBox.expand(),
+                      OkLongPress(
+                        onTap: () => setState(() => _listVisible = true),
+                        onLongPress: _openOptions,
+                        child: Focus(
+                          focusNode: _focus,
+                          autofocus: true,
+                          onKeyEvent: _onKey,
+                          // The mouse on the PC: click = channel list, right
+                          // click = programme / sound track.
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () => setState(() => _listVisible = true),
+                            onSecondaryTap: _openOptions,
+                            child: player != null ? player.view() : const SizedBox.expand(),
+                          ),
                         ),
                       ),
                       TvTuningOverlay(visible: tuning),
@@ -1098,6 +1159,11 @@ class _TvScreenState extends ConsumerState<TvScreen> {
                               if (c.id != _iptv?.id) _tuneIptv(c);
                             },
                             onEpg: _openGuide,
+                            onHbbtv: () {
+                              setState(() => _listVisible = false);
+                              _focus.requestFocus();
+                              _openHbbtv();
+                            },
                             onBrowse: _openBrowse,
                             onSettings: () => Navigator.of(context).push(
                               MaterialPageRoute(builder: (_) => const SettingsScreen(section: SettingsSection.tv)),
@@ -1109,6 +1175,18 @@ class _TvScreenState extends ConsumerState<TvScreen> {
                             onNote: (text) {
                               if (mounted) _showNote(text);
                             },
+                          ),
+                        ),
+                      if (_hbbtvFor != null && _hbbtvFor == _current?.ref && _iptv == null)
+                        Positioned.fill(
+                          child: HbbtvOverlay(
+                            key: _hbbtvKey,
+                            config: config,
+                            channel: _current!,
+                            tap: _session?.tap,
+                            onClose: _closeHbbtv,
+                            onLive: _hbbtvLive,
+                            isHbbtvKey: (k) => ref.read(remoteKeysProvider).matches(RemoteAction.hbbtv, k),
                           ),
                         ),
                     ],
@@ -1565,7 +1643,11 @@ class _ChannelList extends ConsumerStatefulWidget {
     required this.onClose,
     required this.onSettings,
     required this.onNote,
+    required this.onHbbtv,
   });
+
+  /// "HbbTV-Angebot" of the channel on screen (its long-OK menu).
+  final VoidCallback onHbbtv;
 
   /// A short note over the picture (the order saved, or why not).
   final ValueChanged<String> onNote;
@@ -1640,6 +1722,7 @@ class _ChannelListState extends ConsumerState<_ChannelList> with TvChannelMoveMi
       startRow: _receiverStartRow(list),
       onPlay: () => isCurrent ? _showProgrammeInfo(c) : widget.onPick(c),
       onGuide: () => widget.onEpg(c),
+      onHbbtv: widget.onHbbtv,
     );
   }
 

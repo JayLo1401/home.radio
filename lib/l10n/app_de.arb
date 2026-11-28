@@ -465,6 +465,37 @@
   "haOpenDashboard": "Haussteuerung öffnen",
   "haHostHelp": "Nur die IP oder der Name des Rechners mit dem Mosquitto-Add-on, z. B. 192.168.1.5 - nicht die Adresse der Home-Assistant-Seite mit :8123.",
   "haLaunchApp": "App starten",
+  "hbbtvMenuEntry": "HbbTV-Angebot",
+  "hbbtvSearching": "HbbTV wird gesucht…",
+  "hbbtvLoading": "HbbTV von „{channel}“ wird geladen…",
+  "@hbbtvLoading": {
+    "placeholders": {
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "hbbtvCloseHint": "Rot oder Zurück schließt",
+  "hbbtvNone": "„{channel}“ bietet kein HbbTV an",
+  "@hbbtvNone": {
+    "placeholders": {
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "hbbtvLoadFailed": "Die HbbTV-Anwendung lässt sich nicht laden: {error}",
+  "@hbbtvLoadFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "hbbtvOffline": "keine Internetverbindung",
+  "hbbtvTimeout": "der Server antwortet nicht",
+  "hbbtvAndroidOnly": "HbbTV gibt es nur auf Android-Geräten",
+  "hbbtvReceiverOnly": "HbbTV gibt es nur bei Sendern vom Receiver",
   "iptvListName": "Internet-TV",
   "iptvBrowse": "Sender suchen",
   "iptvBrowseTitle": "Internet-TV – Sender suchen",
@@ -834,6 +865,7 @@
   "miscActionGuide": "Programmführer (TV)",
   "miscActionOptions": "Optionen (Kachel unter Home, TV)",
   "miscActionAudio": "Tonspur (TV)",
+  "miscActionHbbtv": "HbbTV-Angebot, Red Button (TV)",
   "miscKeyMenu": "☰ Menü",
   "miscKeySearch": "Suche",
   "miscKeyRed": "Rot",
@@ -3498,6 +3530,8 @@
   "settingsAboutMapsData": "Kartenkacheln © OpenStreetMap-Mitwirkende, Daten unter der Open Database License (ODbL), über tile.openstreetmap.org",
   "settingsAboutAircraft": "Flugzeugdaten (ADS-B)",
   "settingsAboutAircraftData": "Flugzeugtypen, Halter und Flugrouten über adsbdb.com",
+  "settingsAboutHbbtv": "HbbTV (rote Taste im TV)",
+  "settingsAboutHbbtvData": "Die HbbTV-Anwendungen kommen von den Sendern selbst (ARD, ZDF, ORF, ServusTV …) über das Internet; ihre Adresse aus dem Sendesignal (AIT), sonst aus einer kleinen eingebauten Liste der Startadressen, die diese Sender selbst ausstrahlen.",
   "settingsBgTitle": "Hintergrund von Home",
   "settingsBgGradientsHint": "Mitgelieferte Farbverläufe (Nordlicht, Abendrot, Ozean, …) - ohne Internet.",
   "settingsBgPhotos": "Landschaftsfotos aus dem Internet",
@@ -3762,7 +3796,7 @@
   },
   "tvNotSetUpIntro": "Fernsehen vom eigenen Sat-Receiver: Senderlisten, Senderlogos und Programmführer kommen direkt vom Enigma2-Receiver (z. B. GigaBlue, VU+, Dreambox mit OpenWebif) im Heimnetz.",
   "tvSetUpReceiver": "Receiver einrichten",
-  "tvBannerKeyHint": "{channelListKey} Senderliste  ·  {guideKey} Programm  ·  {optionsKey} Optionen",
+  "tvBannerKeyHint": "{channelListKey} Senderliste  ·  {guideKey} Programm  ·  {optionsKey} oder OK lang Optionen",
   "@tvBannerKeyHint": {
     "description": "Key hint in the info banner; the placeholders are the names of the assigned remote keys.",
     "placeholders": {

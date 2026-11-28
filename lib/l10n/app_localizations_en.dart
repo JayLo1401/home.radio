@@ -1044,6 +1044,43 @@ class AppLocalizationsEn extends AppLocalizations {
   String get haLaunchApp => 'Start app';
 
   @override
+  String get hbbtvMenuEntry => 'HbbTV (red button)';
+
+  @override
+  String get hbbtvSearching => 'Looking for HbbTV…';
+
+  @override
+  String hbbtvLoading(String channel) {
+    return 'Loading the HbbTV app of “$channel”…';
+  }
+
+  @override
+  String get hbbtvCloseHint => 'Red or Back closes';
+
+  @override
+  String hbbtvNone(String channel) {
+    return '“$channel” has no HbbTV app';
+  }
+
+  @override
+  String hbbtvLoadFailed(String error) {
+    return 'The HbbTV app can\'t be loaded: $error';
+  }
+
+  @override
+  String get hbbtvOffline => 'no internet connection';
+
+  @override
+  String get hbbtvTimeout => 'the server doesn\'t answer';
+
+  @override
+  String get hbbtvAndroidOnly => 'HbbTV is only available on Android devices';
+
+  @override
+  String get hbbtvReceiverOnly =>
+      'HbbTV is only available on the receiver\'s channels';
+
+  @override
   String get iptvListName => 'Internet TV';
 
   @override
@@ -1567,6 +1604,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get miscActionAudio => 'Audio track (TV)';
+
+  @override
+  String get miscActionHbbtv => 'HbbTV, red button (TV)';
 
   @override
   String get miscKeyMenu => '☰ Menu';
@@ -5448,6 +5488,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Aircraft types, owners and routes via adsbdb.com';
 
   @override
+  String get settingsAboutHbbtv => 'HbbTV (red key in TV)';
+
+  @override
+  String get settingsAboutHbbtvData =>
+      'The HbbTV apps come from the channels themselves (ARD, ZDF, ORF, ServusTV …) over the internet; their address from the broadcast signal (AIT), else from a small built-in list of the start addresses these channels broadcast themselves.';
+
+  @override
   String get settingsBgTitle => 'Home background';
 
   @override
@@ -5852,7 +5899,7 @@ class AppLocalizationsEn extends AppLocalizations {
     String guideKey,
     String optionsKey,
   ) {
-    return '$channelListKey Channel list  ·  $guideKey Guide  ·  $optionsKey Options';
+    return '$channelListKey Channel list  ·  $guideKey Guide  ·  $optionsKey or hold OK Options';
   }
 
   @override

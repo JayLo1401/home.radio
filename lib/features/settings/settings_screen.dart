@@ -1749,6 +1749,7 @@ class _AboutBlockState extends State<_AboutBlock> {
             line(l.settingsAboutUvIndex, l.settingsAboutUvData),
             line(l.settingsAboutInternetRadio, l.settingsAboutInternetRadioData),
             line(l.settingsAboutInternetTv, l.settingsAboutInternetTvData),
+            line(l.settingsAboutHbbtv, l.settingsAboutHbbtvData),
             line(l.settingsAboutMaps, l.settingsAboutMapsData),
             line(l.settingsAboutAircraft, l.settingsAboutAircraftData),
             line(l.settingsAboutAdblock, l.settingsAboutAdblockData),

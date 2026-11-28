@@ -40,6 +40,7 @@
   "miscActionGuide": "Program guide (TV)",
   "miscActionOptions": "Options (tile on Home, TV)",
   "miscActionAudio": "Audio track (TV)",
+  "miscActionHbbtv": "HbbTV, red button (TV)",
 
   "miscKeyMenu": "☰ Menu",
   "miscKeySearch": "Search",

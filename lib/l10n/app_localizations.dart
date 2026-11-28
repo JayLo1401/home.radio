@@ -1934,6 +1934,66 @@ abstract class AppLocalizations {
   /// **'App starten'**
   String get haLaunchApp;
 
+  /// No description provided for @hbbtvMenuEntry.
+  ///
+  /// In de, this message translates to:
+  /// **'HbbTV-Angebot'**
+  String get hbbtvMenuEntry;
+
+  /// No description provided for @hbbtvSearching.
+  ///
+  /// In de, this message translates to:
+  /// **'HbbTV wird gesucht…'**
+  String get hbbtvSearching;
+
+  /// No description provided for @hbbtvLoading.
+  ///
+  /// In de, this message translates to:
+  /// **'HbbTV von „{channel}“ wird geladen…'**
+  String hbbtvLoading(String channel);
+
+  /// No description provided for @hbbtvCloseHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Rot oder Zurück schließt'**
+  String get hbbtvCloseHint;
+
+  /// No description provided for @hbbtvNone.
+  ///
+  /// In de, this message translates to:
+  /// **'„{channel}“ bietet kein HbbTV an'**
+  String hbbtvNone(String channel);
+
+  /// No description provided for @hbbtvLoadFailed.
+  ///
+  /// In de, this message translates to:
+  /// **'Die HbbTV-Anwendung lässt sich nicht laden: {error}'**
+  String hbbtvLoadFailed(String error);
+
+  /// No description provided for @hbbtvOffline.
+  ///
+  /// In de, this message translates to:
+  /// **'keine Internetverbindung'**
+  String get hbbtvOffline;
+
+  /// No description provided for @hbbtvTimeout.
+  ///
+  /// In de, this message translates to:
+  /// **'der Server antwortet nicht'**
+  String get hbbtvTimeout;
+
+  /// No description provided for @hbbtvAndroidOnly.
+  ///
+  /// In de, this message translates to:
+  /// **'HbbTV gibt es nur auf Android-Geräten'**
+  String get hbbtvAndroidOnly;
+
+  /// No description provided for @hbbtvReceiverOnly.
+  ///
+  /// In de, this message translates to:
+  /// **'HbbTV gibt es nur bei Sendern vom Receiver'**
+  String get hbbtvReceiverOnly;
+
   /// No description provided for @iptvListName.
   ///
   /// In de, this message translates to:
@@ -2763,6 +2823,12 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'Tonspur (TV)'**
   String get miscActionAudio;
+
+  /// No description provided for @miscActionHbbtv.
+  ///
+  /// In de, this message translates to:
+  /// **'HbbTV-Angebot, Red Button (TV)'**
+  String get miscActionHbbtv;
 
   /// No description provided for @miscKeyMenu.
   ///
@@ -9208,6 +9274,18 @@ abstract class AppLocalizations {
   /// **'Flugzeugtypen, Halter und Flugrouten über adsbdb.com'**
   String get settingsAboutAircraftData;
 
+  /// No description provided for @settingsAboutHbbtv.
+  ///
+  /// In de, this message translates to:
+  /// **'HbbTV (rote Taste im TV)'**
+  String get settingsAboutHbbtv;
+
+  /// No description provided for @settingsAboutHbbtvData.
+  ///
+  /// In de, this message translates to:
+  /// **'Die HbbTV-Anwendungen kommen von den Sendern selbst (ARD, ZDF, ORF, ServusTV …) über das Internet; ihre Adresse aus dem Sendesignal (AIT), sonst aus einer kleinen eingebauten Liste der Startadressen, die diese Sender selbst ausstrahlen.'**
+  String get settingsAboutHbbtvData;
+
   /// No description provided for @settingsBgTitle.
   ///
   /// In de, this message translates to:
@@ -9853,7 +9931,7 @@ abstract class AppLocalizations {
   /// Key hint in the info banner; the placeholders are the names of the assigned remote keys.
   ///
   /// In de, this message translates to:
-  /// **'{channelListKey} Senderliste  ·  {guideKey} Programm  ·  {optionsKey} Optionen'**
+  /// **'{channelListKey} Senderliste  ·  {guideKey} Programm  ·  {optionsKey} oder OK lang Optionen'**
   String tvBannerKeyHint(
     String channelListKey,
     String guideKey,
