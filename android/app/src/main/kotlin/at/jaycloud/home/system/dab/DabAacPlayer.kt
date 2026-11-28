@@ -76,8 +76,14 @@ class DabAacPlayer(
     private var focusRequest: AudioFocusRequest? = null
     private val focusListener = AudioManager.OnAudioFocusChangeListener { change ->
         if (change == AudioManager.AUDIOFOCUS_LOSS || change == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT) {
-            Log.i(TAG, "audio focus lost ($change)")
-            onAudioFocusLost()
+            if (keepOnFocusLoss) {
+                // The Haussteuerung is in front: its web page (a sound of the
+                // dashboard) took the focus - the radio plays on.
+                Log.i(TAG, "audio focus lost ($change), kept playing (dashboard)")
+            } else {
+                Log.i(TAG, "audio focus lost ($change)")
+                onAudioFocusLost()
+            }
         }
     }
 
@@ -464,6 +470,10 @@ class DabAacPlayer(
     }
 
     companion object {
+        /** Set while the Haussteuerung is in front (see "setKeepOnFocusLoss"). */
+        @Volatile
+        var keepOnFocusLoss = false
+
         private const val TAG = "DabAac"
         private const val PREBUFFER_MS = 400
         private const val BAND_MS = 60

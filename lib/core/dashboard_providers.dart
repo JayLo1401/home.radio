@@ -41,6 +41,23 @@ class DashboardDisplayNotifier extends Notifier<DashboardDisplaySettings> {
 final dashboardDisplayProvider =
     NotifierProvider<DashboardDisplayNotifier, DashboardDisplaySettings>(DashboardDisplayNotifier.new);
 
+/// The playback popup over the Haussteuerung (Settings → Haussteuerung).
+class DashboardPopupNotifier extends Notifier<DashboardPopupSettings> {
+  @override
+  DashboardPopupSettings build() {
+    ref.read(settingsRepositoryProvider).getDashboardPopup().then((v) => state = v);
+    return const DashboardPopupSettings();
+  }
+
+  Future<void> set(DashboardPopupSettings value) async {
+    state = value;
+    await ref.read(settingsRepositoryProvider).setDashboardPopup(value);
+  }
+}
+
+final dashboardPopupProvider =
+    NotifierProvider<DashboardPopupNotifier, DashboardPopupSettings>(DashboardPopupNotifier.new);
+
 /// The display's brightness (Settings → Haussteuerung).
 class DisplayBrightnessNotifier extends Notifier<DisplayBrightness> {
   @override

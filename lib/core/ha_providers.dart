@@ -602,10 +602,11 @@ class _AppHaDevice implements HaDevice {
     showLauncherWith(_ref.read);
     final nav = appNavigatorKey.currentState;
     if (nav == null) return;
-    // TV and the Haussteuerung take the speakers (as from the launcher).
-    if (key != HaKeys.openMusic) {
+    // TV takes the speakers (as from the launcher); radio and music play on
+    // in the Haussteuerung.
+    if (key == HaKeys.openTv) {
       _ref.read(radioCommandProvider.notifier).send(RadioCommand.pauseForApp);
-      if (key == HaKeys.openTv) await _ref.read(musicPlayerProvider).pauseForApp();
+      await _ref.read(musicPlayerProvider).pauseForApp();
     }
     final Widget page = switch (key) {
       HaKeys.openTv => const TvScreen(),

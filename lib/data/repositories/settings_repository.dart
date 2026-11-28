@@ -717,6 +717,23 @@ class SettingsRepository {
     await _db.setSetting('motion_dim_only', '${value.dimOnly}');
   }
 
+  /// The playback popup over the Haussteuerung (on by default, bottom
+  /// centre).
+  Future<DashboardPopupSettings> getDashboardPopup() async => DashboardPopupSettings(
+    show: await _db.getSetting('dashboard_popup') != 'false',
+    position: DashboardPopupPosition.parse(await _db.getSetting('dashboard_popup_position')),
+    loaded: true,
+  );
+
+  Future<void> setDashboardPopup(DashboardPopupSettings value) async {
+    await _db.setSetting('dashboard_popup', '${value.show}');
+    await _db.setSetting('dashboard_popup_position', value.position.name);
+  }
+
+  /// The remote hint of the playback popup was shown once.
+  Future<bool> getDashboardPopupHintShown() async => await _db.getSetting('dashboard_popup_hint') == 'true';
+  Future<void> setDashboardPopupHintShown() => _db.setSetting('dashboard_popup_hint', 'true');
+
   // --- Home (the launcher) ---
 
   /// What shows on start (see [StartScreen]) - Radio by default, as
@@ -978,6 +995,43 @@ class DashboardDisplaySettings {
     webhookUrl: webhookUrl ?? this.webhookUrl,
     dimOnly: dimOnly ?? this.dimOnly,
   );
+}
+
+/// Where the playback popup sits over the Haussteuerung.
+enum DashboardPopupPosition {
+  bottomCenter,
+  bottomLeft,
+  bottomRight,
+  topCenter,
+  topLeft,
+  topRight;
+
+  /// At the top edge (else at the bottom).
+  bool get atTop => this == topCenter || this == topLeft || this == topRight;
+
+  /// The saved name; unknown or none: [bottomCenter].
+  static DashboardPopupPosition parse(String? name) =>
+      values.where((p) => p.name == name).firstOrNull ?? DashboardPopupPosition.bottomCenter;
+}
+
+/// The playback popup over the Haussteuerung: Home, and while radio or
+/// music plays what plays and its controls.
+class DashboardPopupSettings {
+  const DashboardPopupSettings({
+    this.show = true,
+    this.position = DashboardPopupPosition.bottomCenter,
+    this.loaded = false,
+  });
+
+  final bool show;
+  final DashboardPopupPosition position;
+
+  /// Read from the database (until then the popup waits, so that a switched
+  /// off one doesn't flash up).
+  final bool loaded;
+
+  DashboardPopupSettings copyWith({bool? show, DashboardPopupPosition? position}) =>
+      DashboardPopupSettings(show: show ?? this.show, position: position ?? this.position, loaded: true);
 }
 
 /// The display's brightness (Haussteuerung, wall tablets): Android's own,

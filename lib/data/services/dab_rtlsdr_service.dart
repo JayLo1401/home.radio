@@ -285,6 +285,13 @@ class DabRtlSdrService {
 
   Future<void> stopPlayback() => _invokeMethod('stopPlayback');
 
+  /// While the Haussteuerung is in front: DAB+/FM play on when its web page
+  /// takes the audio focus for a sound (Android only).
+  Future<void> setKeepOnFocusLoss(bool keep) async {
+    if (_desktop) return;
+    await _methodChannel.invokeMethod<void>('setKeepOnFocusLoss', {'keep': keep});
+  }
+
   /// Tears down the native DAB+ session (direct-USB mode's rtlsdr_dev_t /
   /// UsbDeviceConnection, or the rtl_tcp client) so a later play/scan
   /// attempt starts fresh - call this once RtlSdrUsbService reports the

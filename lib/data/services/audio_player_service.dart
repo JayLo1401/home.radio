@@ -5,6 +5,7 @@ import 'package:just_audio/just_audio.dart';
 
 import '../../l10n/l10n.dart';
 import '../models/audio_quality.dart';
+import 'audio_focus_guard.dart';
 import 'icy_metadata_service.dart';
 
 /// Thin wrapper around [AudioPlayer] for internet-radio stream playback.
@@ -46,6 +47,9 @@ class AudioPlayerService {
   String? _currentUrl;
 
   String? get currentUrl => _currentUrl;
+
+  /// Whether the stream plays right now.
+  bool get playing => _player.playing;
 
   Stream<PlayerState> get playerStateStream => _player.playerStateStream;
 
@@ -142,7 +146,8 @@ class AudioPlayerService {
     // purpose, and having the radio suddenly start talking over it again on
     // its own would be more surprising than helpful.
     session.interruptionEventStream.listen((event) {
-      if (event.begin) _player.pause();
+      // Not for a sound of the Haussteuerung (see AudioFocusGuard).
+      if (AudioFocusGuard.shouldPause(event)) _player.pause();
     });
     _sessionConfigured = true;
   }

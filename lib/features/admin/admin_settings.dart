@@ -27,6 +27,7 @@ import '../../data/services/picture_library.dart' show SlideshowOrder;
 import '../../l10n/l10n.dart';
 import '../browser/browser_channel.dart';
 import '../browser/browser_settings.dart';
+import '../dashboard/dashboard_mini_player.dart' show dashboardPopupPositionLabel;
 import '../launcher/launcher_providers.dart';
 import '../settings/ha_settings_screen.dart' show haLinkStatusText;
 import '../tv/tv_providers.dart';
@@ -139,6 +140,7 @@ class AdminSettings implements AdminSettingsSource {
     final apps = LauncherService.supported ? await _c.read(launcherServiceProvider).listApps() : const <InstalledApp>[];
     final dashboardUrl = await repo.getDashboardUrl();
     final display = await repo.getDashboardDisplay();
+    final popup = await repo.getDashboardPopup();
     final brightness = await repo.getDisplayBrightness();
     final music = await _c.read(musicSettingsRepositoryProvider).load();
     final browser = await _c.read(browserSettingsProvider.notifier).loaded();
@@ -684,6 +686,33 @@ class AdminSettings implements AdminSettingsSource {
               get: () => dashboardUrl,
               set: (v) async {
                 await _c.read(dashboardUrlProvider.notifier).set('${v ?? ''}');
+                return null;
+              },
+            ),
+            _Setting(
+              id: 'dashboardPopup',
+              label: l.dashboardPopupShow,
+              type: 'bool',
+              get: () => popup.show,
+              set: (v) async {
+                final p = await repo.getDashboardPopup();
+                await _c.read(dashboardPopupProvider.notifier).set(p.copyWith(show: _bool(v) ?? true));
+                return null;
+              },
+            ),
+            _Setting(
+              id: 'dashboardPopupPosition',
+              label: l.dashboardPopupPosition,
+              type: 'choice',
+              options: [
+                for (final p in DashboardPopupPosition.values) (p.name, dashboardPopupPositionLabel(l, p)),
+              ],
+              get: () => popup.position.name,
+              set: (v) async {
+                final position = DashboardPopupPosition.values.where((p) => p.name == v).firstOrNull;
+                if (position == null) return l.adminInvalidValue;
+                final p = await repo.getDashboardPopup();
+                await _c.read(dashboardPopupProvider.notifier).set(p.copyWith(position: position));
                 return null;
               },
             ),

@@ -1226,6 +1226,114 @@ abstract class AppLocalizations {
   /// **'Dieses Gerät hat keinen Lichtsensor.'**
   String get dashboardBrightnessNoSensor;
 
+  /// No description provided for @dashboardPopupHeading.
+  ///
+  /// In de, this message translates to:
+  /// **'Wiedergabe-Popup'**
+  String get dashboardPopupHeading;
+
+  /// No description provided for @dashboardPopupShow.
+  ///
+  /// In de, this message translates to:
+  /// **'Wiedergabe-Popup anzeigen'**
+  String get dashboardPopupShow;
+
+  /// No description provided for @dashboardPopupHelp.
+  ///
+  /// In de, this message translates to:
+  /// **'Radio und Musik spielen in der Haussteuerung weiter. Das schmale Popup über dem Dashboard hat immer eine Home-Taste und zeigt, solange etwas spielt, Sender oder Titel mit Zurück, Pause, Stopp und Weiter. Fernbedienung: Pfeil zum Popup am Rand des Dashboards oder Info-Taste, zurück mit dem Pfeil in die andere Richtung oder Zurück. Play/Pause, Stopp, Weiter und Zurück der Fernbedienung wirken immer.'**
+  String get dashboardPopupHelp;
+
+  /// No description provided for @dashboardPopupPosition.
+  ///
+  /// In de, this message translates to:
+  /// **'Position'**
+  String get dashboardPopupPosition;
+
+  /// No description provided for @dashboardPopupBottomCenter.
+  ///
+  /// In de, this message translates to:
+  /// **'Unten Mitte'**
+  String get dashboardPopupBottomCenter;
+
+  /// No description provided for @dashboardPopupBottomLeft.
+  ///
+  /// In de, this message translates to:
+  /// **'Unten links'**
+  String get dashboardPopupBottomLeft;
+
+  /// No description provided for @dashboardPopupBottomRight.
+  ///
+  /// In de, this message translates to:
+  /// **'Unten rechts'**
+  String get dashboardPopupBottomRight;
+
+  /// No description provided for @dashboardPopupTopCenter.
+  ///
+  /// In de, this message translates to:
+  /// **'Oben Mitte'**
+  String get dashboardPopupTopCenter;
+
+  /// No description provided for @dashboardPopupTopLeft.
+  ///
+  /// In de, this message translates to:
+  /// **'Oben links'**
+  String get dashboardPopupTopLeft;
+
+  /// No description provided for @dashboardPopupTopRight.
+  ///
+  /// In de, this message translates to:
+  /// **'Oben rechts'**
+  String get dashboardPopupTopRight;
+
+  /// No description provided for @dashboardPopupHome.
+  ///
+  /// In de, this message translates to:
+  /// **'Home'**
+  String get dashboardPopupHome;
+
+  /// No description provided for @dashboardPopupPlay.
+  ///
+  /// In de, this message translates to:
+  /// **'Wiedergabe'**
+  String get dashboardPopupPlay;
+
+  /// No description provided for @dashboardPopupPause.
+  ///
+  /// In de, this message translates to:
+  /// **'Pause'**
+  String get dashboardPopupPause;
+
+  /// No description provided for @dashboardPopupStop.
+  ///
+  /// In de, this message translates to:
+  /// **'Stopp'**
+  String get dashboardPopupStop;
+
+  /// No description provided for @dashboardPopupNext.
+  ///
+  /// In de, this message translates to:
+  /// **'Weiter'**
+  String get dashboardPopupNext;
+
+  /// No description provided for @dashboardPopupPrevious.
+  ///
+  /// In de, this message translates to:
+  /// **'Zurück'**
+  String get dashboardPopupPrevious;
+
+  /// No description provided for @dashboardPopupHintBottom.
+  ///
+  /// In de, this message translates to:
+  /// **'Fernbedienung: ▼ am unteren Rand oder Info wählt diese Leiste, ▲ oder Zurück führt zurück ins Dashboard.'**
+  String get dashboardPopupHintBottom;
+
+  /// No description provided for @dashboardPopupHintTop.
+  ///
+  /// In de, this message translates to:
+  /// **'Fernbedienung: ▲ am oberen Rand oder Info wählt diese Leiste, ▼ oder Zurück führt zurück ins Dashboard.'**
+  String get dashboardPopupHintTop;
+
   /// No description provided for @haTitle.
   ///
   /// In de, this message translates to:
