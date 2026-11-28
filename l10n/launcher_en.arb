@@ -21,6 +21,7 @@
   "launcherAddedToGroup": "\"{app}\" is now in \"{group}\"",
   "launcherRemovedFromGroup": "\"{app}\" removed from \"{group}\"",
   "launcherAllAppsHelp": "OK: open app  ·  ☰ or hold OK: favorite, group, app info (force stop, uninstall)",
+  "launcherAllAppsHelpDesktop": "OK or click: open app  ·  ☰, right-click or hold OK: favorite, group",
   "launcherMoveTile": "Move",
   "launcherMoveTiles": "Move tiles",
   "launcherMoveModeHint": "Move mode: OK pick up/drop · ◀ ▶ move · Hold OK: done",

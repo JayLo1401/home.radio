@@ -1458,6 +1458,10 @@ class AppLocalizationsDe extends AppLocalizations {
       'OK: App öffnen  ·  ☰ oder OK lange drücken: Favorit, Gruppe, App-Info (beenden, deinstallieren)';
 
   @override
+  String get launcherAllAppsHelpDesktop =>
+      'OK oder Klick: App öffnen  ·  ☰, Rechtsklick oder OK lange drücken: Favorit, Gruppe';
+
+  @override
   String get launcherMoveTile => 'Verschieben';
 
   @override

@@ -149,10 +149,13 @@ class LauncherTilesNotifier extends Notifier<List<LauncherTile>> {
 
   Future<void> _load() async {
     var saved = await _repo.getLauncherTiles();
-    // Without the device's apps (PC): only Home System's own parts - app
-    // tiles could come along with a backup from the TV box.
-    if (saved != null && !LauncherService.supported) saved = saved.where((t) => t.isBuiltIn).toList();
+    // Only what this platform has: app tiles could come along with a backup
+    // from the TV box (Android apps on the PC) or from Windows - those are
+    // left out (and dropped with the next change of the row).
+    if (saved != null) saved = saved.where(LauncherService.keepsTile).toList();
     if (saved != null) {
+      // Windows: the app list in the background, so a tile starts at once.
+      if (saved.any((t) => t.isApp)) ref.read(launcherServiceProvider).warmUpApps();
       if (!saved.any((t) => t.isTv) && !await _repo.getLauncherTvAdded()) {
         saved.insert(saved.indexWhere((t) => t.isRadio) + 1, const LauncherTile.tv());
         await _repo.setLauncherTiles(saved);
@@ -169,7 +172,8 @@ class LauncherTilesNotifier extends Notifier<List<LauncherTile>> {
       return;
     }
     await _repo.setLauncherTvAdded();
-    final apps = await ref.read(launcherServiceProvider).listApps();
+    // The default streaming apps are Android packages.
+    final apps = LauncherService.supported ? await ref.read(launcherServiceProvider).listApps() : const <InstalledApp>[];
     final tiles = <LauncherTile>[const LauncherTile.radio(), const LauncherTile.tv()];
     for (final package in defaultLauncherPackages) {
       final app = apps.where((a) => a.package == package).firstOrNull;
@@ -229,8 +233,8 @@ class LauncherTilesNotifier extends Notifier<List<LauncherTile>> {
 final launcherTilesProvider = NotifierProvider<LauncherTilesNotifier, List<LauncherTile>>(LauncherTilesNotifier.new);
 
 /// The launcher's groups - rows of apps under the favourites, each with a
-/// name (see LauncherGroup). None until the user makes one; there are no
-/// app tiles on the PC, so none there either.
+/// name (see LauncherGroup). None until the user makes one; only where there
+/// are app tiles (Android, Windows), each with the apps of its platform.
 class LauncherGroupsNotifier extends Notifier<List<LauncherGroup>> {
   late Future<void> _ready;
 
@@ -243,8 +247,12 @@ class LauncherGroupsNotifier extends Notifier<List<LauncherGroup>> {
   SettingsRepository get _repo => ref.read(settingsRepositoryProvider);
 
   Future<void> _load() async {
-    if (!LauncherService.supported) return;
-    state = await _repo.getLauncherGroups();
+    if (!LauncherService.appsSupported) return;
+    state = [
+      for (final g in await _repo.getLauncherGroups())
+        g.tiles.every(LauncherService.keepsTile) ? g : g.copyWith(tiles: g.tiles.where(LauncherService.keepsTile).toList()),
+    ];
+    if (state.any((g) => g.tiles.any((t) => t.isApp))) ref.read(launcherServiceProvider).warmUpApps();
   }
 
   Future<void> _save(List<LauncherGroup> groups) async {
@@ -291,7 +299,8 @@ class LauncherGroupsNotifier extends Notifier<List<LauncherGroup>> {
 final launcherGroupsProvider =
     NotifierProvider<LauncherGroupsNotifier, List<LauncherGroup>>(LauncherGroupsNotifier.new);
 
-/// Every installed app (refreshed with ref.invalidate when "Alle Apps" opens).
+/// Every installed app (refreshed with ref.invalidate when "Alle Apps" opens) -
+/// on Windows the Start menu's apps (see WindowsApps).
 final installedAppsProvider = FutureProvider<List<InstalledApp>>((ref) {
   return ref.watch(launcherServiceProvider).listApps();
 });

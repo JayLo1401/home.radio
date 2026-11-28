@@ -392,9 +392,10 @@ class _LauncherScreenState extends ConsumerState<LauncherScreen> {
   }
 
   /// The top bar's "Einstellungen": Home System's own settings, the device's
-  /// (Android) settings, all apps - on the PC straight the app's settings.
+  /// (Android) settings, all apps, moving tiles - on a PC without apps
+  /// (Linux) straight the app's settings.
   Future<void> _openMenu() async {
-    if (!LauncherService.supported) {
+    if (!LauncherService.appsSupported) {
       await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SettingsScreen()));
       return;
     }
@@ -405,7 +406,8 @@ class _LauncherScreenState extends ConsumerState<LauncherScreen> {
         title: Text(l.systemTileSettingsShort),
         children: [
           _option(context, 'app', Icons.tune, l.settingsLauncherMenuApp, autofocus: true),
-          _option(context, 'android', Icons.settings_applications_outlined, l.settingsLauncherMenuAndroid),
+          if (LauncherService.supported)
+            _option(context, 'android', Icons.settings_applications_outlined, l.settingsLauncherMenuAndroid),
           _option(context, 'apps', Icons.apps, l.miscAllAppsTitle),
           _option(context, 'move', Icons.open_with, l.launcherMoveTiles),
         ],
@@ -528,7 +530,7 @@ class _LauncherScreenState extends ConsumerState<LauncherScreen> {
     final group = row.group;
     final favorites = ref.read(launcherTilesProvider);
     final movable = row.tiles.length > 1 && row.tiles.any((t) => t.id == tile.id);
-    final groupable = LauncherService.supported && LauncherGroup.allows(tile);
+    final groupable = LauncherService.appsSupported && LauncherGroup.allows(tile);
     final inFavorites = favorites.any((t) => t.id == tile.id);
     final l = context.l10n;
     final action = await showDialog<String>(
@@ -686,11 +688,11 @@ class _LauncherScreenState extends ConsumerState<LauncherScreen> {
       for (final t in ref.watch(launcherTilesProvider))
         if (parts.showsTile(t)) t,
     ];
-    final groups = LauncherService.supported ? ref.watch(launcherGroupsProvider) : const <LauncherGroup>[];
+    final groups = LauncherService.appsSupported ? ref.watch(launcherGroupsProvider) : const <LauncherGroup>[];
     // In move mode the lifted tile shows where it is now (see LauncherMoveMode).
     String idOf(LauncherTile t) => t.id;
     _rows = [
-      _RowInfo(id: _favorites, tiles: _move.arrange(_favorites, tiles, idOf), appsTile: LauncherService.supported),
+      _RowInfo(id: _favorites, tiles: _move.arrange(_favorites, tiles, idOf), appsTile: LauncherService.appsSupported),
       for (final g in groups) _RowInfo(id: g.id, group: g, tiles: _move.arrange(g.id, g.tiles, idOf)),
     ];
     // The lifted tile left its row meanwhile: nothing to drop any more.
@@ -1075,7 +1077,8 @@ Future<void> chooseTileImage(BuildContext context, WidgetRef ref, LauncherTile t
     await groups.setImage(tile.id, image);
   }
 
-  final hasPack = ref.read(launcherSettingsProvider).iconPack != null;
+  // Icon packs are Android apps (one could come along with a backup).
+  final hasPack = LauncherService.supported && ref.read(launcherSettingsProvider).iconPack != null;
   final l = context.l10n;
   final choice = await showDialog<String>(
     context: context,
@@ -1701,7 +1704,7 @@ class TileArt extends ConsumerWidget {
       return _BrandArt(icon: Icons.settings_outlined, title: context.l10n.systemTileSettingsShort);
     }
     final package = tile.package!;
-    final pack = ref.watch(launcherSettingsProvider).iconPack;
+    final pack = LauncherService.supported ? ref.watch(launcherSettingsProvider).iconPack : null;
     if (pack != null && tile.image != LauncherTile.originalImage) {
       final packImage = ref.watch(iconPackImageProvider((pack, package)));
       if (packImage.isLoading) return const _Placeholder();

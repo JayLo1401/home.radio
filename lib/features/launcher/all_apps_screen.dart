@@ -42,7 +42,14 @@ class _AllAppsScreenState extends ConsumerState<AllAppsScreen> with WidgetsBindi
 
   Future<void> _launch(InstalledApp app) async {
     pauseRadioAndMusicForApp(ref);
-    await ref.read(launcherServiceProvider).launchApp(app.package);
+    final ok = await ref.read(launcherServiceProvider).launchApp(app.package);
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(context.l10n.settingsLauncherNotInstalled(app.label))));
+      // Gone meanwhile: the list without it.
+      ref.invalidate(installedAppsProvider);
+    }
   }
 
   /// ☰ or holding OK: favourite on/off, into a group, app info (force
@@ -62,7 +69,9 @@ class _AllAppsScreenState extends ConsumerState<AllAppsScreen> with WidgetsBindi
             inRow ? context.l10n.miscAllAppsRemoveFavorite : context.l10n.miscAllAppsAddFavorite,
           ),
           launcherMenuOption(context, 'group', Icons.playlist_add, context.l10n.launcherAddToGroup),
-          launcherMenuOption(context, 'info', Icons.info_outline, context.l10n.miscAllAppsAppInfo),
+          // The system's app page exists on Android only.
+          if (LauncherService.supported)
+            launcherMenuOption(context, 'info', Icons.info_outline, context.l10n.miscAllAppsAppInfo),
         ],
       ),
     );
@@ -80,9 +89,11 @@ class _AllAppsScreenState extends ConsumerState<AllAppsScreen> with WidgetsBindi
   }
 
   // Back from the app info (maybe uninstalled there): read the list again.
+  // (Android only - on Windows "resumed" comes with every click back into
+  // the window.)
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) ref.invalidate(installedAppsProvider);
+    if (state == AppLifecycleState.resumed && LauncherService.supported) ref.invalidate(installedAppsProvider);
   }
 
   /// The app's tile - with the picture it has on Home already, if any.
@@ -147,21 +158,23 @@ class _AllAppsScreenState extends ConsumerState<AllAppsScreen> with WidgetsBindi
                     label: Text(l.miscAllAppsClearSearch),
                   ),
                 const Spacer(),
-                TextButton.icon(
-                  onPressed: () {
-                    final notifier = ref.read(launcherTilesProvider.notifier);
-                    settingsInRow
-                        ? notifier.remove(const LauncherTile.systemSettings().id)
-                        : notifier.add(const LauncherTile.systemSettings());
-                  },
-                  icon: Icon(settingsInRow ? Icons.star : Icons.star_border),
-                  label: Text(settingsInRow ? l.miscAllAppsSettingsIsFavorite : l.miscAllAppsSettingsAddFavorite),
-                ),
+                // The device's settings as a tile: Android only.
+                if (LauncherService.supported)
+                  TextButton.icon(
+                    onPressed: () {
+                      final notifier = ref.read(launcherTilesProvider.notifier);
+                      settingsInRow
+                          ? notifier.remove(const LauncherTile.systemSettings().id)
+                          : notifier.add(const LauncherTile.systemSettings());
+                    },
+                    icon: Icon(settingsInRow ? Icons.star : Icons.star_border),
+                    label: Text(settingsInRow ? l.miscAllAppsSettingsIsFavorite : l.miscAllAppsSettingsAddFavorite),
+                  ),
               ],
             ),
             const SizedBox(height: 8),
             Text(
-              l.launcherAllAppsHelp,
+              LauncherService.supported ? l.launcherAllAppsHelp : l.launcherAllAppsHelpDesktop,
               style: const TextStyle(color: Colors.white54, fontSize: 13),
             ),
             const SizedBox(height: 12),
@@ -270,6 +283,7 @@ class _AppCellState extends State<_AppCell> {
                   },
                   onTap: widget.onOpen,
                   onLongPress: widget.onOptions,
+                  onSecondaryTap: widget.onOptions,
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(12),
                     child: Stack(

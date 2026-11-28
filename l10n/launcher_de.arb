@@ -28,6 +28,7 @@
   "launcherRemovedFromGroup": "„{app}“ aus „{group}“ entfernt",
   "@launcherRemovedFromGroup": {"placeholders": {"app": {"type": "String"}, "group": {"type": "String"}}},
   "launcherAllAppsHelp": "OK: App öffnen  ·  ☰ oder OK lange drücken: Favorit, Gruppe, App-Info (beenden, deinstallieren)",
+  "launcherAllAppsHelpDesktop": "OK oder Klick: App öffnen  ·  ☰, Rechtsklick oder OK lange drücken: Favorit, Gruppe",
   "launcherMoveTile": "Verschieben",
   "launcherMoveTiles": "Kacheln verschieben",
   "launcherMoveModeHint": "Verschiebemodus: OK nehmen/ablegen · ◀ ▶ verschieben · OK lang: fertig",

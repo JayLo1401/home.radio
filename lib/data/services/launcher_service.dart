@@ -4,6 +4,9 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import '../models/launcher_tile.dart';
+import 'desktop/windows_apps.dart';
+
 /// An app installed on the device, as the launcher lists it.
 class InstalledApp {
   const InstalledApp({required this.package, required this.label, required this.tv});
@@ -50,7 +53,8 @@ class HomeButtonStatus {
 /// The device side of Home System's launcher on Android (LauncherPlugin.kt):
 /// installed apps, starting them, icon packs and the Home key. The launcher
 /// itself (Radio, TV) is there on every platform; elsewhere
-/// [supported] is false and everything here answers "nothing".
+/// [supported] is false and everything here answers "nothing" - except the
+/// installed apps on Windows ([appsSupported], see WindowsApps).
 class LauncherService {
   LauncherService() {
     if (supported) _channel.setMethodCallHandler(_onCall);
@@ -58,8 +62,36 @@ class LauncherService {
 
   static const _channel = MethodChannel('home_system/launcher');
 
-  /// Installed apps, the Home key, the device's settings - Android only.
+  /// The Home key, the device's settings, icon packs, App-Info - Android only.
   static bool get supported => !kIsWeb && Platform.isAndroid;
+
+  static bool get _windows => !kIsWeb && Platform.isWindows;
+
+  /// Installed apps as tiles (favourites, groups, "Alle Apps"): Android and
+  /// Windows.
+  static bool get appsSupported => supported || _windows;
+
+  /// Whether an app tile's [package] belongs to this platform - tiles from a
+  /// backup of the other one (an Android package on the PC, a Windows app on
+  /// the TV box) are left out.
+  static bool ownsApp(String package) => appIdBelongsHere(package, android: supported, windows: _windows);
+
+  /// Whether [tile] can be shown here: Home System's own parts always, apps
+  /// of this platform ([ownsApp]), the device's settings on Android.
+  static bool keepsTile(LauncherTile tile) {
+    if (tile.isBuiltIn) return true;
+    if (tile.isApp) return ownsApp(tile.package ?? '');
+    return supported;
+  }
+
+  WindowsApps? _windowsApps;
+  WindowsApps get _win => _windowsApps ??= WindowsApps();
+
+  /// Windows: reads the installed apps in the background, so the first tile
+  /// started doesn't wait for the list.
+  void warmUpApps() {
+    if (_windows) _win.warmUp();
+  }
 
   final _showRequests = StreamController<void>.broadcast();
 
@@ -87,6 +119,7 @@ class LauncherService {
   Future<bool> takeLaunchRequest() async => await _invoke<bool>('takeLaunchRequest') ?? false;
 
   Future<List<InstalledApp>> listApps() async {
+    if (_windows) return _win.list();
     final list = await _invoke<List<Object?>>('listApps') ?? const [];
     return [
       for (final e in list.whereType<Map<Object?, Object?>>())
@@ -99,6 +132,8 @@ class LauncherService {
   }
 
   Future<AppImage?> appImage(String package) async {
+    if (_windows) return _win.icon(package);
+    if (!ownsApp(package)) return null;
     final m = await _invoke<Map<Object?, Object?>>('appImage', {'package': package});
     final bytes = m?['bytes'];
     if (bytes is! Uint8List) return null;
@@ -122,7 +157,11 @@ class LauncherService {
     return AppImage(bytes, banner: false);
   }
 
-  Future<bool> launchApp(String package) async => await _invoke<bool>('launchApp', {'package': package}) ?? false;
+  Future<bool> launchApp(String package) async {
+    if (_windows) return _win.launch(package);
+    if (!ownsApp(package)) return false;
+    return await _invoke<bool>('launchApp', {'package': package}) ?? false;
+  }
 
   Future<bool> openSystemSettings() async => await _invoke<bool>('openSystemSettings') ?? false;
 
