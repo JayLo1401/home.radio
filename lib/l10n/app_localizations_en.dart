@@ -5690,7 +5690,44 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get tvChannelListKeyHint =>
-      'OK play (current channel: info)  ·  → Guide  ·  ← close';
+      'OK play (current channel: info)  ·  hold OK options (move)  ·  → Guide  ·  ← close';
+
+  @override
+  String get tvMoveKeyHint => '↑/↓ move  ·  OK done  ·  Back cancels';
+
+  @override
+  String get tvChannelPlay => 'Play';
+
+  @override
+  String get tvChannelInfo => 'What\'s on';
+
+  @override
+  String get tvChannelMove => 'Move';
+
+  @override
+  String get tvChannelMoveSubtitle => 'Change the order - on the receiver too';
+
+  @override
+  String get tvChannelOrderReset => 'Use the receiver\'s order';
+
+  @override
+  String get tvChannelOrderResetSubtitle =>
+      'Discard the order saved in the app only';
+
+  @override
+  String get tvOrderSaved => 'Order saved on the receiver';
+
+  @override
+  String get tvOrderLocalOnly =>
+      'Order saved in the app only – the receiver\'s bouquet editor isn\'t available';
+
+  @override
+  String tvOrderFailed(String error) {
+    return 'Order not saved: $error';
+  }
+
+  @override
+  String get tvOrderMismatch => 'The receiver didn\'t take the new order';
 
   @override
   String get tvNoChannelsInList => 'No channels in this list';

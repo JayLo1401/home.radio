@@ -5685,7 +5685,46 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get tvChannelListKeyHint =>
-      'OK abspielen (laufender Sender: Info)  ·  → Programm  ·  ← schließen';
+      'OK abspielen (laufender Sender: Info)  ·  OK lang Optionen (verschieben)  ·  → Programm  ·  ← schließen';
+
+  @override
+  String get tvMoveKeyHint =>
+      '↑/↓ verschieben  ·  OK fertig  ·  Zurück abbrechen';
+
+  @override
+  String get tvChannelPlay => 'Abspielen';
+
+  @override
+  String get tvChannelInfo => 'Was läuft';
+
+  @override
+  String get tvChannelMove => 'Verschieben';
+
+  @override
+  String get tvChannelMoveSubtitle => 'Reihenfolge ändern - auch am Receiver';
+
+  @override
+  String get tvChannelOrderReset => 'Reihenfolge des Receivers übernehmen';
+
+  @override
+  String get tvChannelOrderResetSubtitle =>
+      'Die nur in der App gespeicherte Reihenfolge verwerfen';
+
+  @override
+  String get tvOrderSaved => 'Reihenfolge am Receiver gespeichert';
+
+  @override
+  String get tvOrderLocalOnly =>
+      'Reihenfolge nur in der App gespeichert – Bouquet-Editor am Receiver nicht verfügbar';
+
+  @override
+  String tvOrderFailed(String error) {
+    return 'Reihenfolge nicht gespeichert: $error';
+  }
+
+  @override
+  String get tvOrderMismatch =>
+      'Der Receiver hat die neue Reihenfolge nicht übernommen';
 
   @override
   String get tvNoChannelsInList => 'Keine Sender in dieser Liste';
