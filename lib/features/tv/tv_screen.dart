@@ -24,6 +24,8 @@ import 'tv_guide_screen.dart';
 import 'tv_player.dart';
 import 'tv_providers.dart';
 import 'tv_reminder_providers.dart';
+import 'tv_signal_badge.dart';
+import 'tv_tuning_overlay.dart';
 import 'tv_widgets.dart';
 
 /// TV: live TV from the Enigma2 receiver (GigaBlue etc.) and Internet-TV
@@ -64,6 +66,10 @@ class _TvScreenState extends ConsumerState<TvScreen> {
   /// The last channel was started (once both settings were loaded).
   bool _started = false;
 
+  /// TV is opening: the first channel isn't chosen yet (the tuning
+  /// animation shows meanwhile).
+  bool _opening = true;
+
   /// A short note in the middle ("no programme guide for Internet-TV").
   String? _note;
   Timer? _noteTimer;
@@ -99,6 +105,18 @@ class _TvScreenState extends ConsumerState<TvScreen> {
       _maybeStart();
     });
     _nextUpCheck = Timer.periodic(const Duration(seconds: 15), (_) => _checkNextUp());
+  }
+
+  bool _precached = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // The tuning animation's logo decoded now - not at the first switch.
+    if (!_precached) {
+      _precached = true;
+      unawaited(TvTuningOverlay.precache(context));
+    }
   }
 
   /// A reminder's channel while TV is open: back to the picture (closing
@@ -162,6 +180,14 @@ class _TvScreenState extends ConsumerState<TvScreen> {
     final iptv = ref.read(iptvProvider);
     if (config == null || iptv == null) return; // the listeners in build call again
     _started = true;
+    try {
+      await _startFirst(config, iptv);
+    } finally {
+      if (mounted && _opening) setState(() => _opening = false);
+    }
+  }
+
+  Future<void> _startFirst(Enigma2Config config, IptvState iptv) async {
     final fixed = config.configured ? await ref.read(settingsRepositoryProvider).getTvStartChannel() : null;
     final last = iptv.enabled ? await ref.read(iptvRepositoryProvider).getLastChannel() : null;
     if (!mounted) return;
@@ -880,8 +906,14 @@ class _TvScreenState extends ConsumerState<TvScreen> {
     });
     final config = ref.watch(enigma2ConfigProvider);
     final iptv = ref.watch(iptvProvider);
+    // Now and next of the whole bouquet loaded from the start and kept
+    // fresh - a channel switch shows what's on without waiting for it
+    // (listened, not watched: its refreshes needn't rebuild the screen).
+    ref.listen(tvNowNextProvider, (_, _) {});
     final player = _player;
     final hasChannel = _current != null || _iptv != null;
+    // The start animation over the picture's place while a channel tunes.
+    final tuning = player == null && _error == null && !_stopped && (_loading || (!hasChannel && _opening));
     // Neither a receiver nor Internet-TV favorites (nor a channel from the
     // catalogue on air): what TV can be, and the way to set it up.
     final notSetUp = config != null &&
@@ -916,9 +948,9 @@ class _TvScreenState extends ConsumerState<TvScreen> {
                           child: player != null ? player.view() : const SizedBox.expand(),
                         ),
                       ),
+                      TvTuningOverlay(visible: tuning),
                       // Tuning and its errors show in the banner (the
-                      // connection setup) - without a channel in the middle.
-                      if (_loading && !hasChannel) const Center(child: CircularProgressIndicator()),
+                      // connection setup), the tuning animation above.
                       if ((_stopped || (_error != null && !hasChannel)) && !_listVisible)
                         Center(
                           child: _Message(
@@ -1273,11 +1305,12 @@ class _InfoBanner extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final epg = ref.watch(tvNowNextProvider).value ?? const {};
+    final nowNext = ref.watch(tvNowNextProvider);
+    final epg = nowNext.value ?? const {};
     final nn = nowNextFor(epg, channel, DateTime.now());
     final now = nn.now, next = nn.next;
     final lookingAhead = ahead > 0 && link == null;
-    return Container(
+    final banner = Container(
       color: Colors.black.withValues(alpha: 0.75),
       padding: const EdgeInsets.fromLTRB(40, 20, 40, 28),
       child: Row(
@@ -1293,10 +1326,9 @@ class _InfoBanner extends ConsumerWidget {
                 Text('${channel.number} · ${channel.name}',
                     style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 6),
-                if (link case final link?) ...[
-                  const SizedBox(height: 4),
-                  ConnectionChain(view: link),
-                ] else if (lookingAhead) ...[
+                // What's on comes from the bouquet's now and next, loaded
+                // beforehand - shown at once, while the channel still tunes.
+                if (lookingAhead) ...[
                   _later(context, ref),
                 ] else if (now != null) ...[
                   Text('${hhmm(now.begin)} – ${hhmm(now.end)}   ${now.title}',
@@ -1304,11 +1336,17 @@ class _InfoBanner extends ConsumerWidget {
                   const SizedBox(height: 8),
                   EventProgress(event: now, width: 520),
                 ] else
-                  Text(context.l10n.tvNoProgramInfo, style: const TextStyle(color: Colors.white54, fontSize: 18)),
-                if (next != null && link == null && !lookingAhead) ...[
+                  Text(nowNext.hasValue ? context.l10n.tvNoProgramInfo : context.l10n.commonLoading,
+                      style: const TextStyle(color: Colors.white54, fontSize: 18)),
+                if (next != null && !lookingAhead) ...[
                   const SizedBox(height: 8),
                   Text('${context.l10n.tvThen} ${hhmm(next.begin)}   ${next.title}',
                       maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white60, fontSize: 17)),
+                ],
+                // The connection setup below it, in the stream facts' place.
+                if (link case final link?) ...[
+                  const SizedBox(height: 10),
+                  ConnectionChain(view: link),
                 ],
                 if (player case final player? when link == null && !lookingAhead) ...[
                   const SizedBox(height: 10),
@@ -1332,6 +1370,14 @@ class _InfoBanner extends ConsumerWidget {
           ),
         ],
       ),
+    );
+    // The satellite signal small in the bottom right corner - only while
+    // the picture runs (asked only while the banner is up).
+    return Stack(
+      children: [
+        banner,
+        if (player != null && link == null) Positioned(right: 40, bottom: 6, child: TvSignalBadge(channel: channel)),
+      ],
     );
   }
 }
@@ -1379,19 +1425,18 @@ class _IptvInfoBanner extends ConsumerWidget {
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 6),
-                if (link case final link?) ...[
+                Text(context.l10n.iptvListName,
+                    style: const TextStyle(color: brandGreen, fontSize: 18, fontWeight: FontWeight.w600)),
+                if (facts.isNotEmpty) ...[
                   const SizedBox(height: 4),
+                  Text(facts,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: Colors.white70, fontSize: 18)),
+                ],
+                if (link case final link?) ...[
+                  const SizedBox(height: 10),
                   ConnectionChain(view: link),
-                ] else ...[
-                  Text(context.l10n.iptvListName,
-                      style: const TextStyle(color: brandGreen, fontSize: 18, fontWeight: FontWeight.w600)),
-                  if (facts.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(facts,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Colors.white70, fontSize: 18)),
-                  ],
                 ],
                 if (player case final player? when link == null) ...[
                   const SizedBox(height: 10),
@@ -1860,7 +1905,7 @@ class _ChannelListState extends ConsumerState<_ChannelList> {
                                       overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(color: Colors.white60, fontSize: 14)),
                                   const SizedBox(height: 5),
-                                  EventProgress(event: event),
+                                  EventProgress(event: event, height: 4),
                                 ],
                               ],
                             ),

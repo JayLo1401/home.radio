@@ -129,15 +129,25 @@ final tvChannelsProvider = FutureProvider<List<E2Channel>>((ref) async {
   return (await service.channels(bouquet.ref)).where((c) => !c.isRadio).toList();
 });
 
-/// Now and next per channel (service reference -> events, by start),
-/// refreshed every minute and whenever a programme ends.
+/// Now and next per channel (service reference -> events, by start) of the
+/// whole bouquet, in one query - kept loaded while TV is open (TvScreen
+/// watches it from the start), so the info bar and the channel list show
+/// what's on without asking the receiver at a channel switch. Refreshed
+/// shortly after a programme of the bouquet ends (see [nowNextRefreshIn]);
+/// while refreshing, the last answer stays.
 final tvNowNextProvider = FutureProvider<Map<String, List<E2Event>>>((ref) async {
   final service = ref.watch(enigma2ServiceProvider);
   final bouquet = await ref.watch(tvCurrentBouquetProvider.future);
   if (service == null || bouquet == null) return const {};
-  final timer = Timer(const Duration(minutes: 1), ref.invalidateSelf);
-  ref.onDispose(timer.cancel);
-  final events = await service.nowNext(bouquet.ref);
+  Timer? timer;
+  ref.onDispose(() => timer?.cancel());
+  final List<E2Event> events;
+  try {
+    events = await service.nowNext(bouquet.ref);
+  } catch (_) {
+    timer = Timer(const Duration(minutes: 1), ref.invalidateSelf);
+    rethrow;
+  }
   final map = <String, List<E2Event>>{};
   for (final e in events) {
     (map[serviceKey(e.serviceRef)] ??= []).add(e);
@@ -145,8 +155,24 @@ final tvNowNextProvider = FutureProvider<Map<String, List<E2Event>>>((ref) async
   for (final list in map.values) {
     list.sort((a, b) => a.begin.compareTo(b.begin));
   }
+  timer = Timer(nowNextRefreshIn(events, DateTime.now()), ref.invalidateSelf);
   return map;
 });
+
+/// When to ask for now and next again: a few seconds after the first of
+/// [events] running at [t] ends (its successor becomes "now", the one
+/// after it is new) - at least 20 s, at most 3 minutes apart.
+Duration nowNextRefreshIn(List<E2Event> events, DateTime t) {
+  DateTime? first;
+  for (final e in events) {
+    if (!e.end.isAfter(t)) continue;
+    if (first == null || e.end.isBefore(first)) first = e.end;
+  }
+  const min = Duration(seconds: 20), max = Duration(minutes: 3);
+  if (first == null) return max;
+  final wait = first.difference(t) + const Duration(seconds: 5);
+  return wait < min ? min : (wait > max ? max : wait);
+}
 
 /// The full EPG of one channel.
 final tvChannelEpgProvider = FutureProvider.family<List<E2Event>, String>((ref, serviceRef) async {

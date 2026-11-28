@@ -4,6 +4,9 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 
 import '../../l10n/l10n.dart';
+import 'enigma2_signal.dart';
+
+export 'enigma2_signal.dart';
 
 /// Connection to an Enigma2 satellite receiver (GigaBlue, VU+, Dreambox, ...
 /// with OpenWebif - teamBlue, OpenATV, OpenPLi images all have it).
@@ -285,6 +288,15 @@ class Enigma2Service {
       return null;
     }
   }
+
+  /// The signal of the tuner of the receiver's own channel (read only) -
+  /// null in standby or if it tells none (see [parseE2Signal]).
+  Future<E2Signal?> signal() async => parseE2Signal(await _get('/api/signal'));
+
+  /// The tuner the receiver streams [serviceRef] from (/api/about, read
+  /// only) - null if it doesn't say.
+  Future<int?> streamTuner(String serviceRef) async =>
+      streamTunerOf(await _get('/api/about'), serviceRef.replaceAll(RegExp(r':+$'), '').toUpperCase());
 
   /// Whether the receiver is in standby, and the channel it holds itself
   /// (null: none - in standby it normally holds nothing; after a switch
