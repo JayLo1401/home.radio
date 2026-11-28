@@ -134,6 +134,9 @@ abstract class TvPlayer {
 
   Future<void> selectAudio(String id);
 
+  /// Holds the picture (timeshift) or plays on.
+  Future<void> setPaused(bool paused);
+
   Future<void> dispose();
 }
 
@@ -259,6 +262,9 @@ class _MpvTvPlayer implements TvPlayer {
   }
 
   @override
+  Future<void> setPaused(bool paused) => paused ? _player.pause() : _player.play();
+
+  @override
   Widget view() => mkv.Video(
         controller: _video,
         controls: mkv.NoVideoControls,
@@ -351,6 +357,9 @@ class _ExoTvPlayer implements TvPlayer {
     await _controller.selectAudioTrack(id);
     await _loadTracks();
   }
+
+  @override
+  Future<void> setPaused(bool paused) => paused ? _controller.pause() : _controller.play();
 
   @override
   Widget view() => Center(

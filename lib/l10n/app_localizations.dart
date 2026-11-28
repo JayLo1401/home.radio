@@ -3886,6 +3886,18 @@ abstract class AppLocalizations {
   /// **'Backups'**
   String get nasFolderBackups;
 
+  /// No description provided for @nasFolderRecordings.
+  ///
+  /// In de, this message translates to:
+  /// **'Aufnahmen'**
+  String get nasFolderRecordings;
+
+  /// No description provided for @nasFolderTimeshift.
+  ///
+  /// In de, this message translates to:
+  /// **'Timeshift'**
+  String get nasFolderTimeshift;
+
   /// No description provided for @nasFolderNotChosen.
   ///
   /// In de, this message translates to:
@@ -9721,6 +9733,390 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'Hinweis vor Beginn'**
   String get tvReminderLead;
+
+  /// No description provided for @tvRecSettingsTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Aufnahmen & Timeshift'**
+  String get tvRecSettingsTitle;
+
+  /// No description provided for @tvRecRecordingsTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Aufnahmen'**
+  String get tvRecRecordingsTitle;
+
+  /// No description provided for @tvRecTimersTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Geplante Aufnahmen'**
+  String get tvRecTimersTitle;
+
+  /// No description provided for @tvRecReminderOn.
+  ///
+  /// In de, this message translates to:
+  /// **'Erinnern'**
+  String get tvRecReminderOn;
+
+  /// No description provided for @tvRecReminderOff.
+  ///
+  /// In de, this message translates to:
+  /// **'Erinnerung löschen'**
+  String get tvRecReminderOff;
+
+  /// No description provided for @tvRecRecord.
+  ///
+  /// In de, this message translates to:
+  /// **'Aufnehmen'**
+  String get tvRecRecord;
+
+  /// No description provided for @tvRecRecordRest.
+  ///
+  /// In de, this message translates to:
+  /// **'Aufnehmen (ab jetzt)'**
+  String get tvRecRecordRest;
+
+  /// No description provided for @tvRecRecordNow.
+  ///
+  /// In de, this message translates to:
+  /// **'Laufende Sendung aufnehmen'**
+  String get tvRecRecordNow;
+
+  /// No description provided for @tvRecDeleteTimer.
+  ///
+  /// In de, this message translates to:
+  /// **'Aufnahme löschen'**
+  String get tvRecDeleteTimer;
+
+  /// No description provided for @tvRecDeleteTimerQuestion.
+  ///
+  /// In de, this message translates to:
+  /// **'Geplante Aufnahme löschen?'**
+  String get tvRecDeleteTimerQuestion;
+
+  /// No description provided for @tvRecRunningNow.
+  ///
+  /// In de, this message translates to:
+  /// **'Wird gerade aufgenommen'**
+  String get tvRecRunningNow;
+
+  /// No description provided for @tvRecTimerDisabled.
+  ///
+  /// In de, this message translates to:
+  /// **'ausgeschaltet'**
+  String get tvRecTimerDisabled;
+
+  /// No description provided for @tvRecEnded.
+  ///
+  /// In de, this message translates to:
+  /// **'Die Sendung ist schon vorbei.'**
+  String get tvRecEnded;
+
+  /// No description provided for @tvRecFailed.
+  ///
+  /// In de, this message translates to:
+  /// **'Hat nicht geklappt: {error}'**
+  String tvRecFailed(String error);
+
+  /// No description provided for @tvRecSet.
+  ///
+  /// In de, this message translates to:
+  /// **'Aufnahme geplant: {title} um {time} auf {channel}'**
+  String tvRecSet(String title, String time, String channel);
+
+  /// No description provided for @tvRecTimerDeleted.
+  ///
+  /// In de, this message translates to:
+  /// **'Aufnahme gelöscht: {title}'**
+  String tvRecTimerDeleted(String title);
+
+  /// No description provided for @tvRecRefused.
+  ///
+  /// In de, this message translates to:
+  /// **'Der Receiver nimmt die Aufnahme nicht an'**
+  String get tvRecRefused;
+
+  /// No description provided for @tvRecConflict.
+  ///
+  /// In de, this message translates to:
+  /// **'Aufnahme-Konflikt'**
+  String get tvRecConflict;
+
+  /// No description provided for @tvRecReceiverSays.
+  ///
+  /// In de, this message translates to:
+  /// **'Receiver: {message}'**
+  String tvRecReceiverSays(String message);
+
+  /// No description provided for @tvRecConflictsWith.
+  ///
+  /// In de, this message translates to:
+  /// **'Überschneidet sich mit:'**
+  String get tvRecConflictsWith;
+
+  /// No description provided for @tvRecConflictHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Mit einem Sat-Kabel kann der Receiver nur Sender desselben Bands gleichzeitig aufnehmen. Eine der Aufnahmen unter „Geplante Aufnahmen“ löschen und noch einmal versuchen.'**
+  String get tvRecConflictHint;
+
+  /// No description provided for @tvRecTimersEmpty.
+  ///
+  /// In de, this message translates to:
+  /// **'Keine Aufnahmen geplant.\nIm Programmführer: OK lang auf eine Sendung → „Aufnehmen“.'**
+  String get tvRecTimersEmpty;
+
+  /// No description provided for @tvRecTimersHint.
+  ///
+  /// In de, this message translates to:
+  /// **'OK: Aufnahme löschen. Der Receiver nimmt selbst auf - auch im Standby.'**
+  String get tvRecTimersHint;
+
+  /// No description provided for @tvRecRecordingsEmpty.
+  ///
+  /// In de, this message translates to:
+  /// **'Keine Aufnahmen gefunden.'**
+  String get tvRecRecordingsEmpty;
+
+  /// No description provided for @tvRecRecordingsHint.
+  ///
+  /// In de, this message translates to:
+  /// **'OK abspielen  ·  OK lang oder {optionsKey} löschen'**
+  String tvRecRecordingsHint(String optionsKey);
+
+  /// No description provided for @tvRecNoSource.
+  ///
+  /// In de, this message translates to:
+  /// **'Weder ein Receiver noch ein NAS-Ordner „Aufnahmen“ ist eingerichtet (Einstellungen → TV bzw. Einstellungen → NAS).'**
+  String get tvRecNoSource;
+
+  /// No description provided for @tvRecSourceNas.
+  ///
+  /// In de, this message translates to:
+  /// **'NAS'**
+  String get tvRecSourceNas;
+
+  /// No description provided for @tvRecSourceReceiver.
+  ///
+  /// In de, this message translates to:
+  /// **'Receiver'**
+  String get tvRecSourceReceiver;
+
+  /// No description provided for @tvRecPlay.
+  ///
+  /// In de, this message translates to:
+  /// **'Abspielen'**
+  String get tvRecPlay;
+
+  /// No description provided for @tvRecDeleteRecording.
+  ///
+  /// In de, this message translates to:
+  /// **'Aufnahme löschen'**
+  String get tvRecDeleteRecording;
+
+  /// No description provided for @tvRecDeleteRecordingQuestion.
+  ///
+  /// In de, this message translates to:
+  /// **'Aufnahme endgültig löschen?'**
+  String get tvRecDeleteRecordingQuestion;
+
+  /// No description provided for @tvRecRecordingDeleted.
+  ///
+  /// In de, this message translates to:
+  /// **'Gelöscht: {title}'**
+  String tvRecRecordingDeleted(String title);
+
+  /// No description provided for @tvRecStillRecording.
+  ///
+  /// In de, this message translates to:
+  /// **'Läuft noch - abgespielt wird, was schon aufgenommen ist.'**
+  String get tvRecStillRecording;
+
+  /// No description provided for @tvRecReceiverLocation.
+  ///
+  /// In de, this message translates to:
+  /// **'Aufnahmeort am Receiver'**
+  String get tvRecReceiverLocation;
+
+  /// No description provided for @tvRecLocationHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Der Receiver nimmt selbst auf, auch im Standby. Damit die App Aufnahmen direkt vom NAS abspielen kann: am Receiver die NAS-Freigabe einhängen und als Aufnahmeort wählen, dann hier denselben Ordner als NAS-Ordner „Aufnahmen“ einstellen. Ohne ihn zeigt die App die Liste des Receivers und spielt über ihn ab.'**
+  String get tvRecLocationHint;
+
+  /// No description provided for @tvRecNasFolder.
+  ///
+  /// In de, this message translates to:
+  /// **'NAS-Ordner „Aufnahmen“'**
+  String get tvRecNasFolder;
+
+  /// No description provided for @tvRecNasFolderMissing.
+  ///
+  /// In de, this message translates to:
+  /// **'nicht gewählt - Einstellungen → NAS'**
+  String get tvRecNasFolderMissing;
+
+  /// No description provided for @tvRecStreamCut.
+  ///
+  /// In de, this message translates to:
+  /// **'Stream vom Receiver beendet - braucht eine Aufnahme den Tuner? Verbinde neu …'**
+  String get tvRecStreamCut;
+
+  /// No description provided for @tvRecStreamLost.
+  ///
+  /// In de, this message translates to:
+  /// **'Stream von „{channel}“ beendet - vermutlich braucht eine Aufnahme den Tuner. OK oder ein anderer Sender versucht es erneut.'**
+  String tvRecStreamLost(String channel);
+
+  /// No description provided for @tvRecOnlyReceiver.
+  ///
+  /// In de, this message translates to:
+  /// **'Aufnehmen geht nur mit Sendern des Receivers.'**
+  String get tvRecOnlyReceiver;
+
+  /// No description provided for @tvRecGuideKeyHint.
+  ///
+  /// In de, this message translates to:
+  /// **'OK umschalten  ·  OK lang Erinnern/Aufnehmen  ·  {optionsKey} alle Sendungen  ·  ‹‹ ›› ±3 Std.'**
+  String tvRecGuideKeyHint(String optionsKey);
+
+  /// No description provided for @tvRecIsRecorded.
+  ///
+  /// In de, this message translates to:
+  /// **'Aufnahme geplant'**
+  String get tvRecIsRecorded;
+
+  /// No description provided for @tvRecIsReminded.
+  ///
+  /// In de, this message translates to:
+  /// **'Erinnerung gesetzt'**
+  String get tvRecIsReminded;
+
+  /// No description provided for @tvRecOkActionsHint.
+  ///
+  /// In de, this message translates to:
+  /// **'OK: Erinnern oder Aufnehmen'**
+  String get tvRecOkActionsHint;
+
+  /// No description provided for @tvShiftTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Timeshift'**
+  String get tvShiftTitle;
+
+  /// No description provided for @tvShiftLive.
+  ///
+  /// In de, this message translates to:
+  /// **'Live'**
+  String get tvShiftLive;
+
+  /// No description provided for @tvShiftKeyHint.
+  ///
+  /// In de, this message translates to:
+  /// **'‹ › ±10 s  ·  ‹‹ ›› ±1 Min.  ·  ⏯ Pause  ·  Stopp: Live'**
+  String get tvShiftKeyHint;
+
+  /// No description provided for @tvShiftBackToLive.
+  ///
+  /// In de, this message translates to:
+  /// **'Zurück zu Live'**
+  String get tvShiftBackToLive;
+
+  /// No description provided for @tvShiftNothingYet.
+  ///
+  /// In de, this message translates to:
+  /// **'Timeshift: noch nichts zwischengespeichert.'**
+  String get tvShiftNothingYet;
+
+  /// No description provided for @tvShiftPlayFailed.
+  ///
+  /// In de, this message translates to:
+  /// **'Timeshift: die Stelle lässt sich nicht abspielen.'**
+  String get tvShiftPlayFailed;
+
+  /// No description provided for @tvShiftTooSlow.
+  ///
+  /// In de, this message translates to:
+  /// **'Timeshift: das NAS kommt nicht nach - weiter im Arbeitsspeicher.'**
+  String get tvShiftTooSlow;
+
+  /// No description provided for @tvShiftWriteFailed.
+  ///
+  /// In de, this message translates to:
+  /// **'Timeshift: Speichern geht nicht (voll?) - weiter im Arbeitsspeicher.'**
+  String get tvShiftWriteFailed;
+
+  /// No description provided for @tvShiftNoNasFolder.
+  ///
+  /// In de, this message translates to:
+  /// **'Timeshift: kein NAS-Ordner „Timeshift“ gewählt - im Arbeitsspeicher.'**
+  String get tvShiftNoNasFolder;
+
+  /// No description provided for @tvShiftSettingsHelp.
+  ///
+  /// In de, this message translates to:
+  /// **'Live-TV anhalten und zurückspulen: die App hält den Stream des Receivers selbst fest (dessen eigenes Timeshift gilt nur für sein HDMI-Bild). Der Start eines Senders wartet nicht darauf.'**
+  String get tvShiftSettingsHelp;
+
+  /// No description provided for @tvShiftModeOff.
+  ///
+  /// In de, this message translates to:
+  /// **'Aus'**
+  String get tvShiftModeOff;
+
+  /// No description provided for @tvShiftModeMemory.
+  ///
+  /// In de, this message translates to:
+  /// **'Arbeitsspeicher'**
+  String get tvShiftModeMemory;
+
+  /// No description provided for @tvShiftModeMemoryInfo.
+  ///
+  /// In de, this message translates to:
+  /// **'{mb} MB - etwa {hd} Min. bei HD, {sd} Min. bei SD'**
+  String tvShiftModeMemoryInfo(int mb, int hd, int sd);
+
+  /// No description provided for @tvShiftModeLocal.
+  ///
+  /// In de, this message translates to:
+  /// **'Lokaler Speicher'**
+  String get tvShiftModeLocal;
+
+  /// No description provided for @tvShiftModeLocalInfo.
+  ///
+  /// In de, this message translates to:
+  /// **'Im Zwischenspeicher der App auf diesem Gerät - HD braucht etwa 4 GB pro Stunde.'**
+  String get tvShiftModeLocalInfo;
+
+  /// No description provided for @tvShiftModeNas.
+  ///
+  /// In de, this message translates to:
+  /// **'NAS-Ordner „Timeshift“'**
+  String get tvShiftModeNas;
+
+  /// No description provided for @tvShiftNasFolderMissing.
+  ///
+  /// In de, this message translates to:
+  /// **'Ordner nicht gewählt - Einstellungen → NAS'**
+  String get tvShiftNasFolderMissing;
+
+  /// No description provided for @tvShiftMaxMinutes.
+  ///
+  /// In de, this message translates to:
+  /// **'Höchstens zurück'**
+  String get tvShiftMaxMinutes;
+
+  /// No description provided for @tvShiftMaxMinutesHelp.
+  ///
+  /// In de, this message translates to:
+  /// **'Älteres wird laufend gelöscht, beim Umschalten und Verlassen alles. Kommt der Speicher nicht nach, geht es im Arbeitsspeicher weiter.'**
+  String get tvShiftMaxMinutesHelp;
+
+  /// No description provided for @tvShiftKeysHelp.
+  ///
+  /// In de, this message translates to:
+  /// **'Fernbedienung: ⏯ hält an und spielt weiter, ‹‹ spult eine Minute zurück, ‹ › zehn Sekunden (solange nicht live), ›› vor - bis Live, Stopp springt zu Live.'**
+  String get tvShiftKeysHelp;
 }
 
 class _AppLocalizationsDelegate

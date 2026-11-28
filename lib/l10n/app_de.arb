@@ -1315,6 +1315,8 @@
   "nasFolderVideos": "Videos",
   "nasFolderMovies": "Filme",
   "nasFolderBackups": "Backups",
+  "nasFolderRecordings": "Aufnahmen",
+  "nasFolderTimeshift": "Timeshift",
   "nasFolderNotChosen": "Nicht gewählt",
   "nasFolderClear": "Auswahl entfernen",
   "nasBackupsHint": "Vor jedem Update wird ein Backup in den Backup-Ordner gelegt; die {count} neuesten dieses Geräts bleiben.",
@@ -3826,5 +3828,144 @@
   "tvReminderRunningHint": "Läuft gerade",
   "tvReminderSettingsHeading": "Erinnerungen",
   "tvReminderSettingsHelp": "Im Programmführer markiert langes OK eine kommende Sendung (in der Sendungsliste eines Kanals: OK) - auch mehrere zur selben Zeit. Kurz vor Beginn erscheint ein Hinweis: bei einer Sendung schaltet TV nach 30 Sekunden von selbst um, bei mehreren wählt man.",
-  "tvReminderLead": "Hinweis vor Beginn"
+  "tvReminderLead": "Hinweis vor Beginn",
+  "tvRecSettingsTitle": "Aufnahmen & Timeshift",
+  "tvRecRecordingsTitle": "Aufnahmen",
+  "tvRecTimersTitle": "Geplante Aufnahmen",
+  "tvRecReminderOn": "Erinnern",
+  "tvRecReminderOff": "Erinnerung löschen",
+  "tvRecRecord": "Aufnehmen",
+  "tvRecRecordRest": "Aufnehmen (ab jetzt)",
+  "tvRecRecordNow": "Laufende Sendung aufnehmen",
+  "tvRecDeleteTimer": "Aufnahme löschen",
+  "tvRecDeleteTimerQuestion": "Geplante Aufnahme löschen?",
+  "tvRecRunningNow": "Wird gerade aufgenommen",
+  "tvRecTimerDisabled": "ausgeschaltet",
+  "tvRecEnded": "Die Sendung ist schon vorbei.",
+  "tvRecFailed": "Hat nicht geklappt: {error}",
+  "@tvRecFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "tvRecSet": "Aufnahme geplant: {title} um {time} auf {channel}",
+  "@tvRecSet": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      },
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "tvRecTimerDeleted": "Aufnahme gelöscht: {title}",
+  "@tvRecTimerDeleted": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "tvRecRefused": "Der Receiver nimmt die Aufnahme nicht an",
+  "tvRecConflict": "Aufnahme-Konflikt",
+  "tvRecReceiverSays": "Receiver: {message}",
+  "@tvRecReceiverSays": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "tvRecConflictsWith": "Überschneidet sich mit:",
+  "tvRecConflictHint": "Mit einem Sat-Kabel kann der Receiver nur Sender desselben Bands gleichzeitig aufnehmen. Eine der Aufnahmen unter „Geplante Aufnahmen“ löschen und noch einmal versuchen.",
+  "tvRecTimersEmpty": "Keine Aufnahmen geplant.\nIm Programmführer: OK lang auf eine Sendung → „Aufnehmen“.",
+  "tvRecTimersHint": "OK: Aufnahme löschen. Der Receiver nimmt selbst auf - auch im Standby.",
+  "tvRecRecordingsEmpty": "Keine Aufnahmen gefunden.",
+  "tvRecRecordingsHint": "OK abspielen  ·  OK lang oder {optionsKey} löschen",
+  "@tvRecRecordingsHint": {
+    "placeholders": {
+      "optionsKey": {
+        "type": "String"
+      }
+    }
+  },
+  "tvRecNoSource": "Weder ein Receiver noch ein NAS-Ordner „Aufnahmen“ ist eingerichtet (Einstellungen → TV bzw. Einstellungen → NAS).",
+  "tvRecSourceNas": "NAS",
+  "tvRecSourceReceiver": "Receiver",
+  "tvRecPlay": "Abspielen",
+  "tvRecDeleteRecording": "Aufnahme löschen",
+  "tvRecDeleteRecordingQuestion": "Aufnahme endgültig löschen?",
+  "tvRecRecordingDeleted": "Gelöscht: {title}",
+  "@tvRecRecordingDeleted": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "tvRecStillRecording": "Läuft noch - abgespielt wird, was schon aufgenommen ist.",
+  "tvRecReceiverLocation": "Aufnahmeort am Receiver",
+  "tvRecLocationHint": "Der Receiver nimmt selbst auf, auch im Standby. Damit die App Aufnahmen direkt vom NAS abspielen kann: am Receiver die NAS-Freigabe einhängen und als Aufnahmeort wählen, dann hier denselben Ordner als NAS-Ordner „Aufnahmen“ einstellen. Ohne ihn zeigt die App die Liste des Receivers und spielt über ihn ab.",
+  "tvRecNasFolder": "NAS-Ordner „Aufnahmen“",
+  "tvRecNasFolderMissing": "nicht gewählt - Einstellungen → NAS",
+  "tvRecStreamCut": "Stream vom Receiver beendet - braucht eine Aufnahme den Tuner? Verbinde neu …",
+  "tvRecStreamLost": "Stream von „{channel}“ beendet - vermutlich braucht eine Aufnahme den Tuner. OK oder ein anderer Sender versucht es erneut.",
+  "@tvRecStreamLost": {
+    "placeholders": {
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "tvRecOnlyReceiver": "Aufnehmen geht nur mit Sendern des Receivers.",
+  "tvRecGuideKeyHint": "OK umschalten  ·  OK lang Erinnern/Aufnehmen  ·  {optionsKey} alle Sendungen  ·  ‹‹ ›› ±3 Std.",
+  "@tvRecGuideKeyHint": {
+    "placeholders": {
+      "optionsKey": {
+        "type": "String"
+      }
+    }
+  },
+  "tvRecIsRecorded": "Aufnahme geplant",
+  "tvRecIsReminded": "Erinnerung gesetzt",
+  "tvRecOkActionsHint": "OK: Erinnern oder Aufnehmen",
+  "tvShiftTitle": "Timeshift",
+  "tvShiftLive": "Live",
+  "tvShiftKeyHint": "‹ › ±10 s  ·  ‹‹ ›› ±1 Min.  ·  ⏯ Pause  ·  Stopp: Live",
+  "tvShiftBackToLive": "Zurück zu Live",
+  "tvShiftNothingYet": "Timeshift: noch nichts zwischengespeichert.",
+  "tvShiftPlayFailed": "Timeshift: die Stelle lässt sich nicht abspielen.",
+  "tvShiftTooSlow": "Timeshift: das NAS kommt nicht nach - weiter im Arbeitsspeicher.",
+  "tvShiftWriteFailed": "Timeshift: Speichern geht nicht (voll?) - weiter im Arbeitsspeicher.",
+  "tvShiftNoNasFolder": "Timeshift: kein NAS-Ordner „Timeshift“ gewählt - im Arbeitsspeicher.",
+  "tvShiftSettingsHelp": "Live-TV anhalten und zurückspulen: die App hält den Stream des Receivers selbst fest (dessen eigenes Timeshift gilt nur für sein HDMI-Bild). Der Start eines Senders wartet nicht darauf.",
+  "tvShiftModeOff": "Aus",
+  "tvShiftModeMemory": "Arbeitsspeicher",
+  "tvShiftModeMemoryInfo": "{mb} MB - etwa {hd} Min. bei HD, {sd} Min. bei SD",
+  "@tvShiftModeMemoryInfo": {
+    "placeholders": {
+      "mb": {
+        "type": "int"
+      },
+      "hd": {
+        "type": "int"
+      },
+      "sd": {
+        "type": "int"
+      }
+    }
+  },
+  "tvShiftModeLocal": "Lokaler Speicher",
+  "tvShiftModeLocalInfo": "Im Zwischenspeicher der App auf diesem Gerät - HD braucht etwa 4 GB pro Stunde.",
+  "tvShiftModeNas": "NAS-Ordner „Timeshift“",
+  "tvShiftNasFolderMissing": "Ordner nicht gewählt - Einstellungen → NAS",
+  "tvShiftMaxMinutes": "Höchstens zurück",
+  "tvShiftMaxMinutesHelp": "Älteres wird laufend gelöscht, beim Umschalten und Verlassen alles. Kommt der Speicher nicht nach, geht es im Arbeitsspeicher weiter.",
+  "tvShiftKeysHelp": "Fernbedienung: ⏯ hält an und spielt weiter, ‹‹ spult eine Minute zurück, ‹ › zehn Sekunden (solange nicht live), ›› vor - bis Live, Stopp springt zu Live."
 }

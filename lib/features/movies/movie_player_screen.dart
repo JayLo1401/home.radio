@@ -64,10 +64,14 @@ Duration movieJumpTarget(Duration position, int direction, List<Duration> chapte
 /// ▲ ▼ chapters (DVD) or ±5 minutes, ☰ (options key) sound track and
 /// subtitles, Back stops.
 class MoviePlayerScreen extends ConsumerStatefulWidget {
-  const MoviePlayerScreen({super.key, required this.movie, required this.config});
+  const MoviePlayerScreen({super.key, required this.movie, required this.config, this.directUri});
 
   final MovieItem movie;
   final NasConfig config;
+
+  /// Played as it is from this address instead of the NAS (TV's recordings
+  /// on the receiver) - no stream server, no DVD handling.
+  final Uri? directUri;
 
   @override
   ConsumerState<MoviePlayerScreen> createState() => _MoviePlayerScreenState();
@@ -140,6 +144,7 @@ class _MoviePlayerScreenState extends ConsumerState<MoviePlayerScreen> {
   }
 
   Future<void> _start() async {
+    if (widget.directUri != null) return _startDirect();
     try {
       final prepared = await prepareMovie(_client, widget.movie);
       if (!mounted) return;
@@ -184,6 +189,28 @@ class _MoviePlayerScreenState extends ConsumerState<MoviePlayerScreen> {
     }
   }
 
+  /// [MoviePlayerScreen.directUri]: straight into the player.
+  Future<void> _startDirect() async {
+    try {
+      var start = Duration.zero;
+      final resume = await _resume.position(widget.movie.path);
+      if (resume != null && mounted) {
+        final choice = await _askResume(resume);
+        if (!mounted) return;
+        if (choice == null) return _close();
+        if (choice) start = resume;
+      }
+      _engine = firstMovieEngine(android: MoviePlayer.isAndroid, extension: fileExtension(widget.movie.path));
+      await _openPlayer(start);
+      _saveTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+        final player = _player;
+        if (player != null) _savePosition(player);
+      });
+    } catch (e) {
+      if (mounted) _fail(e);
+    }
+  }
+
   String get _language => Localizations.localeOf(context).languageCode;
 
   void _fail(Object e) {
@@ -201,8 +228,7 @@ class _MoviePlayerScreenState extends ConsumerState<MoviePlayerScreen> {
   }
 
   Future<void> _openPlayer(Duration start) async {
-    final server = _server!;
-    final player = MoviePlayer(server.uri, engine: _engine);
+    final player = MoviePlayer(widget.directUri ?? _server!.uri, engine: _engine);
     setState(() {
       _player = player;
       _opening = true;
@@ -233,7 +259,8 @@ class _MoviePlayerScreenState extends ConsumerState<MoviePlayerScreen> {
     final old = _player;
     final server = _server;
     final prepared = _prepared;
-    if (old == null || server == null || prepared == null || _switchingEngine) return;
+    final direct = widget.directUri != null;
+    if (old == null || (!direct && (server == null || prepared == null)) || _switchingEngine) return;
     _switchingEngine = true;
     try {
       old.state.removeListener(_onState);
@@ -244,7 +271,7 @@ class _MoviePlayerScreenState extends ConsumerState<MoviePlayerScreen> {
       });
       await old.dispose();
       if (!mounted) return;
-      await server.replace(prepared.specFor(audio: _dvdAudio, exoPlayer: false));
+      if (!direct) await server!.replace(prepared!.specFor(audio: _dvdAudio, exoPlayer: false));
       if (!mounted) return;
       await _openPlayer(position);
     } finally {

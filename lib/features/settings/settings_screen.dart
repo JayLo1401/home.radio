@@ -34,6 +34,8 @@ import '../rtlsdr/rtl_sdr_test_screen.dart';
 import 'restore_backup_screen.dart';
 import '../tv/tv_providers.dart';
 import '../tv/tv_reminder_providers.dart' show tvReminderLeadProvider;
+import '../tv/tv_timeshift.dart' show tvTimeshiftProvider, tvTimeshiftModeLabel;
+import 'tv_recording_settings_screen.dart';
 import '../tv/iptv_providers.dart';
 import 'ha_settings_screen.dart';
 import 'iptv_settings_screen.dart';
@@ -1048,6 +1050,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   icon: Icons.keyboard_outlined,
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const RemoteKeysSettingsScreen()),
+                  ),
+                ),
+              ),
+              FocusTraversalOrder(
+                order: NumericFocusOrder(nextOrder()),
+                child: _TvNavTile(
+                  label: l.tvRecSettingsTitle,
+                  value: tvTimeshiftModeLabel(context, ref.watch(tvTimeshiftProvider).mode),
+                  icon: Icons.fiber_manual_record_outlined,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const TvRecordingSettingsScreen()),
                   ),
                 ),
               ),

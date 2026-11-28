@@ -31,6 +31,7 @@ import '../launcher/launcher_providers.dart';
 import '../settings/ha_settings_screen.dart' show haLinkStatusText;
 import '../tv/tv_providers.dart';
 import '../tv/tv_reminder_providers.dart' show tvReminderLeadProvider;
+import '../tv/tv_timeshift.dart' show TvTimeshiftMode, TvTimeshiftStore, tvTimeshiftMinuteChoices, tvTimeshiftProvider;
 
 /// One setting the admin page shows and changes.
 class _Setting {
@@ -135,6 +136,7 @@ class AdminSettings implements AdminSettingsSource {
     final repo = _c.read(settingsRepositoryProvider);
     final tv = await repo.getEnigma2Config();
     final nextUp = await repo.getTvNextUp();
+    final timeshift = await TvTimeshiftStore(_c.read(databaseProvider)).load();
     final startApp = await repo.getStartApp();
     final apps = LauncherService.supported ? await _c.read(launcherServiceProvider).listApps() : const <InstalledApp>[];
     final dashboardUrl = await repo.getDashboardUrl();
@@ -486,6 +488,41 @@ class AdminSettings implements AdminSettingsSource {
                 final n = await repo.getTvNextUp();
                 await _c.read(tvNextUpProvider.notifier)
                     .set((enabled: _bool(v) ?? true, leadMinutes: n.leadMinutes, showSeconds: n.showSeconds));
+                return null;
+              },
+            ),
+            _Setting(
+              id: 'tvTimeshiftMode',
+              label: l.tvShiftTitle,
+              help: l.tvShiftSettingsHelp,
+              type: 'choice',
+              options: [
+                (TvTimeshiftMode.off.name, l.tvShiftModeOff),
+                (TvTimeshiftMode.memory.name, l.tvShiftModeMemory),
+                (TvTimeshiftMode.local.name, l.tvShiftModeLocal),
+                (TvTimeshiftMode.nas.name, l.tvShiftModeNas),
+              ],
+              get: () => timeshift.mode.name,
+              set: (v) async {
+                final mode = TvTimeshiftMode.values.where((m) => m.name == v).firstOrNull;
+                if (mode == null) return l.adminInvalidValue;
+                final now = await TvTimeshiftStore(_c.read(databaseProvider)).load();
+                await _c.read(tvTimeshiftProvider.notifier).set((mode: mode, minutes: now.minutes));
+                return null;
+              },
+            ),
+            _Setting(
+              id: 'tvTimeshiftMinutes',
+              label: l.tvShiftMaxMinutes,
+              help: l.tvShiftMaxMinutesHelp,
+              type: 'choice',
+              options: [for (final m in tvTimeshiftMinuteChoices) ('$m', l.tvMinutes(m))],
+              get: () => '${timeshift.minutes}',
+              set: (v) async {
+                final m = _int(v);
+                if (m == null || !tvTimeshiftMinuteChoices.contains(m)) return l.adminInvalidValue;
+                final now = await TvTimeshiftStore(_c.read(databaseProvider)).load();
+                await _c.read(tvTimeshiftProvider.notifier).set((mode: now.mode, minutes: m));
                 return null;
               },
             ),
@@ -1180,6 +1217,8 @@ class AdminSettings implements AdminSettingsSource {
         NasFolder.videos => l10n.nasFolderVideos,
         NasFolder.movies => l10n.nasFolderMovies,
         NasFolder.backups => l10n.nasFolderBackups,
+        NasFolder.recordings => l10n.nasFolderRecordings,
+        NasFolder.timeshift => l10n.nasFolderTimeshift,
       };
 
   /// The areas of the overview - the same as on the device's first

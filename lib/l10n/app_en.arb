@@ -789,6 +789,8 @@
   "nasFolderVideos": "Videos",
   "nasFolderMovies": "Movies",
   "nasFolderBackups": "Backups",
+  "nasFolderRecordings": "Recordings",
+  "nasFolderTimeshift": "Timeshift",
   "nasFolderNotChosen": "Not chosen",
   "nasFolderClear": "Clear choice",
   "nasBackupsHint": "Before every update a backup goes into the backup folder; the {count} newest of this device are kept.",
@@ -1894,5 +1896,144 @@
   "tvReminderRunningHint": "On now",
   "tvReminderSettingsHeading": "Reminders",
   "tvReminderSettingsHelp": "In the programme guide, holding OK marks a coming programme (in a channel's programme list: OK) - several at the same time too. Shortly before it begins a note appears: for one programme TV switches by itself after 30 seconds, for several you pick.",
-  "tvReminderLead": "Note before the start"
+  "tvReminderLead": "Note before the start",
+  "tvRecSettingsTitle": "Recordings & timeshift",
+  "tvRecRecordingsTitle": "Recordings",
+  "tvRecTimersTitle": "Scheduled recordings",
+  "tvRecReminderOn": "Remind me",
+  "tvRecReminderOff": "Delete reminder",
+  "tvRecRecord": "Record",
+  "tvRecRecordRest": "Record (from now)",
+  "tvRecRecordNow": "Record current programme",
+  "tvRecDeleteTimer": "Delete recording",
+  "tvRecDeleteTimerQuestion": "Delete scheduled recording?",
+  "tvRecRunningNow": "Recording now",
+  "tvRecTimerDisabled": "disabled",
+  "tvRecEnded": "This programme is over already.",
+  "tvRecFailed": "That didn't work: {error}",
+  "@tvRecFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "tvRecSet": "Recording scheduled: {title} at {time} on {channel}",
+  "@tvRecSet": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      },
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "tvRecTimerDeleted": "Recording deleted: {title}",
+  "@tvRecTimerDeleted": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "tvRecRefused": "The receiver refused the recording",
+  "tvRecConflict": "Recording conflict",
+  "tvRecReceiverSays": "Receiver: {message}",
+  "@tvRecReceiverSays": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "tvRecConflictsWith": "Overlaps with:",
+  "tvRecConflictHint": "With one satellite cable the receiver can only record channels of the same band at once. Delete one of the recordings under “Scheduled recordings” and try again.",
+  "tvRecTimersEmpty": "No recordings scheduled.\nIn the programme guide: hold OK on a programme → “Record”.",
+  "tvRecTimersHint": "OK: delete recording. The receiver records by itself - in standby too.",
+  "tvRecRecordingsEmpty": "No recordings found.",
+  "tvRecRecordingsHint": "OK play  ·  hold OK or {optionsKey} delete",
+  "@tvRecRecordingsHint": {
+    "placeholders": {
+      "optionsKey": {
+        "type": "String"
+      }
+    }
+  },
+  "tvRecNoSource": "Neither a receiver nor a NAS folder “Recordings” is set up (Settings → TV or Settings → NAS).",
+  "tvRecSourceNas": "NAS",
+  "tvRecSourceReceiver": "Receiver",
+  "tvRecPlay": "Play",
+  "tvRecDeleteRecording": "Delete recording",
+  "tvRecDeleteRecordingQuestion": "Delete this recording for good?",
+  "tvRecRecordingDeleted": "Deleted: {title}",
+  "@tvRecRecordingDeleted": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "tvRecStillRecording": "Still recording - plays what has been recorded so far.",
+  "tvRecReceiverLocation": "Receiver's recording location",
+  "tvRecLocationHint": "The receiver records by itself, in standby too. For the app to play recordings straight from the NAS: mount the NAS share on the receiver and choose it as recording location, then set the same folder here as NAS folder “Recordings”. Without it the app shows the receiver's list and plays through the receiver.",
+  "tvRecNasFolder": "NAS folder “Recordings”",
+  "tvRecNasFolderMissing": "not chosen - Settings → NAS",
+  "tvRecStreamCut": "The receiver ended the stream - does a recording need the tuner? Reconnecting …",
+  "tvRecStreamLost": "Stream of “{channel}” ended - a recording probably needs the tuner. OK or another channel tries again.",
+  "@tvRecStreamLost": {
+    "placeholders": {
+      "channel": {
+        "type": "String"
+      }
+    }
+  },
+  "tvRecOnlyReceiver": "Only the receiver's channels can be recorded.",
+  "tvRecGuideKeyHint": "OK switch  ·  hold OK remind/record  ·  {optionsKey} all programmes  ·  ‹‹ ›› ±3 h",
+  "@tvRecGuideKeyHint": {
+    "placeholders": {
+      "optionsKey": {
+        "type": "String"
+      }
+    }
+  },
+  "tvRecIsRecorded": "Recording scheduled",
+  "tvRecIsReminded": "Reminder set",
+  "tvRecOkActionsHint": "OK: remind or record",
+  "tvShiftTitle": "Timeshift",
+  "tvShiftLive": "Live",
+  "tvShiftKeyHint": "‹ › ±10 s  ·  ‹‹ ›› ±1 min  ·  ⏯ pause  ·  Stop: live",
+  "tvShiftBackToLive": "Back to live",
+  "tvShiftNothingYet": "Timeshift: nothing buffered yet.",
+  "tvShiftPlayFailed": "Timeshift: that part can't be played.",
+  "tvShiftTooSlow": "Timeshift: the NAS can't keep up - continuing in memory.",
+  "tvShiftWriteFailed": "Timeshift: can't store (full?) - continuing in memory.",
+  "tvShiftNoNasFolder": "Timeshift: no NAS folder “Timeshift” chosen - using memory.",
+  "tvShiftSettingsHelp": "Pause and rewind live TV: the app keeps the receiver's stream itself (the receiver's own timeshift only applies to its HDMI picture). Starting a channel doesn't wait for it.",
+  "tvShiftModeOff": "Off",
+  "tvShiftModeMemory": "Memory",
+  "tvShiftModeMemoryInfo": "{mb} MB - about {hd} min of HD, {sd} min of SD",
+  "@tvShiftModeMemoryInfo": {
+    "placeholders": {
+      "mb": {
+        "type": "int"
+      },
+      "hd": {
+        "type": "int"
+      },
+      "sd": {
+        "type": "int"
+      }
+    }
+  },
+  "tvShiftModeLocal": "Local storage",
+  "tvShiftModeLocalInfo": "In the app's cache on this device - HD takes about 4 GB per hour.",
+  "tvShiftModeNas": "NAS folder “Timeshift”",
+  "tvShiftNasFolderMissing": "Folder not chosen - Settings → NAS",
+  "tvShiftMaxMinutes": "Rewind at most",
+  "tvShiftMaxMinutesHelp": "Older parts are deleted continuously, everything when switching or leaving. If the storage can't keep up, it continues in memory.",
+  "tvShiftKeysHelp": "Remote: ⏯ pauses and resumes, ‹‹ rewinds a minute, ‹ › ten seconds (while not live), ›› forward - up to live, Stop jumps to live."
 }

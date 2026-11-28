@@ -15,6 +15,8 @@ String nasFolderLabel(BuildContext context, NasFolder kind) => switch (kind) {
       NasFolder.videos => context.l10n.nasFolderVideos,
       NasFolder.movies => context.l10n.nasFolderMovies,
       NasFolder.backups => context.l10n.nasFolderBackups,
+      NasFolder.recordings => context.l10n.nasFolderRecordings,
+      NasFolder.timeshift => context.l10n.nasFolderTimeshift,
     };
 
 IconData _folderIcon(NasFolder kind) => switch (kind) {
@@ -24,6 +26,8 @@ IconData _folderIcon(NasFolder kind) => switch (kind) {
       NasFolder.videos => Icons.video_library_outlined,
       NasFolder.movies => Icons.movie_outlined,
       NasFolder.backups => Icons.settings_backup_restore,
+      NasFolder.recordings => Icons.fiber_manual_record_outlined,
+      NasFolder.timeshift => Icons.history,
     };
 
 /// Settings → System → NAS: the home NAS (WebDAV, FTP or SMB) - address, login,

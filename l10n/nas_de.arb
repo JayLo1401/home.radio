@@ -51,6 +51,8 @@
   "nasFolderVideos": "Videos",
   "nasFolderMovies": "Filme",
   "nasFolderBackups": "Backups",
+  "nasFolderRecordings": "Aufnahmen",
+  "nasFolderTimeshift": "Timeshift",
   "nasFolderNotChosen": "Nicht gewählt",
   "nasFolderClear": "Auswahl entfernen",
   "nasBackupsHint": "Vor jedem Update wird ein Backup in den Backup-Ordner gelegt; die {count} neuesten dieses Geräts bleiben.",
