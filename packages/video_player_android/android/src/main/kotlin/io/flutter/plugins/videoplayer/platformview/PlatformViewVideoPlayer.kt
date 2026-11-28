@@ -62,6 +62,16 @@ constructor(
       return PlatformViewVideoPlayer(events, asset.mediaItem, options) {
         // Home Media: + software MP2 sound (see mp2/Mp2RenderersFactory.kt).
         val builder = ExoPlayer.Builder(context, Mp2RenderersFactory(context))
+        // Home Media: playback starts after 0.5 s of picture instead of
+        // ExoPlayer's 2.5 s - live TV comes in real time, so every channel
+        // switch waited those 2.5 s (after a stall: 2 s instead of 5 s).
+        val loadControl =
+            DefaultLoadControl.Builder()
+                .setBufferDurationsMs(
+                    DefaultLoadControl.DEFAULT_MIN_BUFFER_MS,
+                    DefaultLoadControl.DEFAULT_MAX_BUFFER_MS,
+                    /* bufferForPlaybackMs= */ 500,
+                    /* bufferForPlaybackAfterRebufferMs= */ 2000)
         val backBufferDurationMs = options.backBufferDurationMs
         if (backBufferDurationMs != null) {
           require(backBufferDurationMs >= 0) { "backBufferDurationMs must be at least 0" }
@@ -69,13 +79,10 @@ constructor(
             // Clamp the value to ensure it fits within the int range expected by
             // DefaultLoadControl.
             val backBufferInt = min(backBufferDurationMs, Int.MAX_VALUE.toLong()).toInt()
-            val loadControl =
-                DefaultLoadControl.Builder()
-                    .setBackBuffer(backBufferInt, /* retainBackBufferFromKeyframe= */ true)
-                    .build()
-            builder.setLoadControl(loadControl)
+            loadControl.setBackBuffer(backBufferInt, /* retainBackBufferFromKeyframe= */ true)
           }
         }
+        builder.setLoadControl(loadControl.build())
         val trackSelector = DefaultTrackSelector(context)
         builder
             .setTrackSelector(trackSelector)

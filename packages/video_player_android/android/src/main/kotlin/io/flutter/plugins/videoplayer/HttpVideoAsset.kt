@@ -13,6 +13,8 @@ import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.extractor.DefaultExtractorsFactory
+import androidx.media3.extractor.ts.DefaultTsPayloadReaderFactory
 import androidx.media3.exoplayer.source.MediaSource
 
 internal class HttpVideoAsset(
@@ -57,10 +59,21 @@ internal class HttpVideoAsset(
   ): MediaSource.Factory {
     unstableUpdateDataSourceFactory(initialFactory, httpHeaders, userAgent)
     val dataSourceFactory: DataSource.Factory = DefaultDataSource.Factory(context, initialFactory)
-    return DefaultMediaSourceFactory(context).setDataSourceFactory(dataSourceFactory)
+    return DefaultMediaSourceFactory(context, tvExtractors()).setDataSourceFactory(dataSourceFactory)
   }
 
   private companion object {
+    /**
+     * Home Media: MPEG-TS (live TV, recordings) starts at the first key
+     * picture, not only at an IDR one - many broadcasters send IDR pictures
+     * rarely (H.264 recovery points instead), and ExoPlayer waited seconds
+     * for one after every channel switch.
+     */
+    @OptIn(UnstableApi::class)
+    fun tvExtractors(): DefaultExtractorsFactory =
+        DefaultExtractorsFactory()
+            .setTsExtractorFlags(DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES)
+
     // TODO: Migrate to stable API, see https://github.com/flutter/flutter/issues/147039.
     @OptIn(UnstableApi::class)
     fun unstableUpdateDataSourceFactory(
