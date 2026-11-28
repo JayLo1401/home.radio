@@ -35,7 +35,7 @@ import '../rtlsdr/rtl_sdr_test_screen.dart';
 import 'restore_backup_screen.dart';
 import '../tv/tv_providers.dart';
 import '../tv/tv_reminder_providers.dart' show tvReminderLeadProvider;
-import '../tv/tv_timeshift.dart' show tvTimeshiftProvider, tvTimeshiftModeLabel;
+import '../tv/tv_timeshift.dart' show TvTimeshiftMode, tvTimeshiftProvider, tvTimeshiftModeLabel;
 import 'tv_recording_settings_screen.dart';
 import '../tv/iptv_providers.dart';
 import 'ha_settings_screen.dart';
@@ -401,6 +401,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
     if (picked == null || !mounted) return;
     await ref.read(dashboardPopupProvider.notifier).set(ref.read(dashboardPopupProvider).copyWith(position: picked));
+  }
+
+  /// "Aufnahmen & Timeshift" set up: recordings from the NAS and timeshift
+  /// on (in NAS mode with its folder) - null while the NAS settings load.
+  bool? _recordingsConfigured() {
+    final nas = ref.watch(nasSettingsProvider).value;
+    if (nas == null) return null;
+    bool set(String? path) => path != null && path.trim().isNotEmpty;
+    final mode = ref.watch(tvTimeshiftProvider).mode;
+    final timeshiftOk = mode != TvTimeshiftMode.off && (mode != TvTimeshiftMode.nas || set(nas.folder(NasFolder.timeshift)));
+    return timeshiftOk && set(nas.folder(NasFolder.recordings));
   }
 
   /// Settings → TV: the info bar's time after switching, the channel
@@ -1170,6 +1181,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 child: _TvNavTile(
                   label: l.tvRecSettingsTitle,
                   value: tvTimeshiftModeLabel(context, ref.watch(tvTimeshiftProvider).mode),
+                  // ✓ when set up: the NAS folder with the receiver's
+                  // recordings, and timeshift on (on the NAS: its folder).
+                  configured: _recordingsConfigured(),
                   icon: Icons.fiber_manual_record_outlined,
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const TvRecordingSettingsScreen()),
