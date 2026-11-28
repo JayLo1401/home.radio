@@ -19,6 +19,7 @@ import '../settings/tv_settings_screen.dart';
 import '../shared/program_number_dialog.dart';
 import 'iptv_browse_screen.dart';
 import 'iptv_providers.dart';
+import 'tv_channel_move.dart';
 import 'tv_epg_screen.dart';
 import 'tv_guide_screen.dart';
 import 'tv_player.dart';
@@ -995,6 +996,9 @@ class _TvScreenState extends ConsumerState<TvScreen> {
                               setState(() => _listVisible = false);
                               _focus.requestFocus();
                             },
+                            onNote: (text) {
+                              if (mounted) _showNote(text);
+                            },
                           ),
                         ),
                     ],
@@ -1422,8 +1426,9 @@ class _IptvInfoBanner extends ConsumerWidget {
 /// The open list's channels on the right, as Radio's station list: picon
 /// (or Internet-TV logo), number, name, what's on now. The chips at the
 /// top switch between the receiver's bouquets and Internet-TV, OK tunes.
-/// Receiver channels: → / ☰ open the programme guide. Internet-TV
-/// favorites: → / ☰ their options (move, number, remove).
+/// Receiver channels: → opens the programme guide, OK held / ☰ their
+/// options (move - into the receiver's bouquet). Internet-TV favorites:
+/// → / ☰ their options (move, number, remove).
 class _ChannelList extends ConsumerStatefulWidget {
   const _ChannelList({
     required this.config,
@@ -1436,7 +1441,11 @@ class _ChannelList extends ConsumerStatefulWidget {
     required this.onBrowse,
     required this.onClose,
     required this.onSettings,
+    required this.onNote,
   });
+
+  /// A short note over the picture (the order saved, or why not).
+  final ValueChanged<String> onNote;
 
   /// Left: back to the picture.
   final VoidCallback onClose;
@@ -1461,7 +1470,7 @@ class _ChannelList extends ConsumerStatefulWidget {
   ConsumerState<_ChannelList> createState() => _ChannelListState();
 }
 
-class _ChannelListState extends ConsumerState<_ChannelList> {
+class _ChannelListState extends ConsumerState<_ChannelList> with TvChannelMoveMixin<_ChannelList> {
   E2Channel? _focused;
   IptvChannel? _focusedIptv;
 
@@ -1479,8 +1488,42 @@ class _ChannelListState extends ConsumerState<_ChannelList> {
   /// while a channel is moved.
   int _iptvStart = 0;
 
-  /// The Internet-TV favorite being moved with ↑/↓ (its id).
+  /// The Internet-TV favorite being moved with ↑/↓ (its id), and where it
+  /// was (Back puts it there again).
   String? _moving;
+  int _movingFrom = 0;
+
+  @override
+  void focusMoveStartRow() => _focusStart();
+
+  @override
+  void moveNote(String text) => widget.onNote(text);
+
+  /// The receiver row with [_startNode]: the tuned channel's (the first if
+  /// it isn't in the bouquet) - kept by position once a channel was moved.
+  int _receiverStartRow(List<E2Channel> list) {
+    final fixed = moveStartRow;
+    if (fixed != null) return fixed.clamp(0, list.isEmpty ? 0 : list.length - 1);
+    final i = list.indexWhere((c) => c.ref == widget.current?.ref);
+    return i < 0 ? 0 : i;
+  }
+
+  void _receiverOptions(E2Channel c) {
+    final list = ref.read(tvChannelsProvider).value ?? const <E2Channel>[];
+    final isCurrent = c.ref == widget.current?.ref;
+    receiverChannelOptions(
+      c,
+      isCurrent: isCurrent,
+      startRow: _receiverStartRow(list),
+      onPlay: () => isCurrent ? _showProgrammeInfo(c) : widget.onPick(c),
+      onGuide: () => widget.onEpg(c),
+    );
+  }
+
+  Future<void> _endReceiverMove() async {
+    final moved = await commitChannelMove();
+    if (moved != null && mounted) _focused = moved;
+  }
 
   /// Every row is this high - so the list can jump straight to the tuned
   /// channel (only rows on screen are built, one further down has no
@@ -1534,7 +1577,7 @@ class _ChannelListState extends ConsumerState<_ChannelList> {
         return;
       }
       // The tuned channel's row in the middle - not in this bouquet: the first.
-      i = list.indexWhere((c) => c.ref == widget.current?.ref);
+      i = _receiverStartRow(list);
     }
     final position = _scroll.position;
     final centred = i * _rowExtent - (position.viewportDimension - _rowExtent) / 2;
@@ -1558,6 +1601,7 @@ class _ChannelListState extends ConsumerState<_ChannelList> {
     setState(() {
       _kind = TvListKind.receiver;
       _moving = null;
+      dropChannelMove();
     });
     unawaited(ref.read(iptvProvider.notifier).setList(TvListKind.receiver));
     if (bouquetRef == ref.read(tvCurrentBouquetProvider).value?.ref) {
@@ -1578,6 +1622,7 @@ class _ChannelListState extends ConsumerState<_ChannelList> {
     setState(() {
       _kind = TvListKind.iptv;
       _iptvStart = _iptvIndexOfCurrent();
+      dropChannelMove();
     });
     unawaited(ref.read(iptvProvider.notifier).setList(TvListKind.iptv));
     WidgetsBinding.instance.addPostFrameCallback((_) => _focusStart());
@@ -1633,7 +1678,10 @@ class _ChannelListState extends ConsumerState<_ChannelList> {
       case 'play':
         widget.onPickIptv(c);
       case 'move':
-        setState(() => _moving = c.id);
+        setState(() {
+          _moving = c.id;
+          _movingFrom = _favorites.indexWhere((x) => x.id == c.id);
+        });
       case 'number':
         final from = _favorites.indexWhere((x) => x.id == c.id);
         if (from < 0) return;
@@ -1683,19 +1731,36 @@ class _ChannelListState extends ConsumerState<_ChannelList> {
     _focusedIptv = _favorites.where((c) => c.id == id).firstOrNull ?? _focusedIptv;
   }
 
+  /// Back while moving: the favorite where it was, the focus on it.
+  Future<void> _cancelMove() async {
+    final id = _moving;
+    final at = _favorites.indexWhere((c) => c.id == id);
+    final from = _movingFrom;
+    setState(() {
+      _moving = null;
+      if (from >= 0) _iptvStart = from;
+    });
+    if (at >= 0 && from >= 0 && at != from) await ref.read(iptvProvider.notifier).moveFavorite(at, from);
+    if (!mounted) return;
+    _focusedIptv = _favorites.where((c) => c.id == id).firstOrNull ?? _focusedIptv;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _focusStart());
+  }
+
   KeyEventResult _onKey(FocusNode node, KeyEvent event) {
     final key = event.logicalKey;
+    final receiverMove = channelMoveKey(event);
+    if (receiverMove != null) return receiverMove;
     if (_moving != null) {
       if (event is KeyUpEvent) return KeyEventResult.ignored;
       if (key == LogicalKeyboardKey.arrowUp || key == LogicalKeyboardKey.arrowDown) {
         _moveBy(key == LogicalKeyboardKey.arrowUp ? -1 : 1);
         return KeyEventResult.handled;
       }
-      if (event is KeyDownEvent &&
-          (key == LogicalKeyboardKey.arrowLeft ||
-              key == LogicalKeyboardKey.arrowRight ||
-              key == LogicalKeyboardKey.escape ||
-              key == LogicalKeyboardKey.goBack)) {
+      if (event is KeyDownEvent && (key == LogicalKeyboardKey.escape || key == LogicalKeyboardKey.goBack)) {
+        _cancelMove();
+        return KeyEventResult.handled;
+      }
+      if (event is KeyDownEvent && (key == LogicalKeyboardKey.arrowLeft || key == LogicalKeyboardKey.arrowRight)) {
         _endMove();
         return KeyEventResult.handled;
       }
@@ -1729,7 +1794,13 @@ class _ChannelListState extends ConsumerState<_ChannelList> {
       widget.onClose();
       return KeyEventResult.handled;
     }
-    if (keys.matches(RemoteAction.guide, key) || keys.matches(RemoteAction.options, key)) {
+    // ☰: the channel's options (move, ...); the guide key: the guide.
+    if (keys.matches(RemoteAction.options, key)) {
+      final c = _focused ?? widget.current;
+      if (c != null) _receiverOptions(c);
+      return KeyEventResult.handled;
+    }
+    if (keys.matches(RemoteAction.guide, key)) {
       final c = _focused ?? widget.current;
       if (c != null) widget.onEpg(c);
       return KeyEventResult.handled;
@@ -1791,12 +1862,13 @@ class _ChannelListState extends ConsumerState<_ChannelList> {
             const SizedBox(height: 8),
             // Plain arrows - Android draws ▶/◀ as coloured emoji.
             Text(
-              _moving != null
-                  ? context.l10n.iptvMoveHint
+              _moving != null || movingChannel
+                  ? context.l10n.tvMoveKeyHint
                   : isIptv
                       ? context.l10n.iptvChannelListKeyHint
                       : context.l10n.tvChannelListKeyHint,
-              style: TextStyle(color: _moving != null ? brandGreen : Colors.white.withValues(alpha: 0.45), fontSize: 14),
+              style: TextStyle(
+                  color: _moving != null || movingChannel ? brandGreen : Colors.white.withValues(alpha: 0.45), fontSize: 14),
             ),
             const SizedBox(height: 10),
             Expanded(child: isIptv ? _iptvRows(iptv?.favorites ?? const []) : _receiverRows()),
@@ -1817,23 +1889,33 @@ class _ChannelListState extends ConsumerState<_ChannelList> {
           ? Center(child: Text(context.l10n.tvNoChannelsInList, style: const TextStyle(color: Colors.white70)))
           : ListView.builder(
               controller: _scroll,
-              itemCount: list.length,
+              itemCount: shownChannels(list).length,
               itemExtent: _rowExtent,
               padding: const EdgeInsets.only(bottom: 20),
               itemBuilder: (context, i) {
-                final c = list[i];
+                final c = shownChannels(list)[i];
                 final event = nowNextFor(epg, c, now).now;
                 final isCurrent = c.ref == widget.current?.ref;
-                final start = isCurrent || (i == 0 && !list.any((x) => x.ref == widget.current?.ref));
+                final start = i == _receiverStartRow(list);
+                final moving = c.ref == movingRef;
+                // OK while moving: done; on the channel on air: its
+                // programme info; on another: play it.
+                void tap() => movingChannel
+                    ? _endReceiverMove()
+                    : isCurrent
+                        ? _showProgrammeInfo(c)
+                        : widget.onPick(c);
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 6),
                   child: TvRow(
                     focusNode: start ? _startNode : null,
-                    selected: isCurrent,
-                    onFocused: () => _focused = c,
-                    // OK on the channel on air: its programme info;
-                    // on another: play it.
-                    onTap: () => isCurrent ? _showProgrammeInfo(c) : widget.onPick(c),
+                    selected: isCurrent || moving,
+                    onFocused: () {
+                      if (!movingChannel) _focused = c;
+                    },
+                    onTap: tap,
+                    // OK held: the channel's options (move, ...).
+                    onLongPress: movingChannel ? null : () => _receiverOptions(c),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                       child: Row(
@@ -1865,12 +1947,15 @@ class _ChannelListState extends ConsumerState<_ChannelList> {
                               ],
                             ),
                           ),
-                          // ▶ (or a click on it): the programme guide.
+                          // ▶ (or a click on it): the programme guide;
+                          // while moving ↕.
                           GestureDetector(
-                            onTap: () => widget.onEpg(c),
-                            child: const Padding(
-                              padding: EdgeInsets.only(left: 8),
-                              child: Icon(Icons.chevron_right, color: Colors.white54, size: 30),
+                            onTap: movingChannel ? null : () => widget.onEpg(c),
+                            child: Padding(
+                              padding: const EdgeInsets.only(left: 8),
+                              child: moving
+                                  ? const Icon(Icons.swap_vert, color: brandGreen, size: 28)
+                                  : const Icon(Icons.chevron_right, color: Colors.white54, size: 30),
                             ),
                           ),
                         ],

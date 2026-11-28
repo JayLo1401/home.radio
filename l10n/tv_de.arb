@@ -142,7 +142,25 @@
   "@tvThen": {
     "description": "Before the start time and title of the programme after the current one."
   },
-  "tvChannelListKeyHint": "OK abspielen (laufender Sender: Info)  ·  → Programm  ·  ← schließen",
+  "tvChannelListKeyHint": "OK abspielen (laufender Sender: Info)  ·  OK lang Optionen (verschieben)  ·  → Programm  ·  ← schließen",
+  "tvMoveKeyHint": "↑/↓ verschieben  ·  OK fertig  ·  Zurück abbrechen",
+  "tvChannelPlay": "Abspielen",
+  "tvChannelInfo": "Was läuft",
+  "tvChannelMove": "Verschieben",
+  "tvChannelMoveSubtitle": "Reihenfolge ändern - auch am Receiver",
+  "tvChannelOrderReset": "Reihenfolge des Receivers übernehmen",
+  "tvChannelOrderResetSubtitle": "Die nur in der App gespeicherte Reihenfolge verwerfen",
+  "tvOrderSaved": "Reihenfolge am Receiver gespeichert",
+  "tvOrderLocalOnly": "Reihenfolge nur in der App gespeichert – Bouquet-Editor am Receiver nicht verfügbar",
+  "tvOrderFailed": "Reihenfolge nicht gespeichert: {error}",
+  "@tvOrderFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "tvOrderMismatch": "Der Receiver hat die neue Reihenfolge nicht übernommen",
   "tvNoChannelsInList": "Keine Sender in dieser Liste",
   "tvChannelList": "Senderliste",
   "tvBouquetFavorites": "Favoriten",

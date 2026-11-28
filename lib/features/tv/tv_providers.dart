@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/providers.dart';
 import '../../data/repositories/settings_repository.dart';
 import '../../data/services/enigma2_service.dart';
+import 'tv_channel_order.dart';
 
 /// The Enigma2 receiver TV uses (Einstellungen → TV).
 class Enigma2ConfigNotifier extends Notifier<Enigma2Config?> {
@@ -122,12 +123,9 @@ final tvCurrentBouquetProvider = FutureProvider<E2Bouquet?>((ref) async {
   return bouquets.where((b) => b.ref == chosen).firstOrNull ?? bouquets.first;
 });
 
-final tvChannelsProvider = FutureProvider<List<E2Channel>>((ref) async {
-  final service = ref.watch(enigma2ServiceProvider);
-  final bouquet = await ref.watch(tvCurrentBouquetProvider.future);
-  if (service == null || bouquet == null) return const [];
-  return (await service.channels(bouquet.ref)).where((c) => !c.isRadio).toList();
-});
+/// The TV channels of the bouquet shown - in the order set in the channel
+/// list ("Verschieben", see tv_channel_order.dart), numbered in it.
+final tvChannelsProvider = FutureProvider<List<E2Channel>>(orderedTvChannels);
 
 /// Now and next per channel (service reference -> events, by start),
 /// refreshed every minute and whenever a programme ends.

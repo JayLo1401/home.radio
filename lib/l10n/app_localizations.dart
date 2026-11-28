@@ -9377,8 +9377,74 @@ abstract class AppLocalizations {
   /// No description provided for @tvChannelListKeyHint.
   ///
   /// In de, this message translates to:
-  /// **'OK abspielen (laufender Sender: Info)  ·  → Programm  ·  ← schließen'**
+  /// **'OK abspielen (laufender Sender: Info)  ·  OK lang Optionen (verschieben)  ·  → Programm  ·  ← schließen'**
   String get tvChannelListKeyHint;
+
+  /// No description provided for @tvMoveKeyHint.
+  ///
+  /// In de, this message translates to:
+  /// **'↑/↓ verschieben  ·  OK fertig  ·  Zurück abbrechen'**
+  String get tvMoveKeyHint;
+
+  /// No description provided for @tvChannelPlay.
+  ///
+  /// In de, this message translates to:
+  /// **'Abspielen'**
+  String get tvChannelPlay;
+
+  /// No description provided for @tvChannelInfo.
+  ///
+  /// In de, this message translates to:
+  /// **'Was läuft'**
+  String get tvChannelInfo;
+
+  /// No description provided for @tvChannelMove.
+  ///
+  /// In de, this message translates to:
+  /// **'Verschieben'**
+  String get tvChannelMove;
+
+  /// No description provided for @tvChannelMoveSubtitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Reihenfolge ändern - auch am Receiver'**
+  String get tvChannelMoveSubtitle;
+
+  /// No description provided for @tvChannelOrderReset.
+  ///
+  /// In de, this message translates to:
+  /// **'Reihenfolge des Receivers übernehmen'**
+  String get tvChannelOrderReset;
+
+  /// No description provided for @tvChannelOrderResetSubtitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Die nur in der App gespeicherte Reihenfolge verwerfen'**
+  String get tvChannelOrderResetSubtitle;
+
+  /// No description provided for @tvOrderSaved.
+  ///
+  /// In de, this message translates to:
+  /// **'Reihenfolge am Receiver gespeichert'**
+  String get tvOrderSaved;
+
+  /// No description provided for @tvOrderLocalOnly.
+  ///
+  /// In de, this message translates to:
+  /// **'Reihenfolge nur in der App gespeichert – Bouquet-Editor am Receiver nicht verfügbar'**
+  String get tvOrderLocalOnly;
+
+  /// No description provided for @tvOrderFailed.
+  ///
+  /// In de, this message translates to:
+  /// **'Reihenfolge nicht gespeichert: {error}'**
+  String tvOrderFailed(String error);
+
+  /// No description provided for @tvOrderMismatch.
+  ///
+  /// In de, this message translates to:
+  /// **'Der Receiver hat die neue Reihenfolge nicht übernommen'**
+  String get tvOrderMismatch;
 
   /// No description provided for @tvNoChannelsInList.
   ///

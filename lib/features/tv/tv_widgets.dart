@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/ok_long_press.dart';
 import '../../core/theme.dart';
 import '../../data/models/iptv_channel.dart';
 import '../../data/services/enigma2_service.dart';
@@ -145,10 +146,15 @@ class TvRow extends StatefulWidget {
     this.focusNode,
     this.onFocused,
     this.selected = false,
+    this.onLongPress,
   });
 
   final Widget child;
   final VoidCallback onTap;
+
+  /// OK held (or a long press / tap): something else than [onTap], e.g. a
+  /// channel's options.
+  final VoidCallback? onLongPress;
   final bool autofocus;
   final FocusNode? focusNode;
   final VoidCallback? onFocused;
@@ -163,7 +169,7 @@ class _TvRowState extends State<TvRow> {
 
   @override
   Widget build(BuildContext context) {
-    return TvFocusHighlight(
+    final row = TvFocusHighlight(
       focused: _focused,
       borderRadius: BorderRadius.circular(10),
       child: Material(
@@ -182,10 +188,15 @@ class _TvRowState extends State<TvRow> {
             }
           },
           onTap: widget.onTap,
+          onLongPress: widget.onLongPress,
           child: widget.child,
         ),
       ),
     );
+    // OK on the remote "activates" on key-down - to tell a held one, the
+    // decision waits for the release (only while there's [onLongPress];
+    // always in the tree, so the row keeps its focus when it comes and goes).
+    return OkLongPress(onTap: widget.onTap, onLongPress: widget.onLongPress, child: row);
   }
 }
 
