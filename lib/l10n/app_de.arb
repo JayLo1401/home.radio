@@ -1745,6 +1745,7 @@
   "picturesStillSearching": "sucht weiter …",
   "picturesPaused": "Pause",
   "picturesSlideshowHint": "← → zurück/vor · OK oder ↑ ↓ Musik und Anzeigedauer · ⏯ Pause · {options} Einstellungen · Zurück beendet",
+  "picturesSlideshowVideoHint": "Video: ← → spulen · ⏮ ⏭ oder Kanal ± voriges/nächstes · OK oder ↑ ↓ Musik und Anzeigedauer · ⏯ Pause · Zurück beendet",
   "@picturesSlideshowHint": {
     "placeholders": {
       "options": {
@@ -2215,6 +2216,7 @@
   "radioLinkStick": "Stick",
   "radioLinkUsbStick": "USB-Stick",
   "radioLinkStation": "Sender",
+  "radioLinkDescramble": "Entschlüsseln",
   "radioLinkTvChannel": "Sender",
   "radioDone": "Fertig",
   "radioEditFavorites": "Favoriten bearbeiten",
@@ -3649,6 +3651,20 @@
       }
     }
   },
+  "settingsTvInfoSeconds": "Infoleiste nach dem Umschalten",
+  "settingsTvInfoSecondsValue": "{seconds} s",
+  "@settingsTvInfoSecondsValue": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsTvListText": "Schrift der Senderliste",
+  "settingsTvListTextNormal": "Normal",
+  "settingsTvListTextLarge": "Groß",
+  "settingsTvListTextExtraLarge": "Sehr groß",
+  "settingsTvViewHelp": "Wie lange Sender und Sendung nach dem Umschalten unten eingeblendet bleiben, und wie groß die Senderliste schreibt – vor allem die Zeile mit der laufenden Sendung.",
   "systemStartDashboard": "Haussteuerung anzeigen (Wandtablet)",
   "systemStartAppNone": "Andere App starten …",
   "systemStartApp": "App starten: {app}",

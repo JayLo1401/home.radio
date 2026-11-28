@@ -5056,6 +5056,12 @@ abstract class AppLocalizations {
   /// **'← → zurück/vor · OK oder ↑ ↓ Musik und Anzeigedauer · ⏯ Pause · {options} Einstellungen · Zurück beendet'**
   String picturesSlideshowHint(String options);
 
+  /// No description provided for @picturesSlideshowVideoHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Video: ← → spulen · ⏮ ⏭ oder Kanal ± voriges/nächstes · OK oder ↑ ↓ Musik und Anzeigedauer · ⏯ Pause · Zurück beendet'**
+  String get picturesSlideshowVideoHint;
+
   /// No description provided for @picturesInterval.
   ///
   /// In de, this message translates to:
@@ -6189,6 +6195,12 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'Sender'**
   String get radioLinkStation;
+
+  /// No description provided for @radioLinkDescramble.
+  ///
+  /// In de, this message translates to:
+  /// **'Entschlüsseln'**
+  String get radioLinkDescramble;
 
   /// No description provided for @radioLinkTvChannel.
   ///
@@ -9639,6 +9651,48 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'Fehler abgefangen: {message}'**
   String errorCaught(String message);
+
+  /// No description provided for @settingsTvInfoSeconds.
+  ///
+  /// In de, this message translates to:
+  /// **'Infoleiste nach dem Umschalten'**
+  String get settingsTvInfoSeconds;
+
+  /// No description provided for @settingsTvInfoSecondsValue.
+  ///
+  /// In de, this message translates to:
+  /// **'{seconds} s'**
+  String settingsTvInfoSecondsValue(int seconds);
+
+  /// No description provided for @settingsTvListText.
+  ///
+  /// In de, this message translates to:
+  /// **'Schrift der Senderliste'**
+  String get settingsTvListText;
+
+  /// No description provided for @settingsTvListTextNormal.
+  ///
+  /// In de, this message translates to:
+  /// **'Normal'**
+  String get settingsTvListTextNormal;
+
+  /// No description provided for @settingsTvListTextLarge.
+  ///
+  /// In de, this message translates to:
+  /// **'Groß'**
+  String get settingsTvListTextLarge;
+
+  /// No description provided for @settingsTvListTextExtraLarge.
+  ///
+  /// In de, this message translates to:
+  /// **'Sehr groß'**
+  String get settingsTvListTextExtraLarge;
+
+  /// No description provided for @settingsTvViewHelp.
+  ///
+  /// In de, this message translates to:
+  /// **'Wie lange Sender und Sendung nach dem Umschalten unten eingeblendet bleiben, und wie groß die Senderliste schreibt – vor allem die Zeile mit der laufenden Sendung.'**
+  String get settingsTvViewHelp;
 
   /// No description provided for @systemStartDashboard.
   ///

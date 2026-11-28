@@ -161,6 +161,7 @@
   "radioLinkStick": "Stick",
   "radioLinkUsbStick": "USB stick",
   "radioLinkStation": "Station",
+  "radioLinkDescramble": "Descramble",
   "radioLinkTvChannel": "Channel",
   "radioDone": "Done",
   "radioEditFavorites": "Edit favorites",

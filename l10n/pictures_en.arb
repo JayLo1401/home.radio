@@ -59,6 +59,7 @@
   "picturesStillSearching": "still looking …",
   "picturesPaused": "Paused",
   "picturesSlideshowHint": "← → back/next · OK or ↑ ↓ music and display time · ⏯ pause · {options} settings · Back ends",
+  "picturesSlideshowVideoHint": "Video: ← → seek · ⏮ ⏭ or channel ± previous/next · OK or ↑ ↓ music and display time · ⏯ pause · Back ends",
   "@picturesSlideshowHint": {
     "placeholders": {
       "options": {

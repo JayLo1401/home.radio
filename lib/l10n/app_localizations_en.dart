@@ -2932,6 +2932,10 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get picturesSlideshowVideoHint =>
+      'Video: ← → seek · ⏮ ⏭ or channel ± previous/next · OK or ↑ ↓ music and display time · ⏯ pause · Back ends';
+
+  @override
   String get picturesInterval => 'Next picture after';
 
   @override
@@ -3620,6 +3624,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get radioLinkStation => 'Station';
+
+  @override
+  String get radioLinkDescramble => 'Descramble';
 
   @override
   String get radioLinkTvChannel => 'Channel';
@@ -5713,6 +5720,30 @@ class AppLocalizationsEn extends AppLocalizations {
   String errorCaught(String message) {
     return 'Error caught: $message';
   }
+
+  @override
+  String get settingsTvInfoSeconds => 'Info bar after switching';
+
+  @override
+  String settingsTvInfoSecondsValue(int seconds) {
+    return '$seconds s';
+  }
+
+  @override
+  String get settingsTvListText => 'Channel list text';
+
+  @override
+  String get settingsTvListTextNormal => 'Normal';
+
+  @override
+  String get settingsTvListTextLarge => 'Large';
+
+  @override
+  String get settingsTvListTextExtraLarge => 'Extra large';
+
+  @override
+  String get settingsTvViewHelp =>
+      'How long channel and programme stay at the bottom after switching, and how big the channel list writes – above all the line with the programme on now.';
 
   @override
   String get systemStartDashboard => 'Show Smart Home (wall tablet)';

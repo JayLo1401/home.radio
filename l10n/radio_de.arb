@@ -387,6 +387,7 @@
   "radioLinkStick": "Stick",
   "radioLinkUsbStick": "USB-Stick",
   "radioLinkStation": "Sender",
+  "radioLinkDescramble": "Entschlüsseln",
   "radioLinkTvChannel": "Sender",
   "radioDone": "Fertig",
   "radioEditFavorites": "Favoriten bearbeiten",

@@ -59,6 +59,7 @@
   "picturesStillSearching": "sucht weiter …",
   "picturesPaused": "Pause",
   "picturesSlideshowHint": "← → zurück/vor · OK oder ↑ ↓ Musik und Anzeigedauer · ⏯ Pause · {options} Einstellungen · Zurück beendet",
+  "picturesSlideshowVideoHint": "Video: ← → spulen · ⏮ ⏭ oder Kanal ± voriges/nächstes · OK oder ↑ ↓ Musik und Anzeigedauer · ⏯ Pause · Zurück beendet",
   "@picturesSlideshowHint": {
     "placeholders": {
       "options": {

@@ -394,5 +394,13 @@
         "type": "String"
       }
     }
-  }
+  },
+  "settingsTvInfoSeconds": "Infoleiste nach dem Umschalten",
+  "settingsTvInfoSecondsValue": "{seconds} s",
+  "@settingsTvInfoSecondsValue": {"placeholders": {"seconds": {"type": "int"}}},
+  "settingsTvListText": "Schrift der Senderliste",
+  "settingsTvListTextNormal": "Normal",
+  "settingsTvListTextLarge": "Groß",
+  "settingsTvListTextExtraLarge": "Sehr groß",
+  "settingsTvViewHelp": "Wie lange Sender und Sendung nach dem Umschalten unten eingeblendet bleiben, und wie groß die Senderliste schreibt – vor allem die Zeile mit der laufenden Sendung."
 }

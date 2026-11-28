@@ -18,6 +18,7 @@ import '../../data/services/nas_service.dart';
 import '../../data/services/picture_library.dart';
 import '../../data/services/radio_audio_handler.dart';
 import '../../l10n/l10n.dart';
+import '../movies/movie_player_screen.dart' show formatMovieTime, movieSeekStep;
 import '../music/music_now_playing_toast.dart';
 import 'slide_loader.dart';
 import 'slide_video.dart';
@@ -103,6 +104,19 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> with SingleTi
   /// The video playing instead of a picture.
   SlideVideo? _video;
 
+  /// Seeking in [_video] with ← / → (as in Filme): the presses add up -
+  /// faster the more in a row - and the jump happens when they stop.
+  SlideVideo? _seekVideo;
+  Duration? _seekTarget;
+  Timer? _seekTimer;
+  int _seekPresses = 0;
+  int _seekDirection = 0;
+  DateTime _lastSeek = DateTime(0);
+
+  /// The video's position bar shows (while seeking and a moment after).
+  var _seekBar = false;
+  Timer? _seekBarTimer;
+
   /// Paused for a video with sound - going on after it.
   var _musicPausedForVideo = false;
   RadioAudioHandler? _radioPausedForVideo;
@@ -144,6 +158,8 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> with SingleTi
     _stop();
     _timer?.cancel();
     _overlayTimer?.cancel();
+    _seekTimer?.cancel();
+    _seekBarTimer?.cancel();
     _fade.dispose();
     _focus.dispose();
     _current?.dispose();
@@ -534,6 +550,13 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> with SingleTi
       LogicalKeyboardKey.mediaFastForward,
       LogicalKeyboardKey.mediaRewind,
     };
+    // A video: ← → (and ⏪ ⏩) seek in it, ⏮ ⏭ and the channel keys go to
+    // the previous / next picture or video (the music is paused anyway).
+    final video = _video;
+    if (video != null && !_popupOpen) {
+      final result = _videoKey(video, event);
+      if (result != null) return result;
+    }
     if (event is KeyDownEvent && trackKeys.contains(key) && ref.read(musicPlayerProvider).handleMediaKey(key)) {
       return KeyEventResult.handled;
     }
@@ -584,6 +607,77 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> with SingleTi
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
+  }
+
+  /// The keys while [video] plays - null for the ones handled as usual.
+  KeyEventResult? _videoKey(SlideVideo video, KeyEvent event) {
+    final key = event.logicalKey;
+    if (key == LogicalKeyboardKey.arrowRight || key == LogicalKeyboardKey.mediaFastForward) {
+      _seekVideoBy(video, 1);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowLeft || key == LogicalKeyboardKey.mediaRewind) {
+      _seekVideoBy(video, -1);
+      return KeyEventResult.handled;
+    }
+    final next = key == LogicalKeyboardKey.mediaTrackNext ||
+        key == LogicalKeyboardKey.channelUp ||
+        key == LogicalKeyboardKey.pageUp;
+    final previous = key == LogicalKeyboardKey.mediaTrackPrevious ||
+        key == LogicalKeyboardKey.channelDown ||
+        key == LogicalKeyboardKey.pageDown;
+    if (next || previous) {
+      if (event is KeyDownEvent) _step(next ? 1 : -1);
+      return KeyEventResult.handled;
+    }
+    return null;
+  }
+
+  void _seekVideoBy(SlideVideo video, int direction) {
+    final state = video.player.state.value;
+    if (!identical(_seekVideo, video)) {
+      _seekVideo = video;
+      _seekTarget = null;
+      _seekPresses = 0;
+      _seekDirection = 0;
+    }
+    final now = DateTime.now();
+    final inARow = direction == _seekDirection && now.difference(_lastSeek) < const Duration(milliseconds: 1500);
+    _seekPresses = inARow ? _seekPresses + 1 : 0;
+    _seekDirection = direction;
+    _lastSeek = now;
+    var target = (_seekTarget ?? state.position) + movieSeekStep(_seekPresses) * direction;
+    if (target < Duration.zero) target = Duration.zero;
+    final duration = state.duration;
+    if (duration > Duration.zero && target >= duration) {
+      // Past the end: on to the next picture or video.
+      _seekTimer?.cancel();
+      _seekTarget = null;
+      _step(1);
+      return;
+    }
+    _seekTimer?.cancel();
+    _seekBarTimer?.cancel();
+    setState(() {
+      _seekTarget = target;
+      _seekBar = true;
+    });
+    _seekTimer = Timer(const Duration(milliseconds: 600), () => unawaited(_applySeek(video)));
+  }
+
+  Future<void> _applySeek(SlideVideo video) async {
+    final target = _seekTarget;
+    if (target == null || !identical(_video, video)) return;
+    try {
+      await video.player.seekTo(target);
+    } catch (e) {
+      debugPrint('slideshow video seek: $e');
+    }
+    if (!mounted || !identical(_video, video)) return;
+    setState(() => _seekTarget = null);
+    _seekBarTimer = Timer(const Duration(seconds: 2), () {
+      if (mounted && _seekTarget == null) setState(() => _seekBar = false);
+    });
   }
 
   void _onTapUp(TapUpDetails details) {
@@ -667,6 +761,15 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> with SingleTi
               ),
           ],
           if (_paused) const Positioned(top: 24, right: 24, child: _PauseBadge()),
+          if (video != null && (_seekBar || _overlay) && !_popupOpen)
+            Positioned(
+              left: 48,
+              right: 48,
+              bottom: _overlay ? 130 : 32,
+              child: IgnorePointer(
+                child: _VideoSeekBar(video: video, target: identical(_seekVideo, video) ? _seekTarget : null),
+              ),
+            ),
           if (_loading)
             const Positioned(
               bottom: 24,
@@ -698,7 +801,9 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> with SingleTi
                   name: shown.name,
                   position: '${_playlist.index + 1} / ${_playlist.length}',
                   searching: !_playlist.complete,
-                  hint: l.picturesSlideshowHint(remoteKeyHint(ref.watch(remoteKeysProvider), RemoteAction.options)),
+                  hint: video != null
+                      ? l.picturesSlideshowVideoHint
+                      : l.picturesSlideshowHint(remoteKeyHint(ref.watch(remoteKeysProvider), RemoteAction.options)),
                 ),
               ),
             ),
@@ -923,4 +1028,59 @@ Future<void> showSlideshowOptions(BuildContext context, WidgetRef ref) {
       },
     ),
   );
+}
+
+/// A video's position while seeking: time, bar, length.
+class _VideoSeekBar extends StatelessWidget {
+  const _VideoSeekBar({required this.video, required this.target});
+
+  final SlideVideo video;
+
+  /// Where the presses so far lead (not yet jumped to).
+  final Duration? target;
+
+  @override
+  Widget build(BuildContext context) => ListenableBuilder(
+        // A new player when ExoPlayer hands over to libmpv.
+        listenable: video,
+        builder: (context, _) => ValueListenableBuilder(
+          valueListenable: video.player.state,
+          builder: (context, state, _) {
+            final position = target ?? state.position;
+            final duration = state.duration;
+            final fraction = duration > Duration.zero
+                ? (position.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0)
+                : 0.0;
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.6),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Text(formatMovieTime(position), style: const TextStyle(color: Colors.white, fontSize: 16)),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(3),
+                      child: LinearProgressIndicator(
+                        value: fraction,
+                        minHeight: 6,
+                        backgroundColor: Colors.white24,
+                        color: brandGreen,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Text(
+                    duration > Duration.zero ? formatMovieTime(duration) : '-:--',
+                    style: const TextStyle(color: Colors.white70, fontSize: 16),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      );
 }

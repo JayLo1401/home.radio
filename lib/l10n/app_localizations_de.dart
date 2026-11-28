@@ -2938,6 +2938,10 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String get picturesSlideshowVideoHint =>
+      'Video: ← → spulen · ⏮ ⏭ oder Kanal ± voriges/nächstes · OK oder ↑ ↓ Musik und Anzeigedauer · ⏯ Pause · Zurück beendet';
+
+  @override
   String get picturesInterval => 'Bild wechselt alle';
 
   @override
@@ -3606,6 +3610,9 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get radioLinkStation => 'Sender';
+
+  @override
+  String get radioLinkDescramble => 'Entschlüsseln';
 
   @override
   String get radioLinkTvChannel => 'Sender';
@@ -5713,6 +5720,30 @@ class AppLocalizationsDe extends AppLocalizations {
   String errorCaught(String message) {
     return 'Fehler abgefangen: $message';
   }
+
+  @override
+  String get settingsTvInfoSeconds => 'Infoleiste nach dem Umschalten';
+
+  @override
+  String settingsTvInfoSecondsValue(int seconds) {
+    return '$seconds s';
+  }
+
+  @override
+  String get settingsTvListText => 'Schrift der Senderliste';
+
+  @override
+  String get settingsTvListTextNormal => 'Normal';
+
+  @override
+  String get settingsTvListTextLarge => 'Groß';
+
+  @override
+  String get settingsTvListTextExtraLarge => 'Sehr groß';
+
+  @override
+  String get settingsTvViewHelp =>
+      'Wie lange Sender und Sendung nach dem Umschalten unten eingeblendet bleiben, und wie groß die Senderliste schreibt – vor allem die Zeile mit der laufenden Sendung.';
 
   @override
   String get systemStartDashboard => 'Haussteuerung anzeigen (Wandtablet)';

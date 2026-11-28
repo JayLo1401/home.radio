@@ -240,7 +240,8 @@ class LinkView {
     required this.station,
     required this.message,
     this.internet = false,
-  }) : tv = false;
+  })  : tv = false,
+        crypt = null;
 
   /// Internet radio: "App — Internet — Sender", [server] standing for the
   /// connection to the stream (no stick).
@@ -249,12 +250,14 @@ class LinkView {
       server = connection,
       stick = LinkState.done,
       internet = true,
-      tv = false;
+      tv = false,
+      crypt = null;
 
-  /// TV: "App — Receiver — Sender", [server] standing for the Sat
-  /// receiver (reached, switched to an encrypted channel), [station] for
-  /// the picture.
-  const LinkView.tv({required LinkState receiver, required this.station, required this.message})
+  /// TV: "App — Receiver — (Entschlüsseln) — Sat", [server] standing for
+  /// the Sat receiver (reached, switched to an encrypted channel), [crypt]
+  /// for the receiver's card / CI module descrambling an encrypted channel
+  /// (null: not encrypted, or not known yet), [station] for the picture.
+  const LinkView.tv({required LinkState receiver, required this.station, required this.message, this.crypt})
     : viaServer = false,
       server = receiver,
       stick = LinkState.done,
@@ -263,13 +266,17 @@ class LinkView {
 
   final bool internet;
   final bool tv;
+
+  /// TV: descrambling an encrypted channel - null without that step.
+  final LinkState? crypt;
   final bool viaServer;
   final LinkState server;
   final LinkState stick;
   final LinkState station;
   final String message;
 
-  bool get animating => [server, stick, station].any((s) => s == LinkState.active || s == LinkState.retrying);
+  bool get animating =>
+      [server, stick, station, crypt].any((s) => s == LinkState.active || s == LinkState.retrying);
 
   @override
   bool operator ==(Object other) =>
@@ -280,10 +287,11 @@ class LinkView {
       other.server == server &&
       other.stick == stick &&
       other.station == station &&
+      other.crypt == crypt &&
       other.message == message;
 
   @override
-  int get hashCode => Object.hash(internet, tv, viaServer, server, stick, station, message);
+  int get hashCode => Object.hash(internet, tv, viaServer, server, stick, station, crypt, message);
 }
 
 /// "App — RTL-Server — Stick — Sender" in the Now Playing banner while the
@@ -387,7 +395,7 @@ class _ConnectionChainState extends State<ConnectionChain> with SingleTickerProv
   Widget build(BuildContext context) {
     final view = widget.view;
     final l10n = context.l10n;
-    final messageColor = switch ([view.server, view.stick, view.station]) {
+    final messageColor = switch ([view.server, view.stick, view.station, view.crypt]) {
       final s when s.contains(LinkState.failed) => Colors.redAccent,
       final s when s.contains(LinkState.retrying) => Colors.orangeAccent,
       _ => Colors.white70,
@@ -399,15 +407,21 @@ class _ConnectionChainState extends State<ConnectionChain> with SingleTickerProv
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _node(Icons.tv, l10n.radioLinkApp, LinkState.done),
+          // The app - Home System's house.
+          _node(Icons.home_outlined, l10n.radioLinkApp, LinkState.done),
           if (view.internet) ...[
             // Internet radio: the stream comes over the internet.
             _segment(view.server),
             _node(Icons.public, 'Internet', view.server),
           ] else if (view.tv) ...[
-            // TV: the picture comes from the Sat receiver.
+            // TV: the picture comes from the Sat receiver (a set-top box),
+            // an encrypted channel descrambled by its card / CI module.
             _segment(view.server),
-            _node(Icons.settings_input_antenna, 'Receiver', view.server),
+            _node(Icons.dvr, 'Receiver', view.server),
+            if (view.crypt case final crypt?) ...[
+              _segment(crypt),
+              _node(crypt == LinkState.done ? Icons.lock_open : Icons.lock_outline, l10n.radioLinkDescramble, crypt),
+            ],
           ] else ...[
             if (view.viaServer) ...[
               _segment(view.server),
@@ -418,7 +432,8 @@ class _ConnectionChainState extends State<ConnectionChain> with SingleTickerProv
           ],
           _segment(view.station),
           _node(
-            view.tv ? Icons.live_tv : (view.internet ? Icons.radio : Icons.cell_tower),
+            // TV: the channel comes from the satellite (dish).
+            view.tv ? Icons.satellite_alt : (view.internet ? Icons.radio : Icons.cell_tower),
             view.tv ? l10n.radioLinkTvChannel : l10n.radioLinkStation,
             view.station,
           ),

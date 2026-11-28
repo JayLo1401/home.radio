@@ -99,6 +99,9 @@ class _TvScreenState extends ConsumerState<TvScreen> {
   String _digits = '';
   Timer? _digitTimer;
 
+  /// Switches to the number typed so far - OK / Enter does it at once.
+  VoidCallback? _digitGo;
+
   /// "Als Nächstes": the programme announced, and which one was already.
   E2Event? _nextUp;
   String? _nextUpShownFor;
@@ -276,8 +279,12 @@ class _TvScreenState extends ConsumerState<TvScreen> {
   /// Radio's; null once the picture runs.
   LinkView? _link;
 
+  /// The descrambling step of the channel being tuned: null while it isn't
+  /// known to be encrypted (see [LinkView.crypt]).
+  LinkState? _crypt;
+
   void _setLink(LinkState receiver, LinkState station, String message) =>
-      setState(() => _link = LinkView.tv(receiver: receiver, station: station, message: message));
+      setState(() => _link = LinkView.tv(receiver: receiver, station: station, message: message, crypt: _crypt));
 
   /// The stream of the channel on air, through [TvStreamSession].
   TvStreamSession? _session;
@@ -298,6 +305,10 @@ class _TvScreenState extends ConsumerState<TvScreen> {
     final clock = Stopwatch()..start();
     void mark(String what) => debugPrint('TV ${channel.name}: $what nach ${clock.elapsedMilliseconds} ms');
     final oldPlayer = _player, oldSession = _session;
+    final known = ref.read(tvStreamKnowledgeProvider);
+    // Known to be encrypted: the descrambling step shows from the start, so
+    // the chain only ever moves on (no "Bild wird geladen" first).
+    _crypt = known.isEncrypted(channel.ref) ? LinkState.pending : null;
     setState(() {
       _current = channel;
       _iptv = null;
@@ -306,7 +317,12 @@ class _TvScreenState extends ConsumerState<TvScreen> {
       _loading = true;
       _error = null;
       _stopped = false;
-      _link = LinkView.tv(receiver: LinkState.active, station: LinkState.pending, message: t.tvLinkConnecting);
+      _link = LinkView.tv(
+        receiver: LinkState.active,
+        station: LinkState.pending,
+        message: t.tvLinkConnecting,
+        crypt: _crypt,
+      );
     });
     _showInfo();
     _checkNextUp();
@@ -316,7 +332,6 @@ class _TvScreenState extends ConsumerState<TvScreen> {
     unawaited(ref.read(settingsRepositoryProvider).setTvLastChannel(channel.ref));
     unawaited(ref.read(iptvProvider.notifier).setList(TvListKind.receiver));
 
-    final known = ref.read(tvStreamKnowledgeProvider);
     // Standby or on decides whether the receiver may be switched - asked
     // while the stream connects.
     final boxState = service.state();
@@ -373,9 +388,13 @@ class _TvScreenState extends ConsumerState<TvScreen> {
       final problem = await zap(t.tvReasonEncrypted);
       if (stale()) return giveUp('', atReceiver: false);
       if (problem != null) return giveUp(problem, atReceiver: true);
-    } else {
-      _setLink(LinkState.done, LinkState.active, t.tvLinkLoadingPicture);
+    } else if (_crypt != null) {
+      // In standby the receiver's card descrambles it - straight away.
+      _crypt = LinkState.active;
+      _setLink(LinkState.done, LinkState.pending, t.tvLinkDescrambling);
     }
+    // Otherwise "Verbinde mit Receiver" until the first data says whether
+    // the channel comes clear or encrypted.
     // No stream at all - no tuner free for its band: the receiver to it (it
     // shows another band itself), the session keeps asking meanwhile.
     unawaited(session.refused.then((_) async {
@@ -393,11 +412,11 @@ class _TvScreenState extends ConsumerState<TvScreen> {
         final problem = await zap(t.tvReasonEncrypted);
         if (stale()) return giveUp('', atReceiver: false);
         if (problem != null) return giveUp(problem, atReceiver: true);
-      } else if (!switched) {
-        // In standby the receiver's card / CI module is free and descrambles
-        // the stream itself, a moment later.
-        _setLink(LinkState.active, LinkState.pending, t.tvLinkDescrambling);
       }
+      // In standby the receiver's card / CI module is free and descrambles
+      // the stream itself, a moment later (when on: after switching).
+      _crypt = LinkState.active;
+      _setLink(LinkState.done, LinkState.pending, t.tvLinkDescrambling);
       // On this connection, or on a new one if the receiver keeps serving
       // the old one scrambled.
       var clear = await _clearWithin(session, Duration(milliseconds: box.standby ? 6000 : 2500));
@@ -424,6 +443,7 @@ class _TvScreenState extends ConsumerState<TvScreen> {
         atReceiver: true,
       );
     }
+    if (_crypt != null) _crypt = LinkState.done;
     _setLink(LinkState.done, LinkState.active, t.tvLinkLoadingPicture);
     try {
       await starting;
@@ -569,12 +589,21 @@ class _TvScreenState extends ConsumerState<TvScreen> {
       _infoVisible = true;
       _link = _iptv != null
           ? LinkView.internet(connection: LinkState.done, station: LinkState.failed, message: message)
-          : LinkView.tv(
-              receiver: atReceiver ? LinkState.failed : LinkState.done,
-              station: atReceiver ? LinkState.pending : LinkState.failed,
-              message: message,
-            );
+          : _failedTvLink(message, atReceiver: atReceiver);
     });
+  }
+
+  /// Where it broke off: still descrambling - the card's step; else at the
+  /// receiver or with the picture.
+  LinkView _failedTvLink(String message, {required bool atReceiver}) {
+    final crypt = _crypt == LinkState.active ? LinkState.failed : _crypt;
+    final atCard = crypt == LinkState.failed;
+    return LinkView.tv(
+      receiver: atReceiver && !atCard ? LinkState.failed : LinkState.done,
+      station: atReceiver ? LinkState.pending : LinkState.failed,
+      message: message,
+      crypt: crypt,
+    );
   }
 
   static String _refKey(String? serviceRef) => (serviceRef ?? '').replaceAll(RegExp(r':+$'), '').toUpperCase();
@@ -857,8 +886,10 @@ class _TvScreenState extends ConsumerState<TvScreen> {
       _infoVisible = true;
       _bannerAhead = ahead;
     });
-    // Looking ahead takes reading - a little longer.
-    _infoTimer = Timer(Duration(seconds: ahead > 0 ? 10 : 6), () {
+    // Looking ahead takes reading - a little longer (Einstellungen → TV
+    // sets the time).
+    final seconds = ref.read(tvViewProvider).infoSeconds;
+    _infoTimer = Timer(Duration(seconds: ahead > 0 ? seconds + 4 : seconds), () {
       if (mounted) {
         setState(() {
           _infoVisible = false;
@@ -880,6 +911,8 @@ class _TvScreenState extends ConsumerState<TvScreen> {
     // As soon as no other channel number can start with these digits.
     final done = _digits.length >= (iptv ? favorites.length : channels.length).toString().length;
     void go() {
+      _digitTimer?.cancel();
+      _digitGo = null;
       setState(() => _digits = '');
       if (iptv) {
         final c = IptvFavorites.byNumber(favorites, number);
@@ -890,6 +923,7 @@ class _TvScreenState extends ConsumerState<TvScreen> {
       if (c != null) _tune(c);
     }
 
+    _digitGo = go;
     done ? go() : _digitTimer = Timer(const Duration(milliseconds: 1500), go);
   }
 
@@ -1070,7 +1104,8 @@ class _TvScreenState extends ConsumerState<TvScreen> {
                     fit: StackFit.expand,
                     children: [
                       OkLongPress(
-                        onTap: () => setState(() => _listVisible = true),
+                        // A number typed: OK switches to it at once.
+                        onTap: () => _digitGo != null ? _digitGo!() : setState(() => _listVisible = true),
                         onLongPress: _openOptions,
                         child: Focus(
                           focusNode: _focus,
@@ -2088,6 +2123,10 @@ class _ChannelListState extends ConsumerState<_ChannelList> with TvChannelMoveMi
     final channels = ref.watch(tvChannelsProvider);
     final epg = ref.watch(tvNowNextProvider).value ?? const {};
     final now = DateTime.now();
+    // Einstellungen → TV: the writing's size - the programme line fully,
+    // the name and number half as much (still fits the rows' height).
+    final textScale = ref.watch(tvViewProvider).listText.factor;
+    final nameScale = 1 + (textScale - 1) / 2;
     return channels.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(child: Text('$e', style: const TextStyle(color: Colors.white70))),
@@ -2128,7 +2167,7 @@ class _ChannelListState extends ConsumerState<_ChannelList> with TvChannelMoveMi
                         children: [
                           SizedBox(
                             width: 40,
-                            child: Text('${c.number}', style: const TextStyle(color: Colors.white54, fontSize: 16)),
+                            child: Text('${c.number}', style: TextStyle(color: Colors.white54, fontSize: 16 * nameScale)),
                           ),
                           Picon(config: widget.config, channel: c, width: 76, height: 46),
                           const SizedBox(width: 14),
@@ -2140,13 +2179,13 @@ class _ChannelListState extends ConsumerState<_ChannelList> with TvChannelMoveMi
                                 Text(c.name,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600)),
+                                    style: TextStyle(color: Colors.white, fontSize: 18 * nameScale, fontWeight: FontWeight.w600)),
                                 if (event != null) ...[
                                   const SizedBox(height: 2),
                                   Text('${hhmm(event.begin)}  ${event.title}',
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(color: Colors.white60, fontSize: 14)),
+                                      style: TextStyle(color: Colors.white70, fontSize: 14 * textScale)),
                                   const SizedBox(height: 5),
                                   EventProgress(event: event, height: 4),
                                 ],

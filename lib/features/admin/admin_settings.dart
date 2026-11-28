@@ -31,6 +31,7 @@ import '../browser/browser_settings.dart';
 import '../dashboard/dashboard_mini_player.dart' show dashboardPopupPositionLabel;
 import '../launcher/launcher_providers.dart';
 import '../settings/ha_settings_screen.dart' show haLinkStatusText;
+import '../settings/settings_screen.dart' show tvListTextLabel;
 import '../tv/tv_providers.dart';
 import '../tv/tv_reminder_providers.dart' show tvReminderLeadProvider;
 import '../tv/tv_timeshift.dart' show TvTimeshiftMode, TvTimeshiftStore, tvTimeshiftMinuteChoices, tvTimeshiftProvider;
@@ -139,6 +140,11 @@ class AdminSettings implements AdminSettingsSource {
     final tv = await repo.getEnigma2Config();
     final nextUp = await repo.getTvNextUp();
     final timeshift = await TvTimeshiftStore(_c.read(databaseProvider)).load();
+    final tvView = await repo.getTvView();
+    Future<String?> setTvView(TvViewSettings Function(TvViewSettings v) f) async {
+      await _c.read(tvViewProvider.notifier).set(f(await repo.getTvView()));
+      return null;
+    }
     final startApp = await repo.getStartApp();
     final apps = LauncherService.supported ? await _c.read(launcherServiceProvider).listApps() : const <InstalledApp>[];
     final dashboardUrl = await repo.getDashboardUrl();
@@ -528,6 +534,31 @@ class AdminSettings implements AdminSettingsSource {
                 final now = await TvTimeshiftStore(_c.read(databaseProvider)).load();
                 await _c.read(tvTimeshiftProvider.notifier).set((mode: now.mode, minutes: m));
                 return null;
+              },
+            ),
+            _Setting(
+              id: 'tvInfoSeconds',
+              label: l.settingsTvInfoSeconds,
+              help: l.settingsTvViewHelp,
+              type: 'choice',
+              options: [for (final s in TvViewSettings.infoSecondChoices) ('$s', l.settingsTvInfoSecondsValue(s))],
+              get: () => '${tvView.infoSeconds}',
+              set: (v) {
+                final s = _int(v);
+                if (s == null || !TvViewSettings.infoSecondChoices.contains(s)) return Future.value(l.adminInvalidValue);
+                return setTvView((t) => t.copyWith(infoSeconds: s));
+              },
+            ),
+            _Setting(
+              id: 'tvListText',
+              label: l.settingsTvListText,
+              type: 'choice',
+              options: [for (final size in TvListTextSize.values) (size.name, tvListTextLabel(l, size))],
+              get: () => tvView.listText.name,
+              set: (v) {
+                final size = TvListTextSize.values.where((s) => s.name == v).firstOrNull;
+                if (size == null) return Future.value(l.adminInvalidValue);
+                return setTvView((t) => t.copyWith(listText: size));
               },
             ),
           ],

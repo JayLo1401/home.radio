@@ -63,6 +63,23 @@ class TvZapEncryptedNotifier extends Notifier<bool> {
 
 final tvZapEncryptedProvider = NotifierProvider<TvZapEncryptedNotifier, bool>(TvZapEncryptedNotifier.new);
 
+/// The info bar's time after switching and the channel list's writing
+/// (Einstellungen → TV).
+class TvViewNotifier extends Notifier<TvViewSettings> {
+  @override
+  TvViewSettings build() {
+    ref.read(settingsRepositoryProvider).getTvView().then((v) => state = v);
+    return TvViewSettings.defaults;
+  }
+
+  Future<void> set(TvViewSettings value) async {
+    state = value;
+    await ref.read(settingsRepositoryProvider).setTvView(value);
+  }
+}
+
+final tvViewProvider = NotifierProvider<TvViewNotifier, TvViewSettings>(TvViewNotifier.new);
+
 /// The channels (service references) whose stream came scrambled - the
 /// receiver is switched to them right away next time, without waiting for
 /// the stream to show it. Kept in the settings.

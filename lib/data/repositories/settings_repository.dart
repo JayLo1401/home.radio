@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show immutable;
+
 import '../db/database.dart';
 import '../models/launcher_group.dart';
 import '../models/launcher_tile.dart';
@@ -912,6 +914,22 @@ class SettingsRepository {
   Future<bool> getTvZapEncrypted() async => await _db.getSetting('tv_zap_encrypted') != 'false';
   Future<void> setTvZapEncrypted(bool value) => _db.setSetting('tv_zap_encrypted', '$value');
 
+  /// How long the info bar shows after switching channels (seconds) and
+  /// how big the channel list writes - see [TvViewSettings].
+  Future<TvViewSettings> getTvView() async {
+    final seconds = int.tryParse(await _db.getSetting('tv_info_seconds') ?? '');
+    final text = await _db.getSetting('tv_list_text');
+    return TvViewSettings(
+      infoSeconds: TvViewSettings.infoSecondChoices.contains(seconds) ? seconds! : TvViewSettings.defaults.infoSeconds,
+      listText: TvListTextSize.values.where((v) => v.name == text).firstOrNull ?? TvViewSettings.defaults.listText,
+    );
+  }
+
+  Future<void> setTvView(TvViewSettings value) async {
+    await _db.setSetting('tv_info_seconds', '${value.infoSeconds}');
+    await _db.setSetting('tv_list_text', value.listText.name);
+  }
+
   /// The remote's keys per action (see RemoteKeys): action name -> logical
   /// key ids; an action not in there has its standard keys.
   Future<Map<String, List<int>>> getRemoteKeys() async {
@@ -1135,4 +1153,40 @@ class HaLinkSettings {
 
   @override
   int get hashCode => Object.hash(enabled, host, port, user, password, shareCamera);
+}
+
+/// The channel list's writing: the programme line especially, which is
+/// small on a TV at a distance.
+enum TvListTextSize {
+  normal(1.0),
+  large(1.25),
+  extraLarge(1.5);
+
+  const TvListTextSize(this.factor);
+
+  /// For the "what's on" line; the channel's name grows half as much.
+  final double factor;
+}
+
+/// TV: the info bar's time after switching, the channel list's writing.
+@immutable
+class TvViewSettings {
+  const TvViewSettings({required this.infoSeconds, required this.listText});
+
+  static const defaults = TvViewSettings(infoSeconds: 6, listText: TvListTextSize.large);
+
+  static const infoSecondChoices = [2, 3, 4, 5, 6, 8, 10, 15, 20, 30];
+
+  final int infoSeconds;
+  final TvListTextSize listText;
+
+  TvViewSettings copyWith({int? infoSeconds, TvListTextSize? listText}) =>
+      TvViewSettings(infoSeconds: infoSeconds ?? this.infoSeconds, listText: listText ?? this.listText);
+
+  @override
+  bool operator ==(Object other) =>
+      other is TvViewSettings && other.infoSeconds == infoSeconds && other.listText == listText;
+
+  @override
+  int get hashCode => Object.hash(infoSeconds, listText);
 }

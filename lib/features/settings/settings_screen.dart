@@ -403,6 +403,49 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     await ref.read(dashboardPopupProvider.notifier).set(ref.read(dashboardPopupProvider).copyWith(position: picked));
   }
 
+  /// Settings → TV: the info bar's time after switching, the channel
+  /// list's writing (- / + like the other steps).
+  List<Widget> _tvViewSettings(BuildContext context, double Function() nextOrder) {
+    final l = context.l10n;
+    final view = ref.watch(tvViewProvider);
+    final notifier = ref.read(tvViewProvider.notifier);
+    Widget stepper(String label, String value, void Function(int) onChange) => Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: Row(
+            children: [
+              SizedBox(width: 260, child: Text(label, style: Theme.of(context).textTheme.bodyLarge)),
+              FocusTraversalOrder(
+                order: NumericFocusOrder(nextOrder()),
+                child: _TvIconButton(icon: Icons.remove, onTap: () => onChange(-1)),
+              ),
+              SizedBox(
+                width: 140,
+                child: Text(value, textAlign: TextAlign.center, style: const TextStyle(fontSize: 18)),
+              ),
+              FocusTraversalOrder(
+                order: NumericFocusOrder(nextOrder()),
+                child: _TvIconButton(icon: Icons.add, onTap: () => onChange(1)),
+              ),
+            ],
+          ),
+        );
+    const seconds = TvViewSettings.infoSecondChoices;
+    final secondsIndex = seconds.indexOf(view.infoSeconds).clamp(0, seconds.length - 1);
+    final sizes = TvListTextSize.values;
+    return [
+      stepper(l.settingsTvInfoSeconds, l.settingsTvInfoSecondsValue(view.infoSeconds), (d) {
+        notifier.set(view.copyWith(infoSeconds: seconds[(secondsIndex + d).clamp(0, seconds.length - 1)]));
+      }),
+      stepper(l.settingsTvListText, tvListTextLabel(l, view.listText), (d) {
+        notifier.set(view.copyWith(listText: sizes[(view.listText.index + d).clamp(0, sizes.length - 1)]));
+      }),
+      Padding(
+        padding: const EdgeInsets.only(top: 6),
+        child: Text(l.settingsTvViewHelp, style: const TextStyle(color: Colors.white60)),
+      ),
+    ];
+  }
+
   /// Settings → Haussteuerung: the dashboard's address, the playback popup,
   /// display by motion, Home Assistant's side.
   List<Widget> _dashboardSection(
@@ -1113,6 +1156,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ref.read(tvZapEncryptedProvider.notifier).set(v);
               }),
               Text(l.settingsTvZapEncryptedHelp, style: const TextStyle(color: Colors.white60)),
+              ..._tvViewSettings(context, nextOrder),
               const Divider(height: 32),
               Text(l.settingsTvStartHeading, style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 8),
@@ -1986,3 +2030,10 @@ class _TvIconButtonState extends State<_TvIconButton> {
     );
   }
 }
+
+/// "Normal", "Groß", "Sehr groß" - the channel list's writing.
+String tvListTextLabel(AppLocalizations l, TvListTextSize size) => switch (size) {
+      TvListTextSize.normal => l.settingsTvListTextNormal,
+      TvListTextSize.large => l.settingsTvListTextLarge,
+      TvListTextSize.extraLarge => l.settingsTvListTextExtraLarge,
+    };

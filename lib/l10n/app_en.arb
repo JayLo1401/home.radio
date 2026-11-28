@@ -1101,6 +1101,7 @@
   "picturesStillSearching": "still looking …",
   "picturesPaused": "Paused",
   "picturesSlideshowHint": "← → back/next · OK or ↑ ↓ music and display time · ⏯ pause · {options} settings · Back ends",
+  "picturesSlideshowVideoHint": "Video: ← → seek · ⏮ ⏭ or channel ± previous/next · OK or ↑ ↓ music and display time · ⏯ pause · Back ends",
   "@picturesSlideshowHint": {
     "placeholders": {
       "options": {
@@ -1345,6 +1346,7 @@
   "radioLinkStick": "Stick",
   "radioLinkUsbStick": "USB stick",
   "radioLinkStation": "Station",
+  "radioLinkDescramble": "Descramble",
   "radioLinkTvChannel": "Channel",
   "radioDone": "Done",
   "radioEditFavorites": "Edit favorites",
@@ -1920,6 +1922,20 @@
   "settingsHomeKeyNotRunning": "Service \"Home System: Home key\" is switched on but not running (the app was ended). The app restarts it by itself where allowed - otherwise restart it here.",
   "settingsHomeKeyRestart": "Restart service",
   "errorCaught": "Error caught: {message}",
+  "settingsTvInfoSeconds": "Info bar after switching",
+  "settingsTvInfoSecondsValue": "{seconds} s",
+  "@settingsTvInfoSecondsValue": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsTvListText": "Channel list text",
+  "settingsTvListTextNormal": "Normal",
+  "settingsTvListTextLarge": "Large",
+  "settingsTvListTextExtraLarge": "Extra large",
+  "settingsTvViewHelp": "How long channel and programme stay at the bottom after switching, and how big the channel list writes – above all the line with the programme on now.",
   "systemStartDashboard": "Show Smart Home (wall tablet)",
   "systemStartAppNone": "Start another app …",
   "systemStartApp": "Start app: {app}",
