@@ -583,6 +583,7 @@
   },
   "iptvEmptyList": "Noch keine Internet-TV-Sender. Oben „Sender suchen“: dort spielt OK einen Sender, ★ nimmt ihn in diese Liste auf.",
   "iptvChannelListKeyHint": "OK abspielen (laufender Sender: Info)  ·  → Optionen (verschieben, entfernen)  ·  ← schließen",
+  "iptvChannelListInfoKeyHint": "OK abspielen (laufender Sender: zurück zum Bild)  ·  → Optionen (verschieben, entfernen)  ·  ← schließen",
   "iptvMove": "Verschieben",
   "iptvMoveHint": "↑/↓ verschieben  ·  OK fertig",
   "iptvChangeNumber": "Nummer ändern…",
@@ -3665,6 +3666,8 @@
   "settingsTvListTextLarge": "Groß",
   "settingsTvListTextExtraLarge": "Sehr groß",
   "settingsTvViewHelp": "Wie lange Sender und Sendung nach dem Umschalten unten eingeblendet bleiben, und wie groß die Senderliste schreibt – vor allem die Zeile mit der laufenden Sendung.",
+  "settingsTvListInfo": "Senderliste mit Info rechts",
+  "settingsTvListInfoHelp": "Die Senderliste steht in der Mitte, rechts daneben immer Sendung, Beschreibung und was danach kommt – für den markierten Sender. OK auf dem laufenden Sender führt zurück zum Bild (oder startet ihn neu, wenn er kein Bild hat). Aus: die Senderliste am Rand wie bisher.",
   "systemStartDashboard": "Haussteuerung anzeigen (Wandtablet)",
   "systemStartAppNone": "Andere App starten …",
   "systemStartApp": "App starten: {app}",
@@ -3834,6 +3837,19 @@
     "description": "Before the start time and title of the programme after the current one."
   },
   "tvChannelListKeyHint": "OK abspielen (laufender Sender: Info)  ·  OK lang Optionen (verschieben)  ·  → Programm  ·  ← schließen",
+  "tvChannelListInfoKeyHint": "OK abspielen (laufender Sender: zurück zum Bild)  ·  OK lang Optionen (verschieben)  ·  → Programm  ·  ← schließen",
+  "tvListOnAir": "Läuft gerade – OK zurück zum Bild",
+  "@tvListOnAir": {
+    "description": "Channel list with info: the channel on air plays fine, OK closes the list."
+  },
+  "tvListRetune": "Kein Bild – OK startet den Sender neu",
+  "@tvListRetune": {
+    "description": "Channel list with info: the channel on air does not play (stopped, error, stream lost), OK tunes it again."
+  },
+  "tvListLater": "Danach",
+  "@tvListLater": {
+    "description": "Heading over the next programmes in the info beside the channel list."
+  },
   "tvMoveKeyHint": "↑/↓ verschieben  ·  OK fertig  ·  Zurück abbrechen",
   "tvChannelPlay": "Abspielen",
   "tvChannelInfo": "Was läuft",

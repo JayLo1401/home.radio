@@ -205,5 +205,7 @@
   "settingsTvListTextNormal": "Normal",
   "settingsTvListTextLarge": "Large",
   "settingsTvListTextExtraLarge": "Extra large",
-  "settingsTvViewHelp": "How long channel and programme stay at the bottom after switching, and how big the channel list writes – above all the line with the programme on now."
+  "settingsTvViewHelp": "How long channel and programme stay at the bottom after switching, and how big the channel list writes – above all the line with the programme on now.",
+  "settingsTvListInfo": "Channel list with info on the right",
+  "settingsTvListInfoHelp": "The channel list sits in the middle with the marked channel's programme, description and what comes next always beside it. OK on the channel on air goes back to the picture (or tunes it again if it shows no picture). Off: the channel list at the side as before."
 }

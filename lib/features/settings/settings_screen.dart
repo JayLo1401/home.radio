@@ -404,7 +404,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   /// Settings → TV: the info bar's time after switching, the channel
-  /// list's writing (- / + like the other steps).
+  /// list's writing (- / + like the other steps) and its layout (in the
+  /// middle with the marked channel's info beside it, or at the side).
   List<Widget> _tvViewSettings(BuildContext context, double Function() nextOrder) {
     final l = context.l10n;
     final view = ref.watch(tvViewProvider);
@@ -443,6 +444,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         padding: const EdgeInsets.only(top: 6),
         child: Text(l.settingsTvViewHelp, style: const TextStyle(color: Colors.white60)),
       ),
+      const SizedBox(height: 12),
+      FocusTraversalOrder(
+        order: NumericFocusOrder(nextOrder()),
+        child: _TvChoiceTile(
+          label: l.settingsTvListInfo,
+          selected: view.listInfo,
+          asToggle: true,
+          onTap: () => notifier.set(view.copyWith(listInfo: !view.listInfo)),
+        ),
+      ),
+      Text(l.settingsTvListInfoHelp, style: const TextStyle(color: Colors.white60)),
     ];
   }
 

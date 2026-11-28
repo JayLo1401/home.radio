@@ -86,6 +86,7 @@
   },
   "iptvEmptyList": "Noch keine Internet-TV-Sender. Oben „Sender suchen“: dort spielt OK einen Sender, ★ nimmt ihn in diese Liste auf.",
   "iptvChannelListKeyHint": "OK abspielen (laufender Sender: Info)  ·  → Optionen (verschieben, entfernen)  ·  ← schließen",
+  "iptvChannelListInfoKeyHint": "OK abspielen (laufender Sender: zurück zum Bild)  ·  → Optionen (verschieben, entfernen)  ·  ← schließen",
   "iptvMove": "Verschieben",
   "iptvMoveHint": "↑/↓ verschieben  ·  OK fertig",
   "iptvChangeNumber": "Nummer ändern…",

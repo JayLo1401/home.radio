@@ -5,7 +5,6 @@ import 'package:intl/intl.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/country_names_de.dart';
 import '../../core/providers.dart';
 import '../../core/ok_long_press.dart';
 import '../../core/remote_keys.dart';
@@ -21,6 +20,7 @@ import '../shared/program_number_dialog.dart';
 import 'hbbtv_overlay.dart';
 import 'iptv_browse_screen.dart';
 import 'iptv_providers.dart';
+import 'tv_channel_info.dart';
 import 'tv_channel_move.dart';
 import 'tv_epg_screen.dart';
 import 'tv_guide_screen.dart';
@@ -180,7 +180,7 @@ class _TvScreenState extends ConsumerState<TvScreen> {
     final key = serviceKey(serviceRef);
     final channel = channels.where((c) => serviceKey(c.ref) == key).firstOrNull;
     if (!mounted || channel == null) return;
-    if (_listVisible) setState(() => _listVisible = false);
+    _hideList();
     _focus.requestFocus();
     if (channel.ref != _current?.ref || _iptv != null) await _tune(channel);
   }
@@ -820,9 +820,7 @@ class _TvScreenState extends ConsumerState<TvScreen> {
       MaterialPageRoute(builder: (_) => IptvBrowseScreen(current: _iptv)),
     );
     if (!mounted) return;
-    if (_listVisible) {
-      setState(() => _listVisible = false);
-    }
+    _hideList();
     if (picked != null && picked.id != _iptv?.id) unawaited(_tuneIptv(picked));
     // From the setup screen the player's Focus is only built now.
     _focus.requestFocus();
@@ -851,10 +849,7 @@ class _TvScreenState extends ConsumerState<TvScreen> {
       MaterialPageRoute(builder: (_) => TvGuideScreen(start: start)),
     );
     if (!mounted || picked == null) return;
-    if (_listVisible) {
-      setState(() => _listVisible = false);
-      _focus.requestFocus();
-    }
+    _hideList();
     if (picked.ref != _current?.ref) unawaited(_tune(picked));
   }
 
@@ -879,6 +874,25 @@ class _TvScreenState extends ConsumerState<TvScreen> {
       if (mounted) setState(() => _nextUp = null);
     });
   }
+
+  /// The channel list closed, the focus back on the picture. The info bar
+  /// stayed under the list all the while - from now on its time runs as
+  /// after switching.
+  void _hideList() {
+    if (!_listVisible) return;
+    setState(() => _listVisible = false);
+    _focus.requestFocus();
+    _showInfo();
+  }
+
+  /// The channel on air plays (or is on its way) - OK on it in the channel
+  /// list with info goes back to the picture, else tunes it again.
+  bool get _currentPlays => tvChannelPlays(
+        hasPlayer: _player != null,
+        loading: _loading,
+        stopped: _stopped,
+        failed: _error != null,
+      );
 
   void _showInfo({int ahead = 0}) {
     _infoTimer?.cancel();
@@ -1037,8 +1051,7 @@ class _TvScreenState extends ConsumerState<TvScreen> {
     if (hbbtv != null) {
       unawaited(hbbtv.back());
     } else if (_listVisible) {
-      setState(() => _listVisible = false);
-      _focus.requestFocus();
+      _hideList();
     } else if (_infoVisible) {
       _infoTimer?.cancel();
       setState(() => _infoVisible = false);
@@ -1089,6 +1102,73 @@ class _TvScreenState extends ConsumerState<TvScreen> {
         !config.configured &&
         _iptv == null &&
         (!iptv.enabled || iptv.favorites.isEmpty);
+    final listInfo = ref.watch(tvViewProvider).listInfo;
+    // Channel, now and next at the bottom - after switching, while tuning or
+    // failed, and always under the open channel list.
+    final showBanner = (_infoVisible || _error != null || _link != null || _listVisible) && hasChannel;
+    final Widget? banner = !showBanner || config == null || iptv == null
+        ? null
+        : ExcludeFocus(
+            child: _iptv != null
+                ? _IptvInfoBanner(
+                    channel: _iptv!,
+                    number: iptv.numberOf(_iptv!.id),
+                    link: _stopped ? null : _link,
+                    player: player,
+                    inList: _listVisible,
+                  )
+                : _InfoBanner(
+                    config: config,
+                    channel: _current!,
+                    link: _stopped ? null : _link,
+                    player: player,
+                    ahead: _listVisible ? 0 : _bannerAhead,
+                    inList: _listVisible,
+                    onAheadLimit: (max) {
+                      if (_bannerAhead > max) setState(() => _bannerAhead = max);
+                    },
+                  ),
+          );
+    final Widget? channelList = !_listVisible || config == null
+        ? null
+        : _ChannelList(
+            config: config,
+            kind: _listKind,
+            current: _current,
+            iptvCurrent: _iptv,
+            withInfo: listInfo,
+            currentPlays: _currentPlays,
+            onPick: (c) {
+              _hideList();
+              if (c.ref != _current?.ref) _tune(c);
+            },
+            onPickIptv: (c) {
+              _hideList();
+              if (c.id != _iptv?.id) _tuneIptv(c);
+            },
+            // OK on the channel on air without a picture: once more.
+            onRetune: (c) {
+              _hideList();
+              _tune(c);
+            },
+            onRetuneIptv: (c) {
+              _hideList();
+              _tuneIptv(c);
+            },
+            onEpg: _openGuide,
+            onHbbtv: () {
+              _hideList();
+              _openHbbtv();
+            },
+            onBrowse: _openBrowse,
+            onSettings: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const SettingsScreen(section: SettingsSection.tv)),
+            ),
+            onClose: _hideList,
+            onNote: (text) {
+              if (mounted) _showNote(text);
+            },
+          );
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
@@ -1149,67 +1229,25 @@ class _TvScreenState extends ConsumerState<TvScreen> {
                         Positioned(top: 32, left: 40, child: TvTimeshiftIndicator(player: ts)),
                       if (_nextUp != null && !_listVisible)
                         Positioned(top: 32, right: 40, child: _NextUpNote(event: _nextUp!)),
-                      if ((_infoVisible || _error != null || _link != null) && hasChannel && !_listVisible)
-                        Positioned(
-                          left: 0,
-                          right: 0,
-                          bottom: 0,
-                          child: _iptv != null
-                              ? _IptvInfoBanner(
-                                  channel: _iptv!,
-                                  number: iptv.numberOf(_iptv!.id),
-                                  link: _stopped ? null : _link,
-                                  player: player,
-                                )
-                              : _InfoBanner(
-                                  config: config,
-                                  channel: _current!,
-                                  link: _stopped ? null : _link,
-                                  player: player,
-                                  ahead: _bannerAhead,
-                                  onAheadLimit: (max) {
-                                    if (_bannerAhead > max) setState(() => _bannerAhead = max);
-                                  },
-                                ),
-                        ),
+                      if (banner != null && !_listVisible)
+                        Positioned(left: 0, right: 0, bottom: 0, child: banner),
+                      // The channel list ends above the info bar, which stays
+                      // up (and never takes the focus) while the list is open.
                       if (_listVisible)
-                        Positioned(
-                          top: 0,
-                          bottom: 0,
-                          right: 0,
-                          width: 620,
-                          child: _ChannelList(
-                            config: config,
-                            kind: _listKind,
-                            current: _current,
-                            iptvCurrent: _iptv,
-                            onPick: (c) {
-                              setState(() => _listVisible = false);
-                              _focus.requestFocus();
-                              if (c.ref != _current?.ref) _tune(c);
-                            },
-                            onPickIptv: (c) {
-                              setState(() => _listVisible = false);
-                              _focus.requestFocus();
-                              if (c.id != _iptv?.id) _tuneIptv(c);
-                            },
-                            onEpg: _openGuide,
-                            onHbbtv: () {
-                              setState(() => _listVisible = false);
-                              _focus.requestFocus();
-                              _openHbbtv();
-                            },
-                            onBrowse: _openBrowse,
-                            onSettings: () => Navigator.of(context).push(
-                              MaterialPageRoute(builder: (_) => const SettingsScreen(section: SettingsSection.tv)),
-                            ),
-                            onClose: () {
-                              setState(() => _listVisible = false);
-                              _focus.requestFocus();
-                            },
-                            onNote: (text) {
-                              if (mounted) _showNote(text);
-                            },
+                        Positioned.fill(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Expanded(
+                                child: listInfo
+                                    ? channelList ?? const SizedBox.shrink()
+                                    : Align(
+                                        alignment: Alignment.centerRight,
+                                        child: SizedBox(width: 620, height: double.infinity, child: channelList ?? const SizedBox.shrink()),
+                                      ),
+                              ),
+                              ?banner,
+                            ],
                           ),
                         ),
                       if (_hbbtvFor != null && _hbbtvFor == _current?.ref && _iptv == null)
@@ -1446,7 +1484,12 @@ class _InfoBanner extends ConsumerWidget {
     this.player,
     this.ahead = 0,
     this.onAheadLimit,
+    this.inList = false,
   });
+
+  /// Under the open channel list: without clock and key hint (the list
+  /// has its own).
+  final bool inList;
 
   /// 0: now and next; 1..: the n-th programme after the one running now.
   final int ahead;
@@ -1575,16 +1618,18 @@ class _InfoBanner extends ConsumerWidget {
               ],
             ),
           ),
-          const SizedBox(width: 20),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              const TvClock(style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 8),
-              Text(_hint(context, ref),
-                  style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 14)),
-            ],
-          ),
+          if (!inList) ...[
+            const SizedBox(width: 20),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                const TvClock(style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 8),
+                Text(_hint(context, ref),
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 14)),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -1599,20 +1644,15 @@ class _InfoBanner extends ConsumerWidget {
   }
 }
 
-/// What an Internet-TV channel is: country, categories, languages - in
-/// place of a programme (no EPG for Internet-TV).
-String iptvChannelFacts(IptvChannel c) => [
-      if (c.country.isNotEmpty) countryName(c.country, c.country),
-      if (c.categories.isNotEmpty) c.categories.map(iptvCategoryName).join(', '),
-      if (c.languages.isNotEmpty) c.languages.map(iptvLanguageName).join(', '),
-    ].join('  ·  ');
-
 /// The Internet-TV channel on air, like [_InfoBanner]: logo, its number in
 /// the Internet-TV list, name - and what it is instead of now and next.
 class _IptvInfoBanner extends ConsumerWidget {
-  const _IptvInfoBanner({required this.channel, this.number, this.link, this.player});
+  const _IptvInfoBanner({required this.channel, this.number, this.link, this.player, this.inList = false});
 
   final IptvChannel channel;
+
+  /// Under the open channel list: without clock and key hint.
+  final bool inList;
 
   /// In the Internet-TV favorites - null if played from the catalogue.
   final int? number;
@@ -1665,16 +1705,18 @@ class _IptvInfoBanner extends ConsumerWidget {
               ],
             ),
           ),
-          const SizedBox(width: 20),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              const TvClock(style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 8),
-              Text(context.l10n.iptvBannerKeyHint(k(RemoteAction.channelList), k(RemoteAction.options)),
-                  style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 14)),
-            ],
-          ),
+          if (!inList) ...[
+            const SizedBox(width: 20),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                const TvClock(style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 8),
+                Text(context.l10n.iptvBannerKeyHint(k(RemoteAction.channelList), k(RemoteAction.options)),
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 14)),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -1687,14 +1729,23 @@ class _IptvInfoBanner extends ConsumerWidget {
 /// Receiver channels: → opens the programme guide, OK held / ☰ their
 /// options (move - into the receiver's bouquet). Internet-TV favorites:
 /// → / ☰ their options (move, number, remove).
+///
+/// With [withInfo] ("Senderliste mit Info rechts") the list stands in the
+/// middle and [TvChannelInfoPanel] beside it shows the marked channel; OK
+/// on the channel on air then goes back to the picture (or tunes it again
+/// when it shows none) instead of opening its info.
 class _ChannelList extends ConsumerStatefulWidget {
   const _ChannelList({
     required this.config,
     required this.kind,
     required this.current,
     required this.iptvCurrent,
+    this.withInfo = false,
+    this.currentPlays = true,
     required this.onPick,
     required this.onPickIptv,
+    required this.onRetune,
+    required this.onRetuneIptv,
     required this.onEpg,
     required this.onBrowse,
     required this.onClose,
@@ -1705,6 +1756,16 @@ class _ChannelList extends ConsumerStatefulWidget {
 
   /// "HbbTV-Angebot" of the channel on screen (its long-OK menu).
   final VoidCallback onHbbtv;
+
+  /// In the middle, the marked channel's info beside it.
+  final bool withInfo;
+
+  /// The channel on air plays (see [tvChannelPlays]).
+  final bool currentPlays;
+
+  /// OK on the channel on air without a picture ([withInfo]).
+  final ValueChanged<E2Channel> onRetune;
+  final ValueChanged<IptvChannel> onRetuneIptv;
 
   /// A short note over the picture (the order saved, or why not).
   final ValueChanged<String> onNote;
@@ -1735,6 +1796,30 @@ class _ChannelList extends ConsumerStatefulWidget {
 class _ChannelListState extends ConsumerState<_ChannelList> with TvChannelMoveMixin<_ChannelList> {
   E2Channel? _focused;
   IptvChannel? _focusedIptv;
+
+  /// The marked channel (an [E2Channel] or [IptvChannel]) for the info
+  /// beside the list - only that rebuilds when the marking moves.
+  late final _marked = ValueNotifier<Object?>(widget.kind == TvListKind.iptv ? widget.iptvCurrent : widget.current);
+
+  void _mark(Object? c) {
+    if (c is E2Channel) _focused = c;
+    if (c is IptvChannel) _focusedIptv = c;
+    _marked.value = c;
+  }
+
+  /// OK on a row (or a click / tap on it).
+  void _ok({required bool isCurrent, required VoidCallback tune, required VoidCallback info, required VoidCallback retune}) {
+    switch (channelListOk(withInfo: widget.withInfo, isCurrent: isCurrent, plays: widget.currentPlays)) {
+      case TvListOk.tune:
+        tune();
+      case TvListOk.showInfo:
+        info();
+      case TvListOk.retune:
+        retune();
+      case TvListOk.close:
+        widget.onClose();
+    }
+  }
 
   /// The tuned channel's row - takes the focus when the list opens (the
   /// player had it, so the rows' autofocus wouldn't).
@@ -1785,7 +1870,7 @@ class _ChannelListState extends ConsumerState<_ChannelList> with TvChannelMoveMi
 
   Future<void> _endReceiverMove() async {
     final moved = await commitChannelMove();
-    if (moved != null && mounted) _focused = moved;
+    if (moved != null && mounted) _mark(moved);
   }
 
   /// Every row is this high - so the list can jump straight to the tuned
@@ -1805,6 +1890,7 @@ class _ChannelListState extends ConsumerState<_ChannelList> with TvChannelMoveMi
     _startNode.dispose();
     _browseNode.dispose();
     _scroll.dispose();
+    _marked.dispose();
     super.dispose();
   }
 
@@ -1970,7 +2056,7 @@ class _ChannelListState extends ConsumerState<_ChannelList> with TvChannelMoveMi
           // The row keeps the focus and now shows the next channel (the
           // last row is gone: up one).
           final i = at.clamp(0, rest.length - 1);
-          _focusedIptv = rest[i];
+          _mark(rest[i]);
           if (at >= rest.length) {
             FocusManager.instance.primaryFocus?.focusInDirection(TraversalDirection.up);
           }
@@ -1991,7 +2077,7 @@ class _ChannelListState extends ConsumerState<_ChannelList> with TvChannelMoveMi
   void _endMove() {
     final id = _moving;
     setState(() => _moving = null);
-    _focusedIptv = _favorites.where((c) => c.id == id).firstOrNull ?? _focusedIptv;
+    _mark(_favorites.where((c) => c.id == id).firstOrNull ?? _focusedIptv);
   }
 
   /// Back while moving: the favorite where it was, the focus on it.
@@ -2005,7 +2091,7 @@ class _ChannelListState extends ConsumerState<_ChannelList> with TvChannelMoveMi
     });
     if (at >= 0 && from >= 0 && at != from) await ref.read(iptvProvider.notifier).moveFavorite(at, from);
     if (!mounted) return;
-    _focusedIptv = _favorites.where((c) => c.id == id).firstOrNull ?? _focusedIptv;
+    _mark(_favorites.where((c) => c.id == id).firstOrNull ?? _focusedIptv);
     WidgetsBinding.instance.addPostFrameCallback((_) => _focusStart());
   }
 
@@ -2077,7 +2163,7 @@ class _ChannelListState extends ConsumerState<_ChannelList> with TvChannelMoveMi
     final iptvShown = iptv?.enabled ?? false;
     final bouquet = ref.watch(tvCurrentBouquetProvider).value;
     final isIptv = _kind == TvListKind.iptv;
-    return Focus(
+    final list = Focus(
       canRequestFocus: false,
       skipTraversal: true,
       onKeyEvent: _onKey,
@@ -2128,8 +2214,10 @@ class _ChannelListState extends ConsumerState<_ChannelList> with TvChannelMoveMi
               _moving != null || movingChannel
                   ? context.l10n.tvMoveKeyHint
                   : isIptv
-                      ? context.l10n.iptvChannelListKeyHint
-                      : context.l10n.tvChannelListKeyHint,
+                      ? (widget.withInfo
+                          ? context.l10n.iptvChannelListInfoKeyHint
+                          : context.l10n.iptvChannelListKeyHint)
+                      : (widget.withInfo ? context.l10n.tvChannelListInfoKeyHint : context.l10n.tvChannelListKeyHint),
               style: TextStyle(
                   color: _moving != null || movingChannel ? brandGreen : Colors.white.withValues(alpha: 0.45), fontSize: 14),
             ),
@@ -2139,6 +2227,58 @@ class _ChannelListState extends ConsumerState<_ChannelList> with TvChannelMoveMi
         ),
       ),
     );
+    if (!widget.withInfo) return list;
+    final textScale = ref.watch(tvViewProvider).listText.factor;
+    // In the middle, the info right of it (left out on a narrow screen).
+    return LayoutBuilder(
+      builder: (context, box) {
+        final at = channelListInfoLayout(box.maxWidth);
+        return Stack(
+          children: [
+            Positioned(left: at.listLeft, width: at.listWidth, top: 0, bottom: 0, child: list),
+            if (at.infoWidth > 0)
+              Positioned(
+                left: at.infoLeft,
+                width: at.infoWidth,
+                top: 0,
+                bottom: 0,
+                child: ExcludeFocus(
+                  child: ValueListenableBuilder<Object?>(
+                    valueListenable: _marked,
+                    builder: (context, marked, _) => _info(marked, textScale),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// The info beside the list for the marked channel [marked].
+  Widget _info(Object? marked, double textScale) {
+    if (marked is IptvChannel && _kind == TvListKind.iptv) {
+      final i = _favorites.indexWhere((c) => c.id == marked.id);
+      return TvChannelInfoPanel(
+        config: widget.config,
+        iptv: marked,
+        iptvNumber: i < 0 ? null : i + 1,
+        isCurrent: marked.id == widget.iptvCurrent?.id,
+        currentPlays: widget.currentPlays,
+        textScale: textScale,
+      );
+    }
+    if (marked is E2Channel && _kind == TvListKind.receiver) {
+      return TvChannelInfoPanel(
+        config: widget.config,
+        channel: marked,
+        isCurrent: marked.ref == widget.current?.ref,
+        currentPlays: widget.currentPlays,
+        textScale: textScale,
+      );
+    }
+    // Nothing marked yet (the list still loading, an empty list).
+    return Container(color: Colors.black.withValues(alpha: 0.78));
   }
 
   Widget _receiverRows() {
@@ -2166,19 +2306,23 @@ class _ChannelListState extends ConsumerState<_ChannelList> with TvChannelMoveMi
                 final start = i == _receiverStartRow(list);
                 final moving = c.ref == movingRef;
                 // OK while moving: done; on the channel on air: its
-                // programme info; on another: play it.
+                // programme info (with the info beside the list: back to the
+                // picture, or tuned again without one); on another: play it.
                 void tap() => movingChannel
                     ? _endReceiverMove()
-                    : isCurrent
-                        ? _showProgrammeInfo(c)
-                        : widget.onPick(c);
+                    : _ok(
+                        isCurrent: isCurrent,
+                        tune: () => widget.onPick(c),
+                        info: () => _showProgrammeInfo(c),
+                        retune: () => widget.onRetune(c),
+                      );
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 6),
                   child: TvRow(
                     focusNode: start ? _startNode : null,
                     selected: isCurrent || moving,
                     onFocused: () {
-                      if (!movingChannel) _focused = c;
+                      if (!movingChannel) _mark(c);
                     },
                     onTap: tap,
                     // OK held: the channel's options (move, ...).
@@ -2262,15 +2406,19 @@ class _ChannelListState extends ConsumerState<_ChannelList> with TvChannelMoveMi
             focusNode: i == _iptvStart ? _startNode : null,
             selected: isCurrent || moving,
             onFocused: () {
-              if (_moving == null) _focusedIptv = c;
+              if (_moving == null) _mark(c);
             },
-            // OK while moving: done; on the channel on air: its info; on
-            // another: play it.
+            // OK while moving: done; on the channel on air: its info (with
+            // the info beside the list: back to the picture, or tuned again
+            // without one); on another: play it.
             onTap: () => _moving != null
                 ? _endMove()
-                : isCurrent
-                    ? showDialog<void>(context: context, builder: (_) => _IptvInfo(channel: c, number: i + 1))
-                    : widget.onPickIptv(c),
+                : _ok(
+                    isCurrent: isCurrent,
+                    tune: () => widget.onPickIptv(c),
+                    info: () => showDialog<void>(context: context, builder: (_) => _IptvInfo(channel: c, number: i + 1)),
+                    retune: () => widget.onRetuneIptv(c),
+                  ),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               child: Row(
@@ -2500,8 +2648,6 @@ class _IptvInfo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.l10n;
-    final stream = channel.streams.firstOrNull;
-    final facts = iptvChannelFacts(channel);
     return AlertDialog(
       backgroundColor: const Color(0xFF0E151A),
       titlePadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
@@ -2517,28 +2663,7 @@ class _IptvInfo extends StatelessWidget {
       ),
       content: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 760),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(t.iptvListName, style: const TextStyle(color: brandGreen, fontSize: 16)),
-            if (facts.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(facts, style: const TextStyle(color: Colors.white, fontSize: 18)),
-            ],
-            const SizedBox(height: 14),
-            Text(t.iptvNoGuideSentence, style: const TextStyle(color: Colors.white70, fontSize: 16)),
-            if (stream != null && (stream.geoBlocked || stream.notAlways)) ...[
-              const SizedBox(height: 8),
-              Text(
-                [if (stream.geoBlocked) t.iptvGeoBlocked, if (stream.notAlways) t.iptvNotAlways].join('  ·  '),
-                style: const TextStyle(color: Colors.amber, fontSize: 15),
-              ),
-            ],
-            const SizedBox(height: 14),
-            Text(t.iptvSource, style: const TextStyle(color: Colors.white38, fontSize: 13)),
-          ],
-        ),
+        child: IptvChannelDetails(channel: channel),
       ),
       actions: [
         TextButton(autofocus: true, onPressed: () => Navigator.of(context).pop(), child: Text(t.commonClose)),
@@ -2582,17 +2707,8 @@ class _ProgrammeInfo extends StatelessWidget {
             children: [
               if (e == null)
                 Text(context.l10n.tvNoProgramInfoSentence, style: const TextStyle(color: Colors.white70, fontSize: 18))
-              else ...[
-                Text(e.title, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 6),
-                Text('${hhmm(e.begin)} – ${hhmm(e.end)}  ·  ${context.l10n.tvMinutes(e.duration.inMinutes)}',
-                    style: const TextStyle(color: brandGreen, fontSize: 16)),
-                const SizedBox(height: 8),
-                EventProgress(event: e, width: 400),
-                const SizedBox(height: 14),
-                Text(e.description.isEmpty ? context.l10n.tvNoDescription : e.description,
-                    style: const TextStyle(color: Colors.white70, fontSize: 17, height: 1.4)),
-              ],
+              else
+                TvProgrammeDetails(event: e),
               if (next != null) ...[
                 const SizedBox(height: 18),
                 Text('${context.l10n.tvThen} ${hhmm(next!.begin)}  ${next!.title}',
