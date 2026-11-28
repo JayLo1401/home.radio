@@ -224,6 +224,26 @@ class AppLocalizationsEn extends AppLocalizations {
       '“Restore backup” is open on the device - upload the file here ›';
 
   @override
+  String get adminMovieFoldersHint =>
+      'Each folder is a place of its own in Movies, in this order. “Browse” picks another folder, × removes it from the list.';
+
+  @override
+  String get adminMovieFolderName => 'Name in Movies';
+
+  @override
+  String get adminMovieFolderNameHelp => 'Empty: the folder\'s name';
+
+  @override
+  String get adminMovieFolderPosition => 'Place in the list';
+
+  @override
+  String get adminMovieFolderAdd => 'Add a movie folder';
+
+  @override
+  String get adminMovieFolderAddHelp =>
+      'It\'s named after the folder - change it above.';
+
+  @override
   String get browserTitle => 'Browser';
 
   @override
@@ -1725,7 +1745,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get moviesNotSetUp =>
-      'Movies come from the NAS. Under Settings → NAS, enter the server and choose the folders “Movies” and/or “Videos”.';
+      'Movies come from the NAS. Under Settings → NAS, enter the server and add one or more folders under “Movie folders”.';
 
   @override
   String get moviesOpenNasSettings => 'Set up NAS';
@@ -2204,8 +2224,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get nasFoldersSection => 'Folders';
 
   @override
-  String get nasFoldersHint =>
-      'OK picks a folder on the NAS. Music, videos and movies are for later (playing from the server).';
+  String get nasFoldersHint => 'OK picks a folder on the NAS.';
 
   @override
   String get nasNeedServer => 'Enter the server address first.';
@@ -2397,6 +2416,42 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String nasBgSyncProgress(int loaded, int total) {
     return 'Loading picture $loaded of $total …';
+  }
+
+  @override
+  String get nasMovieFoldersSection => 'Movie folders';
+
+  @override
+  String get nasMovieFoldersHint =>
+      'Any number of folders for Movies - each is a place of its own there, in this order. OK on a folder: rename, choose another folder, move or remove.';
+
+  @override
+  String get nasMovieFoldersEmpty => 'No movie folder yet.';
+
+  @override
+  String get nasMovieFolderAdd => 'Add a movie folder';
+
+  @override
+  String get nasMovieFolderName => 'Name in Movies';
+
+  @override
+  String get nasMovieFolderRename => 'Rename';
+
+  @override
+  String get nasMovieFolderChange => 'Choose another folder';
+
+  @override
+  String get nasMovieFolderUp => 'Move up';
+
+  @override
+  String get nasMovieFolderDown => 'Move down';
+
+  @override
+  String get nasMovieFolderRemove => 'Remove';
+
+  @override
+  String nasMovieFolderSaveFailed(String error) {
+    return 'The movie folders could not be saved: $error';
   }
 
   @override

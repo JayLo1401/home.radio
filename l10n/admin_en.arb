@@ -66,5 +66,11 @@
   "adminBack": "Back",
   "adminClose": "Close",
   "adminDeviceOnly": "Only on the device itself: tuner and receiver search, station lists, Home key, permissions, backgrounds and icon packs.",
-  "adminRestoreOpenBanner": "“Restore backup” is open on the device - upload the file here ›"
+  "adminRestoreOpenBanner": "“Restore backup” is open on the device - upload the file here ›",
+  "adminMovieFoldersHint": "Each folder is a place of its own in Movies, in this order. “Browse” picks another folder, × removes it from the list.",
+  "adminMovieFolderName": "Name in Movies",
+  "adminMovieFolderNameHelp": "Empty: the folder's name",
+  "adminMovieFolderPosition": "Place in the list",
+  "adminMovieFolderAdd": "Add a movie folder",
+  "adminMovieFolderAddHelp": "It's named after the folder - change it above."
 }

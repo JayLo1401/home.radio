@@ -28,8 +28,9 @@ final movieResumeStoreProvider = Provider<MovieResumeStore>((ref) => MovieResume
 /// Film pictures, kept while the app runs.
 final moviePosterCacheProvider = Provider<MoviePosterCache>((ref) => MoviePosterCache());
 
-/// The films part: the NAS folders "Filme" and "Videos" (Settings → NAS)
-/// as a wall of tiles - folders, films (with their picture, if one lies
+/// The films part: the NAS film folders (Settings → NAS, any number, each
+/// with its name - the top page lists them, one folder opens straight
+/// away) as a wall of tiles - folders, films (with their picture, if one lies
 /// next to them), DVD images and DVD folders. A folder holding just one
 /// film (or a DVD) shows as that film.
 ///
@@ -42,15 +43,15 @@ class MoviesScreen extends ConsumerStatefulWidget {
   ConsumerState<MoviesScreen> createState() => _MoviesScreenState();
 }
 
-/// One of the top places: Filme or Videos.
-typedef _Root = ({NasFolder kind, String path});
+/// One of the top places: a film folder of Settings → NAS.
+typedef _Root = ({String name, String path});
 
 class _MoviesScreenState extends ConsumerState<MoviesScreen> {
   NasClient? _client;
   String? _clientIdentity;
 
-  /// The folders opened, the current one last. Empty: the top with both
-  /// roots.
+  /// The folders opened, the current one last - the first is a root.
+  /// Empty: the top with all roots.
   List<String> _stack = [];
   bool _stackInitialised = false;
 
@@ -84,8 +85,7 @@ class _MoviesScreenState extends ConsumerState<MoviesScreen> {
   }
 
   List<_Root> _rootsOf(NasSettings settings) => [
-        for (final kind in const [NasFolder.movies, NasFolder.videos])
-          if (settings.folder(kind) case final path?) (kind: kind, path: normalizeNasPath(path)),
+        for (final folder in settings.movieSources) (name: folder.label, path: normalizeNasPath(folder.path)),
       ];
 
   NasClient _clientFor(NasConfig config) {
@@ -173,9 +173,11 @@ class _MoviesScreenState extends ConsumerState<MoviesScreen> {
     if (roots.isEmpty) return const _NotSetUp();
     final config = settings.config;
     _clientFor(config);
-    // One root: straight into it; both: the top shows them.
+    // One root: straight into it; more: the top shows them. A root gone
+    // meanwhile (changed on the admin page): back to the top.
     final topDepth = roots.length == 1 ? 1 : 0;
-    if (!_stackInitialised || (topDepth == 1 && (_stack.isEmpty || !roots.any((r) => _stack.first == r.path)))) {
+    final rootGone = _stack.isNotEmpty && !roots.any((r) => _stack.first == r.path);
+    if (!_stackInitialised || rootGone || (topDepth == 1 && _stack.isEmpty)) {
       _stackInitialised = true;
       _stack = topDepth == 1 ? [roots.single.path] : [];
     }
@@ -186,14 +188,14 @@ class _MoviesScreenState extends ConsumerState<MoviesScreen> {
       body = _Grid(
         key: ValueKey('top-$_focusGeneration'),
         count: roots.length,
-        initialFocus: _focusedIndex['/'] ?? 0,
-        onFocused: (i) => _focusedIndex['/'] = i,
+        initialFocus: (_focusedIndex[''] ?? 0).clamp(0, roots.length - 1),
+        onFocused: (i) => _focusedIndex[''] = i,
         tile: (i, focusNode) {
           final root = roots[i];
           return _Tile(
             focusNode: focusNode,
-            title: nasFolderLabel(context, root.kind),
-            icon: root.kind == NasFolder.movies ? Icons.movie_outlined : Icons.video_library_outlined,
+            title: root.name,
+            icon: Icons.video_library_outlined,
             isFolder: true,
             onTap: () => _openFolder(root.path),
           );
@@ -273,10 +275,14 @@ class _MoviesScreenState extends ConsumerState<MoviesScreen> {
 
   String _breadcrumb(List<_Root> roots, String? folder) {
     if (folder == null) return context.l10n.moviesTitle;
-    final root = roots.where((r) => folder == r.path || folder.startsWith('${r.path == '/' ? '' : r.path}/')).firstOrNull;
-    if (root == null) return movieTitle(folder.split('/').last, isFile: false);
+    // The root this way started from (two may lie inside each other).
+    final first = _stack.firstOrNull;
+    final root = roots.where((r) => r.path == first).firstOrNull;
+    if (root == null || !(folder == root.path || folder.startsWith('${root.path == '/' ? '' : root.path}/'))) {
+      return movieTitle(folder.split('/').last, isFile: false);
+    }
     final rest = folder.substring(root.path.length).split('/').where((s) => s.isNotEmpty);
-    return [nasFolderLabel(context, root.kind), ...rest.map((s) => movieTitle(s, isFile: false))].join('  ›  ');
+    return [root.name, ...rest.map((s) => movieTitle(s, isFile: false))].join('  ›  ');
   }
 
   Widget _entryTile(MovieLibraryEntry entry, FocusNode focusNode, NasConfig config) {
@@ -610,7 +616,7 @@ class _Message extends StatelessWidget {
   }
 }
 
-/// No NAS, or neither "Filme" nor "Videos" chosen: what to do.
+/// No NAS, or no film folder chosen: what to do.
 class _NotSetUp extends StatelessWidget {
   const _NotSetUp();
 

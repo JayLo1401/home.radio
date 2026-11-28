@@ -73,5 +73,11 @@
   "adminBack": "Zurück",
   "adminClose": "Schließen",
   "adminDeviceOnly": "Nur am Gerät selbst: Empfänger- und Receiversuche, Senderlisten, Home-Taste, Berechtigungen, Hintergründe und Icon-Pakete.",
-  "adminRestoreOpenBanner": "Am Gerät ist „Backup wiederherstellen“ offen - hier die Datei hochladen ›"
+  "adminRestoreOpenBanner": "Am Gerät ist „Backup wiederherstellen“ offen - hier die Datei hochladen ›",
+  "adminMovieFoldersHint": "Jeder Ordner ist in Filme ein eigener Bereich, in dieser Reihenfolge. „Durchsuchen“ wählt einen anderen Ordner, × entfernt ihn aus der Liste.",
+  "adminMovieFolderName": "Name in Filme",
+  "adminMovieFolderNameHelp": "Leer: der Name des Ordners",
+  "adminMovieFolderPosition": "Platz in der Liste",
+  "adminMovieFolderAdd": "Film-Ordner hinzufügen",
+  "adminMovieFolderAddHelp": "Er heißt dann wie der Ordner - oben änderbar."
 }

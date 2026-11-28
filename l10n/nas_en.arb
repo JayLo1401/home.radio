@@ -23,7 +23,7 @@
   "nasTestOk": "Connection OK - {count} entries in the main folder.",
   "nasTestFailed": "No connection: {message}",
   "nasFoldersSection": "Folders",
-  "nasFoldersHint": "OK picks a folder on the NAS. Music, videos and movies are for later (playing from the server).",
+  "nasFoldersHint": "OK picks a folder on the NAS.",
   "nasNeedServer": "Enter the server address first.",
   "nasFolderPictures": "Pictures",
   "nasFolderMusic": "Music",
@@ -74,5 +74,16 @@
   "nasFolderBackgrounds": "Background pictures (Home)",
   "nasBgSyncListing": "Reading the folder …",
   "nasBgSyncNothingNew": "No new pictures - finishing …",
-  "nasBgSyncProgress": "Loading picture {loaded} of {total} …"
+  "nasBgSyncProgress": "Loading picture {loaded} of {total} …",
+  "nasMovieFoldersSection": "Movie folders",
+  "nasMovieFoldersHint": "Any number of folders for Movies - each is a place of its own there, in this order. OK on a folder: rename, choose another folder, move or remove.",
+  "nasMovieFoldersEmpty": "No movie folder yet.",
+  "nasMovieFolderAdd": "Add a movie folder",
+  "nasMovieFolderName": "Name in Movies",
+  "nasMovieFolderRename": "Rename",
+  "nasMovieFolderChange": "Choose another folder",
+  "nasMovieFolderUp": "Move up",
+  "nasMovieFolderDown": "Move down",
+  "nasMovieFolderRemove": "Remove",
+  "nasMovieFolderSaveFailed": "The movie folders could not be saved: {error}"
 }

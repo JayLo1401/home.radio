@@ -104,12 +104,12 @@ class SystemPartsNotifier extends Notifier<SystemParts> {
     if (value) await ref.read(launcherTilesProvider.notifier).add(const LauncherTile.movies());
   }
 
-  /// A NAS films or videos folder was chosen (or is there at the start):
-  /// Filme goes on - unless it was ever switched on or off by hand.
+  /// A NAS films folder was added (or is there at the start): Filme goes
+  /// on - unless it was ever switched on or off by hand.
   Future<void> moviesFolderChosen() async {
     if (await ref.read(settingsRepositoryProvider).getMoviesEnabled() != null) return;
     final nas = await ref.read(nasSettingsRepositoryProvider).load();
-    if (nas.folder(NasFolder.movies) != null || nas.folder(NasFolder.videos) != null) await setMovies(true);
+    if (nas.movieSources.isNotEmpty) await setMovies(true);
   }
 
   /// Switching Musik on also puts its tile into Home's row; off stops

@@ -1,7 +1,7 @@
 {
   "moviesTitle": "Filme",
   "moviesNotSetUpTitle": "Noch kein Film-Ordner",
-  "moviesNotSetUp": "Die Filme kommen vom NAS. Unter Einstellungen → NAS den Server eintragen und die Ordner „Filme“ und/oder „Videos“ wählen.",
+  "moviesNotSetUp": "Die Filme kommen vom NAS. Unter Einstellungen → NAS den Server eintragen und unter „Film-Ordner“ einen oder mehrere Ordner hinzufügen.",
   "moviesOpenNasSettings": "NAS einrichten",
   "moviesEmpty": "In diesem Ordner sind keine Filme.",
   "moviesListError": "Der Ordner lässt sich nicht lesen: {error}",
