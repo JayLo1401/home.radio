@@ -8,8 +8,11 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../l10n/l10n.dart';
 import '../db/database.dart';
+import 'backup_areas.dart';
 import 'desktop/hrdab_desktop.dart';
 import 'secret_store.dart';
+
+export 'backup_areas.dart' show BackupArea, backupAreaTitle, backupAreaHint;
 
 /// One backup file found in Download/HomeSystem (see BackupPlugin.kt).
 class BackupFile {
@@ -18,6 +21,83 @@ class BackupFile {
   final DateTime modified;
 
   const BackupFile({required this.id, required this.name, required this.modified});
+}
+
+/// What a restore takes over from a backup (see [BackupService.restoreJson]).
+class BackupRestoreSelection {
+  const BackupRestoreSelection({required this.areas, this.deviceName});
+
+  /// The areas replaced by the backup's; all others stay as they are.
+  final Set<BackupArea> areas;
+
+  /// The device name to set; null or blank keeps the current one.
+  final String? deviceName;
+
+  @override
+  String toString() => 'BackupRestoreSelection($areas, $deviceName)';
+}
+
+/// What a backup contains (see [BackupService.inspect]) - for the selection
+/// before restoring.
+class BackupPreview {
+  const BackupPreview({
+    required this.deviceName,
+    required this.createdAt,
+    required this.counts,
+    this.favorites = 0,
+    this.dabStations = 0,
+    this.fmStations = 0,
+  });
+
+  /// The device name in the backup ('' if it had none).
+  final String deviceName;
+  final DateTime? createdAt;
+
+  /// Entries per area (settings, table rows, passwords) - only areas the
+  /// backup has something for.
+  final Map<BackupArea, int> counts;
+  final int favorites;
+  final int dabStations;
+  final int fmStations;
+
+  /// The areas in the backup, in the order of [BackupArea].
+  List<BackupArea> get areas => [for (final a in BackupArea.values) if ((counts[a] ?? 0) > 0) a];
+}
+
+/// The area's line in the selection: what it contains - for Radio with
+/// the number of favorites and stations in the backup.
+String backupAreaSummary(AppLocalizations l, BackupArea area, BackupPreview preview) {
+  final hint = backupAreaHint(l, area);
+  if (area != BackupArea.radio || preview.favorites + preview.dabStations + preview.fmStations == 0) return hint;
+  return '$hint (${l.backupAreaRadioCounts(preview.favorites, preview.dabStations, preview.fmStations)})';
+}
+
+/// A backup read and checked (see BackupService._parse).
+class _ParsedBackup {
+  _ParsedBackup({
+    required this.createdAt,
+    required this.favorites,
+    required this.dabStations,
+    required this.fmStations,
+    required this.settings,
+    required this.secrets,
+  });
+
+  final DateTime? createdAt;
+  final List<Favorite> favorites;
+  final List<DabStation> dabStations;
+  final List<FmStation> fmStations;
+  final List<Setting> settings;
+
+  /// Null in backups from before secure storage.
+  final Map<String, dynamic>? secrets;
+
+  int tableRows(String table) => switch (table) {
+        'favorites' => favorites.length,
+        'dabStations' => dabStations.length,
+        'fmStations' => fmStations.length,
+        _ => 0,
+      };
 }
 
 class BackupFormatException implements Exception {
@@ -33,8 +113,9 @@ class BackupFormatException implements Exception {
 /// covered without touching this) - as one JSON file in the public
 /// Download/HomeSystem folder, which survives uninstalling the app.
 ///
-/// Restoring replaces the current data completely and then restarts the
-/// app, since lots of settings are only read once at startup.
+/// Restoring replaces the current data completely - or only the areas
+/// chosen in the selection (see [BackupArea]) - and then restarts the app,
+/// since lots of settings are only read once at startup.
 ///
 /// On Windows/Linux the files live in Documents/HomeSystem instead (no
 /// BackupPlugin there).
@@ -125,22 +206,21 @@ class BackupService {
         .toList();
   }
 
-  Future<void> restore(BackupFile file) async {
-    if (!Platform.isAndroid) return restoreJson(await File(file.id).readAsString());
+  /// The text of the backup [file] (for [inspect] and [restoreJson]).
+  Future<String> read(BackupFile file) async {
+    if (!Platform.isAndroid) return File(file.id).readAsString();
     final content = await _channel.invokeMethod<String>('read', {'id': file.id});
-    await restoreJson(content!);
+    if (content == null) throw BackupFormatException(l10n.adminFileInvalid);
+    return content;
   }
 
   /// Lets the user pick a backup file via the system document picker (also
-  /// reaches USB sticks). Returns false if the user cancelled. Throws a
-  /// [PlatformException] with code NO_PICKER if the device has no picker -
-  /// common on Android TV.
-  Future<bool> restoreFromPicker() async {
+  /// reaches USB sticks) and returns its text - null if the user cancelled.
+  /// Throws a [PlatformException] with code NO_PICKER if the device has no
+  /// picker - common on Android TV.
+  Future<String?> pick() async {
     if (!Platform.isAndroid) throw PlatformException(code: 'NO_PICKER');
-    final content = await _channel.invokeMethod<String>('pick');
-    if (content == null) return false;
-    await restoreJson(content);
-    return true;
+    return _channel.invokeMethod<String>('pick');
   }
 
   /// Whether reading backups from a previous installation needs "All files
@@ -167,9 +247,8 @@ class BackupService {
     return dir;
   }
 
-  /// Replaces all data with the backup [content] (checked first - throws
-  /// [BackupFormatException]). The app must be restarted afterwards.
-  Future<void> restoreJson(String content) async {
+  /// Reads and checks the backup [content] - throws [BackupFormatException].
+  _ParsedBackup _parse(String content) {
     final Object? decoded;
     try {
       decoded = jsonDecode(content);
@@ -186,47 +265,108 @@ class BackupService {
     List<Map<String, dynamic>> rows(String key) =>
         ((decoded as Map<String, dynamic>)[key] as List? ?? const []).cast<Map<String, dynamic>>();
 
-    final List<Favorite> favorites;
-    final List<DabStation> dabStations;
-    final List<FmStation> fmStations;
-    final List<Setting> settings;
     try {
-      // Locally captured logo files live in the app's private storage and
-      // are gone after a reinstall - drop references to missing ones so the
-      // logo URL is used instead.
-      favorites = rows('favorites').map(Favorite.fromJson).map((f) {
-        return _fileExists(f.logoLocalPath) ? f : f.copyWith(logoLocalPath: const Value(null));
-      }).toList();
-      dabStations = rows('dabStations').map(DabStation.fromJson).map((s) {
-        return _fileExists(s.logoLocalPath) ? s : s.copyWith(logoLocalPath: const Value(null));
-      }).toList();
-      // Missing in backups from before FM existed - then simply none.
-      fmStations = rows('fmStations').map(FmStation.fromJson).map((s) {
-        return _fileExists(s.logoLocalPath) ? s : s.copyWith(logoLocalPath: const Value(null));
-      }).toList();
-      settings = rows('settings').map(Setting.fromJson).toList();
+      final secrets = decoded['secrets'];
+      return _ParsedBackup(
+        createdAt: DateTime.tryParse('${decoded['createdAt'] ?? ''}'),
+        // Locally captured logo files live in the app's private storage and
+        // are gone after a reinstall - drop references to missing ones so
+        // the logo URL is used instead.
+        favorites: rows('favorites').map(Favorite.fromJson).map((f) {
+          return _fileExists(f.logoLocalPath) ? f : f.copyWith(logoLocalPath: const Value(null));
+        }).toList(),
+        dabStations: rows('dabStations').map(DabStation.fromJson).map((s) {
+          return _fileExists(s.logoLocalPath) ? s : s.copyWith(logoLocalPath: const Value(null));
+        }).toList(),
+        // Missing in backups from before FM existed - then simply none.
+        fmStations: rows('fmStations').map(FmStation.fromJson).map((s) {
+          return _fileExists(s.logoLocalPath) ? s : s.copyWith(logoLocalPath: const Value(null));
+        }).toList(),
+        settings: rows('settings').map(Setting.fromJson).toList(),
+        // Missing in backups from before secure storage.
+        secrets: secrets is Map<String, dynamic> ? secrets : null,
+      );
     } catch (_) {
       throw BackupFormatException(l10n.settingsBackupCorrupt);
     }
+  }
 
+  /// What the backup [content] contains, per area - for the selection
+  /// before [restoreJson]. Throws [BackupFormatException] like it.
+  BackupPreview inspect(String content) {
+    final backup = _parse(content);
+    final counts = <BackupArea, int>{};
+    void add(BackupArea area, int n) {
+      if (n > 0) counts[area] = (counts[area] ?? 0) + n;
+    }
+
+    for (final MapEntry(key: table, value: area) in backupTableAreas.entries) {
+      add(area, backup.tableRows(table));
+    }
+    var deviceName = '';
+    for (final s in backup.settings) {
+      if (s.key == 'device_name') deviceName = s.value.trim();
+      if (!backupSpecialKeys.contains(s.key)) add(backupAreaOf(s.key), 1);
+    }
+    // Every backup lists all passwords, empty ones too - only set ones count.
+    for (final MapEntry(:key, :value) in (backup.secrets ?? const <String, dynamic>{}).entries) {
+      if (value is String && value.isNotEmpty) add(backupAreaOf(key), 1);
+    }
+    return BackupPreview(
+      deviceName: deviceName,
+      createdAt: backup.createdAt,
+      counts: counts,
+      favorites: backup.favorites.length,
+      dabStations: backup.dabStations.length,
+      fmStations: backup.fmStations.length,
+    );
+  }
+
+  /// Restores the backup [content] (checked first - throws
+  /// [BackupFormatException]). Without [selection] it replaces all data;
+  /// with one only the chosen areas - each completely, as it is in the
+  /// backup - and the device name if one is given; everything else stays
+  /// untouched. All in one transaction: on an error nothing has changed.
+  /// The app must be restarted afterwards.
+  Future<void> restoreJson(String content, {BackupRestoreSelection? selection}) async {
+    final backup = _parse(content);
+    final areas = selection?.areas;
+    bool chosen(BackupArea area) => areas == null || areas.contains(area);
+    bool chosenKey(String key) => !backupSpecialKeys.contains(key) && chosen(backupAreaOf(key));
+    bool chosenTable(String table) => chosen(backupTableAreas[table] ?? BackupArea.other);
+
+    final settings = areas == null ? backup.settings : backup.settings.where((s) => chosenKey(s.key)).toList();
     await _db.transaction(() async {
-      await _db.delete(_db.favorites).go();
-      await _db.delete(_db.dabStations).go();
-      await _db.delete(_db.fmStations).go();
-      await _db.delete(_db.settings).go();
+      if (chosenTable('favorites')) await _db.delete(_db.favorites).go();
+      if (chosenTable('dabStations')) await _db.delete(_db.dabStations).go();
+      if (chosenTable('fmStations')) await _db.delete(_db.fmStations).go();
+      if (areas == null) {
+        await _db.delete(_db.settings).go();
+      } else {
+        final current = await _db.select(_db.settings).get();
+        final replaced = [for (final s in current) if (chosenKey(s.key)) s.key];
+        if (replaced.isNotEmpty) await _db.deleteSettings(replaced);
+      }
       await _db.batch((b) {
-        b.insertAll(_db.favorites, favorites);
-        b.insertAll(_db.dabStations, dabStations);
-        b.insertAll(_db.fmStations, fmStations);
-        b.insertAll(_db.settings, settings);
+        if (chosenTable('favorites')) b.insertAll(_db.favorites, backup.favorites);
+        if (chosenTable('dabStations')) b.insertAll(_db.dabStations, backup.dabStations);
+        if (chosenTable('fmStations')) b.insertAll(_db.fmStations, backup.fmStations);
+        b.insertAll(_db.settings, settings, mode: InsertMode.insertOrReplace);
       });
+      final name = selection?.deviceName?.trim() ?? '';
+      if (name.isNotEmpty) await _db.setSetting('device_name', name);
       // A restored device is set up - also with backups from before the
       // setup wizard.
       await _db.setSetting('setup_done', 'true');
     });
     // Missing in backups from before secure storage - the passwords stay.
-    final secrets = decoded['secrets'];
-    if (secrets is Map<String, dynamic>) await SecretStore(_db).importAll(secrets);
+    final secrets = backup.secrets;
+    if (secrets != null) {
+      await SecretStore(_db).importAll({
+        for (final MapEntry(:key, :value) in secrets.entries)
+          if (chosen(backupAreaOf(key))) key: value,
+      });
+    }
   }
 
   static bool _fileExists(String? path) => path != null && File(path).existsSync();

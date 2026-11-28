@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/dashboard_providers.dart';
 import 'core/foreground_part.dart';
 import 'core/ha_providers.dart';
+import 'core/nas_providers.dart';
 import 'core/native_errors.dart';
 import 'core/providers.dart';
 import 'core/system_providers.dart';
@@ -44,6 +45,11 @@ class HomeSystemApp extends ConsumerWidget {
         off: display.screenOff,
         reload: () => container.read(dashboardReloadProvider.notifier).reload(),
         available: () => DisplayService.supported && container.read(systemPartsProvider).dashboard,
+      );
+      final nasBackups = container.read(nasBackupServiceProvider);
+      admin.nasBackups = (
+        list: () async => await nasBackups.hasBackupFolder ? await nasBackups.listBackups() : null,
+        read: nasBackups.download,
       );
     }
     // Haussteuerung: the display by motion (camera), when switched on.

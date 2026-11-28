@@ -188,29 +188,11 @@ abstract class AppLocalizations {
   /// **'Zum Wiederherstellen am Gerät Einstellungen → System → Backup wiederherstellen öffnen (oder im Einrichtungsassistenten „Backup wiederherstellen“ wählen). Hier erscheint dann das Hochladen.'**
   String get adminRestoreHow;
 
-  /// No description provided for @adminRestoreReady.
-  ///
-  /// In de, this message translates to:
-  /// **'Das Gerät ist bereit. Alle aktuellen Favoriten, Sender und Einstellungen werden ersetzt, danach startet Home System neu.'**
-  String get adminRestoreReady;
-
-  /// No description provided for @adminRestoreButton.
-  ///
-  /// In de, this message translates to:
-  /// **'Backup einspielen'**
-  String get adminRestoreButton;
-
   /// No description provided for @adminRestoring.
   ///
   /// In de, this message translates to:
   /// **'Wird eingespielt …'**
   String get adminRestoring;
-
-  /// No description provided for @adminConfirmRestore.
-  ///
-  /// In de, this message translates to:
-  /// **'Backup „{file}“ einspielen? Alle aktuellen Daten des Geräts werden ersetzt.'**
-  String adminConfirmRestore(String file);
 
   /// No description provided for @adminRestoreLocked.
   ///
@@ -529,6 +511,240 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'Er heißt dann wie der Ordner - oben änderbar.'**
   String get adminMovieFolderAddHelp;
+
+  /// No description provided for @backupAreaSystem.
+  ///
+  /// In de, this message translates to:
+  /// **'Systemeinstellungen'**
+  String get backupAreaSystem;
+
+  /// No description provided for @backupAreaSystemHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Start-Option, Anzeige, Sprache, Teile an/aus, Launcher-Kacheln, Tasten der Fernbedienung, Updates'**
+  String get backupAreaSystemHint;
+
+  /// No description provided for @backupAreaTv.
+  ///
+  /// In de, this message translates to:
+  /// **'TV-Einstellungen'**
+  String get backupAreaTv;
+
+  /// No description provided for @backupAreaTvHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Receiver mit Anmeldung, Internet-TV, Senderlisten, Erinnerungen, „Als Nächstes“'**
+  String get backupAreaTvHint;
+
+  /// No description provided for @backupAreaRadio.
+  ///
+  /// In de, this message translates to:
+  /// **'Radio-Einstellungen'**
+  String get backupAreaRadio;
+
+  /// No description provided for @backupAreaRadioHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Favoriten, DAB+- und UKW-Sender, Startsender'**
+  String get backupAreaRadioHint;
+
+  /// No description provided for @backupAreaRadioCounts.
+  ///
+  /// In de, this message translates to:
+  /// **'{favorites} Favoriten, {dab} DAB+-Sender, {fm} UKW-Sender'**
+  String backupAreaRadioCounts(int favorites, int dab, int fm);
+
+  /// No description provided for @backupAreaMusic.
+  ///
+  /// In de, this message translates to:
+  /// **'Musik'**
+  String get backupAreaMusic;
+
+  /// No description provided for @backupAreaMusicHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Zufall, Wiederholen, Visualizer, Unterordner'**
+  String get backupAreaMusicHint;
+
+  /// No description provided for @backupAreaMedia.
+  ///
+  /// In de, this message translates to:
+  /// **'Filme/Bilder'**
+  String get backupAreaMedia;
+
+  /// No description provided for @backupAreaMediaHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Diashow und die Einstellungen für Filme und Bilder'**
+  String get backupAreaMediaHint;
+
+  /// No description provided for @backupAreaNas.
+  ///
+  /// In de, this message translates to:
+  /// **'NAS'**
+  String get backupAreaNas;
+
+  /// No description provided for @backupAreaNasHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Server, Anmeldung mit Passwort und die gewählten Ordner'**
+  String get backupAreaNasHint;
+
+  /// No description provided for @backupAreaDashboard.
+  ///
+  /// In de, this message translates to:
+  /// **'Haussteuerung/Dashboard'**
+  String get backupAreaDashboard;
+
+  /// No description provided for @backupAreaDashboardHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Dashboard-Adresse, Display per Bewegung, Helligkeit'**
+  String get backupAreaDashboardHint;
+
+  /// No description provided for @backupAreaHa.
+  ///
+  /// In de, this message translates to:
+  /// **'Home Assistant'**
+  String get backupAreaHa;
+
+  /// No description provided for @backupAreaHaHint.
+  ///
+  /// In de, this message translates to:
+  /// **'MQTT-Verbindung und Anmeldung mit Passwort, Kamera teilen'**
+  String get backupAreaHaHint;
+
+  /// No description provided for @backupAreaSdr.
+  ///
+  /// In de, this message translates to:
+  /// **'Funk/SDR'**
+  String get backupAreaSdr;
+
+  /// No description provided for @backupAreaSdrHint.
+  ///
+  /// In de, this message translates to:
+  /// **'rtl_tcp-Server, Funk-Bänder, Flugzeuge, Sensoren'**
+  String get backupAreaSdrHint;
+
+  /// No description provided for @backupAreaWeather.
+  ///
+  /// In de, this message translates to:
+  /// **'Wetter/Hintergrund'**
+  String get backupAreaWeather;
+
+  /// No description provided for @backupAreaWeatherHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Wetter, Regenradar, Sonne & Mond, Hintergrundbilder'**
+  String get backupAreaWeatherHint;
+
+  /// No description provided for @backupAreaBrowser.
+  ///
+  /// In de, this message translates to:
+  /// **'Webbrowser'**
+  String get backupAreaBrowser;
+
+  /// No description provided for @backupAreaBrowserHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Startseite, Lesezeichen, Suchmaschine, Werbeblocker'**
+  String get backupAreaBrowserHint;
+
+  /// No description provided for @backupAreaOther.
+  ///
+  /// In de, this message translates to:
+  /// **'Sonstiges'**
+  String get backupAreaOther;
+
+  /// No description provided for @backupAreaOtherHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Weitere Einstellungen, die zu keinem der Bereiche gehören'**
+  String get backupAreaOtherHint;
+
+  /// No description provided for @backupSelectTitle.
+  ///
+  /// In de, this message translates to:
+  /// **'Was soll übernommen werden?'**
+  String get backupSelectTitle;
+
+  /// No description provided for @backupSelectHint.
+  ///
+  /// In de, this message translates to:
+  /// **'Nur die angekreuzten Bereiche werden durch die aus dem Backup ersetzt - alles andere bleibt, wie es ist. Danach startet Home System neu.'**
+  String get backupSelectHint;
+
+  /// No description provided for @backupSelectCreated.
+  ///
+  /// In de, this message translates to:
+  /// **'Erstellt: {date}'**
+  String backupSelectCreated(String date);
+
+  /// No description provided for @backupSelectAreas.
+  ///
+  /// In de, this message translates to:
+  /// **'Bereiche'**
+  String get backupSelectAreas;
+
+  /// No description provided for @backupDeviceNameHelp.
+  ///
+  /// In de, this message translates to:
+  /// **'Dieses Gerät heißt zurzeit „{name}“ - leer lassen behält den Namen.'**
+  String backupDeviceNameHelp(String name);
+
+  /// No description provided for @backupDeviceNameHelpNone.
+  ///
+  /// In de, this message translates to:
+  /// **'Leer lassen behält den aktuellen Namen.'**
+  String get backupDeviceNameHelpNone;
+
+  /// No description provided for @backupApply.
+  ///
+  /// In de, this message translates to:
+  /// **'Übernehmen'**
+  String get backupApply;
+
+  /// No description provided for @backupNothingSelected.
+  ///
+  /// In de, this message translates to:
+  /// **'Nichts ausgewählt - mindestens einen Bereich ankreuzen oder einen Gerätenamen eintragen.'**
+  String get backupNothingSelected;
+
+  /// No description provided for @backupNothingInside.
+  ///
+  /// In de, this message translates to:
+  /// **'Das Backup enthält keine Einstellungen.'**
+  String get backupNothingInside;
+
+  /// No description provided for @backupExpired.
+  ///
+  /// In de, this message translates to:
+  /// **'Das Backup ist nicht mehr geladen - bitte noch einmal auswählen.'**
+  String get backupExpired;
+
+  /// No description provided for @backupReading.
+  ///
+  /// In de, this message translates to:
+  /// **'Wird gelesen …'**
+  String get backupReading;
+
+  /// No description provided for @backupPickedFile.
+  ///
+  /// In de, this message translates to:
+  /// **'Ausgewählte Datei'**
+  String get backupPickedFile;
+
+  /// No description provided for @backupAdminOpen.
+  ///
+  /// In de, this message translates to:
+  /// **'Backup öffnen'**
+  String get backupAdminOpen;
+
+  /// No description provided for @backupAdminReady.
+  ///
+  /// In de, this message translates to:
+  /// **'Das Gerät ist bereit. Eine Backup-Datei wählen oder ein Backup vom NAS - vor dem Einspielen lässt sich auswählen, was übernommen wird.'**
+  String get backupAdminReady;
 
   /// No description provided for @browserTitle.
   ///
@@ -9112,24 +9328,6 @@ abstract class AppLocalizations {
   /// **'Backup von der Verwaltungsseite eingespielt - App startet neu …'**
   String get settingsRestoreFromWebDone;
 
-  /// No description provided for @settingsRestoreConfirmTitle.
-  ///
-  /// In de, this message translates to:
-  /// **'Backup wiederherstellen?'**
-  String get settingsRestoreConfirmTitle;
-
-  /// The backup file name, or the sentence settingsRestorePickedFile.
-  ///
-  /// In de, this message translates to:
-  /// **'{what}\n\nAlle aktuellen Favoriten, DAB+ Sender und Einstellungen werden ersetzt. Danach startet die App neu.'**
-  String settingsRestoreConfirmText(String what);
-
-  /// No description provided for @settingsRestoreButton.
-  ///
-  /// In de, this message translates to:
-  /// **'Wiederherstellen'**
-  String get settingsRestoreButton;
-
   /// No description provided for @settingsRestoreDone.
   ///
   /// In de, this message translates to:
@@ -9147,12 +9345,6 @@ abstract class AppLocalizations {
   /// In de, this message translates to:
   /// **'Wiederherstellen fehlgeschlagen: {message}'**
   String settingsRestoreFailed(String message);
-
-  /// No description provided for @settingsRestorePickedFile.
-  ///
-  /// In de, this message translates to:
-  /// **'Die ausgewählte Datei wird eingespielt.'**
-  String get settingsRestorePickedFile;
 
   /// No description provided for @settingsRestoreNoAllFilesSetting.
   ///
