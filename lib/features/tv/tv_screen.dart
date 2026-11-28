@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/dashboard_providers.dart' show displayServiceProvider;
 import '../../core/providers.dart';
 import '../../core/ok_long_press.dart';
 import '../../core/remote_keys.dart';
@@ -191,6 +192,7 @@ class _TvScreenState extends ConsumerState<TvScreen> {
     final open = _open;
     Future.microtask(() => open.set(false));
     _generation++;
+    _setFrameRate(0);
     _player?.dispose();
     _session?.close();
     _infoTimer?.cancel();
@@ -254,6 +256,7 @@ class _TvScreenState extends ConsumerState<TvScreen> {
   Future<void> _startLastChannel() async {
     final config = _config;
     if (config == null || !config.configured) return;
+    await _showRememberedChannel();
     final List<E2Channel> channels;
     try {
       channels = await ref.read(tvChannelsProvider.future);
@@ -273,6 +276,41 @@ class _TvScreenState extends ConsumerState<TvScreen> {
         channels.where((c) => c.ref == last).firstOrNull ??
         channels.first;
     await _tune(channel);
+  }
+
+  /// On opening: the banner of the channel about to start, at once - from
+  /// what was kept of the last one (the receiver's list comes a moment
+  /// later, then the channel itself tunes).
+  Future<void> _showRememberedChannel() async {
+    if (_current != null || widget.startServiceRef != null) return;
+    try {
+      final repo = ref.read(settingsRepositoryProvider);
+      final fixed = await repo.getTvStartChannel();
+      final info = await repo.getTvLastChannelInfo();
+      if (!mounted || _current != null || info == null) return;
+      final channelRef = info['ref'];
+      final name = info['name'];
+      final number = info['number'];
+      if (channelRef is! String || name is! String || number is! int) return;
+      if (fixed != null && fixed != channelRef) return;
+      setState(() {
+        _current = E2Channel(
+          ref: channelRef,
+          name: name,
+          number: number,
+          piconPath: info['picon'] as String?,
+          hasPicon: info['hasPicon'] != false,
+        );
+        _link = LinkView.tv(
+          receiver: LinkState.active,
+          station: LinkState.pending,
+          message: context.l10n.tvLinkConnecting,
+        );
+      });
+      _showInfo();
+    } catch (e) {
+      debugPrint('TV remembered channel: $e');
+    }
   }
 
   /// The connection setup in the banner (App — Receiver — Sender), like
@@ -330,6 +368,13 @@ class _TvScreenState extends ConsumerState<TvScreen> {
     if (oldPlayer != null) unawaited(oldPlayer.dispose());
     if (oldSession != null) unawaited(oldSession.close());
     unawaited(ref.read(settingsRepositoryProvider).setTvLastChannel(channel.ref));
+    unawaited(ref.read(settingsRepositoryProvider).setTvLastChannelInfo({
+      'ref': channel.ref,
+      'name': channel.name,
+      'number': channel.number,
+      'picon': channel.piconPath,
+      'hasPicon': channel.hasPicon,
+    }));
     unawaited(ref.read(iptvProvider.notifier).setList(TvListKind.receiver));
 
     // Standby or on decides whether the receiver may be switched - asked
@@ -463,6 +508,8 @@ class _TvScreenState extends ConsumerState<TvScreen> {
         setState(() => _link = null);
         _showInfo();
       });
+      // European TV is 25/50 Hz: the screen to 50 Hz (Einstellungen → TV).
+      _setFrameRate(ref.read(tvViewProvider).matchFrameRate ? 50 : 0);
     } catch (e) {
       mark('kein Bild: $e');
       unawaited(player.dispose());
@@ -471,10 +518,26 @@ class _TvScreenState extends ConsumerState<TvScreen> {
     }
   }
 
+  /// The refresh rate asked for last - asked again only when it changes.
+  double _frameRate = 0;
+
+  /// The screen's refresh rate (Android; see DisplayService.setFrameRate):
+  /// 50 for receiver channels, 0 = the system's (Internet-TV, leaving).
+  void _setFrameRate(double fps) {
+    if (fps == _frameRate) return;
+    _frameRate = fps;
+    unawaited(ref.read(displayServiceProvider).setFrameRate(fps).catchError((Object e) {
+      debugPrint('TV frame rate: $e');
+      return 0.0;
+    }));
+  }
+
   /// An Internet-TV channel: straight from the internet, no receiver -
   /// its streams in turn (best first) until one shows a picture.
   Future<void> _tuneIptv(IptvChannel channel) async {
     final t = context.l10n;
+    // Internet streams come in any rate - the system decides.
+    _setFrameRate(0);
     final generation = ++_generation;
     bool stale() => !mounted || generation != _generation;
     final oldPlayer = _player, oldSession = _session;
@@ -1091,6 +1154,10 @@ class _TvScreenState extends ConsumerState<TvScreen> {
     // fresh - a channel switch shows what's on without waiting for it
     // (listened, not watched: its refreshes needn't rebuild the screen).
     ref.listen(tvNowNextProvider, (_, _) {});
+    // The channels, too: a provider nobody listens to is paused (Riverpod 3)
+    // - the first channel's start reads them and would wait for ever when
+    // the list is rebuilt meanwhile (the app's channel order loading).
+    ref.listen(tvChannelsProvider, (_, _) {});
     final player = _player;
     final hasChannel = _current != null || _iptv != null;
     // The start animation over the picture's place while a channel tunes.

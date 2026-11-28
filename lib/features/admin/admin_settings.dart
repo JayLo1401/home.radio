@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -569,6 +570,15 @@ class AdminSettings implements AdminSettingsSource {
               get: () => tvView.listInfo,
               set: (v) => setTvView((t) => t.copyWith(listInfo: _bool(v) ?? true)),
             ),
+            if (Platform.isAndroid)
+              _Setting(
+                id: 'tvMatchFrameRate',
+                label: l.settingsTvFrameRate,
+                help: l.settingsTvFrameRateHelp,
+                type: 'bool',
+                get: () => tvView.matchFrameRate,
+                set: (v) => setTvView((t) => t.copyWith(matchFrameRate: _bool(v) ?? true)),
+              ),
           ],
         ),
       if (parts.pictures)

@@ -245,6 +245,16 @@ class DisplayPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAw
                 result.success(null)
             }
             // Home System in front again (from another app, or the display off).
+            "setFrameRate" -> {
+                // Never fatal: a box that can't switch simply stays as it is.
+                val hz = try {
+                    applyFrameRate(call.argument<Double>("fps") ?: 0.0)
+                } catch (e: Exception) {
+                    Log.w(TAG, "frame rate", e)
+                    0.0
+                }
+                result.success(hz)
+            }
             "bringToFront" -> {
                 MotionService.wake(appContext)
                 result.success(true)
@@ -342,6 +352,50 @@ class DisplayPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAw
             val flags = WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
             if (on) a.window.addFlags(flags) else a.window.clearFlags(flags)
         }
+    }
+
+    /**
+     * Picture refresh to the content's frame rate - European TV is 25/50 Hz,
+     * while Google TV runs at 60 Hz (every fifth picture twice: judder).
+     * Picks a mode of the same resolution whose refresh rate is a whole
+     * multiple of [fps] (50 Hz for 25/50, 24 Hz for films), preferring one
+     * of 48 Hz or more; 0 gives the choice back to the system. Returns the
+     * refresh rate now asked for (0: none / the system's).
+     */
+    private fun applyFrameRate(fps: Double): Double {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return 0.0
+        val act = activity ?: return 0.0
+        val window = act.window ?: return 0.0
+        val attrs = window.attributes
+        if (fps <= 0.0) {
+            if (attrs.preferredDisplayModeId != 0) {
+                attrs.preferredDisplayModeId = 0
+                window.attributes = attrs
+            }
+            return 0.0
+        }
+        @Suppress("DEPRECATION")
+        val display = (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) act.display else act.windowManager.defaultDisplay)
+            ?: return 0.0
+        val current = display.mode
+        val same = display.supportedModes.filter {
+            it.physicalWidth == current.physicalWidth && it.physicalHeight == current.physicalHeight
+        }
+        fun multiple(rate: Float): Int? {
+            val k = Math.round(rate / fps).toInt()
+            if (k < 1) return null
+            return if (Math.abs(rate - k * fps) <= rate * 0.002) k else null
+        }
+        val fitting = same.filter { multiple(it.refreshRate) != null }
+        if (fitting.isEmpty()) return 0.0
+        val pick = fitting.filter { it.refreshRate >= 47.9f }.minByOrNull { it.refreshRate }
+            ?: fitting.maxByOrNull { it.refreshRate }!!
+        // Already so (also asked for): no switch, no black screen.
+        if (attrs.preferredDisplayModeId != pick.modeId) {
+            attrs.preferredDisplayModeId = pick.modeId
+            window.attributes = attrs
+        }
+        return pick.refreshRate.toDouble()
     }
 
     companion object {

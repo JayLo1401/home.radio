@@ -46,12 +46,22 @@ final tvBouquetChannelsProvider =
 FutureOr<List<E2Channel>> orderedTvChannels(Ref ref) {
   final orders = ref.watch(tvChannelOrderProvider);
   final box = ref.watch(tvBouquetChannelsProvider);
-  if (!orders.loaded) return Completer<List<E2Channel>>().future; // in a moment
-  List<E2Channel> ordered(TvBouquetChannels b) =>
-      b.bouquetRef == null ? b.channels : applyChannelOrder(b.channels, orders.orderFor(b.bouquetRef!));
-  if (!box.isLoading && box.hasValue) return ordered(box.requireValue);
+  List<E2Channel> ordered(TvBouquetChannels b, TvChannelOrders o) =>
+      b.bouquetRef == null ? b.channels : applyChannelOrder(b.channels, o.orderFor(b.bouquetRef!));
+  if (!orders.loaded) {
+    // The app's own orders are still loading (right after the app starts):
+    // wait for them - this future must complete (TV's first channel waits
+    // on it), not hang until something else rebuilds the provider.
+    final notifier = ref.read(tvChannelOrderProvider.notifier);
+    final channels = ref.watch(tvBouquetChannelsProvider.future);
+    return notifier.ready.timeout(const Duration(seconds: 3), onTimeout: () {}).then((_) async {
+      final b = await channels;
+      return ordered(b, notifier.current);
+    });
+  }
+  if (!box.isLoading && box.hasValue) return ordered(box.requireValue, orders);
   if (!box.isLoading && box.hasError) Error.throwWithStackTrace(box.error!, box.stackTrace ?? StackTrace.current);
-  return ref.watch(tvBouquetChannelsProvider.future).then(ordered);
+  return ref.watch(tvBouquetChannelsProvider.future).then((b) => ordered(b, orders));
 }
 
 /// The same channels numbered 1, 2, 3, ... in this order.
@@ -209,10 +219,20 @@ class TvChannelOrderNotifier extends Notifier<TvChannelOrders> {
   /// moves aren't tried there again.
   String? _noEditorHost;
 
+  /// Completes once the app's own orders are loaded (also if that fails).
+  Completer<void> _ready = Completer<void>();
+  Future<void> get ready => _ready.future;
+
+  /// The orders as they are now (also outside a provider's build).
+  TvChannelOrders get current => state;
+
   @override
   TvChannelOrders build() {
     final host = ref.watch(enigma2ConfigProvider.select((c) => c?.host.trim().toLowerCase() ?? ''));
-    _load(host);
+    final ready = _ready = Completer<void>();
+    _load(host).whenComplete(() {
+      if (!ready.isCompleted) ready.complete();
+    });
     return TvChannelOrders(host: host);
   }
 

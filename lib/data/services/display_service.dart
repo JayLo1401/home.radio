@@ -60,6 +60,12 @@ class DisplayService {
 
   Future<void> setKeepScreenOn(bool on) => _invoke<void>('setKeepScreenOn', {'on': on});
 
+  /// The screen's refresh rate to [fps] (Android: a display mode of the
+  /// same resolution, e.g. 50 Hz for TV); 0 gives it back to the system.
+  /// Returns the refresh rate asked for, 0 if none fits / elsewhere.
+  Future<double> setFrameRate(double fps) async =>
+      await _invoke<double>('setFrameRate', {'fps': fps}) ?? 0;
+
   /// The dashboard is on screen - only then the display goes off by itself.
   Future<void> setDashboardActive(bool active) => _invoke<void>('setDashboardActive', {'active': active});
 

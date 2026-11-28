@@ -921,10 +921,12 @@ class SettingsRepository {
     final seconds = int.tryParse(await _db.getSetting('tv_info_seconds') ?? '');
     final text = await _db.getSetting('tv_list_text');
     final info = await _db.getSetting('tv_list_info');
+    final frameRate = await _db.getSetting('tv_match_frame_rate');
     return TvViewSettings(
       infoSeconds: TvViewSettings.infoSecondChoices.contains(seconds) ? seconds! : TvViewSettings.defaults.infoSeconds,
       listText: TvListTextSize.values.where((v) => v.name == text).firstOrNull ?? TvViewSettings.defaults.listText,
       listInfo: info == null ? TvViewSettings.defaults.listInfo : info != 'false',
+      matchFrameRate: frameRate == null ? TvViewSettings.defaults.matchFrameRate : frameRate != 'false',
     );
   }
 
@@ -932,6 +934,7 @@ class SettingsRepository {
     await _db.setSetting('tv_info_seconds', '${value.infoSeconds}');
     await _db.setSetting('tv_list_text', value.listText.name);
     await _db.setSetting('tv_list_info', '${value.listInfo}');
+    await _db.setSetting('tv_match_frame_rate', '${value.matchFrameRate}');
   }
 
   /// The remote's keys per action (see RemoteKeys): action name -> logical
@@ -966,6 +969,20 @@ class SettingsRepository {
   /// The channel last watched (service reference) - TV starts with it.
   Future<String?> getTvLastChannel() => _db.getSetting('tv_last_channel');
   Future<void> setTvLastChannel(String ref) => _db.setSetting('tv_last_channel', ref);
+
+  /// The last channel's name, number and picon - TV shows its banner at
+  /// once on opening, before the receiver's channel list has come.
+  Future<Map<String, Object?>?> getTvLastChannelInfo() async {
+    try {
+      final json = jsonDecode(await _db.getSetting('tv_last_channel_info') ?? 'null');
+      return json is Map<String, Object?> ? json : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> setTvLastChannelInfo(Map<String, Object?> info) =>
+      _db.setSetting('tv_last_channel_info', jsonEncode(info));
 }
 
 /// Bilder: how a slideshow runs (Einstellungen → Bilder).
@@ -1176,7 +1193,12 @@ enum TvListTextSize {
 /// and its layout.
 @immutable
 class TvViewSettings {
-  const TvViewSettings({required this.infoSeconds, required this.listText, this.listInfo = true});
+  const TvViewSettings({
+    required this.infoSeconds,
+    required this.listText,
+    this.listInfo = true,
+    this.matchFrameRate = true,
+  });
 
   static const defaults = TvViewSettings(infoSeconds: 6, listText: TvListTextSize.large, listInfo: true);
 
@@ -1190,10 +1212,16 @@ class TvViewSettings {
   /// back to the picture); off: the list at the side as before.
   final bool listInfo;
 
-  TvViewSettings copyWith({int? infoSeconds, TvListTextSize? listText, bool? listInfo}) => TvViewSettings(
+  /// The screen at 50 Hz while a receiver channel plays (Android) - no
+  /// judder from 60 Hz.
+  final bool matchFrameRate;
+
+  TvViewSettings copyWith({int? infoSeconds, TvListTextSize? listText, bool? listInfo, bool? matchFrameRate}) =>
+      TvViewSettings(
         infoSeconds: infoSeconds ?? this.infoSeconds,
         listText: listText ?? this.listText,
         listInfo: listInfo ?? this.listInfo,
+        matchFrameRate: matchFrameRate ?? this.matchFrameRate,
       );
 
   @override
@@ -1201,8 +1229,9 @@ class TvViewSettings {
       other is TvViewSettings &&
       other.infoSeconds == infoSeconds &&
       other.listText == listText &&
-      other.listInfo == listInfo;
+      other.listInfo == listInfo &&
+      other.matchFrameRate == matchFrameRate;
 
   @override
-  int get hashCode => Object.hash(infoSeconds, listText, listInfo);
+  int get hashCode => Object.hash(infoSeconds, listText, listInfo, matchFrameRate);
 }

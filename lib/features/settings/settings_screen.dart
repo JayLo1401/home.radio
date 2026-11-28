@@ -455,6 +455,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ),
       ),
       Text(l.settingsTvListInfoHelp, style: const TextStyle(color: Colors.white60)),
+      if (Platform.isAndroid) ...[
+        const SizedBox(height: 12),
+        FocusTraversalOrder(
+          order: NumericFocusOrder(nextOrder()),
+          child: _TvChoiceTile(
+            label: l.settingsTvFrameRate,
+            selected: view.matchFrameRate,
+            asToggle: true,
+            onTap: () => notifier.set(view.copyWith(matchFrameRate: !view.matchFrameRate)),
+          ),
+        ),
+        Text(l.settingsTvFrameRateHelp, style: const TextStyle(color: Colors.white60)),
+      ],
     ];
   }
 

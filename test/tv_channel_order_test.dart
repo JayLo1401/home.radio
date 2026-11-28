@@ -268,6 +268,26 @@ void main() {
 
     List<String> names(List<E2Channel> list) => [for (final c in list) '${c.number} ${c.name}'];
 
+    test('orders still loading (app just started): the list still comes - the first channel waits on it', () async {
+      final receiver = _FakeReceiver([_tv('A'), _tv('B')]);
+      final c = ProviderContainer(overrides: [
+        enigma2ConfigProvider.overrideWith(_FixedConfig.new),
+        tvBouquetProvider.overrideWith(_NoBouquetChoice.new),
+        enigma2ServiceProvider.overrideWithValue(Enigma2Service(_config, client: receiver.client)),
+        enigma2BouquetEditorProvider.overrideWithValue(Enigma2BouquetEditor(_config, client: receiver.client)),
+        tvChannelOrderStoreProvider.overrideWithValue(TvChannelOrderStore((k) async {
+          await Future<void>.delayed(const Duration(milliseconds: 100));
+          return null;
+        }, (k, v) async {})),
+      ]);
+      addTearDown(c.dispose);
+      // As TvScreen asks: listening from its first frame, reading the
+      // list for the first channel while the orders still load.
+      c.listen(tvChannelsProvider, (_, _) {});
+      final list = await c.read(tvChannelsProvider.future).timeout(const Duration(seconds: 5));
+      expect(names(list), ['1 Sender A', '2 Sender B']);
+    });
+
     test('written to the receiver: the new order and numbers, from the receiver', () async {
       final receiver = _FakeReceiver([_tv('A'), _tv('B'), _tv('C')]);
       final c = container(receiver, {});

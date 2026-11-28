@@ -5757,6 +5757,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'The channel list sits in the middle with the marked channel\'s programme, description and what comes next always beside it. OK on the channel on air goes back to the picture (or tunes it again if it shows no picture). Off: the channel list at the side as before.';
 
   @override
+  String get settingsTvFrameRate => 'Match refresh rate (50 Hz)';
+
+  @override
+  String get settingsTvFrameRateHelp =>
+      'While a receiver channel plays, the screen switches to 50 Hz – like the TV signal. Otherwise a 60 Hz TV shows every fifth picture twice (slight judder on pans and tickers). The picture may go black briefly when TV starts; switching channels doesn\'t. Leaving TV gives the device\'s own setting back.';
+
+  @override
   String get systemStartDashboard => 'Show Smart Home (wall tablet)';
 
   @override

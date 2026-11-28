@@ -5757,6 +5757,13 @@ class AppLocalizationsDe extends AppLocalizations {
       'Die Senderliste steht in der Mitte, rechts daneben immer Sendung, Beschreibung und was danach kommt – für den markierten Sender. OK auf dem laufenden Sender führt zurück zum Bild (oder startet ihn neu, wenn er kein Bild hat). Aus: die Senderliste am Rand wie bisher.';
 
   @override
+  String get settingsTvFrameRate => 'Bildwiederholrate anpassen (50 Hz)';
+
+  @override
+  String get settingsTvFrameRateHelp =>
+      'Während ein Sender vom Receiver läuft, schaltet der Bildschirm auf 50 Hz – wie das Fernsehsignal. Sonst zeigt ein Fernseher mit 60 Hz jedes fünfte Bild doppelt (leichtes Ruckeln bei Schwenks und Laufschrift). Beim Einschalten von TV kann das Bild kurz schwarz werden; Umschalten zwischen Sendern bleibt ohne. Beim Verlassen von TV gilt wieder die Einstellung des Geräts.';
+
+  @override
   String get systemStartDashboard => 'Haussteuerung anzeigen (Wandtablet)';
 
   @override
