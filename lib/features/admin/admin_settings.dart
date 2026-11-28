@@ -153,6 +153,7 @@ class AdminSettings implements AdminSettingsSource {
     }
 
     final slideshow = await repo.getSlideshowSettings();
+    final showVideos = await repo.getPicturesShowVideos();
     Future<String?> setSlideshow(SlideshowSettings Function(SlideshowSettings s) change) async {
       await _c.read(slideshowSettingsProvider.notifier).set(change(await repo.getSlideshowSettings()));
       return null;
@@ -497,6 +498,16 @@ class AdminSettings implements AdminSettingsSource {
           help: null,
           title: l.picturesSettingsTitle,
           items: [
+            _Setting(
+              id: 'picturesShowVideos',
+              label: l.picturesShowVideos,
+              type: 'bool',
+              get: () => showVideos,
+              set: (v) async {
+                await _c.read(picturesShowVideosProvider.notifier).set(_bool(v) ?? false);
+                return null;
+              },
+            ),
             _Setting(
               id: 'slideshowInterval',
               label: l.picturesInterval,

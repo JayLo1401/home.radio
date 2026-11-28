@@ -19,6 +19,35 @@ bool isPictureName(String name) {
   return dot > 0 && pictureExtensions.contains(name.substring(dot).toLowerCase());
 }
 
+/// Video files a pictures folder may hold too (phones, cameras, camcorders):
+/// shown with "Videos anzeigen", played by the films' player. No DVD
+/// images or VOBs - those belong to Filme.
+const pictureVideoExtensions = {
+  '.mp4', '.m4v', '.mkv', '.mov', '.qt', '.avi', '.3gp', '.3g2', '.mts', '.m2ts', '.webm', '.wmv', '.asf', //
+  '.mpg', '.mpeg', '.flv', '.divx', '.ogv', //
+};
+
+/// A video file by its name (hidden ones left out, as for pictures).
+bool isPictureVideoName(String name) {
+  if (name.startsWith('.')) return false;
+  final dot = name.lastIndexOf('.');
+  return dot > 0 && pictureVideoExtensions.contains(name.substring(dot).toLowerCase());
+}
+
+/// What a slideshow shows (asked when it starts, if there are videos).
+enum SlideshowMedia {
+  pictures,
+  both,
+  videos;
+
+  bool get withPictures => this != videos;
+  bool get withVideos => this != pictures;
+}
+
+/// Small picture files next to a video that show it: a camera's ".THM"
+/// (a JPEG), or a picture of the same name ("MVI_0001.JPG").
+const _videoSidecarExtensions = ['.thm', '.jpg', '.jpeg', '.png'];
+
 /// Folders nobody wants to see: hidden ones (".thumbnails"), the NAS's own
 /// (Synology "@eaDir", "#recycle", "#snapshot") and Windows' "$RECYCLE.BIN".
 bool isHiddenPictureFolder(String name) {
@@ -67,14 +96,74 @@ class PictureFolder {
   /// Pictures directly in the folder, in natural order.
   final List<NasEntry> pictures;
 
-  const PictureFolder({required this.folders, required this.pictures});
+  /// Videos directly in the folder, in natural order.
+  final List<NasEntry> videos;
 
-  factory PictureFolder.of(List<NasEntry> entries) => PictureFolder(
-        folders: [for (final e in entries) if (e.isDirectory && !isHiddenPictureFolder(e.name)) e]
-          ..sort((a, b) => compareNatural(a.name, b.name)),
-        pictures: [for (final e in entries) if (!e.isDirectory && isPictureName(e.name)) e]
-          ..sort((a, b) => compareNatural(a.name, b.name)),
-      );
+  /// Where a video's preview may be, by its path: a small picture next to
+  /// it (see [_videoSidecarExtensions]) and/or the folder a Synology NAS
+  /// keeps its previews in ("@eaDir/" plus its name) - found in the listing alone.
+  final Map<String, VideoPreviewHint> videoHints;
+
+  const PictureFolder({
+    required this.folders,
+    required this.pictures,
+    this.videos = const [],
+    this.videoHints = const {},
+  });
+
+  factory PictureFolder.of(List<NasEntry> entries) {
+    int byName(NasEntry a, NasEntry b) => compareNatural(a.name, b.name);
+    final videos = [for (final e in entries) if (!e.isDirectory && isPictureVideoName(e.name)) e]..sort(byName);
+    final hints = <String, VideoPreviewHint>{};
+    if (videos.isNotEmpty) {
+      final synology = entries.any((e) => e.isDirectory && e.name == '@eaDir');
+      // Base name (lower case) → the best sidecar ([_videoSidecarExtensions]
+      // in that order).
+      final sidecars = <String, ({String path, int rank})>{};
+      for (final e in entries) {
+        if (e.isDirectory || e.name.startsWith('.')) continue;
+        final dot = e.name.lastIndexOf('.');
+        if (dot <= 0) continue;
+        final rank = _videoSidecarExtensions.indexOf(e.name.substring(dot).toLowerCase());
+        if (rank < 0) continue;
+        final base = e.name.substring(0, dot).toLowerCase();
+        final known = sidecars[base];
+        if (known == null || rank < known.rank) sidecars[base] = (path: e.path, rank: rank);
+      }
+      for (final v in videos) {
+        final dot = v.name.lastIndexOf('.');
+        final sidecar = sidecars[v.name.substring(0, dot).toLowerCase()]?.path;
+        final eaDir = synology ? joinNasPath(joinNasPath(parentNasPath(v.path), '@eaDir'), v.name) : null;
+        if (sidecar != null || eaDir != null) hints[v.path] = VideoPreviewHint(sidecar: sidecar, synologyFolder: eaDir);
+      }
+    }
+    return PictureFolder(
+      folders: [for (final e in entries) if (e.isDirectory && !isHiddenPictureFolder(e.name)) e]..sort(byName),
+      pictures: [for (final e in entries) if (!e.isDirectory && isPictureName(e.name)) e]..sort(byName),
+      videos: videos,
+      videoHints: hints,
+    );
+  }
+
+  /// The pictures and/or videos, by name - as a phone's gallery mixes them
+  /// ("20260704_101500.jpg", "20260704_101622.mp4").
+  List<NasEntry> media(SlideshowMedia media) {
+    if (!media.withVideos) return pictures;
+    if (!media.withPictures) return videos;
+    if (videos.isEmpty) return pictures;
+    return [...pictures, ...videos]..sort((a, b) => compareNatural(a.name, b.name));
+  }
+}
+
+/// Where a video's preview picture may be (see [PictureFolder.videoHints]).
+class VideoPreviewHint {
+  const VideoPreviewHint({this.sidecar, this.synologyFolder});
+
+  /// A picture file next to the video.
+  final String? sidecar;
+
+  /// "…/@eaDir/(video name)" - Synology's previews of the video.
+  final String? synologyFolder;
 }
 
 /// All pictures in [root] and its subfolders, folder by folder (a folder's
@@ -87,11 +176,15 @@ class PictureFolder {
 /// [onError]); if [root] can't be read, the stream ends with its error.
 /// Every folder gives a list (also an empty one) - so cancelling the
 /// subscription stops the walk after the folder being read.
+///
+/// [media]: pictures, videos or both (mixed by name, see
+/// [PictureFolder.media]).
 Stream<List<NasEntry>> collectPictures(
   NasClient client,
   String root, {
   int maxPictures = 10000,
   int maxDepth = 8,
+  SlideshowMedia media = SlideshowMedia.pictures,
   void Function(String folder, Object error)? onError,
 }) async* {
   var count = 0;
@@ -108,7 +201,7 @@ Stream<List<NasEntry>> collectPictures(
       yield const [];
       continue;
     }
-    final take = content.pictures.take(maxPictures - count).toList();
+    final take = content.media(media).take(maxPictures - count).toList();
     count += take.length;
     yield take;
     if (folder.depth < maxDepth) {

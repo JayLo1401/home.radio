@@ -10,12 +10,15 @@ import '../../core/pictures_providers.dart';
 import '../../core/remote_keys.dart';
 import '../../core/theme.dart';
 import '../../data/repositories/nas_settings_repository.dart';
+import '../../data/services/movie_library.dart';
 import '../../data/services/nas_service.dart';
 import '../../data/services/picture_library.dart';
 import '../../l10n/l10n.dart';
+import '../movies/movie_player_screen.dart';
 import '../settings/nas_settings_screen.dart';
 import 'slideshow_screen.dart';
 import 'thumbnails.dart';
+import 'video_previews.dart';
 
 /// Bilder: the NAS pictures folder (Settings → NAS) to browse - its
 /// subfolders as large tiles, first a "Diashow" entry for the folder with
@@ -28,6 +31,10 @@ import 'thumbnails.dart';
 /// a folder starts its slideshow straight away, Back goes up a level and
 /// leaves at the top. Touch: tap opens, holding a folder starts its
 /// slideshow.
+///
+/// "Videos anzeigen" (the switch in the top bar) shows the folders' videos
+/// among the pictures: OK plays one with the films' player, and a slideshow
+/// asks first whether it shows pictures, videos or both.
 class PicturesScreen extends ConsumerStatefulWidget {
   const PicturesScreen({super.key, @visibleForTesting this.createClient});
 
@@ -56,6 +63,7 @@ class _PicturesScreenState extends ConsumerState<PicturesScreen> {
   /// behind photos.
   NasClient? _thumbClient;
   ThumbnailLoader? _thumbs;
+  VideoPreviewLoader? _videoPreviews;
 
   /// The folders opened, the top one is shown.
   final _stack = <String>[];
@@ -101,6 +109,8 @@ class _PicturesScreenState extends ConsumerState<PicturesScreen> {
   void _closeThumbnails() {
     _thumbs?.close();
     _thumbs = null;
+    _videoPreviews?.close();
+    _videoPreviews = null;
     _thumbClient?.close();
     _thumbClient = null;
   }
@@ -126,6 +136,7 @@ class _PicturesScreenState extends ConsumerState<PicturesScreen> {
     _closeThumbnails();
     _config = nas.config;
     _thumbs = ThumbnailLoader(() => _thumbClient ??= _newClient());
+    _videoPreviews = VideoPreviewLoader(() => _thumbClient ??= _newClient());
     _root = root;
     _stack
       ..clear()
@@ -219,27 +230,110 @@ class _PicturesScreenState extends ConsumerState<PicturesScreen> {
     _load();
   }
 
-  /// [folder]'s slideshow - from [startAt] (a picture), else from where it
-  /// was last if the user wants (or from the start).
+  /// [folder]'s slideshow - from [startAt] (a picture or video), else from
+  /// where it was last if the user wants (or from the start). With videos
+  /// shown it asks first what to show.
   Future<void> _startSlideshow(String folder, {String? startAt}) async {
-    startAt ??= await _askResume(folder);
+    final media = await _askMedia(folder, startAtVideo: startAt != null && _isVideo(startAt));
+    if (media == null || !mounted) return;
+    // Not among what's shown: it would never come (the slideshow would
+    // wait for the whole walk) - from the start then.
+    if (startAt != null && !_shows(media, startAt)) startAt = null;
+    startAt ??= await _askResume(folder, media);
     if (startAt == '' || !mounted) return;
     // The slideshow has its own connection; this one would only idle (and
     // an FTP server drops it after a while). Counting and thumbnails go on
     // afterwards.
     _counting++;
     _closeClient();
-    _thumbs?.suspend();
-    await Navigator.of(context)
-        .push(MaterialPageRoute(builder: (_) => SlideshowScreen(folder: folder, startAt: startAt)));
+    _suspendPreviews();
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => SlideshowScreen(folder: folder, startAt: startAt, media: media)),
+    );
     if (!mounted) return;
-    _thumbs?.resume();
+    _resumePreviews();
     if (_root != null && _cache.containsKey(_path)) _countSubfolders();
   }
 
+  void _suspendPreviews() {
+    _thumbs?.suspend();
+    _videoPreviews?.suspend();
+  }
+
+  void _resumePreviews() {
+    _thumbs?.resume();
+    _videoPreviews?.resume();
+  }
+
+  /// OK on a video: the films' player (Back comes back to it here).
+  Future<void> _playVideo(NasEntry video) async {
+    final config = _config;
+    if (config == null) return;
+    _counting++;
+    _suspendPreviews();
+    try {
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => MoviePlayerScreen(
+            movie: MovieItem(path: video.path, title: movieTitle(video.name), kind: MovieKind.file, size: video.size),
+            config: config,
+          ),
+        ),
+      );
+    } catch (e) {
+      debugPrint('pictures: video ${video.path} ($e)');
+    }
+    if (!mounted) return;
+    _resumePreviews();
+    if (_root != null && _cache.containsKey(_path)) _countSubfolders();
+  }
+
+  /// Whether [folder] or a folder below it may have videos - as far as the
+  /// listings of this visit tell (a folder not listed yet: maybe).
+  bool _mayHaveVideos(String folder, [int depth = 0]) {
+    final content = _cache[folder];
+    if (content == null) return true;
+    if (content.videos.isNotEmpty) return true;
+    if (depth >= 8) return false;
+    return content.folders.any((f) => _mayHaveVideos(f.path, depth + 1));
+  }
+
+  /// What the slideshow shows: pictures, both or videos (null: dismissed).
+  /// Only asked with videos shown and when there may be some.
+  Future<SlideshowMedia?> _askMedia(String folder, {bool startAtVideo = false}) async {
+    if (!ref.read(picturesShowVideosProvider) || !_mayHaveVideos(folder)) return SlideshowMedia.pictures;
+    final content = _cache[folder];
+    final preferred =
+        startAtVideo || (content?.videos.isNotEmpty ?? false) ? SlideshowMedia.both : SlideshowMedia.pictures;
+    final l = context.l10n;
+    Widget option(BuildContext context, SlideshowMedia media, IconData icon, String label) => ListTile(
+          autofocus: media == preferred,
+          leading: Icon(icon, color: media == preferred ? brandGreen : null),
+          title: Text(label),
+          onTap: () => Navigator.of(context).pop(media),
+        );
+    return showDialog<SlideshowMedia>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: Text(l.picturesSlideshow(_name(folder))),
+        children: [
+          option(context, SlideshowMedia.pictures, Icons.photo_outlined, l.picturesMediaPictures),
+          option(context, SlideshowMedia.both, Icons.perm_media_outlined, l.picturesMediaBoth),
+          option(context, SlideshowMedia.videos, Icons.movie_outlined, l.picturesMediaVideos),
+        ],
+      ),
+    );
+  }
+
+  static bool _isVideo(String path) => isPictureVideoName(path.split('/').last);
+
+  /// Whether a slideshow of [media] shows the file at [path].
+  static bool _shows(SlideshowMedia media, String path) => _isVideo(path) ? media.withVideos : media.withPictures;
+
   /// The folder's slideshow was stopped somewhere before: go on there
   /// (its path) or start over (null)? '' when the question was dismissed.
-  Future<String?> _askResume(String folder) async {
+  /// Not asked when that place isn't among what [media] shows.
+  Future<String?> _askResume(String folder, SlideshowMedia media) async {
     final config = _config;
     if (config == null) return null;
     SlideshowResumePoint? point;
@@ -248,7 +342,7 @@ class _PicturesScreenState extends ConsumerState<PicturesScreen> {
     } catch (e) {
       debugPrint('pictures: no resume point ($e)');
     }
-    if (point == null || point.position <= 1 || !mounted) return null;
+    if (point == null || point.position <= 1 || !_shows(media, point.path) || !mounted) return null;
     final l = context.l10n;
     final from = point;
     final resume = await showDialog<bool>(
@@ -315,12 +409,26 @@ class _PicturesScreenState extends ConsumerState<PicturesScreen> {
   /// "Bilder › Urlaub 2026 › Tag 2"
   String get _breadcrumb => [for (final p in _stack) _name(p)].join('  ›  ');
 
-  String _countLabel(PictureFolder content) {
+  String _countLabel(PictureFolder content, {required bool videos}) {
     final l = context.l10n;
+    final withVideos = videos && content.videos.isNotEmpty;
     return [
-      if (content.pictures.isNotEmpty || content.folders.isEmpty) l.picturesCount(content.pictures.length),
+      if (content.pictures.isNotEmpty || (content.folders.isEmpty && !withVideos))
+        l.picturesCount(content.pictures.length),
+      if (withVideos) l.picturesVideoCount(content.videos.length),
       if (content.folders.isNotEmpty) l.picturesFolderCount(content.folders.length),
     ].join('  ·  ');
+  }
+
+  /// The heading above the folder's own pictures (and videos).
+  String _mediaHeading(PictureFolder content, {required bool videos}) {
+    final l = context.l10n;
+    if (!videos || content.videos.isEmpty) return l.picturesInThisFolder(content.pictures.length);
+    if (content.pictures.isEmpty) return l.picturesVideosInThisFolder(l.picturesVideoCount(content.videos.length));
+    return l.picturesMediaInThisFolder(
+      l.picturesCount(content.pictures.length),
+      l.picturesVideoCount(content.videos.length),
+    );
   }
 
   @override
@@ -333,6 +441,16 @@ class _PicturesScreenState extends ConsumerState<PicturesScreen> {
       _reset(settings, root);
     }
     final content = _root == null ? null : _cache[_path];
+    final showVideos = ref.watch(picturesShowVideosProvider);
+    // Switched (also from the admin page) while a video had the focus: back
+    // on the slideshow entry.
+    ref.listen<bool>(picturesShowVideosProvider, (_, _) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _root == null || !_cache.containsKey(_path)) return;
+        final focus = FocusManager.instance.primaryFocus;
+        if (focus == null || focus is FocusScopeNode) _node('slideshow:$_path').requestFocus();
+      });
+    });
     Widget body;
     if (settings == null) {
       body = const Center(child: LoadingWave());
@@ -348,7 +466,7 @@ class _PicturesScreenState extends ConsumerState<PicturesScreen> {
       );
     } else if (content == null || _loading) {
       body = const Center(child: LoadingWave());
-    } else if (content.folders.isEmpty && content.pictures.isEmpty) {
+    } else if (content.folders.isEmpty && content.pictures.isEmpty && (!showVideos || content.videos.isEmpty)) {
       body = _Message(text: l.picturesEmptyFolder);
     } else {
       body = LayoutBuilder(
@@ -357,8 +475,9 @@ class _PicturesScreenState extends ConsumerState<PicturesScreen> {
           _columns = max(1, ((width + _spacing) / (_tileWidth + _spacing)).floor());
           final thumbColumns = max(2, ((width + _thumbSpacing) / (_thumbWidth + _thumbSpacing)).floor());
           final thumbWidth = (width - (thumbColumns - 1) * _thumbSpacing) / thumbColumns;
-          final pictures = content.pictures;
+          final pictures = showVideos ? content.media(SlideshowMedia.both) : content.pictures;
           final thumbs = _thumbs;
+          final videoPreviews = _videoPreviews;
           return CustomScrollView(
             controller: _scroll,
             slivers: [
@@ -381,7 +500,7 @@ class _PicturesScreenState extends ConsumerState<PicturesScreen> {
                           title: content.folders.isEmpty
                               ? l.picturesSlideshow(_name(_path))
                               : l.picturesSlideshowWithSubfolders(_name(_path)),
-                          subtitle: _countLabel(content),
+                          subtitle: _countLabel(content, videos: showVideos),
                           accent: true,
                           onTap: () => _startSlideshow(_path),
                           onKey: (e) => _slideshowKey(e, _path),
@@ -393,7 +512,7 @@ class _PicturesScreenState extends ConsumerState<PicturesScreen> {
                         focusNode: _node(folder.path),
                         icon: Icons.folder,
                         title: folder.name,
-                        subtitle: inside == null ? '' : _countLabel(inside),
+                        subtitle: inside == null ? '' : _countLabel(inside, videos: showVideos),
                         onTap: () => _open(folder),
                         onLongPress: () => _startSlideshow(folder.path),
                         onKey: (e) => _slideshowKey(e, folder.path),
@@ -402,12 +521,12 @@ class _PicturesScreenState extends ConsumerState<PicturesScreen> {
                   ),
                 ),
               ),
-              if (pictures.isNotEmpty && thumbs != null) ...[
+              if (pictures.isNotEmpty && thumbs != null && videoPreviews != null) ...[
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(8, 28, 8, 12),
                     child: Text(
-                      l.picturesInThisFolder(pictures.length),
+                      _mediaHeading(content, videos: showVideos),
                       style: const TextStyle(color: Colors.white70, fontSize: 16),
                     ),
                   ),
@@ -427,6 +546,17 @@ class _PicturesScreenState extends ConsumerState<PicturesScreen> {
                       childCount: pictures.length,
                       (context, i) {
                         final picture = pictures[i];
+                        if (showVideos && isPictureVideoName(picture.name)) {
+                          return VideoTile(
+                            key: ValueKey(picture.path),
+                            entry: picture,
+                            hint: content.videoHints[picture.path],
+                            loader: videoPreviews,
+                            onTap: () => _playVideo(picture),
+                            // ⏯ / options: the slideshow from it.
+                            onKey: (e) => _pictureKey(e, picture),
+                          );
+                        }
                         return ThumbnailTile(
                           key: ValueKey(picture.path),
                           entry: picture,
@@ -478,6 +608,14 @@ class _PicturesScreenState extends ConsumerState<PicturesScreen> {
                           style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w600),
                         ),
                       ),
+                      if (root != null) ...[
+                        const SizedBox(width: 16),
+                        _VideosSwitch(
+                          focusNode: _node('videosSwitch'),
+                          value: showVideos,
+                          onChanged: (v) => ref.read(picturesShowVideosProvider.notifier).set(v),
+                        ),
+                      ],
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -492,6 +630,58 @@ class _PicturesScreenState extends ConsumerState<PicturesScreen> {
                     ),
                 ],
               ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// "Videos anzeigen" in the top bar: OK switches it.
+class _VideosSwitch extends StatefulWidget {
+  const _VideosSwitch({required this.focusNode, required this.value, required this.onChanged});
+
+  final FocusNode focusNode;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  State<_VideosSwitch> createState() => _VideosSwitchState();
+}
+
+class _VideosSwitchState extends State<_VideosSwitch> {
+  bool _focused = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final on = widget.value;
+    return TvFocusHighlight(
+      focused: _focused,
+      borderRadius: BorderRadius.circular(24),
+      child: Material(
+        color: on ? const Color(0xFF12301C) : const Color(0xFF15191B),
+        borderRadius: BorderRadius.circular(24),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          focusNode: widget.focusNode,
+          focusColor: Colors.white.withValues(alpha: 0.06),
+          onFocusChange: (v) => setState(() => _focused = v),
+          onTap: () => widget.onChanged(!on),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 6, 10, 6),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.movie_outlined, size: 20, color: on ? brandGreen : Colors.white60),
+                const SizedBox(width: 8),
+                Text(
+                  context.l10n.picturesShowVideos,
+                  style: TextStyle(color: on ? Colors.white : Colors.white70, fontSize: 16),
+                ),
+                const SizedBox(width: 6),
+                Icon(on ? Icons.toggle_on : Icons.toggle_off, size: 34, color: on ? brandGreen : Colors.white38),
+              ],
             ),
           ),
         ),

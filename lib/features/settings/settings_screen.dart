@@ -540,6 +540,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ),
       ),
       Padding(padding: const EdgeInsets.fromLTRB(12, 4, 12, 0), child: Text(l.picturesMusicHelp, style: help)),
+      const SizedBox(height: 8),
+      tileToggle(l.picturesShowVideos, ref.watch(picturesShowVideosProvider),
+          (v) => ref.read(picturesShowVideosProvider.notifier).set(v)),
       const Divider(height: 32),
       Text(l.picturesSlideshowHeading, style: Theme.of(context).textTheme.titleLarge),
       Padding(

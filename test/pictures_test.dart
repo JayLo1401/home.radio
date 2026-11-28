@@ -11,11 +11,14 @@ import 'package:home_system/core/nas_providers.dart';
 import 'package:home_system/core/pictures_providers.dart';
 import 'package:home_system/core/remote_keys.dart';
 import 'package:home_system/data/repositories/nas_settings_repository.dart';
+import 'package:home_system/data/repositories/settings_repository.dart';
 import 'package:home_system/data/services/nas_service.dart';
 import 'package:home_system/data/services/picture_library.dart';
 import 'package:home_system/features/pictures/pictures_screen.dart';
 import 'package:home_system/features/pictures/slide_loader.dart';
+import 'package:home_system/features/pictures/slideshow_popup.dart';
 import 'package:home_system/features/pictures/thumbnails.dart';
+import 'package:home_system/features/pictures/video_previews.dart';
 import 'package:home_system/l10n/l10n.dart';
 
 class _NasSettings extends NasSettingsNotifier {
@@ -25,6 +28,19 @@ class _NasSettings extends NasSettingsNotifier {
 
   @override
   Future<NasSettings> build() async => settings;
+}
+
+/// "Videos anzeigen" in memory instead of the database.
+class _ShowVideos extends PicturesShowVideosNotifier {
+  _ShowVideos(this.initial);
+
+  final bool initial;
+
+  @override
+  bool build() => initial;
+
+  @override
+  Future<void> set(bool value) async => state = value;
 }
 
 class _Keys extends RemoteKeysNotifier {
@@ -43,10 +59,12 @@ Future<void> _pumpBrowser(
   NasSettings settings,
   NasClient nas, {
   SlideshowResumeStore? resume,
+  bool showVideos = false,
 }) async {
   await tester.pumpWidget(ProviderScope(
     overrides: [
       nasSettingsProvider.overrideWith(() => _NasSettings(settings)),
+      picturesShowVideosProvider.overrideWith(() => _ShowVideos(showVideos)),
       remoteKeysProvider.overrideWith(_Keys.new),
       slideshowResumeProvider.overrideWithValue(resume ?? _memoryResume()),
     ],
@@ -491,6 +509,131 @@ void main() {
       expect(find.text('Fortsetzen ab Bild 5 (b.jpg)'), findsNothing);
       expect(find.text('Diashow: Bilder'), findsOneWidget);
       await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets('videos: hidden until switched on, then among the pictures by name', (tester) async {
+      final nas = _FakeNas({
+        '/Bilder': ['b.jpg', 'a.mp4', 'c.mov', 'Urlaub/'],
+        '/Bilder/Urlaub': ['u.jpg', 'u.mp4'],
+      });
+      await _pumpBrowser(tester, configured, nas);
+      expect(find.text('a.mp4'), findsNothing);
+      expect(find.text('1 Bild in diesem Ordner - OK auf einem Bild startet die Diashow ab dort'), findsOneWidget);
+      expect(find.text('Videos anzeigen'), findsOneWidget);
+
+      // The switch: above the tiles.
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+      await _settle(tester);
+      expect(_focused, 'videosSwitch');
+      await tester.sendKeyEvent(LogicalKeyboardKey.select);
+      await _settle(tester);
+      expect(find.byType(VideoTile), findsNWidgets(2));
+      expect(
+        find.text('1 Bild und 2 Videos in diesem Ordner - OK auf einem Bild startet die Diashow ab dort, '
+            'OK auf einem Video spielt es ab'),
+        findsOneWidget,
+      );
+      expect(find.text('1 Bild  ·  1 Video'), findsOneWidget);
+      // a.mp4, b.jpg, c.mov
+      expect(tester.getTopLeft(find.text('a.mp4')).dx, lessThan(tester.getTopLeft(find.text('b.jpg')).dx));
+      expect(tester.getTopLeft(find.text('b.jpg')).dx, lessThan(tester.getTopLeft(find.text('c.mov')).dx));
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets('videos shown: the slideshow asks what to show, "Bilder und Videos" focused', (tester) async {
+      final nas = _FakeNas({
+        '/Bilder': ['a.jpg', 'b.mp4'],
+      });
+      await _pumpBrowser(tester, configured, nas, showVideos: true);
+      expect(_focused, 'slideshow:/Bilder');
+      await tester.sendKeyEvent(LogicalKeyboardKey.select);
+      await _settle(tester);
+      expect(find.text('Nur Bilder wiedergeben'), findsOneWidget);
+      expect(find.text('Nur Videos wiedergeben'), findsOneWidget);
+      final focused = FocusManager.instance.primaryFocus?.context;
+      final title = focused?.findAncestorWidgetOfExactType<ListTile>()?.title;
+      expect(title is Text ? title.data : null, 'Bilder und Videos wiedergeben');
+      // Back: nothing starts.
+      await tester.binding.handlePopRoute();
+      await _settle(tester);
+      expect(find.text('Nur Bilder wiedergeben'), findsNothing);
+      expect(find.text('Diashow: Bilder'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  });
+
+  group('videos', () {
+    test('video names', () {
+      for (final name in ['a.mp4', 'B.MOV', 'c.mkv', 'd.avi', 'e.3gp', 'f.mts', 'g.m2ts', 'h.webm', 'i.wmv', 'j.mpg']) {
+        expect(isPictureVideoName(name), isTrue, reason: name);
+      }
+      for (final name in ['._a.mp4', 'film.iso', 'VTS_01_1.VOB', 'a.jpg', 'mp4']) {
+        expect(isPictureVideoName(name), isFalse, reason: name);
+      }
+    });
+
+    test('a folder: its videos, where their previews may be, mixed with the pictures by name', () {
+      final folder = PictureFolder.of([
+        const NasEntry(name: '@eaDir', path: '/F/@eaDir', isDirectory: true),
+        const NasEntry(name: 'MVI_2.MOV', path: '/F/MVI_2.MOV', isDirectory: false),
+        const NasEntry(name: 'MVI_2.JPG', path: '/F/MVI_2.JPG', isDirectory: false),
+        const NasEntry(name: 'MVI_2.THM', path: '/F/MVI_2.THM', isDirectory: false),
+        const NasEntry(name: 'img_10.jpg', path: '/F/img_10.jpg', isDirectory: false),
+        const NasEntry(name: 'img_9.mp4', path: '/F/img_9.mp4', isDirectory: false),
+      ]);
+      expect(folder.videos.map((e) => e.name), ['img_9.mp4', 'MVI_2.MOV']);
+      expect(folder.pictures.map((e) => e.name), ['img_10.jpg', 'MVI_2.JPG']);
+      // The camera's .THM before the picture of the same name.
+      expect(folder.videoHints['/F/MVI_2.MOV']?.sidecar, '/F/MVI_2.THM');
+      expect(folder.videoHints['/F/MVI_2.MOV']?.synologyFolder, '/F/@eaDir/MVI_2.MOV');
+      expect(folder.videoHints['/F/img_9.mp4']?.sidecar, isNull);
+      expect(
+        folder.media(SlideshowMedia.both).map((e) => e.name),
+        ['img_9.mp4', 'img_10.jpg', 'MVI_2.JPG', 'MVI_2.MOV'],
+      );
+      expect(folder.media(SlideshowMedia.pictures).map((e) => e.name), ['img_10.jpg', 'MVI_2.JPG']);
+      expect(folder.media(SlideshowMedia.videos).map((e) => e.name), ['img_9.mp4', 'MVI_2.MOV']);
+
+      // No Synology folder: no guess there.
+      final plain = PictureFolder.of([const NasEntry(name: 'a.mp4', path: '/G/a.mp4', isDirectory: false)]);
+      expect(plain.videoHints, isEmpty);
+    });
+
+    test('the slideshow walk: pictures, videos or both', () async {
+      final nas = _FakeNas({
+        '/P': ['1.jpg', '2.mp4', 'A/'],
+        '/P/A': ['3.mov', '4.png'],
+      });
+      Future<List<String>> walk(SlideshowMedia media) async => [
+            for (final batch in await collectPictures(nas, '/P', media: media).toList()) ...batch.map((e) => e.path),
+          ];
+      expect(await walk(SlideshowMedia.pictures), ['/P/1.jpg', '/P/A/4.png']);
+      expect(await walk(SlideshowMedia.videos), ['/P/2.mp4', '/P/A/3.mov']);
+      expect(await walk(SlideshowMedia.both), ['/P/1.jpg', '/P/2.mp4', '/P/A/3.mov', '/P/A/4.png']);
+    });
+
+    test('display time: an earlier value becomes the nearest one offered', () {
+      expect(SettingsRepository.slideshowIntervalOf(8), 8);
+      expect(SettingsRepository.slideshowIntervalOf(12), 10);
+      expect(SettingsRepository.slideshowIntervalOf(1), 3);
+      expect(SettingsRepository.slideshowIntervalOf(600), 60);
+      expect(SettingsRepository.slideshowIntervalOf(null), SettingsRepository.defaultSlideshowInterval);
+    });
+
+    test('the popup shows the music while it has the session, else the radio', () {
+      SlideshowPopupSource source({bool active = false, bool playing = false, bool radio = false, bool guest = false}) =>
+          slideshowPopupSource(
+            musicActive: active,
+            musicPlaying: playing,
+            radioHasStation: radio,
+            musicHoldsSession: guest,
+          );
+      expect(source(), SlideshowPopupSource.none);
+      expect(source(radio: true), SlideshowPopupSource.radio);
+      expect(source(active: true), SlideshowPopupSource.music);
+      expect(source(active: true, radio: true), SlideshowPopupSource.radio);
+      expect(source(active: true, radio: true, guest: true), SlideshowPopupSource.music);
+      expect(source(active: true, playing: true, radio: true), SlideshowPopupSource.music);
     });
   });
 

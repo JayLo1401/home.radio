@@ -1611,7 +1611,7 @@
   "picturesNoneFound": "Hier sind keine Bilder - auch nicht in den Unterordnern.",
   "picturesStillSearching": "sucht weiter …",
   "picturesPaused": "Pause",
-  "picturesSlideshowHint": "← → zurück/vor · OK Pause · {options} Einstellungen · Zurück beendet",
+  "picturesSlideshowHint": "← → zurück/vor · OK oder ↑ ↓ Musik und Anzeigedauer · ⏯ Pause · {options} Einstellungen · Zurück beendet",
   "@picturesSlideshowHint": {
     "placeholders": {
       "options": {
@@ -1634,7 +1634,7 @@
   "picturesOrderNextTime": "Die Reihenfolge gilt ab der nächsten Diashow.",
   "picturesBlur": "Ränder mit dem unscharfen Bild füllen",
   "picturesFolder": "Bilder-Ordner",
-  "picturesMusicHelp": "Radio und Musik laufen während der Diashow einfach weiter.",
+  "picturesMusicHelp": "Radio und Musik laufen während der Diashow einfach weiter - nur während eines Videos mit Ton pausieren sie.",
   "picturesSlideshowHeading": "Diashow",
   "picturesInThisFolder": "{count, plural, =1{1 Bild in diesem Ordner} other{{count} Bilder in diesem Ordner}} - OK auf einem Bild startet die Diashow ab dort",
   "@picturesInThisFolder": {
@@ -1656,6 +1656,44 @@
     }
   },
   "picturesResumeRestart": "Von vorne",
+  "picturesShowVideos": "Videos anzeigen",
+  "picturesVideoCount": "{count, plural, =1{1 Video} other{{count} Videos}}",
+  "@picturesVideoCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "picturesMediaInThisFolder": "{pictures} und {videos} in diesem Ordner - OK auf einem Bild startet die Diashow ab dort, OK auf einem Video spielt es ab",
+  "@picturesMediaInThisFolder": {
+    "placeholders": {
+      "pictures": {
+        "type": "String"
+      },
+      "videos": {
+        "type": "String"
+      }
+    }
+  },
+  "picturesVideosInThisFolder": "{videos} in diesem Ordner - OK spielt ein Video ab, ⏯ startet die Diashow ab dort",
+  "@picturesVideosInThisFolder": {
+    "placeholders": {
+      "videos": {
+        "type": "String"
+      }
+    }
+  },
+  "picturesMediaPictures": "Nur Bilder wiedergeben",
+  "picturesMediaBoth": "Bilder und Videos wiedergeben",
+  "picturesMediaVideos": "Nur Videos wiedergeben",
+  "picturesNoVideosFound": "Hier sind keine Videos - auch nicht in den Unterordnern.",
+  "picturesNoMediaFound": "Hier sind keine Bilder und keine Videos - auch nicht in den Unterordnern.",
+  "picturesDisplayDuration": "Anzeigedauer",
+  "picturesNothingPlaying": "Gerade läuft keine Musik und kein Radio. Starte Musik oder Radio, dann lässt sie sich hier steuern.",
+  "picturesPopupHint": "← → wählen · OK · Zurück schließt",
+  "picturesPreviousStation": "Voriger Sender",
+  "picturesNextStation": "Nächster Sender",
   "radioErrorConnectionLost": "Verbindung zum Sender verloren - versuche erneut…",
   "radioErrorStationUnreachable": "Sender nicht erreichbar - versuche erneut…",
   "radioErrorPlayback": "Wiedergabefehler: {message}",

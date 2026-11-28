@@ -13,33 +13,43 @@ import '../../core/providers.dart';
 import '../../core/remote_keys.dart';
 import '../../core/theme.dart';
 import '../../data/repositories/settings_repository.dart';
+import '../../data/services/music_player.dart';
 import '../../data/services/nas_service.dart';
 import '../../data/services/picture_library.dart';
+import '../../data/services/radio_audio_handler.dart';
 import '../../l10n/l10n.dart';
 import '../music/music_now_playing_toast.dart';
 import 'slide_loader.dart';
+import 'slide_video.dart';
+import 'slideshow_popup.dart';
 
 /// A slideshow of [folder] and all its subfolders: starts with the first
 /// pictures found while the rest is still being looked for, shows each
 /// for the set time with a soft crossfade, and keeps the display on. Radio
-/// and music are left alone - they simply play on.
+/// and music are left alone - they simply play on, except while a video
+/// with sound plays ([media] with videos): a video plays to its end, the
+/// music pauses meanwhile and goes on afterwards.
 ///
-/// Remote: ←/→ previous/next, OK or ⏯ pause/go on, ↑/↓ or Info the
-/// picture's folder, name and number, the options key the slideshow's
-/// settings, Back ends it. Touch: tap left/right third back/next, the
-/// middle pause, swipe back/next.
+/// Remote: ←/→ previous/next, OK or ↑/↓ the popup with what's playing,
+/// its controls and the display time (SlideshowPopup), ⏯ pause/go on, Info
+/// the picture's folder, name and number, the options key the slideshow's
+/// settings, Back ends it (or closes the popup). Touch: tap left/right
+/// third back/next, the middle the popup, swipe back/next.
 ///
 /// [startAt]: begins with that picture ("ab hier", or resumed) and goes on
 /// in the usual order from there. Where it is, is remembered per folder
 /// (SlideshowResumeStore).
 class SlideshowScreen extends ConsumerStatefulWidget {
-  const SlideshowScreen({super.key, required this.folder, this.startAt});
+  const SlideshowScreen({super.key, required this.folder, this.startAt, this.media = SlideshowMedia.pictures});
 
   /// Absolute NAS path.
   final String folder;
 
-  /// Path of a picture in [folder] or below.
+  /// Path of a picture (or video) in [folder] or below.
   final String? startAt;
+
+  /// Pictures, videos or both.
+  final SlideshowMedia media;
 
   @override
   ConsumerState<SlideshowScreen> createState() => _SlideshowScreenState();
@@ -50,6 +60,7 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> with SingleTi
 
   final _focus = FocusNode(debugLabel: 'slideshow');
   late final _display = ref.read(displayServiceProvider);
+  late final MusicPlayer _music = ref.read(musicPlayerProvider);
   late final AnimationController _fade = AnimationController(vsync: this, duration: _fadeDuration)
     ..addStatusListener((status) {
       if (status == AnimationStatus.completed) _dropPrevious();
@@ -86,11 +97,29 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> with SingleTi
   /// Where this folder's place is remembered (see SlideshowResumeStore).
   String? _resumeKey;
 
+  /// The NAS - videos get a connection of their own.
+  NasConfig? _config;
+
+  /// The video playing instead of a picture.
+  SlideVideo? _video;
+
+  /// Paused for a video with sound - going on after it.
+  var _musicPausedForVideo = false;
+  RadioAudioHandler? _radioPausedForVideo;
+
+  /// The popup with what's playing and the display time is shown.
+  var _popupOpen = false;
+
+  /// What is shown now: the video, else the picture.
+  NasEntry? get _shown => _video?.entry ?? _current?.entry;
+
   @override
   void initState() {
     super.initState();
     // Loads the interval before the first picture's time is counted.
     ref.read(slideshowSettingsProvider);
+    // Read now: dispose may need it to resume the music after a video.
+    _music;
     _display.setKeepScreenOn(true);
     _start();
     _grabFocus();
@@ -119,8 +148,51 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> with SingleTi
     _focus.dispose();
     _current?.dispose();
     _previous?.dispose();
+    final video = _video;
+    _video = null;
+    if (video != null) _closeVideo(video);
+    _resumeAudioAfterVideo();
     _display.setKeepScreenOn(false);
     super.dispose();
+  }
+
+  void _closeVideo(SlideVideo video) {
+    video.removeListener(_onVideoChanged);
+    unawaited(video.close());
+  }
+
+  /// Music or radio playing: paused for a video (its sound would mix in).
+  Future<void> _pauseAudioForVideo() async {
+    if (_musicPausedForVideo || _radioPausedForVideo != null) return;
+    try {
+      if (_music.state.value.playing) {
+        _musicPausedForVideo = true;
+        await _music.pause();
+        return;
+      }
+    } catch (e) {
+      debugPrint('slideshow: music not paused ($e)');
+    }
+    try {
+      final handler = ref.read(radioAudioHandlerProvider).value;
+      if (handler != null && !handler.hasGuest && handler.playbackState.value.playing) {
+        _radioPausedForVideo = handler;
+        await handler.pause();
+      }
+    } catch (e) {
+      debugPrint('slideshow: radio not paused ($e)');
+    }
+  }
+
+  /// What [_pauseAudioForVideo] paused goes on.
+  void _resumeAudioAfterVideo() {
+    if (_musicPausedForVideo) {
+      _musicPausedForVideo = false;
+      _music.play().catchError((Object e) => debugPrint('slideshow: music not resumed ($e)'));
+    }
+    final radio = _radioPausedForVideo;
+    _radioPausedForVideo = null;
+    if (radio != null) radio.play().catchError((Object e) => debugPrint('slideshow: radio not resumed ($e)'));
   }
 
   /// Stops looking for pictures and loading them.
@@ -147,6 +219,7 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> with SingleTi
     if (!mounted) return;
     final client = nas.config.createClient();
     _client = client;
+    _config = nas.config;
     _blur = settings.blurredBackground;
     _resumeKey = SlideshowResumeStore.keyOf(nas.config.identity, widget.folder);
     final startAt = widget.startAt;
@@ -163,6 +236,7 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> with SingleTi
     _walk = collectPictures(
       client,
       widget.folder,
+      media: widget.media,
       onError: (folder, e) => debugPrint('slideshow: $folder left out ($e)'),
     ).listen(
       _onFound,
@@ -178,12 +252,12 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> with SingleTi
   void _onFound(List<NasEntry> pictures) {
     if (pictures.isEmpty || !mounted) return;
     _playlist.addAll(pictures);
-    if (_current == null && !_loading) {
+    if (_shown == null && !_loading) {
       _showCurrent();
     } else if (_waiting) {
       _waiting = false;
       _step(1);
-    } else if (_preload == null && _current != null) {
+    } else if (_preload == null && _shown != null) {
       _preloadNext();
     }
     setState(() {});
@@ -192,11 +266,11 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> with SingleTi
   void _onWalkDone() {
     if (!mounted) return;
     _playlist.finish();
-    if (_playlist.isEmpty && _current == null) {
+    if (_playlist.isEmpty && _shown == null) {
       setState(() => _noneFound = true);
       return;
     }
-    if (_current == null && !_loading) {
+    if (_shown == null && !_loading) {
       // The picture to start at never came (deleted meanwhile): the first.
       _showCurrent();
     } else if (_waiting) {
@@ -219,28 +293,77 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> with SingleTi
     }
     final generation = ++_generation;
     _timer?.cancel();
+    // A video being left stops at once (its sound mustn't play on while
+    // the next one loads).
+    unawaited(_video?.pause());
     setState(() => _loading = true);
+    if (isPictureVideoName(entry.name)) return _showVideo(entry, generation, forward: forward);
     final slide = await _slideFor(entry);
     if (!mounted || generation != _generation) {
       slide?.dispose();
       return;
     }
-    if (slide == null) {
-      final more = _playlist.removeCurrent(forward: forward);
-      if (more) {
-        unawaited(_showCurrent(forward: forward));
-      } else {
-        setState(() {
-          _loading = false;
-          _waiting = true;
-          _noneFound = _playlist.isEmpty && _playlist.complete && _current == null;
-        });
-        // Nothing to wait for: shown again in a while (the one shown stays).
-        if (_playlist.complete && _current != null) _scheduleNext();
-      }
+    if (slide == null) return _skipUnusable(forward: forward);
+    _present(slide);
+  }
+
+  /// The current one can't be shown: dropped, the next one in that
+  /// direction tried.
+  void _skipUnusable({required bool forward}) {
+    final more = _playlist.removeCurrent(forward: forward);
+    if (more) {
+      unawaited(_showCurrent(forward: forward));
       return;
     }
-    _present(slide);
+    setState(() {
+      _loading = false;
+      _waiting = true;
+      _noneFound = _playlist.isEmpty && _playlist.complete && _shown == null;
+    });
+    if (_video == null) _resumeAudioAfterVideo();
+    // Nothing to wait for: shown again in a while (the one shown stays).
+    if (_playlist.complete && _shown != null) _scheduleNext();
+  }
+
+  /// A video: plays whole with sound (the music pauses meanwhile), then the
+  /// slideshow goes on ([_onVideoChanged]).
+  Future<void> _showVideo(NasEntry entry, int generation, {required bool forward}) async {
+    final config = _config;
+    final language = Localizations.localeOf(context).languageCode;
+    await _pauseAudioForVideo();
+    if (!mounted || generation != _generation) return;
+    final video = config == null ? null : await SlideVideo.open(config, entry, language: language);
+    if (!mounted || generation != _generation) {
+      if (video != null) unawaited(video.close());
+      return;
+    }
+    if (video == null) return _skipUnusable(forward: forward);
+    if (!await video.hasSound()) _resumeAudioAfterVideo();
+    if (!mounted || generation != _generation) {
+      unawaited(video.close());
+      return;
+    }
+    final old = _video;
+    setState(() {
+      _video = video;
+      _loading = false;
+      _waiting = false;
+    });
+    if (old != null) WidgetsBinding.instance.addPostFrameCallback((_) => _closeVideo(old));
+    video.addListener(_onVideoChanged);
+    if (_paused) unawaited(video.pause());
+    _timer?.cancel();
+    _remember(entry);
+    // The picture after it, loaded while it plays.
+    _preloadNext();
+  }
+
+  /// The video played to its end (or broke off): the next one.
+  void _onVideoChanged() {
+    final video = _video;
+    if (video == null || !video.ended || !mounted) return;
+    video.removeListener(_onVideoChanged);
+    _step(1);
   }
 
   Future<SlideImage?> _slideFor(NasEntry entry) {
@@ -261,14 +384,23 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> with SingleTi
 
   void _present(SlideImage slide) {
     final dropped = _previous;
+    final video = _video;
+    // After a video the picture comes without a crossfade (from the one
+    // before the video).
+    final before = video != null ? _current : null;
     setState(() {
-      _previous = _current;
+      _previous = video != null ? null : _current;
       _current = slide;
+      _video = null;
       _loading = false;
       _waiting = false;
     });
     // After the frame that no longer shows it.
     if (dropped != null) WidgetsBinding.instance.addPostFrameCallback((_) => dropped.dispose());
+    if (before != null) WidgetsBinding.instance.addPostFrameCallback((_) => before.dispose());
+    if (video != null) WidgetsBinding.instance.addPostFrameCallback((_) => _closeVideo(video));
+    // Paused for a video (also one that couldn't be played): goes on.
+    _resumeAudioAfterVideo();
     _fade.forward(from: 0);
     _scheduleNext();
     _preloadNext();
@@ -293,8 +425,8 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> with SingleTi
   /// Loads the following picture ahead, so it's there when its time comes.
   void _preloadNext() {
     final next = _playlist.peek(1);
-    final current = _current?.entry;
-    if (next == null || next.path == current?.path) return;
+    final current = _shown;
+    if (next == null || next.path == current?.path || isPictureVideoName(next.name)) return;
     if (_preload?.entry.path == next.path) return;
     _discardPreload();
     _preload = (entry: next, slide: _load(next));
@@ -302,20 +434,22 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> with SingleTi
 
   void _scheduleNext() {
     _timer?.cancel();
-    if (_paused || _optionsOpen) return;
+    // A video goes on when it has ended.
+    if (_paused || _optionsOpen || _video != null) return;
     final seconds = ref.read(slideshowSettingsProvider).intervalSeconds;
     _timer = Timer(Duration(seconds: seconds), () => _step(1));
   }
 
   /// [delta] pictures on (1) or back (-1).
   void _step(int delta) {
-    if (_current == null && _loading) return;
+    if (_shown == null && _loading) return;
     if (!_playlist.move(delta)) {
       if (delta > 0) _waiting = true;
       return;
     }
-    if (_playlist.current?.path == _current?.entry.path && !_loading) {
-      // Only one picture: it stays.
+    final shown = _shown;
+    if (_playlist.current?.path == shown?.path && !_loading && _video == null) {
+      // Only one picture: it stays. (Only one video: it plays again.)
       _scheduleNext();
       return;
     }
@@ -324,11 +458,35 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> with SingleTi
 
   void _togglePause([bool? pause]) {
     setState(() => _paused = pause ?? !_paused);
+    final video = _video;
+    if (video != null) {
+      unawaited(_paused ? video.pause() : video.play());
+      return;
+    }
     if (_paused) {
       _timer?.cancel();
     } else {
       _scheduleNext();
     }
+  }
+
+  /// The popup with what's playing, its controls and the display time; the
+  /// info bar shows meanwhile.
+  void _openPopup() {
+    _overlayTimer?.cancel();
+    setState(() {
+      _popupOpen = true;
+      _overlay = true;
+    });
+  }
+
+  void _closePopup() {
+    if (!_popupOpen || !mounted) return;
+    setState(() {
+      _popupOpen = false;
+      _overlay = false;
+    });
+    _focus.requestFocus();
   }
 
   void _toggleOverlay() {
@@ -365,7 +523,7 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> with SingleTi
   KeyEventResult _onKey(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
     // Without a picture (error, nothing found) the buttons take the keys.
-    if (_current == null) return KeyEventResult.ignored;
+    if (_shown == null) return KeyEventResult.ignored;
     final key = event.logicalKey;
     // Music to the pictures: next/previous (and fast-forward/rewind) switch
     // the track - ←/→ step the pictures; OK and the pause key pause the
@@ -379,6 +537,8 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> with SingleTi
     if (event is KeyDownEvent && trackKeys.contains(key) && ref.read(musicPlayerProvider).handleMediaKey(key)) {
       return KeyEventResult.handled;
     }
+    // The popup's controls take the keys (← → move between them).
+    if (_popupOpen) return KeyEventResult.ignored;
     if (key == LogicalKeyboardKey.arrowRight ||
         key == LogicalKeyboardKey.mediaTrackNext ||
         key == LogicalKeyboardKey.mediaFastForward) {
@@ -398,7 +558,12 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> with SingleTi
         key == LogicalKeyboardKey.numpadEnter ||
         key == LogicalKeyboardKey.space ||
         key == LogicalKeyboardKey.gameButtonA ||
-        key == LogicalKeyboardKey.mediaPlayPause) {
+        key == LogicalKeyboardKey.arrowUp ||
+        key == LogicalKeyboardKey.arrowDown) {
+      _openPopup();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.mediaPlayPause) {
       _togglePause();
       return KeyEventResult.handled;
     }
@@ -410,10 +575,7 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> with SingleTi
       _togglePause(false);
       return KeyEventResult.handled;
     }
-    if (key == LogicalKeyboardKey.arrowUp ||
-        key == LogicalKeyboardKey.arrowDown ||
-        key == LogicalKeyboardKey.info ||
-        key == LogicalKeyboardKey.guide) {
+    if (key == LogicalKeyboardKey.info || key == LogicalKeyboardKey.guide) {
       _toggleOverlay();
       return KeyEventResult.handled;
     }
@@ -425,7 +587,11 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> with SingleTi
   }
 
   void _onTapUp(TapUpDetails details) {
-    if (_current == null) return;
+    if (_shown == null) return;
+    if (_popupOpen) {
+      _closePopup();
+      return;
+    }
     final width = MediaQuery.sizeOf(context).width;
     final x = details.localPosition.dx;
     if (x < width / 3) {
@@ -433,14 +599,13 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> with SingleTi
     } else if (x > width * 2 / 3) {
       _step(1);
     } else {
-      _togglePause();
-      _toggleOverlay();
+      _openPopup();
     }
   }
 
   void _onSwipe(DragEndDetails details) {
     final v = details.primaryVelocity ?? 0;
-    if (v.abs() < 200 || _current == null) return;
+    if (v.abs() < 200 || _shown == null) return;
     _step(v < 0 ? 1 : -1);
   }
 
@@ -453,13 +618,22 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> with SingleTi
     final l = context.l10n;
     final current = _current;
     final previous = _previous;
+    final video = _video;
+    final shown = _shown;
     Widget body;
-    if (_error != null && current == null) {
+    if (_error != null && shown == null) {
       body = _Message(text: l.picturesLoadError(_error!), action: l.commonRetry, onAction: _start);
     } else if (_noneFound) {
-      body = _Message(text: l.picturesNoneFound, action: MaterialLocalizations.of(context).backButtonTooltip,
-          onAction: () => Navigator.of(context).maybePop());
-    } else if (current == null) {
+      body = _Message(
+        text: switch (widget.media) {
+          SlideshowMedia.pictures => l.picturesNoneFound,
+          SlideshowMedia.both => l.picturesNoMediaFound,
+          SlideshowMedia.videos => l.picturesNoVideosFound,
+        },
+        action: MaterialLocalizations.of(context).backButtonTooltip,
+        onAction: () => Navigator.of(context).maybePop(),
+      );
+    } else if (shown == null) {
       body = Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -474,15 +648,24 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> with SingleTi
       body = Stack(
         fit: StackFit.expand,
         children: [
-          if (previous != null)
-            _SlideView(
-              key: ObjectKey(previous),
-              slide: previous,
-              // An opaque picture (with background) can simply be covered;
-              // without, the old one has to fade out, too.
-              opacity: _blur && previous.cover != null ? kAlwaysCompleteAnimation : ReverseAnimation(_fade),
-            ),
-          _SlideView(key: ObjectKey(current), slide: current, opacity: previous == null ? kAlwaysCompleteAnimation : _fade),
+          if (video != null)
+            KeyedSubtree(key: ObjectKey(video), child: video.view())
+          else ...[
+            if (previous != null)
+              _SlideView(
+                key: ObjectKey(previous),
+                slide: previous,
+                // An opaque picture (with background) can simply be covered;
+                // without, the old one has to fade out, too.
+                opacity: _blur && previous.cover != null ? kAlwaysCompleteAnimation : ReverseAnimation(_fade),
+              ),
+            if (current != null)
+              _SlideView(
+                key: ObjectKey(current),
+                slide: current,
+                opacity: previous == null ? kAlwaysCompleteAnimation : _fade,
+              ),
+          ],
           if (_paused) const Positioned(top: 24, right: 24, child: _PauseBadge()),
           if (_loading)
             const Positioned(
@@ -492,13 +675,17 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> with SingleTi
             ),
           // Music to the pictures: what's playing, for a few seconds at
           // the start and on every new track (above the info bar).
-          AnimatedPositioned(
-            duration: const Duration(milliseconds: 250),
-            left: 32,
-            bottom: _overlay ? 130 : 32,
-            child: const MusicNowPlayingToast(),
-          ),
+          if (!_popupOpen)
+            AnimatedPositioned(
+              // Keyed: kept when a video takes the pictures' place.
+              key: const ValueKey('toast'),
+              duration: const Duration(milliseconds: 250),
+              left: 32,
+              bottom: _overlay ? 130 : 32,
+              child: const MusicNowPlayingToast(),
+            ),
           Positioned(
+            key: const ValueKey('info'),
             left: 0,
             right: 0,
             bottom: 0,
@@ -507,8 +694,8 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> with SingleTi
                 opacity: _overlay ? 1 : 0,
                 duration: const Duration(milliseconds: 250),
                 child: _InfoBar(
-                  folder: pictureFolderLabel(widget.folder, current.entry.path),
-                  name: current.entry.name,
+                  folder: pictureFolderLabel(widget.folder, shown.path),
+                  name: shown.name,
                   position: '${_playlist.index + 1} / ${_playlist.length}',
                   searching: !_playlist.complete,
                   hint: l.picturesSlideshowHint(remoteKeyHint(ref.watch(remoteKeysProvider), RemoteAction.options)),
@@ -516,20 +703,35 @@ class _SlideshowScreenState extends ConsumerState<SlideshowScreen> with SingleTi
               ),
             ),
           ),
+          if (_popupOpen)
+            Positioned(
+              key: const ValueKey('popup'),
+              left: 0,
+              right: 0,
+              bottom: 130,
+              child: Center(child: SlideshowPopup(onClose: _closePopup)),
+            ),
         ],
       );
     }
-    return Focus(
-      focusNode: _focus,
-      autofocus: true,
-      onKeyEvent: _onKey,
-      child: Scaffold(
-        backgroundColor: Colors.black,
-        body: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTapUp: _onTapUp,
-          onHorizontalDragEnd: _onSwipe,
-          child: body,
+    return PopScope(
+      // Back closes the popup first.
+      canPop: !_popupOpen,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _closePopup();
+      },
+      child: Focus(
+        focusNode: _focus,
+        autofocus: true,
+        onKeyEvent: _onKey,
+        child: Scaffold(
+          backgroundColor: Colors.black,
+          body: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTapUp: _onTapUp,
+            onHorizontalDragEnd: _onSwipe,
+            child: body,
+          ),
         ),
       ),
     );
